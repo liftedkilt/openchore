@@ -141,7 +141,7 @@ func main() {
 			penalty = c.points // Default penalty to points value for required chores
 		}
 		_, err := db.Exec(
-			`INSERT INTO chores (title, description, category, points_value, missed_penalty_value, estimated_minutes, created_by) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+			`INSERT INTO chores (title, description, category, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, created_by) VALUES (?, ?, ?, ?, ?, ?, 0, 0, 1)`,
 			c.title, c.description, c.category, c.points, penalty, c.minutes)
 		if err != nil {
 			fmt.Printf("Error inserting chore %s: %v\n", c.title, err)

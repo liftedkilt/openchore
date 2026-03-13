@@ -49,13 +49,15 @@ func (h *ChoreHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 type createChoreRequest struct {
-	Title            string `json:"title"`
-	Description      string `json:"description"`
-	Category         string `json:"category"`
-	Icon             string `json:"icon"`
-	PointsValue      int    `json:"points_value"`
-	MissedPenaltyValue int  `json:"missed_penalty_value"`
-	EstimatedMinutes *int   `json:"estimated_minutes"`
+	Title              string `json:"title"`
+	Description        string `json:"description"`
+	Category           string `json:"category"`
+	Icon               string `json:"icon"`
+	PointsValue        int    `json:"points_value"`
+	MissedPenaltyValue int    `json:"missed_penalty_value"`
+	EstimatedMinutes   *int   `json:"estimated_minutes"`
+	RequiresApproval   bool   `json:"requires_approval"`
+	RequiresPhoto      bool   `json:"requires_photo"`
 }
 
 func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -78,15 +80,17 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	user := UserFromContext(r.Context())
 	chore := &model.Chore{
-		Title:            req.Title,
-		Description:      req.Description,
-		Category:         req.Category,
-		Icon:             req.Icon,
-		PointsValue:      req.PointsValue,
+		Title:              req.Title,
+		Description:        req.Description,
+		Category:           req.Category,
+		Icon:               req.Icon,
+		PointsValue:        req.PointsValue,
 		MissedPenaltyValue: req.MissedPenaltyValue,
-		EstimatedMinutes: req.EstimatedMinutes,
-		Source:           "manual",
-		CreatedBy:        user.ID,
+		EstimatedMinutes:   req.EstimatedMinutes,
+		RequiresApproval:   req.RequiresApproval,
+		RequiresPhoto:      req.RequiresPhoto,
+		Source:             "manual",
+		CreatedBy:          user.ID,
 	}
 	if err := h.store.CreateChore(r.Context(), chore); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create chore")
@@ -141,6 +145,9 @@ func (h *ChoreHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.EstimatedMinutes != nil {
 		existing.EstimatedMinutes = req.EstimatedMinutes
 	}
+	// Always update booleans as they might be toggled off (or we could rely on a PATCH approach, but here we just assign)
+	existing.RequiresApproval = req.RequiresApproval
+	existing.RequiresPhoto = req.RequiresPhoto
 
 	if err := h.store.UpdateChore(r.Context(), existing); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update chore")
@@ -290,6 +297,7 @@ func (h *ChoreHandler) DeleteSchedule(w http.ResponseWriter, r *http.Request) {
 type completeChoreRequest struct {
 	CompletedBy    int64  `json:"completed_by"`
 	CompletionDate string `json:"completion_date"`
+	PhotoURL       string `json:"photo_url"`
 }
 
 func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
@@ -355,6 +363,19 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch chore details to check category and requirements
+	chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
+
+	if chore != nil && chore.RequiresPhoto && req.PhotoURL == "" {
+		writeError(w, http.StatusBadRequest, "a photo is required to complete this chore")
+		return
+	}
+
+	status := "approved"
+	if chore != nil && chore.RequiresApproval {
+		status = "pending"
+	}
+
 	user := UserFromContext(r.Context())
 	completedBy := user.ID
 	if req.CompletedBy != 0 {
@@ -364,7 +385,8 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	completion := &model.ChoreCompletion{
 		ChoreScheduleID: scheduleID,
 		CompletedBy:     completedBy,
-		Status:          "approved",
+		Status:          status,
+		PhotoURL:        req.PhotoURL,
 		CompletionDate:  req.CompletionDate,
 	}
 	if err := h.store.CompleteChore(r.Context(), completion); err != nil {
@@ -372,40 +394,41 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch chore details to check category
-	chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
+	var pts int
+	// Only calculate points and streak if immediately approved
+	if status == "approved" {
+		// Credit or penalize points based on expiry status
+		pts, _ = h.store.GetChorePointsForSchedule(r.Context(), scheduleID)
 
-	// Credit or penalize points based on expiry status
-	pts, _ := h.store.GetChorePointsForSchedule(r.Context(), scheduleID)
-
-	// Bonus chore points only count once required + core chores are complete
-	if chore != nil && chore.Category == "bonus" {
-		todayChores, err := h.store.GetScheduledChoresForUser(r.Context(), completedBy, []string{req.CompletionDate}, time.Now())
-		if err == nil {
-			for _, c := range todayChores {
-				if !c.Completed && (c.Category == "required" || c.Category == "core") {
-					pts = 0 // Required/Core chores still pending, no bonus points yet
-					break
+		// Bonus chore points only count once required + core chores are complete
+		if chore != nil && chore.Category == "bonus" {
+			todayChores, err := h.store.GetScheduledChoresForUser(r.Context(), completedBy, []string{req.CompletionDate}, time.Now())
+			if err == nil {
+				for _, c := range todayChores {
+					if !c.Completed && (c.Category == "required" || c.Category == "core") {
+						pts = 0 // Required/Core chores still pending, no bonus points yet
+						break
+					}
 				}
 			}
 		}
-	}
 
-	if isExpired {
-		switch schedule.ExpiryPenalty {
-		case "no_points":
-			pts = 0
-		case "penalty":
-			pts = 0
-			_ = h.store.DebitExpiryPenalty(r.Context(), completedBy, completion.ID, schedule.ExpiryPenaltyValue)
+		if isExpired {
+			switch schedule.ExpiryPenalty {
+			case "no_points":
+				pts = 0
+			case "penalty":
+				pts = 0
+				_ = h.store.DebitExpiryPenalty(r.Context(), completedBy, completion.ID, schedule.ExpiryPenaltyValue)
+			}
 		}
-	}
-	if pts > 0 {
-		_ = h.store.CreditChorePoints(r.Context(), completedBy, completion.ID, pts)
-	}
+		if pts > 0 {
+			_ = h.store.CreditChorePoints(r.Context(), completedBy, completion.ID, pts)
+		}
 
-	// Recalculate streak
-	_ = h.store.RecalculateStreak(r.Context(), completedBy, req.CompletionDate)
+		// Recalculate streak
+		_ = h.store.RecalculateStreak(r.Context(), completedBy, req.CompletionDate)
+	}
 
 	// Fire webhook
 	choreTitle := ""
@@ -424,28 +447,31 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		"user_name":       completedByName,
 		"completion_date": req.CompletionDate,
 		"points_earned":   pts,
+		"status":          status,
 	})
 
-	// Check if all chores for today are done
-	go func() {
-		todayChores, err := h.store.GetScheduledChoresForUser(r.Context(), completedBy, []string{req.CompletionDate}, time.Now())
-		if err == nil {
-			allDone := len(todayChores) > 0
-			for _, c := range todayChores {
-				if !c.Completed && c.Category != "bonus" {
-					allDone = false
-					break
+	// Check if all chores for today are done (only if this one was approved)
+	if status == "approved" {
+		go func() {
+			todayChores, err := h.store.GetScheduledChoresForUser(r.Context(), completedBy, []string{req.CompletionDate}, time.Now())
+			if err == nil {
+				allDone := len(todayChores) > 0
+				for _, c := range todayChores {
+					if !c.Completed && c.Category != "bonus" {
+						allDone = false
+						break
+					}
+				}
+				if allDone {
+					h.dispatcher.Fire(webhook.EventDailyComplete, map[string]any{
+						"user_id":   completedBy,
+						"user_name": completedByName,
+						"date":      req.CompletionDate,
+					})
 				}
 			}
-			if allDone {
-				h.dispatcher.Fire(webhook.EventDailyComplete, map[string]any{
-					"user_id":   completedBy,
-					"user_name": completedByName,
-					"date":      req.CompletionDate,
-				})
-			}
-		}
-	}()
+		}()
+	}
 
 	writeJSON(w, http.StatusCreated, completion)
 }
@@ -504,6 +530,102 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 		"user_name":   uncompleteUserName,
 		"date":        dateStr,
 	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// --- Approvals ---
+
+func (h *ChoreHandler) ListPending(w http.ResponseWriter, r *http.Request) {
+	pending, err := h.store.ListPendingCompletions(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list pending completions")
+		return
+	}
+	if pending == nil {
+		pending = []store.PendingCompletionRow{}
+	}
+	writeJSON(w, http.StatusOK, pending)
+}
+
+func (h *ChoreHandler) Approve(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid completion id")
+		return
+	}
+
+	completion, err := h.store.GetCompletion(r.Context(), id)
+	if err != nil || completion == nil {
+		writeError(w, http.StatusNotFound, "completion not found")
+		return
+	}
+
+	if completion.Status != "pending" {
+		writeError(w, http.StatusBadRequest, "completion is not pending")
+		return
+	}
+
+	admin := UserFromContext(r.Context())
+	if err := h.store.UpdateCompletionStatus(r.Context(), id, "approved", admin.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to approve")
+		return
+	}
+
+	// Calculate and award points now that it's approved
+	schedule, _ := h.store.GetSchedule(r.Context(), completion.ChoreScheduleID)
+	var pts int
+	if schedule != nil {
+		pts, _ = h.store.GetChorePointsForSchedule(r.Context(), schedule.ID)
+		chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
+		
+		// Bonus logic
+		if chore != nil && chore.Category == "bonus" {
+			todayChores, err := h.store.GetScheduledChoresForUser(r.Context(), completion.CompletedBy, []string{completion.CompletionDate}, time.Now())
+			if err == nil {
+				for _, c := range todayChores {
+					if !c.Completed && (c.Category == "required" || c.Category == "core") {
+						pts = 0
+						break
+					}
+				}
+			}
+		}
+
+		if pts > 0 {
+			_ = h.store.CreditChorePoints(r.Context(), completion.CompletedBy, completion.ID, pts)
+		}
+	}
+
+	// Recalculate streak
+	_ = h.store.RecalculateStreak(r.Context(), completion.CompletedBy, completion.CompletionDate)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *ChoreHandler) Reject(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid completion id")
+		return
+	}
+
+	completion, err := h.store.GetCompletion(r.Context(), id)
+	if err != nil || completion == nil {
+		writeError(w, http.StatusNotFound, "completion not found")
+		return
+	}
+
+	if completion.Status != "pending" {
+		writeError(w, http.StatusBadRequest, "completion is not pending")
+		return
+	}
+
+	admin := UserFromContext(r.Context())
+	if err := h.store.UpdateCompletionStatus(r.Context(), id, "rejected", admin.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to reject")
+		return
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }

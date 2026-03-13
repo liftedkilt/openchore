@@ -94,6 +94,9 @@ export const api = {
       fetchWithAuth(`/schedules/${scheduleId}/complete?date=${date}`, {
         method: 'DELETE',
       }),
+    listPending: () => fetchWithAuth<any[]>('/completions/pending'),
+    approve: (completionId: number) => fetchWithAuth(`/completions/${completionId}/approve`, { method: 'POST' }),
+    reject: (completionId: number) => fetchWithAuth(`/completions/${completionId}/reject`, { method: 'POST' }),
     listSchedules: (choreId: number) =>
       fetchWithAuth<ChoreSchedule[]>(`/chores/${choreId}/schedules`),
     createSchedule: (choreId: number, data: Partial<ChoreSchedule>) =>

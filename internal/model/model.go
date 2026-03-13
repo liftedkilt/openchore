@@ -13,18 +13,20 @@ type User struct {
 }
 
 type Chore struct {
-	ID               int64     `json:"id"`
-	Title            string    `json:"title"`
-	Description      string    `json:"description"`
-	Category         string    `json:"category"`
-	Icon             string    `json:"icon,omitempty"`
-	PointsValue      int       `json:"points_value"`
-	MissedPenaltyValue int      `json:"missed_penalty_value"`
-	EstimatedMinutes *int      `json:"estimated_minutes,omitempty"`
-	Source           string    `json:"source"`
-	ExternalID       string    `json:"external_id,omitempty"`
-	CreatedBy        int64     `json:"created_by"`
-	CreatedAt        time.Time `json:"created_at"`
+	ID                 int64     `json:"id"`
+	Title              string    `json:"title"`
+	Description        string    `json:"description"`
+	Category           string    `json:"category"`
+	Icon               string    `json:"icon,omitempty"`
+	PointsValue        int       `json:"points_value"`
+	MissedPenaltyValue int       `json:"missed_penalty_value"`
+	EstimatedMinutes   *int      `json:"estimated_minutes,omitempty"`
+	RequiresApproval   bool      `json:"requires_approval"`
+	RequiresPhoto      bool      `json:"requires_photo"`
+	Source             string    `json:"source"`
+	ExternalID         string    `json:"external_id,omitempty"`
+	CreatedBy          int64     `json:"created_by"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 type ChoreSchedule struct {
@@ -159,6 +161,8 @@ type ScheduledChore struct {
 	PointsValue      int     `json:"points_value"`
 	MissedPenaltyValue int    `json:"missed_penalty_value"`
 	EstimatedMinutes *int    `json:"estimated_minutes,omitempty"`
+	RequiresApproval bool    `json:"requires_approval"`
+	RequiresPhoto    bool    `json:"requires_photo"`
 	AssignmentType   string  `json:"assignment_type"`
 	AvailableAt      *string `json:"available_at,omitempty"`
 	DueBy              *string `json:"due_by,omitempty"`

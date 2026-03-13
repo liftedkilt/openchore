@@ -206,7 +206,10 @@ export interface Chore {
   category: 'required' | 'core' | 'bonus';
   icon?: string;
   points_value: number;
+  missed_penalty_value: number;
   estimated_minutes?: number;
+  requires_approval: boolean;
+  requires_photo: boolean;
 }
 
 export interface ChoreSchedule {
@@ -306,7 +309,10 @@ export interface ScheduledChore {
   category: 'required' | 'core' | 'bonus';
   icon?: string;
   points_value: number;
+  missed_penalty_value: number;
   estimated_minutes?: number;
+  requires_approval: boolean;
+  requires_photo: boolean;
   assignment_type: string;
   available_at?: string;
   due_by?: string;

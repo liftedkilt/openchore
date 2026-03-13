@@ -69,6 +69,11 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 				r.Post("/chores/{id}/schedules", chores.CreateSchedule)
 				r.Delete("/chores/{id}/schedules/{scheduleID}", chores.DeleteSchedule)
 
+				// Approvals
+				r.Get("/completions/pending", chores.ListPending)
+				r.Post("/completions/{id}/approve", chores.Approve)
+				r.Post("/completions/{id}/reject", chores.Reject)
+
 				r.Put("/admin/passcode", admin.UpdatePasscode)
 
 				// Points management

@@ -62,10 +62,18 @@ func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 // --- Chores ---
 
 func (s *Store) CreateChore(ctx context.Context, c *model.Chore) error {
+	requiresApproval := 0
+	if c.RequiresApproval {
+		requiresApproval = 1
+	}
+	requiresPhoto := 0
+	if c.RequiresPhoto {
+		requiresPhoto = 1
+	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO chores (title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, source, external_id, created_by)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, c.Source, c.ExternalID, c.CreatedBy)
+		`INSERT INTO chores (title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, source, external_id, created_by)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, requiresApproval, requiresPhoto, c.Source, c.ExternalID, c.CreatedBy)
 	if err != nil {
 		return err
 	}
@@ -75,19 +83,22 @@ func (s *Store) CreateChore(ctx context.Context, c *model.Chore) error {
 
 func (s *Store) GetChore(ctx context.Context, id int64) (*model.Chore, error) {
 	c := &model.Chore{}
+	var reqApp, reqPho int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, source, external_id, created_by, created_at
+		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, source, external_id, created_by, created_at
 		 FROM chores WHERE id = ?`, id).
-		Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &c.Source, &c.ExternalID, &c.CreatedBy, &c.CreatedAt)
+		Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &reqApp, &reqPho, &c.Source, &c.ExternalID, &c.CreatedBy, &c.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
+	c.RequiresApproval = reqApp == 1
+	c.RequiresPhoto = reqPho == 1
 	return c, err
 }
 
 func (s *Store) ListChores(ctx context.Context) ([]model.Chore, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, source, external_id, created_by, created_at
+		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, source, external_id, created_by, created_at
 		 FROM chores ORDER BY title`)
 	if err != nil {
 		return nil, err
@@ -96,19 +107,30 @@ func (s *Store) ListChores(ctx context.Context) ([]model.Chore, error) {
 	var chores []model.Chore
 	for rows.Next() {
 		var c model.Chore
-		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &c.Source, &c.ExternalID, &c.CreatedBy, &c.CreatedAt); err != nil {
+		var reqApp, reqPho int
+		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &reqApp, &reqPho, &c.Source, &c.ExternalID, &c.CreatedBy, &c.CreatedAt); err != nil {
 			return nil, err
 		}
+		c.RequiresApproval = reqApp == 1
+		c.RequiresPhoto = reqPho == 1
 		chores = append(chores, c)
 	}
 	return chores, rows.Err()
 }
 
 func (s *Store) UpdateChore(ctx context.Context, c *model.Chore) error {
+	requiresApproval := 0
+	if c.RequiresApproval {
+		requiresApproval = 1
+	}
+	requiresPhoto := 0
+	if c.RequiresPhoto {
+		requiresPhoto = 1
+	}
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE chores SET title=?, description=?, category=?, icon=?, points_value=?, missed_penalty_value=?, estimated_minutes=?, source=?, external_id=?
+		`UPDATE chores SET title=?, description=?, category=?, icon=?, points_value=?, missed_penalty_value=?, estimated_minutes=?, requires_approval=?, requires_photo=?, source=?, external_id=?
 		 WHERE id=?`,
-		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, c.Source, c.ExternalID, c.ID)
+		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, requiresApproval, requiresPhoto, c.Source, c.ExternalID, c.ID)
 	return err
 }
 
@@ -163,7 +185,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 
 	query := `
 		SELECT
-			cs.id, c.id, c.title, c.description, c.category, c.icon, c.points_value, c.missed_penalty_value, c.estimated_minutes,
+			cs.id, c.id, c.title, c.description, c.category, c.icon, c.points_value, c.missed_penalty_value, c.estimated_minutes, c.requires_approval, c.requires_photo,
 			cs.assignment_type, cs.available_at, cs.due_by, cs.expiry_penalty, cs.expiry_penalty_value,
 			cs.day_of_week, cs.specific_date,
 			cc.id, cc.id, cc.completed_at
@@ -201,14 +223,17 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			var dayOfWeek sql.NullInt64
 			var specificDate sql.NullString
 			var completedAt sql.NullTime
+			var reqApp, reqPho int
 			if err := rows.Scan(&sc.ScheduleID, &sc.ChoreID, &sc.Title, &sc.Description, &sc.Category, &sc.Icon,
-				&sc.PointsValue, &sc.MissedPenaltyValue, &sc.EstimatedMinutes, &sc.AssignmentType, &sc.AvailableAt, &sc.DueBy,
+				&sc.PointsValue, &sc.MissedPenaltyValue, &sc.EstimatedMinutes, &reqApp, &reqPho, &sc.AssignmentType, &sc.AvailableAt, &sc.DueBy,
 				&sc.ExpiryPenalty, &sc.ExpiryPenaltyValue,
 				&dayOfWeek, &specificDate,
 				&compID, &compIDCheck, &completedAt); err != nil {
 				rows.Close()
 				return nil, err
 			}
+			sc.RequiresApproval = reqApp == 1
+			sc.RequiresPhoto = reqPho == 1
 			sc.Date = dateStr
 			sc.Completed = compID.Valid
 			if compID.Valid {
@@ -286,6 +311,66 @@ func (s *Store) GetCompletionForScheduleDate(ctx context.Context, scheduleID int
 		return nil, nil
 	}
 	return cc, err
+}
+
+func (s *Store) GetCompletion(ctx context.Context, id int64) (*model.ChoreCompletion, error) {
+	cc := &model.ChoreCompletion{}
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, chore_schedule_id, completed_by, status, photo_url, approved_by, approved_at, completed_at, completion_date
+		 FROM chore_completions WHERE id = ?`, id).
+		Scan(&cc.ID, &cc.ChoreScheduleID, &cc.CompletedBy, &cc.Status, &cc.PhotoURL, &cc.ApprovedBy, &cc.ApprovedAt, &cc.CompletedAt, &cc.CompletionDate)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return cc, err
+}
+
+type PendingCompletionRow struct {
+	ID             int64     `json:"id"`
+	ChoreTitle     string    `json:"chore_title"`
+	ChildName      string    `json:"child_name"`
+	PhotoURL       string    `json:"photo_url"`
+	CompletionDate string    `json:"completion_date"`
+	CompletedAt    time.Time `json:"completed_at"`
+}
+
+func (s *Store) ListPendingCompletions(ctx context.Context) ([]PendingCompletionRow, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT cc.id, c.title, u.name, cc.photo_url, cc.completion_date, cc.completed_at
+		FROM chore_completions cc
+		JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
+		JOIN chores c ON c.id = cs.chore_id
+		JOIN users u ON u.id = cc.completed_by
+		WHERE cc.status = 'pending'
+		ORDER BY cc.completed_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var pending []PendingCompletionRow
+	for rows.Next() {
+		var p PendingCompletionRow
+		if err := rows.Scan(&p.ID, &p.ChoreTitle, &p.ChildName, &p.PhotoURL, &p.CompletionDate, &p.CompletedAt); err != nil {
+			return nil, err
+		}
+		pending = append(pending, p)
+	}
+	return pending, rows.Err()
+}
+
+func (s *Store) UpdateCompletionStatus(ctx context.Context, id int64, status string, adminID int64) error {
+	var err error
+	if status == "approved" {
+		_, err = s.db.ExecContext(ctx,
+			`UPDATE chore_completions SET status = ?, approved_by = ?, approved_at = CURRENT_TIMESTAMP WHERE id = ?`,
+			status, adminID, id)
+	} else {
+		_, err = s.db.ExecContext(ctx,
+			`UPDATE chore_completions SET status = ? WHERE id = ?`,
+			status, id)
+	}
+	return err
 }
 
 // --- Settings ---
