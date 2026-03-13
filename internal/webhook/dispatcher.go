@@ -26,6 +26,7 @@ const (
 	EventDailyComplete    = "daily.complete"
 	EventStreakMilestone   = "streak.milestone"
 	EventPointsDecayed    = "points.decayed"
+	EventChoreMissed      = "chore.missed"
 )
 
 type Dispatcher struct {

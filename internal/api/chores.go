@@ -54,6 +54,7 @@ type createChoreRequest struct {
 	Category         string `json:"category"`
 	Icon             string `json:"icon"`
 	PointsValue      int    `json:"points_value"`
+	MissedPenaltyValue int  `json:"missed_penalty_value"`
 	EstimatedMinutes *int   `json:"estimated_minutes"`
 }
 
@@ -82,6 +83,7 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Category:         req.Category,
 		Icon:             req.Icon,
 		PointsValue:      req.PointsValue,
+		MissedPenaltyValue: req.MissedPenaltyValue,
 		EstimatedMinutes: req.EstimatedMinutes,
 		Source:           "manual",
 		CreatedBy:        user.ID,
@@ -132,6 +134,9 @@ func (h *ChoreHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.PointsValue != 0 {
 		existing.PointsValue = req.PointsValue
+	}
+	if req.MissedPenaltyValue != 0 {
+		existing.MissedPenaltyValue = req.MissedPenaltyValue
 	}
 	if req.EstimatedMinutes != nil {
 		existing.EstimatedMinutes = req.EstimatedMinutes
@@ -367,8 +372,25 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch chore details to check category
+	chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
+
 	// Credit or penalize points based on expiry status
 	pts, _ := h.store.GetChorePointsForSchedule(r.Context(), scheduleID)
+
+	// Bonus chore points only count once required + core chores are complete
+	if chore != nil && chore.Category == "bonus" {
+		todayChores, err := h.store.GetScheduledChoresForUser(r.Context(), completedBy, []string{req.CompletionDate}, time.Now())
+		if err == nil {
+			for _, c := range todayChores {
+				if !c.Completed && (c.Category == "required" || c.Category == "core") {
+					pts = 0 // Required/Core chores still pending, no bonus points yet
+					break
+				}
+			}
+		}
+	}
+
 	if isExpired {
 		switch schedule.ExpiryPenalty {
 		case "no_points":
@@ -386,7 +408,6 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	_ = h.store.RecalculateStreak(r.Context(), completedBy, req.CompletionDate)
 
 	// Fire webhook
-	chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
 	choreTitle := ""
 	if chore != nil {
 		choreTitle = chore.Title

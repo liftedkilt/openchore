@@ -22,7 +22,7 @@
 - [x] Per-kid reward visibility and custom pricing
 - [x] Redemption history with admin undo
 - [x] Configurable expiry penalties per schedule (block/no_points/penalty)
-- [ ] Bonus chore points only count once required + core chores are complete
+- [x] Bonus chore points only count once required + core chores are complete
 
 ## Phase 3: Approval & Notifications
 - [ ] Parent approval workflow for chore completions (pending/approved/rejected)
@@ -52,6 +52,7 @@
 - [ ] Plugin architecture for external chore sources (source + external_id on chores)
 - [ ] Home Assistant integration (e.g., laundry done notification creates a chore)
 - [ ] Calendar integration (Google/Apple Calendar for absence detection)
+- [ ] Event bus for plugin subscriptions (chore.completed, chore.created, etc.)
 
 ## Phase 7: UX Enhancements (Partially Complete)
 - [x] Per-kid themes (4 themes with custom labels, icons, greetings, sounds, confetti)

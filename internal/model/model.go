@@ -19,6 +19,7 @@ type Chore struct {
 	Category         string    `json:"category"`
 	Icon             string    `json:"icon,omitempty"`
 	PointsValue      int       `json:"points_value"`
+	MissedPenaltyValue int      `json:"missed_penalty_value"`
 	EstimatedMinutes *int      `json:"estimated_minutes,omitempty"`
 	Source           string    `json:"source"`
 	ExternalID       string    `json:"external_id,omitempty"`
@@ -156,6 +157,7 @@ type ScheduledChore struct {
 	Category         string  `json:"category"`
 	Icon             string  `json:"icon,omitempty"`
 	PointsValue      int     `json:"points_value"`
+	MissedPenaltyValue int    `json:"missed_penalty_value"`
 	EstimatedMinutes *int    `json:"estimated_minutes,omitempty"`
 	AssignmentType   string  `json:"assignment_type"`
 	AvailableAt      *string `json:"available_at,omitempty"`

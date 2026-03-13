@@ -63,9 +63,9 @@ func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 
 func (s *Store) CreateChore(ctx context.Context, c *model.Chore) error {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO chores (title, description, category, icon, points_value, estimated_minutes, source, external_id, created_by)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.EstimatedMinutes, c.Source, c.ExternalID, c.CreatedBy)
+		`INSERT INTO chores (title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, source, external_id, created_by)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, c.Source, c.ExternalID, c.CreatedBy)
 	if err != nil {
 		return err
 	}
@@ -76,9 +76,9 @@ func (s *Store) CreateChore(ctx context.Context, c *model.Chore) error {
 func (s *Store) GetChore(ctx context.Context, id int64) (*model.Chore, error) {
 	c := &model.Chore{}
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, title, description, category, icon, points_value, estimated_minutes, source, external_id, created_by, created_at
+		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, source, external_id, created_by, created_at
 		 FROM chores WHERE id = ?`, id).
-		Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.EstimatedMinutes, &c.Source, &c.ExternalID, &c.CreatedBy, &c.CreatedAt)
+		Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &c.Source, &c.ExternalID, &c.CreatedBy, &c.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -87,7 +87,7 @@ func (s *Store) GetChore(ctx context.Context, id int64) (*model.Chore, error) {
 
 func (s *Store) ListChores(ctx context.Context) ([]model.Chore, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title, description, category, icon, points_value, estimated_minutes, source, external_id, created_by, created_at
+		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, source, external_id, created_by, created_at
 		 FROM chores ORDER BY title`)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func (s *Store) ListChores(ctx context.Context) ([]model.Chore, error) {
 	var chores []model.Chore
 	for rows.Next() {
 		var c model.Chore
-		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.EstimatedMinutes, &c.Source, &c.ExternalID, &c.CreatedBy, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &c.Source, &c.ExternalID, &c.CreatedBy, &c.CreatedAt); err != nil {
 			return nil, err
 		}
 		chores = append(chores, c)
@@ -106,9 +106,9 @@ func (s *Store) ListChores(ctx context.Context) ([]model.Chore, error) {
 
 func (s *Store) UpdateChore(ctx context.Context, c *model.Chore) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE chores SET title=?, description=?, category=?, icon=?, points_value=?, estimated_minutes=?, source=?, external_id=?
+		`UPDATE chores SET title=?, description=?, category=?, icon=?, points_value=?, missed_penalty_value=?, estimated_minutes=?, source=?, external_id=?
 		 WHERE id=?`,
-		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.EstimatedMinutes, c.Source, c.ExternalID, c.ID)
+		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, c.Source, c.ExternalID, c.ID)
 	return err
 }
 
@@ -163,7 +163,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 
 	query := `
 		SELECT
-			cs.id, c.id, c.title, c.description, c.category, c.icon, c.points_value, c.estimated_minutes,
+			cs.id, c.id, c.title, c.description, c.category, c.icon, c.points_value, c.missed_penalty_value, c.estimated_minutes,
 			cs.assignment_type, cs.available_at, cs.due_by, cs.expiry_penalty, cs.expiry_penalty_value,
 			cs.day_of_week, cs.specific_date,
 			cc.id, cc.id, cc.completed_at
@@ -202,7 +202,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			var specificDate sql.NullString
 			var completedAt sql.NullTime
 			if err := rows.Scan(&sc.ScheduleID, &sc.ChoreID, &sc.Title, &sc.Description, &sc.Category, &sc.Icon,
-				&sc.PointsValue, &sc.EstimatedMinutes, &sc.AssignmentType, &sc.AvailableAt, &sc.DueBy,
+				&sc.PointsValue, &sc.MissedPenaltyValue, &sc.EstimatedMinutes, &sc.AssignmentType, &sc.AvailableAt, &sc.DueBy,
 				&sc.ExpiryPenalty, &sc.ExpiryPenaltyValue,
 				&dayOfWeek, &specificDate,
 				&compID, &compIDCheck, &completedAt); err != nil {
@@ -984,6 +984,22 @@ func (s *Store) DebitDecay(ctx context.Context, userID int64, amount int) error 
 		 VALUES (?, ?, 'points_decay', 'Daily points decay')`,
 		userID, -amount)
 	return err
+}
+
+func (s *Store) DebitMissedChore(ctx context.Context, userID int64, scheduleID int64, amount int, date string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+		 VALUES (?, ?, 'missed_chore', ?, ?)`,
+		userID, -amount, scheduleID, "Penalty for missed chore on "+date)
+	return err
+}
+
+func (s *Store) HasMissedChorePenalty(ctx context.Context, scheduleID int64, date string) (bool, error) {
+	var exists bool
+	err := s.db.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM point_transactions WHERE reason = 'missed_chore' AND reference_id = ? AND note LIKE ?)`,
+		scheduleID, "%"+date+"%").Scan(&exists)
+	return exists, err
 }
 
 // --- Webhooks ---

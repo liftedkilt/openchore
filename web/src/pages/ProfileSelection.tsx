@@ -12,13 +12,20 @@ export const ProfileSelection: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.users.list().then(setUsers).catch(console.error);
-  }, []);
+    api.users.list().then(data => {
+      setUsers(data);
+      if (data.length === 0) {
+        navigate('/setup');
+      }
+    }).catch(console.error);
+  }, [navigate]);
 
   const handleSelect = (user: User) => {
     setUser(user);
     navigate('/');
   };
+
+  if (users.length === 0) return null; // Let the redirect handle it
 
   // Show kids first, then admins
   const sorted = [...users].sort((a, b) => {
@@ -69,10 +76,17 @@ export const ProfileSelection: React.FC = () => {
           <Monitor size={18} />
           <span>Wall Display</span>
         </button>
-        <button className={styles.settingsBtn} onClick={() => navigate('/admin')}>
-          <Settings size={18} />
-          <span>Manage</span>
-        </button>
+        {users.length === 0 ? (
+          <button className={styles.settingsBtn} onClick={() => navigate('/setup')}>
+            <Sparkles size={18} />
+            <span>Get Started</span>
+          </button>
+        ) : (
+          <button className={styles.settingsBtn} onClick={() => navigate('/admin')}>
+            <Settings size={18} />
+            <span>Manage</span>
+          </button>
+        )}
       </div>
     </div>
   );

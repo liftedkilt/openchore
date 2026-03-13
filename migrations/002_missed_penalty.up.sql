@@ -1,0 +1,1 @@
+ALTER TABLE chores ADD COLUMN missed_penalty_value INTEGER NOT NULL DEFAULT 0;
