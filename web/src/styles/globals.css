@@ -1,0 +1,191 @@
+:root {
+  --bg-primary: #0f172a; /* Deep Navy */
+  --bg-secondary: #1e293b; /* Slightly lighter navy for cards */
+  --text-primary: #f8fafc; /* Near white */
+  --text-secondary: #94a3b8; /* Slate gray */
+
+  /* Accent Colors */
+  --accent-blue: #38bdf8; /* Electric Blue */
+  --accent-green: #34d399; /* Mint Green */
+  --accent-pink: #f472b6; /* Coral Pink */
+  --accent-purple: #a78bfa; /* Lavender */
+
+  /* UI Feedback */
+  --status-required: #f87171; /* Soft Red */
+  --status-core: #60a5fa; /* Blue */
+  --status-bonus: #fbbf24; /* Amber */
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 24px;
+
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-sm: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+
+  /* Theme background pattern (none for default) */
+  --bg-pattern: none;
+  --bg-pattern-opacity: 0;
+
+  /* Progress bar */
+  --progress-gradient: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+  --progress-glow: none;
+  --progress-done-gradient: linear-gradient(90deg, #22c55e, #4ade80);
+  --progress-done-glow: 0 0 12px rgba(34, 197, 94, 0.3);
+}
+
+/* ==================== GALAXY THEME ==================== */
+body.theme-galaxy {
+  --bg-primary: #020617;
+  --bg-secondary: #0f0a2a;
+  --text-secondary: #7c83a8;
+  --accent-blue: #a855f7;
+  --accent-green: #38bdf8;
+  --accent-pink: #d946ef;
+  --accent-purple: #818cf8;
+  --status-required: #e11d48;
+  --status-core: #7c3aed;
+  --status-bonus: #0ea5e9;
+
+  --progress-gradient: linear-gradient(90deg, #7c3aed, #a855f7, #d946ef);
+  --progress-glow: 0 0 12px rgba(168, 85, 247, 0.4);
+  --progress-done-gradient: linear-gradient(90deg, #38bdf8, #818cf8);
+  --progress-done-glow: 0 0 16px rgba(56, 189, 248, 0.4);
+
+  --bg-pattern:
+    radial-gradient(1.2px 1.2px at 10% 15%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 25% 45%, rgba(168,85,247,0.6), transparent),
+    radial-gradient(0.8px 0.8px at 40% 80%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1.5px 1.5px at 55% 25%, rgba(56,189,248,0.5), transparent),
+    radial-gradient(1px 1px at 70% 60%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(0.8px 0.8px at 85% 35%, rgba(217,70,239,0.5), transparent),
+    radial-gradient(1.2px 1.2px at 15% 70%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 50% 50%, rgba(129,140,248,0.5), transparent),
+    radial-gradient(0.8px 0.8px at 90% 80%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1.5px 1.5px at 30% 10%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 65% 90%, rgba(168,85,247,0.4), transparent),
+    radial-gradient(0.8px 0.8px at 5% 50%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1.2px 1.2px at 75% 15%, rgba(56,189,248,0.4), transparent),
+    radial-gradient(1px 1px at 45% 65%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(0.8px 0.8px at 20% 90%, rgba(217,70,239,0.3), transparent),
+    radial-gradient(1px 1px at 80% 45%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1.5px 1.5px at 60% 5%, rgba(129,140,248,0.4), transparent),
+    radial-gradient(0.8px 0.8px at 35% 55%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(ellipse 120px 80px at 20% 30%, rgba(168,85,247,0.03), transparent),
+    radial-gradient(ellipse 100px 60px at 75% 70%, rgba(56,189,248,0.03), transparent);
+  --bg-pattern-opacity: 1;
+}
+
+/* ==================== QUEST THEME ==================== */
+body.theme-quest {
+  --bg-primary: #1a1611;
+  --bg-secondary: #2a2419;
+  --text-secondary: #a8977a;
+  --accent-blue: #fbbf24;
+  --accent-green: #4ade80;
+  --accent-pink: #f87171;
+  --accent-purple: #e0a84e;
+  --status-required: #f97316;
+  --status-core: #eab308;
+  --status-bonus: #a3e635;
+
+  --progress-gradient: linear-gradient(90deg, #92400e, #fbbf24, #f97316);
+  --progress-glow: 0 0 10px rgba(251, 191, 36, 0.3);
+  --progress-done-gradient: linear-gradient(90deg, #fbbf24, #f59e0b);
+  --progress-done-glow: 0 0 14px rgba(251, 191, 36, 0.4);
+
+  --bg-pattern:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 40px,
+      rgba(139, 92, 42, 0.03) 40px,
+      rgba(139, 92, 42, 0.03) 41px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 40px,
+      rgba(139, 92, 42, 0.02) 40px,
+      rgba(139, 92, 42, 0.02) 41px
+    ),
+    radial-gradient(ellipse 200px 200px at 15% 20%, rgba(139, 92, 42, 0.06), transparent),
+    radial-gradient(ellipse 180px 180px at 80% 75%, rgba(139, 92, 42, 0.05), transparent),
+    radial-gradient(ellipse 150px 150px at 50% 50%, rgba(139, 92, 42, 0.03), transparent);
+  --bg-pattern-opacity: 1;
+}
+
+/* ==================== FOREST THEME ==================== */
+body.theme-forest {
+  --bg-primary: #071a0e;
+  --bg-secondary: #0d2818;
+  --text-secondary: #7aad8a;
+  --accent-blue: #4ade80;
+  --accent-green: #10b981;
+  --accent-pink: #fcd34d;
+  --accent-purple: #86efac;
+  --status-required: #d97706;
+  --status-core: #22c55e;
+  --status-bonus: #84cc16;
+
+  --progress-gradient: linear-gradient(90deg, #064e3b, #10b981, #4ade80);
+  --progress-glow: 0 0 10px rgba(16, 185, 129, 0.3);
+  --progress-done-gradient: linear-gradient(90deg, #4ade80, #84cc16);
+  --progress-done-glow: 0 0 14px rgba(74, 222, 128, 0.4);
+
+  --bg-pattern:
+    radial-gradient(ellipse 3px 8px at 8% 15%, rgba(74, 222, 128, 0.08), transparent),
+    radial-gradient(ellipse 4px 6px at 22% 40%, rgba(34, 197, 94, 0.06), transparent),
+    radial-gradient(ellipse 3px 9px at 35% 70%, rgba(132, 204, 22, 0.07), transparent),
+    radial-gradient(ellipse 5px 7px at 50% 20%, rgba(74, 222, 128, 0.05), transparent),
+    radial-gradient(ellipse 3px 8px at 65% 55%, rgba(16, 185, 129, 0.06), transparent),
+    radial-gradient(ellipse 4px 6px at 78% 35%, rgba(74, 222, 128, 0.07), transparent),
+    radial-gradient(ellipse 3px 9px at 92% 75%, rgba(34, 197, 94, 0.05), transparent),
+    radial-gradient(ellipse 4px 7px at 15% 85%, rgba(132, 204, 22, 0.06), transparent),
+    radial-gradient(ellipse 3px 6px at 42% 10%, rgba(16, 185, 129, 0.05), transparent),
+    radial-gradient(ellipse 5px 8px at 88% 50%, rgba(74, 222, 128, 0.04), transparent),
+    radial-gradient(ellipse 250px 200px at 25% 60%, rgba(16, 185, 129, 0.04), transparent),
+    radial-gradient(ellipse 200px 250px at 70% 30%, rgba(74, 222, 128, 0.03), transparent);
+  --bg-pattern-opacity: 1;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}

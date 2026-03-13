@@ -1,0 +1,842 @@
+.wrapper {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem;
+  min-height: 100vh;
+}
+
+/* --- Header --- */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.backBtn {
+  color: var(--text-secondary);
+  padding: 0.75rem;
+  border-radius: 12px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.backBtn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+/* --- Nav Tabs (iOS segmented control style) --- */
+.nav {
+  display: flex;
+  background: var(--bg-secondary);
+  padding: 4px;
+  border-radius: 12px;
+  margin-bottom: 1.25rem;
+}
+
+.navItem {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  min-height: 48px;
+}
+
+.navItemActive {
+  background: var(--bg-primary);
+  color: var(--accent-blue);
+  box-shadow: var(--shadow-sm);
+}
+
+/* --- Section Header --- */
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.sectionTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--accent-blue);
+  color: #0f172a;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  min-height: 44px;
+}
+
+.addBtn:hover {
+  opacity: 0.9;
+}
+
+.addBtnSmall {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.addBtnSmall:hover {
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+/* --- List Items --- */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.listItem {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+.listItemMain {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  cursor: pointer;
+  min-height: 56px;
+}
+
+.listItemMain:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.listItemInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.listItemHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+}
+
+.listItemTitle {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.listItemDesc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.3rem;
+}
+
+.listItemMeta {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.listItemMeta span {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.listItemActions {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+/* --- Badges --- */
+.badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.badge_required { background: #fee2e2; color: #ef4444; }
+.badge_core { background: #dbeafe; color: #3b82f6; }
+.badge_bonus { background: #fef3c7; color: #f59e0b; }
+.badge_admin { background: #ede9fe; color: #8b5cf6; }
+.badge_child { background: #d1fae5; color: #059669; }
+
+/* --- Icon Buttons (44px min touch target) --- */
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  color: var(--text-secondary);
+}
+
+.iconBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.iconBtnDanger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.iconBtnSm {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+/* --- User Avatar --- */
+.userAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-primary);
+}
+
+.userAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.userAvatarPlaceholder {
+  width: 100%;
+  height: 100%;
+  background: #334155;
+}
+
+/* --- Forms --- */
+.form {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(56, 189, 248, 0.15);
+}
+
+.formHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.formHeader h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.formGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.formRow {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+}
+
+.label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.input {
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-family: inherit;
+  width: 100%;
+  min-height: 48px;
+  -webkit-appearance: none;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+}
+
+.input option {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+select.input {
+  cursor: pointer;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.btnPrimary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--accent-blue);
+  color: #0f172a;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  min-height: 48px;
+}
+
+.btnPrimary:hover { opacity: 0.9; }
+.btnPrimary:disabled { opacity: 0.4; cursor: default; }
+
+.btnSecondary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  min-height: 48px;
+}
+
+.btnSecondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.btnSmall {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+.btnSmall:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.btnDanger {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.btnDanger:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* --- Schedule Section --- */
+.scheduleSection {
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 1rem;
+}
+
+.scheduleHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.scheduleTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+}
+
+.scheduleForm {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 14px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* --- Day Picker (big touch targets) --- */
+.dayPicker {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.dayBtn {
+  flex: 1;
+  padding: 0.625rem 0;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border: 2px solid rgba(255, 255, 255, 0.06);
+  min-height: 44px;
+}
+
+.dayBtn:active {
+  transform: scale(0.95);
+}
+
+.dayBtnActive {
+  background: var(--accent-blue);
+  color: #0f172a;
+  border-color: var(--accent-blue);
+}
+
+/* --- Schedule List --- */
+.scheduleList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.scheduleItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  min-height: 44px;
+}
+
+.scheduleUser {
+  font-weight: 600;
+  min-width: 60px;
+}
+
+.scheduleDays {
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+.scheduleTime {
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+/* --- Interval Input --- */
+.intervalInput {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.intervalInput .input {
+  width: 90px;
+  flex: none;
+  text-align: center;
+}
+
+.intervalSuffix {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* --- User Picker (multi-select, big pill buttons) --- */
+.userPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.userPickerBtn {
+  padding: 0.625rem 1rem;
+  border-radius: 100px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border: 2px solid rgba(255, 255, 255, 0.06);
+  min-height: 44px;
+}
+
+.userPickerBtn:active {
+  transform: scale(0.95);
+}
+
+.userPickerBtn:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
+.userPickerBtnActive {
+  background: var(--accent-blue);
+  color: #0f172a;
+  border-color: var(--accent-blue);
+}
+
+.userPickerBtnAll {
+  font-style: italic;
+}
+
+/* --- Day Presets --- */
+.dayPresets {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.presetBtn {
+  padding: 0.5rem 0.875rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 36px;
+}
+
+.presetBtn:active {
+  transform: scale(0.95);
+}
+
+.presetBtn:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
+.presetBtnActive {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.helpText {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.emptyText {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 0.75rem;
+}
+
+.content {
+  padding-bottom: 2rem;
+}
+
+/* --- Rewards Tab --- */
+.rewardIconLg {
+  font-size: 1.75rem;
+  flex-shrink: 0;
+  width: 44px;
+  text-align: center;
+}
+
+.statusActive {
+  color: #22c55e;
+  font-weight: 700;
+}
+
+.statusInactive {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.streakBadge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.08));
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #f59e0b;
+  flex-shrink: 0;
+}
+
+.sectionSubtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: -0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* --- Points Tab --- */
+.balanceGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.balanceCard {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.balanceName {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.balanceAmount {
+  font-size: 1.75rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.balanceIcon {
+  color: var(--accent-blue);
+}
+
+.adjustBtn {
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  min-height: 40px;
+}
+
+.adjustBtn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.adjustForm {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* --- Activity Tab --- */
+.activityList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.activityItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  min-height: 52px;
+}
+
+.activityIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.activityInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.activityMain {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.activityUser {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.activityReason {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.activityNote {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.1rem;
+  opacity: 0.7;
+}
+
+.activityTime {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+  opacity: 0.5;
+}
+
+.activityAmount {
+  font-size: 0.9rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  min-width: 40px;
+  text-align: right;
+}
+
+.activityAmountPos {
+  color: #22c55e;
+}
+
+.activityAmountNeg {
+  color: #ef4444;
+}
+
+/* --- Reward Assignments --- */
+.assignmentToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  padding: 0.25rem 0;
+  cursor: pointer;
+  margin-top: 0.25rem;
+}
+
+.assignmentToggle:hover {
+  color: var(--accent-blue);
+}
+
+.assignmentEditor {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.assignmentHint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  opacity: 0.7;
+}
+
+.assignmentRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  gap: 1rem;
+  min-height: 44px;
+}
+
+.assignmentCheck {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assignmentCheck input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent-blue);
+  cursor: pointer;
+}
+
+.assignmentCost {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.assignmentCost .input {
+  width: 150px;
+  padding: 0.5rem 0.75rem;
+  min-height: 40px;
+  font-size: 0.9rem;
+}
+
+.assignmentCostLabel {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}

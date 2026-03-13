@@ -1,0 +1,75 @@
+package api
+
+import (
+	"crypto/subtle"
+	"net/http"
+
+	"github.com/liftedkilt/openchore/internal/store"
+)
+
+type AdminHandler struct {
+	store *store.Store
+}
+
+func NewAdminHandler(s *store.Store) *AdminHandler {
+	return &AdminHandler{store: s}
+}
+
+type verifyPasscodeRequest struct {
+	Passcode string `json:"passcode"`
+}
+
+func (h *AdminHandler) VerifyPasscode(w http.ResponseWriter, r *http.Request) {
+	var req verifyPasscodeRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	stored, err := h.store.GetSetting(r.Context(), "admin_passcode")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to check passcode")
+		return
+	}
+
+	if subtle.ConstantTimeCompare([]byte(req.Passcode), []byte(stored)) != 1 {
+		writeError(w, http.StatusUnauthorized, "incorrect passcode")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"valid": true})
+}
+
+type updatePasscodeRequest struct {
+	OldPasscode string `json:"old_passcode"`
+	NewPasscode string `json:"new_passcode"`
+}
+
+func (h *AdminHandler) UpdatePasscode(w http.ResponseWriter, r *http.Request) {
+	var req updatePasscodeRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if len(req.NewPasscode) < 4 {
+		writeError(w, http.StatusBadRequest, "passcode must be at least 4 characters")
+		return
+	}
+
+	stored, err := h.store.GetSetting(r.Context(), "admin_passcode")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to check passcode")
+		return
+	}
+	if subtle.ConstantTimeCompare([]byte(req.OldPasscode), []byte(stored)) != 1 {
+		writeError(w, http.StatusUnauthorized, "incorrect current passcode")
+		return
+	}
+
+	if err := h.store.SetSetting(r.Context(), "admin_passcode", req.NewPasscode); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update passcode")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"updated": true})
+}

@@ -1,0 +1,7 @@
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+web/
+.git/
+.claude/

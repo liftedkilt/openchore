@@ -1,0 +1,1187 @@
+package store
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"time"
+
+	"github.com/liftedkilt/openchore/internal/model"
+)
+
+type Store struct {
+	db *sql.DB
+}
+
+func New(db *sql.DB) *Store {
+	return &Store{db: db}
+}
+
+// --- Users ---
+
+func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO users (name, avatar_url, role, age, theme) VALUES (?, ?, ?, ?, ?)`,
+		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme)
+	if err != nil {
+		return err
+	}
+	u.ID, _ = res.LastInsertId()
+	return nil
+}
+
+func (s *Store) GetUser(ctx context.Context, id int64) (*model.User, error) {
+	u := &model.User{}
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, name, avatar_url, role, age, theme, created_at FROM users WHERE id = ?`, id).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return u, err
+}
+
+func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, name, avatar_url, role, age, theme, created_at FROM users ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var users []model.User
+	for rows.Next() {
+		var u model.User
+		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+// --- Chores ---
+
+func (s *Store) CreateChore(ctx context.Context, c *model.Chore) error {
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO chores (title, description, category, icon, points_value, estimated_minutes, source, external_id, created_by)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.EstimatedMinutes, c.Source, c.ExternalID, c.CreatedBy)
+	if err != nil {
+		return err
+	}
+	c.ID, _ = res.LastInsertId()
+	return nil
+}
+
+func (s *Store) GetChore(ctx context.Context, id int64) (*model.Chore, error) {
+	c := &model.Chore{}
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, title, description, category, icon, points_value, estimated_minutes, source, external_id, created_by, created_at
+		 FROM chores WHERE id = ?`, id).
+		Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.EstimatedMinutes, &c.Source, &c.ExternalID, &c.CreatedBy, &c.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return c, err
+}
+
+func (s *Store) ListChores(ctx context.Context) ([]model.Chore, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, title, description, category, icon, points_value, estimated_minutes, source, external_id, created_by, created_at
+		 FROM chores ORDER BY title`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var chores []model.Chore
+	for rows.Next() {
+		var c model.Chore
+		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.EstimatedMinutes, &c.Source, &c.ExternalID, &c.CreatedBy, &c.CreatedAt); err != nil {
+			return nil, err
+		}
+		chores = append(chores, c)
+	}
+	return chores, rows.Err()
+}
+
+func (s *Store) UpdateChore(ctx context.Context, c *model.Chore) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE chores SET title=?, description=?, category=?, icon=?, points_value=?, estimated_minutes=?, source=?, external_id=?
+		 WHERE id=?`,
+		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.EstimatedMinutes, c.Source, c.ExternalID, c.ID)
+	return err
+}
+
+func (s *Store) DeleteChore(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM chores WHERE id = ?`, id)
+	return err
+}
+
+// --- Schedules ---
+
+func (s *Store) CreateSchedule(ctx context.Context, cs *model.ChoreSchedule) error {
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO chore_schedules (chore_id, assigned_to, assignment_type, day_of_week, specific_date, available_at, points_multiplier, start_date, end_date, recurrence_interval, recurrence_start, due_by, expiry_penalty, expiry_penalty_value)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		cs.ChoreID, cs.AssignedTo, cs.AssignmentType, cs.DayOfWeek, cs.SpecificDate, cs.AvailableAt, cs.PointsMultiplier, cs.StartDate, cs.EndDate, cs.RecurrenceInterval, cs.RecurrenceStart, cs.DueBy, cs.ExpiryPenalty, cs.ExpiryPenaltyValue)
+	if err != nil {
+		return err
+	}
+	cs.ID, _ = res.LastInsertId()
+	return nil
+}
+
+func (s *Store) DeleteSchedule(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM chore_schedules WHERE id = ?`, id)
+	return err
+}
+
+func (s *Store) ListSchedulesForChore(ctx context.Context, choreID int64) ([]model.ChoreSchedule, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, chore_id, assigned_to, assignment_type, day_of_week, specific_date, available_at, points_multiplier, start_date, end_date, recurrence_interval, recurrence_start, due_by, expiry_penalty, expiry_penalty_value, created_at
+		 FROM chore_schedules WHERE chore_id = ? ORDER BY id`, choreID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var schedules []model.ChoreSchedule
+	for rows.Next() {
+		var cs model.ChoreSchedule
+		if err := rows.Scan(&cs.ID, &cs.ChoreID, &cs.AssignedTo, &cs.AssignmentType, &cs.DayOfWeek, &cs.SpecificDate, &cs.AvailableAt, &cs.PointsMultiplier, &cs.StartDate, &cs.EndDate, &cs.RecurrenceInterval, &cs.RecurrenceStart, &cs.DueBy, &cs.ExpiryPenalty, &cs.ExpiryPenaltyValue, &cs.CreatedAt); err != nil {
+			return nil, err
+		}
+		schedules = append(schedules, cs)
+	}
+	return schedules, rows.Err()
+}
+
+// GetScheduledChoresForUser returns all chores for a user on the given dates, with completion status.
+func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dates []string, now time.Time) ([]model.ScheduledChore, error) {
+	if len(dates) == 0 {
+		return nil, nil
+	}
+
+	query := `
+		SELECT
+			cs.id, c.id, c.title, c.description, c.category, c.icon, c.points_value, c.estimated_minutes,
+			cs.assignment_type, cs.available_at, cs.due_by, cs.expiry_penalty, cs.expiry_penalty_value,
+			cs.day_of_week, cs.specific_date,
+			cc.id, cc.id, cc.completed_at
+		FROM chore_schedules cs
+		JOIN chores c ON c.id = cs.chore_id
+		LEFT JOIN chore_completions cc ON cc.chore_schedule_id = cs.id AND cc.completion_date = ?
+		WHERE cs.assigned_to = ?
+		  AND (
+			(cs.day_of_week = ? AND cs.specific_date IS NULL AND cs.recurrence_interval IS NULL)
+			OR (cs.specific_date = ? AND cs.recurrence_interval IS NULL)
+			OR (cs.recurrence_interval IS NOT NULL AND cs.recurrence_start IS NOT NULL
+				AND CAST((julianday(?) - julianday(cs.recurrence_start)) AS INTEGER) >= 0
+				AND CAST((julianday(?) - julianday(cs.recurrence_start)) AS INTEGER) % cs.recurrence_interval = 0)
+		  )
+		  AND (cs.start_date IS NULL OR cs.start_date <= ?)
+		  AND (cs.end_date IS NULL OR cs.end_date >= ?)
+		ORDER BY cs.available_at NULLS FIRST, c.category, c.title`
+
+	var results []model.ScheduledChore
+	currentTime := now.Format("15:04")
+
+	for _, dateStr := range dates {
+		t, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid date %s: %w", dateStr, err)
+		}
+		dow := int(t.Weekday())
+		rows, err := s.db.QueryContext(ctx, query, dateStr, userID, dow, dateStr, dateStr, dateStr, dateStr, dateStr)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var sc model.ScheduledChore
+			var compID, compIDCheck sql.NullInt64
+			var dayOfWeek sql.NullInt64
+			var specificDate sql.NullString
+			var completedAt sql.NullTime
+			if err := rows.Scan(&sc.ScheduleID, &sc.ChoreID, &sc.Title, &sc.Description, &sc.Category, &sc.Icon,
+				&sc.PointsValue, &sc.EstimatedMinutes, &sc.AssignmentType, &sc.AvailableAt, &sc.DueBy,
+				&sc.ExpiryPenalty, &sc.ExpiryPenaltyValue,
+				&dayOfWeek, &specificDate,
+				&compID, &compIDCheck, &completedAt); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			sc.Date = dateStr
+			sc.Completed = compID.Valid
+			if compID.Valid {
+				id := compID.Int64
+				sc.CompletionID = &id
+			}
+			if completedAt.Valid {
+				t := completedAt.Time
+				sc.CompletedAt = &t
+			}
+			if sc.AvailableAt != nil && *sc.AvailableAt != "" {
+				sc.Available = currentTime >= *sc.AvailableAt
+			} else {
+				sc.Available = true
+			}
+			// Check if chore has expired (past due_by time and not completed)
+			if sc.DueBy != nil && *sc.DueBy != "" && !sc.Completed {
+				// Only check expiry for today's chores
+				if dateStr == now.Format("2006-01-02") && currentTime > *sc.DueBy {
+					sc.Expired = true
+				}
+			}
+			results = append(results, sc)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+	}
+
+	return results, nil
+}
+
+// --- Completions ---
+
+func (s *Store) CompleteChore(ctx context.Context, cc *model.ChoreCompletion) error {
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO chore_completions (chore_schedule_id, completed_by, status, photo_url, completion_date)
+		 VALUES (?, ?, ?, ?, ?)`,
+		cc.ChoreScheduleID, cc.CompletedBy, cc.Status, cc.PhotoURL, cc.CompletionDate)
+	if err != nil {
+		return err
+	}
+	cc.ID, _ = res.LastInsertId()
+	return nil
+}
+
+func (s *Store) UncompleteChore(ctx context.Context, scheduleID int64, completionDate string) error {
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM chore_completions WHERE chore_schedule_id = ? AND completion_date = ?`,
+		scheduleID, completionDate)
+	return err
+}
+
+func (s *Store) GetSchedule(ctx context.Context, id int64) (*model.ChoreSchedule, error) {
+	cs := &model.ChoreSchedule{}
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, chore_id, assigned_to, assignment_type, day_of_week, specific_date, available_at, points_multiplier, start_date, end_date, recurrence_interval, recurrence_start, due_by, expiry_penalty, expiry_penalty_value, created_at
+		 FROM chore_schedules WHERE id = ?`, id).
+		Scan(&cs.ID, &cs.ChoreID, &cs.AssignedTo, &cs.AssignmentType, &cs.DayOfWeek, &cs.SpecificDate, &cs.AvailableAt, &cs.PointsMultiplier, &cs.StartDate, &cs.EndDate, &cs.RecurrenceInterval, &cs.RecurrenceStart, &cs.DueBy, &cs.ExpiryPenalty, &cs.ExpiryPenaltyValue, &cs.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return cs, err
+}
+
+func (s *Store) GetCompletionForScheduleDate(ctx context.Context, scheduleID int64, completionDate string) (*model.ChoreCompletion, error) {
+	cc := &model.ChoreCompletion{}
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, chore_schedule_id, completed_by, status, photo_url, approved_by, approved_at, completed_at, completion_date
+		 FROM chore_completions WHERE chore_schedule_id = ? AND completion_date = ?`,
+		scheduleID, completionDate).
+		Scan(&cc.ID, &cc.ChoreScheduleID, &cc.CompletedBy, &cc.Status, &cc.PhotoURL, &cc.ApprovedBy, &cc.ApprovedAt, &cc.CompletedAt, &cc.CompletionDate)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return cc, err
+}
+
+// --- Settings ---
+
+func (s *Store) GetSetting(ctx context.Context, key string) (string, error) {
+	var value string
+	err := s.db.QueryRowContext(ctx, `SELECT value FROM app_settings WHERE key = ?`, key).Scan(&value)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return value, err
+}
+
+func (s *Store) SetSetting(ctx context.Context, key, value string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?`,
+		key, value, value)
+	return err
+}
+
+// --- Users (update) ---
+
+func (s *Store) UpdateUser(ctx context.Context, u *model.User) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET name=?, avatar_url=?, role=?, age=?, theme=? WHERE id=?`,
+		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.ID)
+	return err
+}
+
+func (s *Store) DeleteUser(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, id)
+	return err
+}
+
+// --- Points ---
+
+func (s *Store) GetChorePointsForSchedule(ctx context.Context, scheduleID int64) (int, error) {
+	var pts int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT CAST(c.points_value * cs.points_multiplier AS INTEGER)
+		 FROM chore_schedules cs JOIN chores c ON c.id = cs.chore_id
+		 WHERE cs.id = ?`, scheduleID).Scan(&pts)
+	return pts, err
+}
+
+func (s *Store) CreditChorePoints(ctx context.Context, userID, completionID int64, amount int) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+		 VALUES (?, ?, 'chore_complete', ?, '')`,
+		userID, amount, completionID)
+	return err
+}
+
+func (s *Store) DebitChorePoints(ctx context.Context, userID, completionID int64, amount int) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+		 VALUES (?, ?, 'chore_uncomplete', ?, '')`,
+		userID, -amount, completionID)
+	return err
+}
+
+// GetNetPointsForCompletion returns the net points credited/debited for a specific completion.
+// Positive means points were earned, negative means a penalty was applied.
+func (s *Store) GetNetPointsForCompletion(ctx context.Context, completionID int64) (int, error) {
+	var total int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(amount), 0) FROM point_transactions
+		 WHERE reference_id = ? AND reason IN ('chore_complete', 'expiry_penalty')`,
+		completionID).Scan(&total)
+	return total, err
+}
+
+func (s *Store) GetPointBalance(ctx context.Context, userID int64) (int, error) {
+	var balance int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(amount), 0) FROM point_transactions WHERE user_id = ?`, userID).Scan(&balance)
+	return balance, err
+}
+
+type PointBalanceRow struct {
+	UserID  int64 `json:"user_id"`
+	Balance int   `json:"balance"`
+}
+
+func (s *Store) GetAllPointBalances(ctx context.Context) ([]PointBalanceRow, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT u.id, COALESCE(SUM(pt.amount), 0)
+		 FROM users u LEFT JOIN point_transactions pt ON pt.user_id = u.id
+		 GROUP BY u.id ORDER BY u.name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []PointBalanceRow
+	for rows.Next() {
+		var r PointBalanceRow
+		if err := rows.Scan(&r.UserID, &r.Balance); err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) ListPointTransactions(ctx context.Context, userID int64, limit int) ([]model.PointTransaction, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, user_id, amount, reason, reference_id, note, created_at
+		 FROM point_transactions WHERE user_id = ? ORDER BY id DESC LIMIT ?`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var txs []model.PointTransaction
+	for rows.Next() {
+		var t model.PointTransaction
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Amount, &t.Reason, &t.ReferenceID, &t.Note, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		txs = append(txs, t)
+	}
+	return txs, rows.Err()
+}
+
+func (s *Store) AdminAdjustPoints(ctx context.Context, userID int64, amount int, note string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO point_transactions (user_id, amount, reason, note)
+		 VALUES (?, ?, 'admin_adjust', ?)`, userID, amount, note)
+	return err
+}
+
+// --- Rewards ---
+
+func (s *Store) CreateReward(ctx context.Context, r *model.Reward) error {
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO rewards (name, description, icon, cost, stock, active, created_by)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		r.Name, r.Description, r.Icon, r.Cost, r.Stock, r.Active, r.CreatedBy)
+	if err != nil {
+		return err
+	}
+	r.ID, _ = res.LastInsertId()
+	return nil
+}
+
+func (s *Store) GetReward(ctx context.Context, id int64) (*model.Reward, error) {
+	r := &model.Reward{}
+	var active int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, name, description, icon, cost, stock, active, created_by, created_at
+		 FROM rewards WHERE id = ?`, id).
+		Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &active, &r.CreatedBy, &r.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	r.Active = active == 1
+	return r, err
+}
+
+func (s *Store) ListRewards(ctx context.Context, activeOnly bool) ([]model.Reward, error) {
+	q := `SELECT id, name, description, icon, cost, stock, active, created_by, created_at FROM rewards`
+	if activeOnly {
+		q += ` WHERE active = 1`
+	}
+	q += ` ORDER BY cost`
+	rows, err := s.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var rewards []model.Reward
+	for rows.Next() {
+		var r model.Reward
+		var active int
+		if err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &active, &r.CreatedBy, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		r.Active = active == 1
+		r.EffectiveCost = r.Cost
+		rewards = append(rewards, r)
+	}
+	return rewards, rows.Err()
+}
+
+// ListRewardsForUser returns active rewards available to a specific user.
+// If a reward has no assignments, it's available to everyone.
+// If it has assignments, only assigned users see it, with per-user cost.
+func (s *Store) ListRewardsForUser(ctx context.Context, userID int64) ([]model.Reward, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT r.id, r.name, r.description, r.icon, r.cost, r.stock, r.created_by, r.created_at,
+			ra.custom_cost
+		FROM rewards r
+		LEFT JOIN reward_assignments ra ON ra.reward_id = r.id AND ra.user_id = ?
+		WHERE r.active = 1
+		  AND (
+			-- No assignments at all: available to everyone
+			NOT EXISTS (SELECT 1 FROM reward_assignments WHERE reward_id = r.id)
+			-- Or this user is assigned
+			OR ra.id IS NOT NULL
+		  )
+		ORDER BY r.cost`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var rewards []model.Reward
+	for rows.Next() {
+		var r model.Reward
+		var customCost sql.NullInt64
+		if err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &r.CreatedBy, &r.CreatedAt, &customCost); err != nil {
+			return nil, err
+		}
+		r.Active = true
+		if customCost.Valid {
+			r.EffectiveCost = int(customCost.Int64)
+		} else {
+			r.EffectiveCost = r.Cost
+		}
+		rewards = append(rewards, r)
+	}
+	return rewards, rows.Err()
+}
+
+// ListRewardsWithAssignments returns all rewards with their assignments (admin view).
+func (s *Store) ListRewardsWithAssignments(ctx context.Context) ([]model.Reward, error) {
+	rewards, err := s.ListRewards(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	for i := range rewards {
+		assignments, err := s.GetRewardAssignments(ctx, rewards[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		rewards[i].Assignments = assignments
+	}
+	return rewards, nil
+}
+
+func (s *Store) GetRewardAssignments(ctx context.Context, rewardID int64) ([]model.RewardAssignment, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, reward_id, user_id, custom_cost FROM reward_assignments WHERE reward_id = ? ORDER BY user_id`, rewardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var assignments []model.RewardAssignment
+	for rows.Next() {
+		var a model.RewardAssignment
+		if err := rows.Scan(&a.ID, &a.RewardID, &a.UserID, &a.CustomCost); err != nil {
+			return nil, err
+		}
+		assignments = append(assignments, a)
+	}
+	return assignments, rows.Err()
+}
+
+func (s *Store) SetRewardAssignments(ctx context.Context, rewardID int64, assignments []model.RewardAssignment) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Remove existing
+	_, err = tx.ExecContext(ctx, `DELETE FROM reward_assignments WHERE reward_id = ?`, rewardID)
+	if err != nil {
+		return err
+	}
+
+	// Insert new
+	for _, a := range assignments {
+		_, err = tx.ExecContext(ctx,
+			`INSERT INTO reward_assignments (reward_id, user_id, custom_cost) VALUES (?, ?, ?)`,
+			rewardID, a.UserID, a.CustomCost)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (s *Store) UpdateReward(ctx context.Context, r *model.Reward) error {
+	active := 0
+	if r.Active {
+		active = 1
+	}
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE rewards SET name=?, description=?, icon=?, cost=?, stock=?, active=? WHERE id=?`,
+		r.Name, r.Description, r.Icon, r.Cost, r.Stock, active, r.ID)
+	return err
+}
+
+func (s *Store) DeleteReward(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM rewards WHERE id = ?`, id)
+	return err
+}
+
+func (s *Store) RedeemReward(ctx context.Context, userID, rewardID int64) (*model.RewardRedemption, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// Get reward
+	var baseCost int
+	var stock sql.NullInt64
+	var active int
+	err = tx.QueryRowContext(ctx,
+		`SELECT cost, stock, active FROM rewards WHERE id = ?`, rewardID).
+		Scan(&baseCost, &stock, &active)
+	if err != nil {
+		return nil, fmt.Errorf("reward not found")
+	}
+	if active != 1 {
+		return nil, fmt.Errorf("reward is not active")
+	}
+	if stock.Valid && stock.Int64 <= 0 {
+		return nil, fmt.Errorf("reward is out of stock")
+	}
+
+	// Check if reward has assignments and if user is assigned
+	var hasAssignments bool
+	err = tx.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM reward_assignments WHERE reward_id = ?)`, rewardID).
+		Scan(&hasAssignments)
+	if err != nil {
+		return nil, err
+	}
+	if hasAssignments {
+		var assigned bool
+		err = tx.QueryRowContext(ctx,
+			`SELECT EXISTS(SELECT 1 FROM reward_assignments WHERE reward_id = ? AND user_id = ?)`,
+			rewardID, userID).Scan(&assigned)
+		if err != nil {
+			return nil, err
+		}
+		if !assigned {
+			return nil, fmt.Errorf("reward is not available to you")
+		}
+	}
+
+	// Determine effective cost (per-user override or base)
+	cost := baseCost
+	var customCost sql.NullInt64
+	tx.QueryRowContext(ctx,
+		`SELECT custom_cost FROM reward_assignments WHERE reward_id = ? AND user_id = ?`,
+		rewardID, userID).Scan(&customCost)
+	if customCost.Valid {
+		cost = int(customCost.Int64)
+	}
+
+	// Check balance
+	var balance int
+	err = tx.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(amount), 0) FROM point_transactions WHERE user_id = ?`, userID).
+		Scan(&balance)
+	if err != nil {
+		return nil, err
+	}
+	if balance < cost {
+		return nil, fmt.Errorf("insufficient points (have %d, need %d)", balance, cost)
+	}
+
+	// Insert redemption
+	res, err := tx.ExecContext(ctx,
+		`INSERT INTO reward_redemptions (reward_id, user_id, points_spent) VALUES (?, ?, ?)`,
+		rewardID, userID, cost)
+	if err != nil {
+		return nil, err
+	}
+	redemptionID, _ := res.LastInsertId()
+
+	// Debit points
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+		 VALUES (?, ?, 'reward_redeem', ?, '')`,
+		userID, -cost, redemptionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decrement stock if limited
+	if stock.Valid {
+		_, err = tx.ExecContext(ctx, `UPDATE rewards SET stock = stock - 1 WHERE id = ?`, rewardID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &model.RewardRedemption{
+		ID:          redemptionID,
+		RewardID:    rewardID,
+		UserID:      userID,
+		PointsSpent: cost,
+	}, nil
+}
+
+// --- Streaks ---
+
+func (s *Store) GetUserStreak(ctx context.Context, userID int64) (*model.UserStreak, error) {
+	st := &model.UserStreak{UserID: userID}
+	err := s.db.QueryRowContext(ctx,
+		`SELECT current_streak, longest_streak, streak_start_date, last_completed_date
+		 FROM user_streaks WHERE user_id = ?`, userID).
+		Scan(&st.CurrentStreak, &st.LongestStreak, &st.StreakStartDate, &st.LastCompletedDate)
+	if err == sql.ErrNoRows {
+		return st, nil // zero values
+	}
+	return st, err
+}
+
+func (s *Store) RecalculateStreak(ctx context.Context, userID int64, today string) error {
+	now, err := time.Parse("2006-01-02", today)
+	if err != nil {
+		return err
+	}
+
+	streak := 0
+	// Walk backwards from yesterday (today may be incomplete)
+	for i := 1; i <= 365; i++ {
+		d := now.AddDate(0, 0, -i)
+		dateStr := d.Format("2006-01-02")
+		chores, err := s.GetScheduledChoresForUser(ctx, userID, []string{dateStr}, d)
+		if err != nil {
+			return err
+		}
+		// Filter to required + core only
+		var nonBonus []model.ScheduledChore
+		for _, c := range chores {
+			if c.Category != "bonus" {
+				nonBonus = append(nonBonus, c)
+			}
+		}
+		if len(nonBonus) == 0 {
+			continue // free day, don't break or count
+		}
+		allDone := true
+		for _, c := range nonBonus {
+			if !c.Completed {
+				allDone = false
+				break
+			}
+		}
+		if !allDone {
+			break
+		}
+		streak++
+	}
+
+	// Check if today is also fully complete (adds to streak)
+	todayChores, err := s.GetScheduledChoresForUser(ctx, userID, []string{today}, now)
+	if err != nil {
+		return err
+	}
+	var todayNonBonus []model.ScheduledChore
+	for _, c := range todayChores {
+		if c.Category != "bonus" {
+			todayNonBonus = append(todayNonBonus, c)
+		}
+	}
+	todayComplete := len(todayNonBonus) > 0
+	for _, c := range todayNonBonus {
+		if !c.Completed {
+			todayComplete = false
+			break
+		}
+	}
+	if todayComplete {
+		streak++
+	}
+
+	var startDate *string
+	if streak > 0 {
+		d := now.AddDate(0, 0, -(streak - 1))
+		s := d.Format("2006-01-02")
+		startDate = &s
+	}
+
+	var lastCompleted *string
+	if todayComplete {
+		lastCompleted = &today
+	} else if streak > 0 {
+		yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
+		lastCompleted = &yesterday
+	}
+
+	_, err = s.db.ExecContext(ctx,
+		`INSERT INTO user_streaks (user_id, current_streak, longest_streak, streak_start_date, last_completed_date, updated_at)
+		 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		 ON CONFLICT(user_id) DO UPDATE SET
+			current_streak = ?,
+			longest_streak = MAX(user_streaks.longest_streak, ?),
+			streak_start_date = ?,
+			last_completed_date = ?,
+			updated_at = CURRENT_TIMESTAMP`,
+		userID, streak, streak, startDate, lastCompleted,
+		streak, streak, startDate, lastCompleted)
+	return err
+}
+
+func (s *Store) ListStreakRewards(ctx context.Context) ([]model.StreakReward, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, streak_days, bonus_points, label FROM streak_rewards ORDER BY streak_days`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var rewards []model.StreakReward
+	for rows.Next() {
+		var r model.StreakReward
+		if err := rows.Scan(&r.ID, &r.StreakDays, &r.BonusPoints, &r.Label); err != nil {
+			return nil, err
+		}
+		rewards = append(rewards, r)
+	}
+	return rewards, rows.Err()
+}
+
+func (s *Store) CreateStreakReward(ctx context.Context, r *model.StreakReward) error {
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO streak_rewards (streak_days, bonus_points, label) VALUES (?, ?, ?)`,
+		r.StreakDays, r.BonusPoints, r.Label)
+	if err != nil {
+		return err
+	}
+	r.ID, _ = res.LastInsertId()
+	return nil
+}
+
+func (s *Store) DeleteStreakReward(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM streak_rewards WHERE id = ?`, id)
+	return err
+}
+
+// --- Reward Redemption History ---
+
+type RedemptionHistoryRow struct {
+	ID          int64     `json:"id"`
+	RewardName  string    `json:"reward_name"`
+	RewardIcon  string    `json:"reward_icon"`
+	PointsSpent int       `json:"points_spent"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+func (s *Store) ListRedemptionsForUser(ctx context.Context, userID int64, limit int) ([]RedemptionHistoryRow, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT rr.id, r.name, r.icon, rr.points_spent, rr.created_at
+		FROM reward_redemptions rr
+		JOIN rewards r ON r.id = rr.reward_id
+		WHERE rr.user_id = ?
+		ORDER BY rr.created_at DESC
+		LIMIT ?`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []RedemptionHistoryRow
+	for rows.Next() {
+		var r RedemptionHistoryRow
+		if err := rows.Scan(&r.ID, &r.RewardName, &r.RewardIcon, &r.PointsSpent, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) UndoRedemption(ctx context.Context, redemptionID int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Get the redemption details
+	var userID, rewardID int64
+	var pointsSpent int
+	err = tx.QueryRowContext(ctx,
+		`SELECT user_id, reward_id, points_spent FROM reward_redemptions WHERE id = ?`,
+		redemptionID).Scan(&userID, &rewardID, &pointsSpent)
+	if err != nil {
+		return fmt.Errorf("redemption not found")
+	}
+
+	// Delete the point transaction that debited points
+	_, err = tx.ExecContext(ctx,
+		`DELETE FROM point_transactions WHERE reason = 'reward_redeem' AND reference_id = ?`,
+		redemptionID)
+	if err != nil {
+		return err
+	}
+
+	// Restore stock if the reward has limited stock
+	var stock sql.NullInt64
+	err = tx.QueryRowContext(ctx, `SELECT stock FROM rewards WHERE id = ?`, rewardID).Scan(&stock)
+	if err == nil && stock.Valid {
+		_, err = tx.ExecContext(ctx, `UPDATE rewards SET stock = stock + 1 WHERE id = ?`, rewardID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Delete the redemption record
+	_, err = tx.ExecContext(ctx, `DELETE FROM reward_redemptions WHERE id = ?`, redemptionID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// --- Decay Config ---
+
+func (s *Store) GetUserDecayConfig(ctx context.Context, userID int64) (*model.UserDecayConfig, error) {
+	cfg := &model.UserDecayConfig{UserID: userID}
+	var enabled int
+	var lastDecay sql.NullTime
+	err := s.db.QueryRowContext(ctx,
+		`SELECT enabled, decay_rate, decay_interval_hours, last_decay_at FROM user_decay_config WHERE user_id = ?`,
+		userID).Scan(&enabled, &cfg.DecayRate, &cfg.DecayIntervalHours, &lastDecay)
+	if err == sql.ErrNoRows {
+		// Return defaults
+		cfg.DecayRate = 5
+		cfg.DecayIntervalHours = 24
+		return cfg, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	cfg.Enabled = enabled == 1
+	if lastDecay.Valid {
+		cfg.LastDecayAt = &lastDecay.Time
+	}
+	return cfg, nil
+}
+
+func (s *Store) SetUserDecayConfig(ctx context.Context, cfg *model.UserDecayConfig) error {
+	enabled := 0
+	if cfg.Enabled {
+		enabled = 1
+	}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO user_decay_config (user_id, enabled, decay_rate, decay_interval_hours)
+		 VALUES (?, ?, ?, ?)
+		 ON CONFLICT(user_id) DO UPDATE SET enabled = ?, decay_rate = ?, decay_interval_hours = ?`,
+		cfg.UserID, enabled, cfg.DecayRate, cfg.DecayIntervalHours,
+		enabled, cfg.DecayRate, cfg.DecayIntervalHours)
+	return err
+}
+
+func (s *Store) ListDecayConfigsEnabled(ctx context.Context) ([]model.UserDecayConfig, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT user_id, decay_rate, decay_interval_hours, last_decay_at FROM user_decay_config WHERE enabled = 1`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var configs []model.UserDecayConfig
+	for rows.Next() {
+		cfg := model.UserDecayConfig{Enabled: true}
+		var lastDecay sql.NullTime
+		if err := rows.Scan(&cfg.UserID, &cfg.DecayRate, &cfg.DecayIntervalHours, &lastDecay); err != nil {
+			return nil, err
+		}
+		if lastDecay.Valid {
+			cfg.LastDecayAt = &lastDecay.Time
+		}
+		configs = append(configs, cfg)
+	}
+	return configs, rows.Err()
+}
+
+func (s *Store) UpdateLastDecayAt(ctx context.Context, userID int64, t time.Time) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE user_decay_config SET last_decay_at = ? WHERE user_id = ?`, t, userID)
+	return err
+}
+
+func (s *Store) DebitExpiryPenalty(ctx context.Context, userID, completionID int64, amount int) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+		 VALUES (?, ?, 'expiry_penalty', ?, 'Late completion penalty')`,
+		userID, -amount, completionID)
+	return err
+}
+
+func (s *Store) DebitDecay(ctx context.Context, userID int64, amount int) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO point_transactions (user_id, amount, reason, note)
+		 VALUES (?, ?, 'points_decay', 'Daily points decay')`,
+		userID, -amount)
+	return err
+}
+
+// --- Webhooks ---
+
+func (s *Store) CreateWebhook(ctx context.Context, w *model.Webhook) error {
+	active := 0
+	if w.Active {
+		active = 1
+	}
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO webhooks (url, secret, events, active) VALUES (?, ?, ?, ?)`,
+		w.URL, w.Secret, w.Events, active)
+	if err != nil {
+		return err
+	}
+	w.ID, _ = res.LastInsertId()
+	return nil
+}
+
+func (s *Store) ListWebhooks(ctx context.Context) ([]model.Webhook, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, url, secret, events, active, created_at FROM webhooks ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var webhooks []model.Webhook
+	for rows.Next() {
+		var w model.Webhook
+		var active int
+		if err := rows.Scan(&w.ID, &w.URL, &w.Secret, &w.Events, &active, &w.CreatedAt); err != nil {
+			return nil, err
+		}
+		w.Active = active == 1
+		webhooks = append(webhooks, w)
+	}
+	return webhooks, rows.Err()
+}
+
+func (s *Store) GetActiveWebhooksForEvent(ctx context.Context, event string) ([]model.Webhook, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, url, secret, events, active, created_at FROM webhooks WHERE active = 1`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var webhooks []model.Webhook
+	for rows.Next() {
+		var w model.Webhook
+		var active int
+		if err := rows.Scan(&w.ID, &w.URL, &w.Secret, &w.Events, &active, &w.CreatedAt); err != nil {
+			return nil, err
+		}
+		w.Active = active == 1
+		// Filter by event: "*" matches all, otherwise comma-separated list
+		if w.Events == "*" || containsEvent(w.Events, event) {
+			webhooks = append(webhooks, w)
+		}
+	}
+	return webhooks, rows.Err()
+}
+
+func containsEvent(events, event string) bool {
+	for _, e := range splitEvents(events) {
+		if e == event {
+			return true
+		}
+	}
+	return false
+}
+
+func splitEvents(events string) []string {
+	var result []string
+	current := ""
+	for _, c := range events {
+		if c == ',' {
+			trimmed := ""
+			for _, r := range current {
+				if r != ' ' {
+					trimmed += string(r)
+				}
+			}
+			if trimmed != "" {
+				result = append(result, trimmed)
+			}
+			current = ""
+		} else {
+			current += string(c)
+		}
+	}
+	trimmed := ""
+	for _, r := range current {
+		if r != ' ' {
+			trimmed += string(r)
+		}
+	}
+	if trimmed != "" {
+		result = append(result, trimmed)
+	}
+	return result
+}
+
+func (s *Store) UpdateWebhook(ctx context.Context, w *model.Webhook) error {
+	active := 0
+	if w.Active {
+		active = 1
+	}
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE webhooks SET url=?, secret=?, events=?, active=? WHERE id=?`,
+		w.URL, w.Secret, w.Events, active, w.ID)
+	return err
+}
+
+func (s *Store) DeleteWebhook(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM webhooks WHERE id = ?`, id)
+	return err
+}
+
+func (s *Store) LogWebhookDelivery(ctx context.Context, d *model.WebhookDelivery) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO webhook_deliveries (webhook_id, event, payload, status_code, response_body, error)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		d.WebhookID, d.Event, d.Payload, d.StatusCode, d.ResponseBody, d.Error)
+	return err
+}
+
+func (s *Store) ListWebhookDeliveries(ctx context.Context, webhookID int64, limit int) ([]model.WebhookDelivery, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, webhook_id, event, payload, status_code, response_body, error, created_at
+		 FROM webhook_deliveries WHERE webhook_id = ? ORDER BY id DESC LIMIT ?`, webhookID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var deliveries []model.WebhookDelivery
+	for rows.Next() {
+		var d model.WebhookDelivery
+		if err := rows.Scan(&d.ID, &d.WebhookID, &d.Event, &d.Payload, &d.StatusCode, &d.ResponseBody, &d.Error, &d.CreatedAt); err != nil {
+			return nil, err
+		}
+		deliveries = append(deliveries, d)
+	}
+	return deliveries, rows.Err()
+}
+
+// GetExpiredChores returns chores that are past their due_by time and not completed for today.
+func (s *Store) GetExpiredChores(ctx context.Context, date string, currentTime string) ([]struct {
+	ScheduleID int64
+	ChoreTitle string
+	UserID     int64
+	UserName   string
+	DueBy      string
+}, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT cs.id, c.title, cs.assigned_to, u.name, cs.due_by
+		FROM chore_schedules cs
+		JOIN chores c ON c.id = cs.chore_id
+		JOIN users u ON u.id = cs.assigned_to
+		LEFT JOIN chore_completions cc ON cc.chore_schedule_id = cs.id AND cc.completion_date = ?
+		WHERE cs.due_by IS NOT NULL
+		  AND cs.due_by != ''
+		  AND cs.due_by <= ?
+		  AND cc.id IS NULL
+		  AND (
+			(cs.day_of_week = ? AND cs.specific_date IS NULL AND cs.recurrence_interval IS NULL)
+			OR cs.specific_date = ?
+			OR (cs.recurrence_interval IS NOT NULL AND cs.recurrence_start IS NOT NULL
+				AND CAST((julianday(?) - julianday(cs.recurrence_start)) AS INTEGER) >= 0
+				AND CAST((julianday(?) - julianday(cs.recurrence_start)) AS INTEGER) % cs.recurrence_interval = 0)
+		  )
+		  AND (cs.start_date IS NULL OR cs.start_date <= ?)
+		  AND (cs.end_date IS NULL OR cs.end_date >= ?)`,
+		date, currentTime,
+		func() int { t, _ := time.Parse("2006-01-02", date); return int(t.Weekday()) }(),
+		date, date, date, date, date)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []struct {
+		ScheduleID int64
+		ChoreTitle string
+		UserID     int64
+		UserName   string
+		DueBy      string
+	}
+	for rows.Next() {
+		var r struct {
+			ScheduleID int64
+			ChoreTitle string
+			UserID     int64
+			UserName   string
+			DueBy      string
+		}
+		if err := rows.Scan(&r.ScheduleID, &r.ChoreTitle, &r.UserID, &r.UserName, &r.DueBy); err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}

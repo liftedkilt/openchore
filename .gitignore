@@ -1,0 +1,25 @@
+# Database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Binaries
+/openchore
+/cmd/server/server
+
+# Frontend
+web/node_modules/
+web/dist/
+
+# Debug/test scripts
+web/debug-*.mjs
+
+# OS
+.DS_Store
+
+# Temp
+/tmp/
+
+# Editor/Agent
+.claude/

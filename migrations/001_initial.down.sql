@@ -1,0 +1,14 @@
+DROP TABLE IF EXISTS user_decay_config;
+DROP TABLE IF EXISTS webhook_deliveries;
+DROP TABLE IF EXISTS webhooks;
+DROP TABLE IF EXISTS streak_rewards;
+DROP TABLE IF EXISTS user_streaks;
+DROP TABLE IF EXISTS reward_assignments;
+DROP TABLE IF EXISTS reward_redemptions;
+DROP TABLE IF EXISTS rewards;
+DROP TABLE IF EXISTS point_transactions;
+DROP TABLE IF EXISTS chore_completions;
+DROP TABLE IF EXISTS chore_schedules;
+DROP TABLE IF EXISTS chores;
+DROP TABLE IF EXISTS app_settings;
+DROP TABLE IF EXISTS users;
