@@ -1138,3 +1138,84 @@
   font-size: 0.75rem;
   white-space: nowrap;
 }
+
+/* --- Modal & QR --- */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 2rem;
+}
+
+.qrModal {
+  background: var(--bg-secondary);
+  padding: 2.5rem;
+  border-radius: 2rem;
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.qrModal h2 {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.qrModal p {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.closeBtn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  color: var(--text-secondary);
+  padding: 0.5rem;
+}
+
+.qrWrapper {
+  background: white;
+  padding: 1rem;
+  border-radius: 1.5rem;
+  margin: 1rem 0;
+}
+
+.qrStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 0.75rem 1.5rem;
+  border-radius: 100px;
+  color: var(--accent-blue);
+  font-weight: 700;
+}
+
+.qrHelp {
+  font-size: 0.85rem !important;
+  opacity: 0.7;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

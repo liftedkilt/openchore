@@ -10,6 +10,10 @@ async function fetchWithAuth<T>(path: string, options: RequestInit = {}): Promis
     ...options.headers as Record<string, string>,
   };
 
+  if (headers['Content-Type'] === 'remove') {
+    delete headers['Content-Type'];
+  }
+
   const resp = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ error: 'Unknown error' }));
@@ -85,15 +89,25 @@ export const api = {
       body: JSON.stringify(data),
     }),
     delete: (id: number) => fetchWithAuth(`/chores/${id}`, { method: 'DELETE' }),
-    complete: (scheduleId: number, date: string) =>
+    complete: (scheduleId: number, date: string, photoUrl?: string) =>
       fetchWithAuth(`/schedules/${scheduleId}/complete`, {
         method: 'POST',
-        body: JSON.stringify({ completion_date: date }),
+        body: JSON.stringify({ completion_date: date, photo_url: photoUrl }),
       }),
     uncomplete: (scheduleId: number, date: string) =>
       fetchWithAuth(`/schedules/${scheduleId}/complete?date=${date}`, {
         method: 'DELETE',
       }),
+    upload: (file: File) => {
+      const formData = new FormData();
+      formData.append('photo', file);
+      return fetchWithAuth<{ url: string }>('/upload', {
+        method: 'POST',
+        body: formData,
+        // Don't set Content-Type header, fetch will set it correctly with boundary
+        headers: { 'Content-Type': 'remove' }
+      });
+    },
     listPending: () => fetchWithAuth<any[]>('/completions/pending'),
     approve: (completionId: number) => fetchWithAuth(`/completions/${completionId}/approve`, { method: 'POST' }),
     reject: (completionId: number) => fetchWithAuth(`/completions/${completionId}/reject`, { method: 'POST' }),
@@ -166,6 +180,11 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ old_passcode: oldPasscode, new_passcode: newPasscode }),
       }),
+    getSetting: (key: string) => fetchWithAuth<{ key: string; value: string }>(`/admin/settings/${key}`),
+    setSetting: (key: string, value: string) => fetchWithAuth<{ key: string; value: string }>(`/admin/settings/${key}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    }),
   },
   webhooks: {
     list: () => fetchWithAuth<Webhook[]>('/admin/webhooks'),

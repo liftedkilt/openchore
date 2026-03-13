@@ -73,3 +73,37 @@ func (h *AdminHandler) UpdatePasscode(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]bool{"updated": true})
 }
+
+func (h *AdminHandler) GetSetting(w http.ResponseWriter, r *http.Request) {
+	key := urlParam(r, "key")
+	if key == "" {
+		writeError(w, http.StatusBadRequest, "key required")
+		return
+	}
+	val, err := h.store.GetSetting(r.Context(), key)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get setting")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"key": key, "value": val})
+}
+
+func (h *AdminHandler) SetSetting(w http.ResponseWriter, r *http.Request) {
+	key := urlParam(r, "key")
+	if key == "" {
+		writeError(w, http.StatusBadRequest, "key required")
+		return
+	}
+	var req struct {
+		Value string `json:"value"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := h.store.SetSetting(r.Context(), key, req.Value); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update setting")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"key": key, "value": req.Value})
+}

@@ -55,12 +55,27 @@
   font-size: 1rem;
   color: var(--text-secondary);
   min-height: 48px;
+  position: relative;
 }
 
 .navItemActive {
   background: var(--bg-primary);
   color: var(--accent-blue);
   box-shadow: var(--shadow-sm);
+}
+
+.navBadge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
 }
 
 /* --- Section Header --- */
@@ -839,4 +854,120 @@ select.input {
 .assignmentCostLabel {
   font-size: 0.8rem;
   color: var(--text-secondary);
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkboxLabel input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: pointer;
+}
+
+/* --- Approvals Tab --- */
+.approvalCard {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  padding: 1.25rem;
+  border: 1px solid rgba(56, 189, 248, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.approvalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.approvalUser {
+  font-weight: 700;
+  color: var(--accent-blue);
+  font-size: 0.85rem;
+}
+
+.approvalDate {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.approvalTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.approvalPhoto {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: zoom-in;
+}
+
+.approvalPhoto img {
+  width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+  display: block;
+}
+
+.approvalActions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.approveBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: #22c55e;
+  color: white;
+  padding: 0.75rem;
+  border-radius: 12px;
+  font-weight: 700;
+  min-height: 44px;
+}
+
+.rejectBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 0.75rem;
+  border-radius: 12px;
+  font-weight: 700;
+  min-height: 44px;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--text-secondary);
+  gap: 1rem;
+}
+
+.emptyIcon {
+  opacity: 0.2;
 }

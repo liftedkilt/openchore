@@ -440,6 +440,16 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	if completedByUser != nil {
 		completedByName = completedByUser.Name
 	}
+
+	// Determine absolute photo URL for webhooks
+	absolutePhotoURL := req.PhotoURL
+	if req.PhotoURL != "" {
+		baseURL, _ := h.store.GetSetting(r.Context(), "base_url")
+		if baseURL != "" {
+			absolutePhotoURL = baseURL + req.PhotoURL
+		}
+	}
+
 	h.dispatcher.Fire(webhook.EventChoreCompleted, map[string]any{
 		"schedule_id":     scheduleID,
 		"chore_title":     choreTitle,
@@ -448,6 +458,7 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		"completion_date": req.CompletionDate,
 		"points_earned":   pts,
 		"status":          status,
+		"photo_url":       absolutePhotoURL,
 	})
 
 	// Check if all chores for today are done (only if this one was approved)

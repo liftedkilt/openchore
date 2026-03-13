@@ -4,11 +4,60 @@ import { useTheme } from '../ThemeContext';
 import { api } from '../api';
 import type { ScheduledChore, UserStreakData, PointsData, Reward, RedemptionHistory, Theme } from '../types';
 import styles from './Dashboard.module.css';
-import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X } from 'lucide-react';
+import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
+import { QRCodeSVG } from 'qrcode.react';
 import { useThemeSound } from '../hooks/useThemeSound';
+
+const QRCodeModal: React.FC<{
+  chore: ScheduledChore;
+  userId: number;
+  baseUrl?: string;
+  onClose: () => void;
+  onComplete: () => void;
+}> = ({ chore, userId, baseUrl, onClose, onComplete }) => {
+  // Poll for completion status
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const chores = await api.users.getChores(userId, 'daily', chore.date);
+        const updated = chores.find(c => c.schedule_id === chore.schedule_id);
+        if (updated?.completed) {
+          onComplete();
+        }
+      } catch (e) {
+        console.error('Polling failed:', e);
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [chore, userId, onComplete]);
+
+  const origin = baseUrl || window.location.origin;
+  const uploadUrl = `${origin}/upload?scheduleId=${chore.schedule_id}&date=${chore.date}&userId=${userId}`;
+
+  return (
+    <div className={styles.modalOverlay}>
+      <div className={styles.qrModal}>
+        <button className={styles.closeBtn} onClick={onClose}><X size={24} /></button>
+        <h2>Photo Proof Needed</h2>
+        <p>Scan this code with another iPad or phone to take a picture of your work!</p>
+        
+        <div className={styles.qrWrapper}>
+          <QRCodeSVG value={uploadUrl} size={256} marginSize={4} />
+        </div>
+
+        <div className={styles.qrStatus}>
+          <Loader2 className={styles.spinner} size={20} />
+          <span>Waiting for photo...</span>
+        </div>
+
+        <p className={styles.qrHelp}>Your chore will be finished automatically once you upload the photo.</p>
+      </div>
+    </div>
+  );
+};
 
 // Map icon string names from ThemeConfig to actual components
 const CATEGORY_ICON_MAP: Record<string, React.FC<{ size?: number }>> = {
@@ -42,7 +91,16 @@ export const Dashboard: React.FC = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [qrChore, setQrChore] = useState<ScheduledChore | null>(null);
+  const [systemBaseUrl, setSystemBaseUrl] = useState<string>('');
   const navigate = useNavigate();
+
+  // Load system settings
+  useEffect(() => {
+    api.admin.getSetting('base_url')
+      .then(data => setSystemBaseUrl(data.value))
+      .catch(() => {});
+  }, []);
 
   const localDateStr = (d: Date) => {
     const y = d.getFullYear();
@@ -99,21 +157,33 @@ export const Dashboard: React.FC = () => {
     if (view === 'rewards') loadRewards();
   }, [view, loadRewards]);
 
+  const onChoreFinished = useCallback(async () => {
+    setQrChore(null);
+    confetti({
+      particleCount: 150,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: config.confettiColors,
+    });
+    playComplete();
+    if (navigator.vibrate) navigator.vibrate(50);
+    await loadChores();
+    await loadExtras();
+  }, [config.confettiColors, playComplete, loadChores, loadExtras]);
+
   const handleToggleComplete = async (chore: ScheduledChore) => {
     if (chore.date !== todayStr) return;
     try {
       if (chore.completed) {
         await api.chores.uncomplete(chore.schedule_id, chore.date);
       } else {
+        if (chore.requires_photo) {
+          setQrChore(chore);
+          return;
+        }
         await api.chores.complete(chore.schedule_id, chore.date);
-        confetti({
-          particleCount: 150,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: config.confettiColors,
-        });
-        playComplete();
-        if (navigator.vibrate) navigator.vibrate(50);
+        onChoreFinished();
+        return; // onChoreFinished handles reload
       }
       await loadChores();
       await loadExtras();
@@ -651,6 +721,16 @@ export const Dashboard: React.FC = () => {
             setShowAvatarPicker(false);
           }}
           onClose={() => setShowAvatarPicker(false)}
+        />
+      )}
+
+      {qrChore && user && (
+        <QRCodeModal
+          chore={qrChore}
+          userId={user.id}
+          baseUrl={systemBaseUrl}
+          onClose={() => setQrChore(null)}
+          onComplete={onChoreFinished}
         />
       )}
 

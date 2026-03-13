@@ -7,6 +7,7 @@ import { AdminPasscode } from './pages/AdminPasscode';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AmbientDashboard } from './pages/AmbientDashboard';
 import { SetupWizard } from './pages/SetupWizard';
+import { PhotoUpload } from './pages/PhotoUpload';
 import { useIdleRedirect } from './hooks/useIdleRedirect';
 
 const RequireAdmin: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -26,6 +27,7 @@ export const App: React.FC = () => {
     <Routes>
       <Route path="/login" element={<ProfileSelection />} />
       <Route path="/setup" element={<SetupWizard />} />
+      <Route path="/upload" element={<PhotoUpload />} />
       <Route path="/admin" element={<AdminPasscode />} />
       <Route path="/admin/dashboard" element={
         <RequireAdmin><AdminDashboard /></RequireAdmin>

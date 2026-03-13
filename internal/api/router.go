@@ -1,6 +1,9 @@
 package api
 
 import (
+	"net/http"
+	"os"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/liftedkilt/openchore/internal/store"
@@ -20,6 +23,10 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 	rewards := NewRewardHandler(s, dispatcher)
 	streaks := NewStreakHandler(s)
 	webhooks := NewWebhookHandler(s)
+
+	// Serve uploaded photos
+	_ = os.MkdirAll("data/uploads", 0755)
+	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("data/uploads"))))
 
 	r.Route("/api", func(r chi.Router) {
 		// Public: list users (for profile selection screen)
@@ -46,6 +53,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 			// Any user can complete/uncomplete chores
 			r.Post("/schedules/{scheduleID}/complete", chores.Complete)
 			r.Delete("/schedules/{scheduleID}/complete", chores.Uncomplete)
+			r.Post("/upload", chores.UploadPhoto)
 
 			// Any user can view and redeem rewards
 			r.Get("/rewards", rewards.List)
@@ -68,6 +76,10 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 				r.Get("/chores/{id}/schedules", chores.ListSchedules)
 				r.Post("/chores/{id}/schedules", chores.CreateSchedule)
 				r.Delete("/chores/{id}/schedules/{scheduleID}", chores.DeleteSchedule)
+
+				// Settings
+				r.Get("/admin/settings/{key}", admin.GetSetting)
+				r.Put("/admin/settings/{key}", admin.SetSetting)
 
 				// Approvals
 				r.Get("/completions/pending", chores.ListPending)
