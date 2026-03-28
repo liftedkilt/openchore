@@ -44,12 +44,21 @@ export const AdminDashboard: React.FC = () => {
         navigate('/admin', { replace: true });
         return;
       }
-      const users = await fetch('/api/users').then(r => r.json());
-      const admin = users.find((u: User) => u.role === 'admin');
-      if (admin) {
-        localStorage.setItem('openchore_user', JSON.stringify(admin));
+      try {
+        const users = await api.users.list();
+        const admin = users.find((u: User) => u.role === 'admin');
+        if (admin) {
+          localStorage.setItem('openchore_user', JSON.stringify(admin));
+          setReady(true);
+        } else {
+          // No admin exists — redirect to setup
+          localStorage.removeItem('openchore_user');
+          sessionStorage.removeItem('openchore_admin');
+          navigate('/setup', { replace: true });
+        }
+      } catch {
+        navigate('/login', { replace: true });
       }
-      setReady(true);
     };
     ensureAdminUser();
   }, [navigate]);

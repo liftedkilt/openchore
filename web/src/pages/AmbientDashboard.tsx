@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchAsUser } from '../api';
+import { api, fetchAsUser } from '../api';
 import type { User, ScheduledChore, UserStreakData, PointsData } from '../types';
 import styles from './AmbientDashboard.module.css';
 import { Flame } from 'lucide-react';
@@ -174,8 +174,7 @@ export const AmbientDashboard: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const resp = await fetch('/api/users');
-      const allUsers: User[] = await resp.json();
+      const allUsers: User[] = await api.users.list();
       const childUsers = allUsers.filter(u => u.role === 'child');
       const today = localDateStr(new Date());
 

@@ -96,12 +96,13 @@ export const Dashboard: React.FC = () => {
   const [systemBaseUrl, setSystemBaseUrl] = useState<string>('');
   const navigate = useNavigate();
 
-  // Load system settings
+  // Load system settings (only if user is authenticated)
   useEffect(() => {
+    if (!user) return;
     api.admin.getSetting('base_url')
       .then(data => setSystemBaseUrl(data.value))
       .catch(() => {});
-  }, []);
+  }, [user]);
 
   const [date] = useState(localDateStr(new Date()));
   const todayStr = localDateStr(new Date());

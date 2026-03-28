@@ -1365,6 +1365,22 @@ func TestDeleteUser(t *testing.T) {
 	env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d", kidID), nil, nil, http.StatusNotFound)
 }
 
+func TestDeleteLastAdminBlocked(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t) // admin ID = 1
+
+	// Attempt to delete the only admin — should be blocked
+	resp := env.expectStatus(t, "DELETE", "/api/users/1", nil, adminHeaders(), http.StatusConflict)
+	var body map[string]string
+	decodeBody(t, resp, &body)
+	if body["error"] != "cannot delete the last admin user" {
+		t.Errorf("expected last-admin error, got %q", body["error"])
+	}
+
+	// Admin should still exist
+	env.expectStatus(t, "GET", "/api/users/1", nil, nil, http.StatusOK)
+}
+
 func TestUserThemeUpdate(t *testing.T) {
 	env := setupTest(t)
 	env.createAdmin(t)

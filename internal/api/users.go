@@ -219,6 +219,35 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid user id")
 		return
 	}
+
+	// Prevent deleting the last admin
+	user, err := h.store.GetUser(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get user")
+		return
+	}
+	if user == nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	if user.Role == "admin" {
+		users, err := h.store.ListUsers(r.Context())
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to list users")
+			return
+		}
+		adminCount := 0
+		for _, u := range users {
+			if u.Role == "admin" {
+				adminCount++
+			}
+		}
+		if adminCount <= 1 {
+			writeError(w, http.StatusConflict, "cannot delete the last admin user")
+			return
+		}
+	}
+
 	if err := h.store.DeleteUser(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete user")
 		return
