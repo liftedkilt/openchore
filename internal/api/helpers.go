@@ -18,6 +18,10 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
+func urlParam(r *http.Request, key string) string {
+	return chi.URLParam(r, key)
+}
+
 func urlParamInt64(r *http.Request, key string) (int64, error) {
 	return strconv.ParseInt(chi.URLParam(r, key), 10, 64)
 }

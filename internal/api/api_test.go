@@ -30,10 +30,11 @@ type testEnv struct {
 func setupTest(t *testing.T) *testEnv {
 	t.Helper()
 
-	db, err := sql.Open("sqlite3", ":memory:?_foreign_keys=on")
+	db, err := sql.Open("sqlite3", ":memory:?_foreign_keys=on&_busy_timeout=5000")
 	if err != nil {
 		t.Fatalf("failed to open db: %v", err)
 	}
+	db.SetMaxOpenConns(1)
 
 	driver, err := msqlite.WithInstance(db, &msqlite.Config{})
 	if err != nil {
