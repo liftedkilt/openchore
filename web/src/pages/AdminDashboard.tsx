@@ -4,9 +4,10 @@ import { api } from '../api';
 import type { Chore, User, ChoreSchedule, ChoreTrigger, Reward, PointBalance, PointTransaction, StreakRewardItem, Theme, Webhook, WebhookDelivery, UserDecayConfig } from '../types';
 import { DAY_NAMES } from '../types';
 import styles from './AdminDashboard.module.css';
-import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, CalendarPlus, Gift, Coins, Flame, Undo2, Activity, Settings, Check, Pause, Play, Link2, Copy } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, Gift, Coins, Flame, Undo2, Activity, Settings, Check, Pause, Play, Link2, Copy } from 'lucide-react';
 import clsx from 'clsx';
 import CreateChoreWizard from '../components/CreateChoreWizard/CreateChoreWizard';
+import EditChoreModal from '../components/EditChoreModal/EditChoreModal';
 
 type Tab = 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'settings';
 
@@ -123,10 +124,8 @@ export const AdminDashboard: React.FC = () => {
 const ChoresTab: React.FC = () => {
   const [chores, setChores] = useState<Chore[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [showForm, setShowForm] = useState(false);
   const [editingChore, setEditingChore] = useState<Chore | null>(null);
   const [expandedChore, setExpandedChore] = useState<number | null>(null);
-  const [autoAssign, setAutoAssign] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -144,17 +143,6 @@ const ChoresTab: React.FC = () => {
 
   const handleEdit = (chore: Chore) => {
     setEditingChore(chore);
-    setShowForm(true);
-  };
-
-  const handleSaved = (newChoreId?: number) => {
-    setShowForm(false);
-    setEditingChore(null);
-    load();
-    if (newChoreId) {
-      setExpandedChore(newChoreId);
-      setAutoAssign(true);
-    }
   };
 
   const childUsers = users.filter(u => u.role === 'child');
@@ -168,12 +156,15 @@ const ChoresTab: React.FC = () => {
         </button>
       </div>
 
-      {showForm && editingChore && (
-        <ChoreForm
+      {editingChore && (
+        <EditChoreModal
           chore={editingChore}
+          isOpen={!!editingChore}
+          onClose={() => { setEditingChore(null); load(); }}
+          onSaved={load}
           users={childUsers}
-          onSave={handleSaved}
-          onCancel={() => { setShowForm(false); setEditingChore(null); }}
+          renderSchedules={(choreId, users) => <ScheduleManager choreId={choreId} users={users} />}
+          renderTriggers={(choreId, users) => <TriggerManager choreId={choreId} users={users} />}
         />
       )}
 
@@ -191,7 +182,7 @@ const ChoresTab: React.FC = () => {
       <div className={styles.list}>
         {chores.map(chore => (
           <div key={chore.id} className={styles.listItem}>
-            <div className={styles.listItemMain} onClick={() => { setExpandedChore(expandedChore === chore.id ? null : chore.id); setAutoAssign(false); }}>
+            <div className={styles.listItemMain} onClick={() => handleEdit(chore)}>
               <div className={styles.listItemInfo}>
                 <div className={styles.listItemHeader}>
                   <span className={clsx(styles.badge, styles[`badge_${chore.category}`])}>{chore.category}</span>
@@ -206,24 +197,14 @@ const ChoresTab: React.FC = () => {
                 </div>
               </div>
               <div className={styles.listItemActions}>
-                <button className={styles.iconBtn} title="Quick Assign" onClick={(e) => { e.stopPropagation(); setExpandedChore(chore.id); setAutoAssign(true); }}>
-                  <CalendarPlus size={16} />
-                </button>
-                <button className={styles.iconBtn} onClick={(e) => { e.stopPropagation(); handleEdit(chore); }}>
+                <button className={styles.iconBtn} title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(chore); }}>
                   <Edit2 size={16} />
                 </button>
-                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} onClick={(e) => { e.stopPropagation(); handleDelete(chore.id); }}>
+                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(chore.id); }}>
                   <Trash2 size={16} />
                 </button>
-                {expandedChore === chore.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </div>
             </div>
-            {expandedChore === chore.id && (
-              <>
-                <ScheduleManager choreId={chore.id} users={childUsers} autoOpen={autoAssign} onOpened={() => setAutoAssign(false)} />
-                <TriggerManager choreId={chore.id} users={childUsers} />
-              </>
-            )}
           </div>
         ))}
       </div>
@@ -305,120 +286,6 @@ const ApprovalsTab: React.FC<{ onCountChange: (count: number) => void }> = ({ on
   );
 };
 
-// =================== CHORE FORM ===================
-
-const ChoreForm: React.FC<{
-  chore: Chore | null;
-  users: User[];
-  onSave: (newChoreId?: number) => void;
-  onCancel: () => void;
-}> = ({ chore, users, onSave, onCancel }) => {
-  const [title, setTitle] = useState(chore?.title || '');
-  const [description, setDescription] = useState(chore?.description || '');
-  const [category, setCategory] = useState<string>(chore?.category || 'core');
-  const [points, setPoints] = useState(chore?.points_value?.toString() || '5');
-  const [minutes, setMinutes] = useState(chore?.estimated_minutes?.toString() || '5');
-  const [requiresApproval, setRequiresApproval] = useState(chore?.requires_approval || false);
-  const [requiresPhoto, setRequiresPhoto] = useState(chore?.requires_photo || false);
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent, andAssign = false) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const data = {
-        title,
-        description,
-        category,
-        points_value: parseInt(points) || 0,
-        estimated_minutes: parseInt(minutes) || undefined,
-        requires_approval: requiresApproval,
-        requires_photo: requiresPhoto,
-      };
-      if (chore) {
-        await api.chores.update(chore.id, data);
-        onSave();
-      } else {
-        const created = await api.chores.create(data);
-        onSave(andAssign ? created.id : undefined);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-    setSaving(false);
-  };
-
-  return (
-    <form className={styles.form} onSubmit={handleSubmit}>
-      <div className={styles.formHeader}>
-        <h3>{chore ? 'Edit Chore' : 'New Chore'}</h3>
-        <button type="button" className={styles.iconBtn} onClick={onCancel}><X size={18} /></button>
-      </div>
-
-      <div className={styles.formGrid}>
-        <div className={styles.formGroup}>
-          <label className={styles.label}>Title</label>
-          <input className={styles.input} value={title} onChange={e => setTitle(e.target.value)} required placeholder="e.g. Feed the Cats" />
-        </div>
-
-        <div className={styles.formGroup}>
-          <label className={styles.label}>Description</label>
-          <input className={styles.input} value={description} onChange={e => setDescription(e.target.value)} placeholder="What needs to be done?" />
-        </div>
-
-        <div className={styles.formRow}>
-          <div className={styles.formGroup}>
-            <label className={styles.label} title="Required: must be done to unlock core points. Core: daily tasks. Bonus: optional extras.">Category</label>
-            <select className={styles.input} value={category} onChange={e => setCategory(e.target.value)}>
-              <option value="required">Required</option>
-              <option value="core">Core</option>
-              <option value="bonus">Bonus</option>
-            </select>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label className={styles.label}>Points</label>
-            <input className={styles.input} type="number" min="0" value={points} onChange={e => setPoints(e.target.value)} />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label className={styles.label}>Minutes</label>
-            <input className={styles.input} type="number" min="1" value={minutes} onChange={e => setMinutes(e.target.value)} />
-          </div>
-        </div>
-
-        <div className={styles.formRow} style={{ gap: '2rem', padding: '0.5rem 0' }}>
-          <label className={styles.checkboxLabel}>
-            <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)} />
-            <span>Requires Parent Approval</span>
-          </label>
-          <label className={styles.checkboxLabel}>
-            <input type="checkbox" checked={requiresPhoto} onChange={e => setRequiresPhoto(e.target.checked)} />
-            <span>Requires Photo Proof</span>
-          </label>
-        </div>
-      </div>
-
-      <div className={styles.formActions}>
-        <button type="button" className={styles.btnSecondary} onClick={onCancel}>Cancel</button>
-        {chore ? (
-          <button type="submit" className={styles.btnPrimary} disabled={saving || !title}>
-            <Save size={16} /> Update
-          </button>
-        ) : (
-          <>
-            <button type="submit" className={styles.btnSecondary} disabled={saving || !title} style={{ fontWeight: 700 }}>
-              <Save size={16} /> Create
-            </button>
-            <button type="button" className={styles.btnPrimary} disabled={saving || !title} onClick={(e) => handleSubmit(e, true)}>
-              <CalendarPlus size={16} /> Create & Assign
-            </button>
-          </>
-        )}
-      </div>
-    </form>
-  );
-};
 
 // =================== SCHEDULE MANAGER ===================
 
@@ -429,9 +296,7 @@ const WEEKENDS = [0, 6];
 const ScheduleManager: React.FC<{
   choreId: number;
   users: User[];
-  autoOpen?: boolean;
-  onOpened?: () => void;
-}> = ({ choreId, users, autoOpen, onOpened }) => {
+}> = ({ choreId, users }) => {
   const [schedules, setSchedules] = useState<ChoreSchedule[]>([]);
   const [adding, setAdding] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<number[]>(users[0] ? [users[0].id] : []);
@@ -456,12 +321,6 @@ const ScheduleManager: React.FC<{
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    if (autoOpen && !adding) {
-      setAdding(true);
-      onOpened?.();
-    }
-  }, [autoOpen, adding, onOpened]);
 
   const toggleDay = (d: number) => {
     setSelectedDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);

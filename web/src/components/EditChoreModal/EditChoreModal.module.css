@@ -1,0 +1,132 @@
+/* Sections */
+.section {
+  margin-bottom: 1.5rem;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.sectionTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin: 1.5rem 0;
+}
+
+/* Form fields */
+.formGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.formRow {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+}
+
+.label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.input {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text-primary, #e2e8f0);
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent-blue, #38bdf8);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 40px;
+}
+
+.checkRow input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent-blue, #38bdf8);
+}
+
+.checkLabel {
+  font-size: 0.85rem;
+  color: var(--text-primary, #e2e8f0);
+}
+
+/* Save button */
+.saveRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.25rem;
+  min-height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent-blue, #38bdf8);
+  color: #0f172a;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnPrimary:hover {
+  opacity: 0.9;
+}
+
+.btnPrimary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Status messages */
+.saved {
+  color: #4ade80;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.error {
+  color: #f87171;
+  font-size: 0.8rem;
+}
