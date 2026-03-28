@@ -4,7 +4,7 @@ import { api } from '../api';
 import type { Chore, User, ChoreSchedule, Reward, PointBalance, PointTransaction, StreakRewardItem, Theme, Webhook, WebhookDelivery, UserDecayConfig } from '../types';
 import { DAY_NAMES } from '../types';
 import styles from './AdminDashboard.module.css';
-import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, CalendarPlus, Gift, Coins, Flame, Undo2, Activity, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, CalendarPlus, Gift, Coins, Flame, Undo2, Activity, Settings, Check } from 'lucide-react';
 import clsx from 'clsx';
 
 type Tab = 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'settings';
