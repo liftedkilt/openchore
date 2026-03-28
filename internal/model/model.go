@@ -2,6 +2,9 @@ package model
 
 import "time"
 
+// DateFormat is the standard YYYY-MM-DD date layout used throughout the application.
+const DateFormat = "2006-01-02"
+
 type User struct {
 	ID        int64     `json:"id"`
 	Name      string    `json:"name"`

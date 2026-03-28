@@ -10,6 +10,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	msqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/migrations"
 )
 
@@ -238,10 +239,10 @@ func main() {
 	// COMPLETIONS — seed today + past 3 days
 	// =========================================================================
 	now := time.Now()
-	today := now.Format("2006-01-02")
-	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
-	twoDaysAgo := now.AddDate(0, 0, -2).Format("2006-01-02")
-	threeDaysAgo := now.AddDate(0, 0, -3).Format("2006-01-02")
+	today := now.Format(model.DateFormat)
+	yesterday := now.AddDate(0, 0, -1).Format(model.DateFormat)
+	twoDaysAgo := now.AddDate(0, 0, -2).Format(model.DateFormat)
+	threeDaysAgo := now.AddDate(0, 0, -3).Format(model.DateFormat)
 
 	todayDow := int(now.Weekday())
 	yesterdayDow := int(now.AddDate(0, 0, -1).Weekday())

@@ -236,10 +236,10 @@ func (h *UserHandler) GetChores(w http.ResponseWriter, r *http.Request) {
 	view := r.URL.Query().Get("view")
 	dateStr := r.URL.Query().Get("date")
 	if dateStr == "" {
-		dateStr = time.Now().Format("2006-01-02")
+		dateStr = time.Now().Format(model.DateFormat)
 	}
 
-	date, err := time.Parse("2006-01-02", dateStr)
+	date, err := time.Parse(model.DateFormat, dateStr)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid date format, use YYYY-MM-DD")
 		return
@@ -256,7 +256,7 @@ func (h *UserHandler) GetChores(w http.ResponseWriter, r *http.Request) {
 		}
 		monday := date.AddDate(0, 0, -offset)
 		for i := 0; i < 7; i++ {
-			dates = append(dates, monday.AddDate(0, 0, i).Format("2006-01-02"))
+			dates = append(dates, monday.AddDate(0, 0, i).Format(model.DateFormat))
 		}
 	default: // daily
 		dates = []string{dateStr}
