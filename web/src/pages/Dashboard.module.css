@@ -707,6 +707,64 @@
   white-space: nowrap;
 }
 
+/* --- Time Period Sections --- */
+.timePeriodSection {
+  margin-bottom: 1.25rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+.timePeriodActive {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.timePeriodFuture {
+  opacity: 0.5;
+}
+
+.timePeriodPast {
+  opacity: 0.7;
+}
+
+.timePeriodHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.timePeriodEmoji {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.timePeriodLabel {
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
+}
+
+.timePeriodCount {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.15rem 0.5rem;
+  border-radius: 100px;
+}
+
+.timePeriodBody {
+  padding: 0.5rem 0.75rem 0.75rem;
+}
+
 /* --- Empty State --- */
 .empty {
   text-align: center;
