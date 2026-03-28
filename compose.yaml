@@ -11,7 +11,9 @@ services:
       - CONFIG_PATH=/app/config.yaml
     volumes:
       - openchore-data:/data
-      - ./config.yaml:/app/config.yaml:ro
+      # Optional: mount a config file to bootstrap the database on first start.
+      # Create config.yaml from config.example.yaml, then uncomment:
+      # - ./config.yaml:/app/config.yaml:ro
     expose:
       - "8080"
     healthcheck:
