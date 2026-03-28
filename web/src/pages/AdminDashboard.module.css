@@ -986,3 +986,23 @@ select.input {
 .emptyIcon {
   opacity: 0.2;
 }
+
+/* Trigger URLs */
+.triggerInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.triggerUrl {
+  display: inline-block;
+  background: var(--bg-secondary, #f0f0f0);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.triggerUrl:hover {
+  background: var(--bg-tertiary, #e0e0e0);
+}

@@ -343,6 +343,19 @@ export interface RedemptionHistory {
   created_at: string;
 }
 
+export interface ChoreTrigger {
+  id: number;
+  uuid: string;
+  chore_id: number;
+  default_assigned_to?: number;
+  default_due_by?: string;
+  default_available_at?: string;
+  enabled: boolean;
+  cooldown_minutes: number;
+  last_triggered_at?: string;
+  created_at: string;
+}
+
 export interface Webhook {
   id: number;
   url: string;

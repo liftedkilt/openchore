@@ -132,6 +132,21 @@ type UserDecayConfig struct {
 	LastDecayAt        *time.Time `json:"last_decay_at,omitempty"`
 }
 
+// --- Chore Triggers ---
+
+type ChoreTrigger struct {
+	ID                int64   `json:"id"`
+	UUID              string  `json:"uuid"`
+	ChoreID           int64   `json:"chore_id"`
+	DefaultAssignedTo *int64  `json:"default_assigned_to,omitempty"`
+	DefaultDueBy      *string `json:"default_due_by,omitempty"`
+	DefaultAvailableAt *string `json:"default_available_at,omitempty"`
+	Enabled           bool    `json:"enabled"`
+	CooldownMinutes   int     `json:"cooldown_minutes"`
+	LastTriggeredAt   *string `json:"last_triggered_at,omitempty"`
+	CreatedAt         string  `json:"created_at"`
+}
+
 // --- Webhooks ---
 
 type Webhook struct {

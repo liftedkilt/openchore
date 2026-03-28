@@ -26,6 +26,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 	rewards := NewRewardHandler(s, dispatcher)
 	streaks := NewStreakHandler(s)
 	webhooks := NewWebhookHandler(s)
+	triggers := NewTriggerHandler(s)
 	setup := NewSetupHandler(s)
 	reports := NewReportsHandler(s)
 
@@ -37,6 +38,9 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 		// Public: list users (for profile selection screen)
 		r.Get("/users", users.List)
 		r.Get("/users/{id}", users.Get)
+
+		// Public: chore trigger webhook (UUID is the auth)
+		r.Post("/hooks/trigger/{uuid}", triggers.FireTrigger)
 
 		// Initial setup (only works when no users exist)
 		r.Post("/setup", setup.Setup)
@@ -86,6 +90,12 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 				r.Get("/chores/{id}/schedules", chores.ListSchedules)
 				r.Post("/chores/{id}/schedules", chores.CreateSchedule)
 				r.Delete("/chores/{id}/schedules/{scheduleID}", chores.DeleteSchedule)
+
+				// Chore triggers
+				r.Get("/chores/{id}/triggers", triggers.ListForChore)
+				r.Post("/chores/{id}/triggers", triggers.Create)
+				r.Put("/triggers/{id}", triggers.Update)
+				r.Delete("/triggers/{id}", triggers.Delete)
 
 				// Settings
 				r.Get("/admin/settings/{key}", admin.GetSetting)

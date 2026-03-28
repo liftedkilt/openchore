@@ -1,4 +1,4 @@
-import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, Reward, RewardAssignment, RewardRedemption, RedemptionHistory, UserStreakData, StreakRewardItem, Webhook, WebhookDelivery, UserDecayConfig } from './types';
+import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, Reward, RewardAssignment, RewardRedemption, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig } from './types';
 
 const API_BASE = '/api';
 
@@ -203,6 +203,22 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  triggers: {
+    listForChore: (choreId: number) =>
+      fetchWithAuth<ChoreTrigger[]>(`/chores/${choreId}/triggers`),
+    create: (choreId: number, data: Partial<ChoreTrigger>) =>
+      fetchWithAuth<ChoreTrigger>(`/chores/${choreId}/triggers`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (triggerId: number, data: Partial<ChoreTrigger>) =>
+      fetchWithAuth<ChoreTrigger>(`/triggers/${triggerId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    delete: (triggerId: number) =>
+      fetchWithAuth(`/triggers/${triggerId}`, { method: 'DELETE' }),
+  },
   webhooks: {
     list: () => fetchWithAuth<Webhook[]>('/admin/webhooks'),
     create: (data: { url: string; secret?: string; events?: string }) =>

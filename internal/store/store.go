@@ -1117,6 +1117,94 @@ func (s *Store) HasMissedChorePenalty(ctx context.Context, scheduleID int64, dat
 	return exists, err
 }
 
+// --- Chore Triggers ---
+
+func (s *Store) CreateChoreTrigger(ctx context.Context, t *model.ChoreTrigger) error {
+	enabled := 0
+	if t.Enabled {
+		enabled = 1
+	}
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO chore_triggers (uuid, chore_id, default_assigned_to, default_due_by, default_available_at, enabled, cooldown_minutes)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		t.UUID, t.ChoreID, t.DefaultAssignedTo, t.DefaultDueBy, t.DefaultAvailableAt, enabled, t.CooldownMinutes)
+	if err != nil {
+		return err
+	}
+	t.ID, _ = res.LastInsertId()
+	return nil
+}
+
+func (s *Store) GetChoreTriggerByUUID(ctx context.Context, uuid string) (*model.ChoreTrigger, error) {
+	t := &model.ChoreTrigger{}
+	var enabled int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, uuid, chore_id, default_assigned_to, default_due_by, default_available_at, enabled, cooldown_minutes, last_triggered_at, created_at
+		 FROM chore_triggers WHERE uuid = ?`, uuid).
+		Scan(&t.ID, &t.UUID, &t.ChoreID, &t.DefaultAssignedTo, &t.DefaultDueBy, &t.DefaultAvailableAt, &enabled, &t.CooldownMinutes, &t.LastTriggeredAt, &t.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	t.Enabled = enabled == 1
+	return t, err
+}
+
+func (s *Store) ListChoreTriggersForChore(ctx context.Context, choreID int64) ([]model.ChoreTrigger, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, uuid, chore_id, default_assigned_to, default_due_by, default_available_at, enabled, cooldown_minutes, last_triggered_at, created_at
+		 FROM chore_triggers WHERE chore_id = ? ORDER BY id`, choreID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var triggers []model.ChoreTrigger
+	for rows.Next() {
+		var t model.ChoreTrigger
+		var enabled int
+		if err := rows.Scan(&t.ID, &t.UUID, &t.ChoreID, &t.DefaultAssignedTo, &t.DefaultDueBy, &t.DefaultAvailableAt, &enabled, &t.CooldownMinutes, &t.LastTriggeredAt, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		t.Enabled = enabled == 1
+		triggers = append(triggers, t)
+	}
+	return triggers, rows.Err()
+}
+
+func (s *Store) UpdateChoreTrigger(ctx context.Context, t *model.ChoreTrigger) error {
+	enabled := 0
+	if t.Enabled {
+		enabled = 1
+	}
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE chore_triggers SET default_assigned_to = ?, default_due_by = ?, default_available_at = ?, enabled = ?, cooldown_minutes = ? WHERE id = ?`,
+		t.DefaultAssignedTo, t.DefaultDueBy, t.DefaultAvailableAt, enabled, t.CooldownMinutes, t.ID)
+	return err
+}
+
+func (s *Store) DeleteChoreTrigger(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM chore_triggers WHERE id = ?`, id)
+	return err
+}
+
+func (s *Store) UpdateTriggerLastFired(ctx context.Context, id int64, t time.Time) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE chore_triggers SET last_triggered_at = ? WHERE id = ?`, t.UTC().Format("2006-01-02 15:04:05"), id)
+	return err
+}
+
+func (s *Store) GetUserByName(ctx context.Context, name string) (*model.User, error) {
+	u := &model.User{}
+	var paused int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, name, avatar_url, role, age, theme, paused, created_at FROM users WHERE LOWER(name) = LOWER(?)`, name).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &paused, &u.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	u.Paused = paused == 1
+	return u, err
+}
+
 // --- Webhooks ---
 
 func (s *Store) CreateWebhook(ctx context.Context, w *model.Webhook) error {

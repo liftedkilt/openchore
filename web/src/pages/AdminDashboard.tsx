@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { Chore, User, ChoreSchedule, Reward, PointBalance, PointTransaction, StreakRewardItem, Theme, Webhook, WebhookDelivery, UserDecayConfig } from '../types';
+import type { Chore, User, ChoreSchedule, ChoreTrigger, Reward, PointBalance, PointTransaction, StreakRewardItem, Theme, Webhook, WebhookDelivery, UserDecayConfig } from '../types';
 import { DAY_NAMES } from '../types';
 import styles from './AdminDashboard.module.css';
-import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, CalendarPlus, Gift, Coins, Flame, Undo2, Activity, Settings, Check, Pause, Play } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, CalendarPlus, Gift, Coins, Flame, Undo2, Activity, Settings, Check, Pause, Play, Link2, Copy } from 'lucide-react';
 import clsx from 'clsx';
 
 type Tab = 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'settings';
@@ -206,7 +206,10 @@ const ChoresTab: React.FC = () => {
               </div>
             </div>
             {expandedChore === chore.id && (
-              <ScheduleManager choreId={chore.id} users={childUsers} autoOpen={autoAssign} onOpened={() => setAutoAssign(false)} />
+              <>
+                <ScheduleManager choreId={chore.id} users={childUsers} autoOpen={autoAssign} onOpened={() => setAutoAssign(false)} />
+                <TriggerManager choreId={chore.id} users={childUsers} />
+              </>
             )}
           </div>
         ))}
@@ -721,6 +724,198 @@ const ScheduleManager: React.FC<{
             </div>
           ));
         })()}
+      </div>
+    </div>
+  );
+};
+
+// =================== TRIGGER MANAGER ===================
+
+const TriggerManager: React.FC<{
+  choreId: number;
+  users: User[];
+}> = ({ choreId, users }) => {
+  const [triggers, setTriggers] = useState<ChoreTrigger[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [defaultAssignedTo, setDefaultAssignedTo] = useState<number | ''>('');
+  const [defaultDueBy, setDefaultDueBy] = useState('');
+  const [defaultAvailableAt, setDefaultAvailableAt] = useState('');
+  const [cooldownMinutes, setCooldownMinutes] = useState('0');
+  const [copied, setCopied] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    const t = await api.triggers.listForChore(choreId);
+    setTriggers(t);
+  }, [choreId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleAdd = async () => {
+    await api.triggers.create(choreId, {
+      default_assigned_to: defaultAssignedTo ? Number(defaultAssignedTo) : undefined,
+      default_due_by: defaultDueBy || undefined,
+      default_available_at: defaultAvailableAt || undefined,
+      cooldown_minutes: parseInt(cooldownMinutes) || 0,
+    });
+    setAdding(false);
+    resetForm();
+    load();
+  };
+
+  const handleUpdate = async (id: number) => {
+    await api.triggers.update(id, {
+      default_assigned_to: defaultAssignedTo ? Number(defaultAssignedTo) : undefined,
+      default_due_by: defaultDueBy || undefined,
+      default_available_at: defaultAvailableAt || undefined,
+      cooldown_minutes: parseInt(cooldownMinutes) || 0,
+    });
+    setEditingId(null);
+    resetForm();
+    load();
+  };
+
+  const handleToggle = async (trigger: ChoreTrigger) => {
+    await api.triggers.update(trigger.id, {
+      default_assigned_to: trigger.default_assigned_to,
+      default_due_by: trigger.default_due_by,
+      default_available_at: trigger.default_available_at,
+      cooldown_minutes: trigger.cooldown_minutes,
+      enabled: !trigger.enabled,
+    });
+    load();
+  };
+
+  const handleDelete = async (id: number) => {
+    await api.triggers.delete(id);
+    load();
+  };
+
+  const startEdit = (trigger: ChoreTrigger) => {
+    setEditingId(trigger.id);
+    setDefaultAssignedTo(trigger.default_assigned_to ?? '');
+    setDefaultDueBy(trigger.default_due_by ?? '');
+    setDefaultAvailableAt(trigger.default_available_at ?? '');
+    setCooldownMinutes(String(trigger.cooldown_minutes));
+  };
+
+  const resetForm = () => {
+    setDefaultAssignedTo('');
+    setDefaultDueBy('');
+    setDefaultAvailableAt('');
+    setCooldownMinutes('0');
+  };
+
+  const copyUrl = (uuid: string, id: number) => {
+    const url = `${window.location.origin}/api/hooks/trigger/${uuid}`;
+    navigator.clipboard.writeText(url);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  const getUserName = (id: number) => users.find(u => u.id === id)?.name || `User ${id}`;
+
+  const triggerForm = (
+    <div className={styles.scheduleForm}>
+      <div className={styles.formGroup}>
+        <label className={styles.label}>Default assigned to</label>
+        <select className={styles.input} value={defaultAssignedTo} onChange={e => setDefaultAssignedTo(e.target.value ? Number(e.target.value) : '')}>
+          <option value="">-- None (require param) --</option>
+          {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+        </select>
+      </div>
+      <div className={styles.formRow}>
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Default available at</label>
+          <input className={styles.input} type="time" value={defaultAvailableAt} onChange={e => setDefaultAvailableAt(e.target.value)} />
+        </div>
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Default due by</label>
+          <input className={styles.input} type="time" value={defaultDueBy} onChange={e => setDefaultDueBy(e.target.value)} />
+        </div>
+      </div>
+      <div className={styles.formGroup}>
+        <label className={styles.label}>Cooldown (minutes)</label>
+        <input className={styles.input} type="number" min="0" value={cooldownMinutes} onChange={e => setCooldownMinutes(e.target.value)} />
+        <span className={styles.helpText}>0 = no cooldown</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={styles.scheduleSection}>
+      <div className={styles.scheduleHeader}>
+        <span className={styles.scheduleTitle}><Link2 size={14} /> Trigger URLs</span>
+        <button className={styles.addBtnSmall} onClick={() => { setAdding(!adding); setEditingId(null); if (!adding) resetForm(); }}>
+          {adding ? <X size={14} /> : <Plus size={14} />}
+        </button>
+      </div>
+
+      {adding && (
+        <>
+          {triggerForm}
+          <button className={styles.saveBtn} onClick={handleAdd}>
+            <Save size={14} /> Create Trigger
+          </button>
+        </>
+      )}
+
+      <div className={styles.scheduleList}>
+        {triggers.length === 0 && !adding && (
+          <p className={styles.helpText} style={{ padding: '0.5rem 0' }}>No triggers yet. Add one to allow external systems to create chore assignments.</p>
+        )}
+        {triggers.map(trigger => (
+          <div key={trigger.id} className={styles.scheduleItem} style={{ opacity: trigger.enabled ? 1 : 0.5 }}>
+            {editingId === trigger.id ? (
+              <>
+                {triggerForm}
+                <div className={styles.scheduleItemActions}>
+                  <button className={styles.saveBtn} onClick={() => handleUpdate(trigger.id)}>
+                    <Save size={14} /> Save
+                  </button>
+                  <button className={styles.iconBtn} onClick={() => { setEditingId(null); resetForm(); }}>
+                    <X size={14} />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles.triggerInfo}>
+                  <code className={styles.triggerUrl} onClick={() => copyUrl(trigger.uuid, trigger.id)} title="Click to copy">
+                    /api/hooks/trigger/{trigger.uuid.substring(0, 8)}...
+                  </code>
+                  <div className={styles.listItemMeta}>
+                    {trigger.default_assigned_to && <span>Assigned: {getUserName(trigger.default_assigned_to)}</span>}
+                    {trigger.default_due_by && <span>Due: {trigger.default_due_by}</span>}
+                    {trigger.cooldown_minutes > 0 && <span>Cooldown: {trigger.cooldown_minutes}m</span>}
+                  </div>
+                </div>
+                <div className={styles.scheduleItemActions}>
+                  <button
+                    className={styles.iconBtn}
+                    title="Copy URL"
+                    onClick={() => copyUrl(trigger.uuid, trigger.id)}
+                  >
+                    {copied === trigger.id ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
+                  <button
+                    className={styles.iconBtn}
+                    title={trigger.enabled ? 'Disable' : 'Enable'}
+                    onClick={() => handleToggle(trigger)}
+                  >
+                    {trigger.enabled ? <Pause size={14} /> : <Play size={14} />}
+                  </button>
+                  <button className={styles.iconBtn} title="Edit" onClick={() => startEdit(trigger)}>
+                    <Edit2 size={14} />
+                  </button>
+                  <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} title="Delete" onClick={() => handleDelete(trigger.id)}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

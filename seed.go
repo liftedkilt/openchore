@@ -46,7 +46,7 @@ func main() {
 
 	// Clear existing to avoid conflicts
 	for _, table := range []string{
-		"webhook_deliveries", "webhooks", "user_decay_config",
+		"webhook_deliveries", "webhooks", "chore_triggers", "user_decay_config",
 		"point_transactions", "reward_redemptions", "reward_assignments",
 		"user_streaks", "chore_completions", "chore_schedules",
 		"chores", "rewards", "streak_rewards", "users",
@@ -387,6 +387,12 @@ func main() {
 	// DECAY CONFIG — enable for Natalie as example
 	// =========================================================================
 	db.Exec(`INSERT INTO user_decay_config (user_id, enabled, decay_rate, decay_interval_hours) VALUES (3, 1, 5, 24)`)
+
+	// =========================================================================
+	// CHORE TRIGGERS — sample trigger for "Feed Cats (Morning)" assigned to Natalie
+	// =========================================================================
+	fmt.Println("Seeding chore triggers...")
+	db.Exec(`INSERT INTO chore_triggers (uuid, chore_id, default_assigned_to, default_due_by, enabled, cooldown_minutes) VALUES ('a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4', 1, 3, '09:00', 1, 30)`)
 
 	fmt.Println("\nSeeding complete!")
 
