@@ -12,6 +12,7 @@ import (
 	msqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/liftedkilt/openchore/internal/api"
+	"github.com/liftedkilt/openchore/internal/config"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/webhook"
 	"github.com/liftedkilt/openchore/migrations"
@@ -38,6 +39,22 @@ func main() {
 	}
 
 	s := store.New(db)
+
+	// Load and apply config file (only populates an empty database)
+	configPath := os.Getenv("CONFIG_PATH")
+	if configPath == "" {
+		configPath = "config.yaml"
+	}
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+	if cfg != nil {
+		if err := config.Apply(context.Background(), s, cfg); err != nil {
+			log.Fatalf("failed to apply config: %v", err)
+		}
+	}
+
 	dispatcher := webhook.NewDispatcher(s)
 
 	// Start background checkers

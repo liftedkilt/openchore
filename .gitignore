@@ -15,6 +15,9 @@ web/dist/
 # Debug/test scripts
 web/debug-*.mjs
 
+# Config (user's real config — use config.example.yaml as template)
+config.yaml
+
 # OS
 .DS_Store
 

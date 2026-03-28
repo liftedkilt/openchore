@@ -8,8 +8,10 @@ services:
     restart: unless-stopped
     environment:
       - TZ=America/Los_Angeles
+      - CONFIG_PATH=/app/config.yaml
     volumes:
       - openchore-data:/data
+      - ./config.yaml:/app/config.yaml:ro
     expose:
       - "8080"
     healthcheck:

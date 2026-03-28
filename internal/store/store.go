@@ -392,6 +392,23 @@ func (s *Store) SetSetting(ctx context.Context, key, value string) error {
 	return err
 }
 
+func (s *Store) ListSettings(ctx context.Context) (map[string]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT key, value FROM app_settings`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	settings := make(map[string]string)
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
+			return nil, err
+		}
+		settings[k] = v
+	}
+	return settings, rows.Err()
+}
+
 // --- Users (update) ---
 
 func (s *Store) UpdateUser(ctx context.Context, u *model.User) error {

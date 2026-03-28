@@ -1,0 +1,293 @@
+# OpenChore Configuration
+# Copy this file to config.yaml and customize for your family.
+# The config is applied only when the database is empty (first boot).
+# To re-apply, use ./redeploy.sh --wipe to clear the database.
+
+users:
+  - name: Dad
+    role: admin
+  - name: Mom
+    role: admin
+  - name: Natalie
+    role: child
+    age: 12
+    theme: default
+  - name: Zoe
+    role: child
+    age: 10
+    theme: default
+  - name: David
+    role: child
+    age: 6
+    theme: default
+
+chores:
+  # === Required daily chores ===
+  - title: "Feed Cats (Morning)"
+    icon: "🐱"
+    category: required
+    points: 5
+    missed_penalty: 5
+    schedules:
+      - assign_to: Natalie
+        days: [daily]
+        available_at: "07:00"
+        due_by: "09:00"
+        expiry: no_points
+
+  - title: "Feed Cats (Evening)"
+    icon: "🐱"
+    category: required
+    points: 5
+    missed_penalty: 5
+    schedules:
+      - assign_to: Natalie
+        days: [daily]
+        available_at: "19:00"
+        due_by: "21:00"
+        expiry: no_points
+
+  - title: "Make Bed"
+    icon: "🛏️"
+    category: required
+    points: 5
+    missed_penalty: 5
+    schedules:
+      - assign_to: Natalie
+        days: [daily]
+        expiry: block
+      - assign_to: Zoe
+        days: [daily]
+        expiry: block
+      - assign_to: David
+        days: [daily]
+        expiry: block
+
+  - title: "Brush Teeth (Morning)"
+    icon: "🪥"
+    category: required
+    points: 5
+    missed_penalty: 5
+    schedules:
+      - assign_to: Natalie
+        days: [daily]
+        available_at: "07:00"
+        due_by: "09:00"
+        expiry: no_points
+      - assign_to: Zoe
+        days: [daily]
+        available_at: "07:00"
+        due_by: "09:00"
+        expiry: no_points
+      - assign_to: David
+        days: [daily]
+        available_at: "07:00"
+        due_by: "09:00"
+        expiry: no_points
+
+  - title: "Brush Teeth (Evening)"
+    icon: "🪥"
+    category: required
+    points: 5
+    missed_penalty: 5
+    schedules:
+      - assign_to: Natalie
+        days: [daily]
+        available_at: "20:00"
+        due_by: "21:30"
+        expiry: no_points
+      - assign_to: Zoe
+        days: [daily]
+        available_at: "20:00"
+        due_by: "21:30"
+        expiry: no_points
+      - assign_to: David
+        days: [daily]
+        available_at: "20:00"
+        due_by: "21:30"
+        expiry: no_points
+
+  # === Core rotating chores ===
+  - title: "Empty Dishwasher"
+    icon: "🍽️"
+    category: core
+    points: 10
+    schedules:
+      - assign_to: Natalie
+        days: [mon, wed, fri]
+        expiry: block
+
+  - title: "Load Dishwasher"
+    icon: "🍽️"
+    category: core
+    points: 10
+    schedules:
+      - assign_to: Zoe
+        days: [tue, thu, sat]
+        available_at: "18:00"
+        expiry: block
+
+  - title: "Sweep Kitchen"
+    icon: "🧹"
+    category: core
+    points: 10
+    schedules:
+      - assign_to: Zoe
+        days: [mon, fri]
+        expiry: block
+
+  - title: "Clean Room"
+    icon: "🧹"
+    category: core
+    points: 15
+    schedules:
+      - assign_to: Natalie
+        days: [sat]
+        expiry: block
+      - assign_to: Zoe
+        days: [sat]
+        expiry: block
+
+  - title: "Take Out Trash"
+    icon: "🗑️"
+    category: core
+    points: 10
+    schedules:
+      - assign_to: David
+        days: [wed, sat]
+        expiry: block
+
+  - title: "Fold Laundry"
+    icon: "👕"
+    category: core
+    points: 10
+    schedules:
+      - assign_to: Natalie
+        days: [sun]
+        expiry: block
+
+  - title: "Set Table"
+    icon: "🍴"
+    category: core
+    points: 5
+    schedules:
+      - assign_to: Zoe
+        days: [daily]
+        available_at: "17:00"
+        due_by: "19:00"
+        expiry: penalty
+        expiry_points: 3
+      - assign_to: David
+        days: [tue, thu]
+        available_at: "17:00"
+        due_by: "19:00"
+        expiry: penalty
+        expiry_points: 3
+
+  - title: "Pick Up Toys"
+    icon: "🧸"
+    category: core
+    points: 5
+    schedules:
+      - assign_to: David
+        days: [daily]
+        expiry: block
+
+  - title: "Wipe Bathroom Counter"
+    icon: "🧽"
+    category: core
+    points: 10
+    schedules:
+      - assign_to: Natalie
+        days: [thu]
+        expiry: block
+
+  # === Bonus chores ===
+  - title: "Read 20 Minutes"
+    icon: "📖"
+    category: bonus
+    points: 10
+    schedules:
+      - assign_to: Natalie
+        days: [daily]
+        expiry: block
+      - assign_to: Zoe
+        days: [daily]
+        expiry: block
+      - assign_to: David
+        days: [daily]
+        expiry: block
+
+  - title: "Practice Piano"
+    icon: "🎹"
+    category: bonus
+    points: 10
+    schedules:
+      - assign_to: Natalie
+        days: [daily]
+        expiry: block
+      - assign_to: Zoe
+        days: [daily]
+        expiry: block
+
+  - title: "Help a Sibling"
+    icon: "🤝"
+    category: bonus
+    points: 15
+    schedules:
+      - assign_to: Natalie
+        days: [daily]
+        expiry: block
+      - assign_to: Zoe
+        days: [daily]
+        expiry: block
+      - assign_to: David
+        days: [daily]
+        expiry: block
+
+  - title: "Write in Journal"
+    icon: "📓"
+    category: bonus
+    points: 10
+    schedules:
+      - assign_to: Natalie
+        days: [daily]
+        expiry: block
+      - assign_to: Zoe
+        days: [daily]
+        expiry: block
+
+rewards:
+  - name: "Extra Screen Time"
+    icon: "📺"
+    cost: 50
+  - name: "Ice Cream Trip"
+    icon: "🍦"
+    cost: 100
+  - name: "Movie Night Pick"
+    icon: "🎬"
+    cost: 75
+  - name: "New Book"
+    icon: "📚"
+    cost: 150
+  - name: "Skip a Chore"
+    icon: "🎉"
+    cost: 30
+    stock: 3
+
+streak_rewards:
+  - days: 3
+    bonus_points: 10
+    label: "3-Day Streak!"
+  - days: 7
+    bonus_points: 25
+    label: "Week Warrior!"
+  - days: 14
+    bonus_points: 50
+    label: "Two Week Champion!"
+  - days: 30
+    bonus_points: 100
+    label: "Monthly Master!"
+
+settings:
+  admin_passcode: "1234"

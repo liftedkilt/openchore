@@ -6,6 +6,8 @@ require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	golang.org/x/crypto v0.49.0
+	gopkg.in/yaml.v3 v3.0.1
+	modernc.org/sqlite v1.48.0
 )
 
 require (
@@ -18,5 +20,4 @@ require (
 	modernc.org/libc v1.70.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.48.0 // indirect
 )

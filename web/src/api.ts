@@ -180,6 +180,15 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ value }),
     }),
+    exportConfig: async (sections: string[]) => {
+      const userStr = localStorage.getItem('openchore_user');
+      const headers: Record<string, string> = userStr
+        ? { 'X-User-ID': JSON.parse(userStr).id.toString() }
+        : {};
+      const resp = await fetch(`${API_BASE}/admin/export-config?sections=${sections.join(',')}`, { headers });
+      if (!resp.ok) throw new Error('export failed');
+      return resp.blob();
+    },
   },
   setup: (data: { children: { name: string; theme: string }[]; chores: { title: string; icon: string; category: string; points_value: number }[] }) =>
     fetchPublic<{ admin: User; children: User[] }>('/setup', {

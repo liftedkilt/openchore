@@ -111,6 +111,9 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 				r.Post("/admin/streak-rewards", streaks.CreateReward)
 				r.Delete("/admin/streak-rewards/{id}", streaks.DeleteReward)
 
+				// Config export
+				r.Get("/admin/export-config", admin.ExportConfig)
+
 				// Webhooks management
 				r.Get("/admin/webhooks", webhooks.List)
 				r.Post("/admin/webhooks", webhooks.Create)

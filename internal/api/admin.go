@@ -2,9 +2,11 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/liftedkilt/openchore/internal/config"
 	"github.com/liftedkilt/openchore/internal/store"
 )
 
@@ -113,4 +115,28 @@ func (h *AdminHandler) SetSetting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"key": key, "value": req.Value})
+}
+
+func (h *AdminHandler) ExportConfig(w http.ResponseWriter, r *http.Request) {
+	allSections := []string{"users", "chores", "rewards", "streak_rewards", "settings"}
+	sections := allSections
+	if q := r.URL.Query().Get("sections"); q != "" {
+		sections = strings.Split(q, ",")
+	}
+
+	cfg, err := config.Export(r.Context(), h.store, sections)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to export config")
+		return
+	}
+
+	data, err := config.Marshal(cfg)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to marshal config")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-yaml")
+	w.Header().Set("Content-Disposition", `attachment; filename="config.yaml"`)
+	w.Write(data)
 }
