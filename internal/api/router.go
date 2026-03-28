@@ -26,7 +26,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 	setup := NewSetupHandler(s)
 
 	// Serve uploaded photos
-	_ = os.MkdirAll("data/uploads", 0755)
+	_ = os.MkdirAll("data/uploads", 0750)
 	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("data/uploads"))))
 
 	r.Route("/api", func(r chi.Router) {

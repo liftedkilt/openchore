@@ -1,8 +1,9 @@
 package api
 
 import (
-	"crypto/subtle"
 	"net/http"
+
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/liftedkilt/openchore/internal/store"
 )
@@ -32,7 +33,7 @@ func (h *AdminHandler) VerifyPasscode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if subtle.ConstantTimeCompare([]byte(req.Passcode), []byte(stored)) != 1 {
+	if err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(req.Passcode)); err != nil {
 		writeError(w, http.StatusUnauthorized, "incorrect passcode")
 		return
 	}
@@ -61,12 +62,18 @@ func (h *AdminHandler) UpdatePasscode(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to check passcode")
 		return
 	}
-	if subtle.ConstantTimeCompare([]byte(req.OldPasscode), []byte(stored)) != 1 {
+	if err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(req.OldPasscode)); err != nil {
 		writeError(w, http.StatusUnauthorized, "incorrect current passcode")
 		return
 	}
 
-	if err := h.store.SetSetting(r.Context(), "admin_passcode", req.NewPasscode); err != nil {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.NewPasscode), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to hash passcode")
+		return
+	}
+
+	if err := h.store.SetSetting(r.Context(), "admin_passcode", string(hashed)); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update passcode")
 		return
 	}

@@ -12,7 +12,7 @@ import (
 const uploadDir = "data/uploads"
 
 func init() {
-	_ = os.MkdirAll(uploadDir, 0755)
+	_ = os.MkdirAll(uploadDir, 0750)
 }
 
 func (h *ChoreHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
@@ -29,6 +29,32 @@ func (h *ChoreHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+
+	// Validate MIME type by reading the first 512 bytes
+	buf := make([]byte, 512)
+	n, err := file.Read(buf)
+	if err != nil && err != io.EOF {
+		writeError(w, http.StatusBadRequest, "failed to read file")
+		return
+	}
+	mimeType := http.DetectContentType(buf[:n])
+	allowedTypes := map[string]bool{
+		"image/jpeg": true,
+		"image/png":  true,
+		"image/gif":  true,
+		"image/webp": true,
+	}
+	if !allowedTypes[mimeType] {
+		writeError(w, http.StatusBadRequest, "only image files are allowed (JPEG, PNG, GIF, WebP)")
+		return
+	}
+	// Seek back to the beginning after reading for MIME detection
+	if seeker, ok := file.(io.Seeker); ok {
+		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to process file")
+			return
+		}
+	}
 
 	// Generate unique filename
 	ext := filepath.Ext(header.Filename)

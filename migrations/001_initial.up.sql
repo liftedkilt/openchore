@@ -15,7 +15,7 @@ CREATE TABLE app_settings (
     value TEXT NOT NULL
 );
 
-INSERT INTO app_settings (key, value) VALUES ('admin_passcode', '0000');
+INSERT INTO app_settings (key, value) VALUES ('admin_passcode', '$2a$10$s.PKiK/kAD3.S2BZQKh0.e1jYi2WFx0KiWc1wuY6o1lfiCga1Hnc6');
 
 -- Chores
 CREATE TABLE chores (

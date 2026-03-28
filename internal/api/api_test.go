@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -1890,5 +1891,129 @@ func TestUncompleteNormalPointsReversed(t *testing.T) {
 	decodeBody(t, resp, &pts)
 	if pts["balance"].(float64) != 0 {
 		t.Fatalf("expected 0 after uncomplete, got %v", pts["balance"])
+	}
+}
+
+// =================== BCRYPT PASSCODE TESTS ===================
+
+func TestBcryptPasscodeRoundTrip(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	// Default passcode "0000" should work (stored as bcrypt hash in migration)
+	resp := env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
+		"passcode": "0000",
+	}, nil, http.StatusOK)
+	var result map[string]any
+	decodeBody(t, resp, &result)
+	if result["valid"] != true {
+		t.Fatal("expected valid=true for correct default passcode")
+	}
+
+	// Update passcode to "abcd1234"
+	env.expectStatus(t, "PUT", "/api/admin/passcode", map[string]any{
+		"old_passcode": "0000",
+		"new_passcode": "abcd1234",
+	}, adminHeaders(), http.StatusOK)
+
+	// Old passcode should fail
+	env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
+		"passcode": "0000",
+	}, nil, http.StatusUnauthorized)
+
+	// New passcode should work
+	resp = env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
+		"passcode": "abcd1234",
+	}, nil, http.StatusOK)
+	decodeBody(t, resp, &result)
+	if result["valid"] != true {
+		t.Fatal("expected valid=true for new passcode")
+	}
+
+	// Verify the stored value is a bcrypt hash (starts with $2a$)
+	var stored string
+	err := env.db.QueryRow(`SELECT value FROM app_settings WHERE key = 'admin_passcode'`).Scan(&stored)
+	if err != nil {
+		t.Fatalf("failed to read stored passcode: %v", err)
+	}
+	if len(stored) < 4 || stored[:4] != "$2a$" {
+		t.Fatalf("expected bcrypt hash starting with $2a$, got %q", stored)
+	}
+}
+
+// =================== UPLOAD MIME VALIDATION TESTS ===================
+
+func TestUploadRejectsNonImage(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	// Create a multipart form with a text file
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	part, err := writer.CreateFormFile("photo", "malicious.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	part.Write([]byte("This is not an image file, just plain text content."))
+	writer.Close()
+
+	req, err := http.NewRequest("POST", env.server.URL+"/api/upload", &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-User-ID", "1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for non-image upload, got %d", resp.StatusCode)
+	}
+}
+
+func TestUploadAcceptsImage(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	// Create a minimal valid PNG (1x1 pixel)
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	part, err := writer.CreateFormFile("photo", "test.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Minimal valid PNG file bytes
+	pngData := []byte{
+		0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+		0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
+		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1
+		0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, // bit depth, color type, etc.
+		0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, // IDAT chunk
+		0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
+		0x00, 0x00, 0x02, 0x00, 0x01, 0xE2, 0x21, 0xBC,
+		0x33, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+		0x44, 0xAE, 0x42, 0x60, 0x82, // IEND chunk
+	}
+	part.Write(pngData)
+	writer.Close()
+
+	req, err := http.NewRequest("POST", env.server.URL+"/api/upload", &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-User-ID", "1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200 for valid PNG upload, got %d: %s", resp.StatusCode, body)
 	}
 }
