@@ -9,6 +9,8 @@ import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
 import { localDateStr } from '../utils';
+import { getTimePeriod, groupChoresByTimePeriod, isTimePeriodActive, isTimePeriodPast } from '../timeGrouping';
+import type { TimePeriod } from '../timeGrouping';
 import { QRCodeSVG } from 'qrcode.react';
 import { useThemeSound } from '../hooks/useThemeSound';
 
@@ -326,48 +328,7 @@ export const Dashboard: React.FC = () => {
       .filter(g => g.chores.length > 0);
   };
 
-  type TimePeriod = 'morning' | 'afternoon' | 'evening';
-
-  const getTimePeriod = (availableAt?: string): TimePeriod => {
-    if (!availableAt) return 'morning';
-    const [hrs] = availableAt.split(':').map(Number);
-    if (hrs < 12) return 'morning';
-    if (hrs < 17) return 'afternoon';
-    return 'evening';
-  };
-
-  const TIME_PERIOD_CONFIG: { key: TimePeriod; label: string; emoji: string; startHour: number }[] = [
-    { key: 'morning', label: 'Morning', emoji: '\u{1F305}', startHour: 0 },
-    { key: 'afternoon', label: 'Afternoon', emoji: '\u2600\uFE0F', startHour: 12 },
-    { key: 'evening', label: 'Evening', emoji: '\u{1F319}', startHour: 17 },
-  ];
-
-  const isTimePeriodActive = (startHour: number, nextStartHour: number) => {
-    const hour = new Date().getHours();
-    return hour >= startHour && hour < nextStartHour;
-  };
-
-  const isTimePeriodPast = (nextStartHour: number) => {
-    return new Date().getHours() >= nextStartHour;
-  };
-
-  const groupChoresByTimePeriod = (list: ScheduledChore[]) => {
-    const groups: Record<TimePeriod, ScheduledChore[]> = {
-      morning: [],
-      afternoon: [],
-      evening: [],
-    };
-    list.forEach(c => {
-      groups[getTimePeriod(c.available_at)].push(c);
-    });
-    return TIME_PERIOD_CONFIG
-      .map((period, idx) => ({
-        ...period,
-        chores: groups[period.key],
-        nextStartHour: TIME_PERIOD_CONFIG[idx + 1]?.startHour ?? 24,
-      }))
-      .filter(g => g.chores.length > 0);
-  };
+  // Time period grouping functions imported from '../timeGrouping'
 
   // --- Renders ---
   const renderChoreCard = (chore: ScheduledChore, isWeekly = false) => {
