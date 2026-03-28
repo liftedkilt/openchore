@@ -1,0 +1,319 @@
+.wrapper {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem;
+  min-height: 100vh;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.backBtn {
+  color: var(--text-secondary);
+  padding: 0.75rem;
+  border-radius: 12px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.backBtn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+/* --- Period Selector --- */
+.periodNav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.periodTabs {
+  display: flex;
+  background: var(--bg-secondary);
+  padding: 4px;
+  border-radius: 12px;
+  flex: 1;
+}
+
+.periodTab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  min-height: 44px;
+}
+
+.periodTabActive {
+  background: var(--bg-primary);
+  color: var(--accent-blue);
+  box-shadow: var(--shadow-sm);
+}
+
+.arrowBtn {
+  color: var(--text-secondary);
+  padding: 0.5rem;
+  border-radius: 10px;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arrowBtn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.dateLabel {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+/* --- Cards Grid --- */
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 2rem;
+}
+
+.card {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.cardTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cardTitleIcon {
+  color: var(--accent-blue);
+}
+
+/* --- Kid Scorecards --- */
+.kidGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.kidCard {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 14px;
+}
+
+.kidAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-primary);
+}
+
+.kidAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.kidAvatarPlaceholder {
+  width: 100%;
+  height: 100%;
+  background: #334155;
+}
+
+.kidInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.kidName {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.kidStats {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.kidStat {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.kidRate {
+  font-size: 1.25rem;
+  font-weight: 800;
+  min-width: 50px;
+  text-align: right;
+}
+
+.rateGreen {
+  color: #22c55e;
+}
+
+.rateYellow {
+  color: #f59e0b;
+}
+
+.rateRed {
+  color: #ef4444;
+}
+
+/* --- Points Flow --- */
+.pointsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pointsRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+
+.pointsName {
+  font-weight: 600;
+  font-size: 0.9rem;
+  min-width: 80px;
+}
+
+.pointsValues {
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+  font-size: 0.8rem;
+}
+
+.pointsEarned {
+  color: #22c55e;
+  font-weight: 700;
+}
+
+.pointsDecayed {
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+.pointsSpent {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+/* --- Category Breakdown --- */
+.categoryList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.categoryRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.categoryLabel {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  min-width: 70px;
+}
+
+.categoryRequired { color: #ef4444; }
+.categoryCore { color: #3b82f6; }
+.categoryBonus { color: #f59e0b; }
+
+.categoryBar {
+  flex: 1;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.categoryFill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+
+.categoryRate {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  min-width: 45px;
+  text-align: right;
+}
+
+/* --- Empty State --- */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--text-secondary);
+  gap: 1rem;
+}
+
+.emptyIcon {
+  opacity: 0.2;
+}
+
+/* --- Loading --- */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}

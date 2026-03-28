@@ -1284,3 +1284,264 @@ func (s *Store) GetExpiredChores(ctx context.Context, date string, currentTime s
 	}
 	return result, rows.Err()
 }
+
+// --- Reports ---
+
+type KidSummaryRow struct {
+	UserID         int64
+	Name           string
+	AvatarURL      string
+	TotalAssigned  int
+	TotalCompleted int
+	PointsEarned   int
+	CurrentStreak  int
+}
+
+// ReportKidSummaries returns per-kid completion and points stats for the date range.
+func (s *Store) ReportKidSummaries(ctx context.Context, startDate, endDate string) ([]KidSummaryRow, error) {
+	query := `
+		SELECT
+			u.id,
+			u.name,
+			u.avatar_url,
+			COALESCE(completed.cnt, 0) AS total_completed,
+			COALESCE(missed.cnt, 0) AS total_missed,
+			COALESCE(earned.total, 0) AS points_earned,
+			COALESCE(us.current_streak, 0) AS current_streak
+		FROM users u
+		LEFT JOIN (
+			SELECT cc.completed_by, COUNT(*) AS cnt
+			FROM chore_completions cc
+			WHERE cc.completion_date >= ? AND cc.completion_date <= ?
+			AND cc.status IN ('approved', 'completed')
+			GROUP BY cc.completed_by
+		) completed ON completed.completed_by = u.id
+		LEFT JOIN (
+			SELECT cc.completed_by, COUNT(*) AS cnt
+			FROM chore_completions cc
+			WHERE cc.completion_date >= ? AND cc.completion_date <= ?
+			AND cc.status = 'missed'
+			GROUP BY cc.completed_by
+		) missed ON missed.completed_by = u.id
+		LEFT JOIN (
+			SELECT pt.user_id, SUM(pt.amount) AS total
+			FROM point_transactions pt
+			WHERE pt.amount > 0
+			AND pt.reason IN ('chore_complete', 'streak_bonus')
+			AND DATE(pt.created_at) >= ? AND DATE(pt.created_at) <= ?
+			GROUP BY pt.user_id
+		) earned ON earned.user_id = u.id
+		LEFT JOIN user_streaks us ON us.user_id = u.id
+		WHERE u.role = 'child'
+		ORDER BY u.name`
+
+	rows, err := s.db.QueryContext(ctx, query, startDate, endDate, startDate, endDate, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []KidSummaryRow
+	for rows.Next() {
+		var r KidSummaryRow
+		var totalMissed int
+		if err := rows.Scan(&r.UserID, &r.Name, &r.AvatarURL, &r.TotalCompleted, &totalMissed, &r.PointsEarned, &r.CurrentStreak); err != nil {
+			return nil, err
+		}
+		r.TotalAssigned = r.TotalCompleted + totalMissed
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
+
+type MissedChoreRow struct {
+	ChoreID   int64
+	ChoreName string
+	MissCount int
+	Kids      string // comma-separated
+}
+
+// ReportMostMissed returns chores with the most misses in the date range.
+func (s *Store) ReportMostMissed(ctx context.Context, startDate, endDate string) ([]MissedChoreRow, error) {
+	query := `
+		SELECT
+			c.id,
+			c.title,
+			COUNT(*) AS miss_count,
+			GROUP_CONCAT(DISTINCT u.name) AS kids
+		FROM chore_completions cc
+		JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
+		JOIN chores c ON c.id = cs.chore_id
+		JOIN users u ON u.id = cc.completed_by
+		WHERE cc.status = 'missed'
+		AND cc.completion_date >= ? AND cc.completion_date <= ?
+		GROUP BY c.id, c.title
+		ORDER BY miss_count DESC
+		LIMIT 10`
+
+	rows, err := s.db.QueryContext(ctx, query, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []MissedChoreRow
+	for rows.Next() {
+		var r MissedChoreRow
+		if err := rows.Scan(&r.ChoreID, &r.ChoreName, &r.MissCount, &r.Kids); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
+
+type TrendDayRow struct {
+	Date      string
+	Completed int
+	Assigned  int
+}
+
+// ReportCompletionTrend returns daily completion counts for the date range.
+func (s *Store) ReportCompletionTrend(ctx context.Context, startDate, endDate string) ([]TrendDayRow, error) {
+	query := `
+		SELECT
+			cc.completion_date,
+			SUM(CASE WHEN cc.status IN ('approved', 'completed') THEN 1 ELSE 0 END) AS completed,
+			COUNT(*) AS assigned
+		FROM chore_completions cc
+		WHERE cc.completion_date >= ? AND cc.completion_date <= ?
+		GROUP BY cc.completion_date
+		ORDER BY cc.completion_date`
+
+	rows, err := s.db.QueryContext(ctx, query, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []TrendDayRow
+	for rows.Next() {
+		var r TrendDayRow
+		if err := rows.Scan(&r.Date, &r.Completed, &r.Assigned); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
+
+type CategoryStatRow struct {
+	Category       string
+	TotalAssigned  int
+	TotalCompleted int
+}
+
+// ReportCategoryBreakdown returns completion stats grouped by chore category.
+func (s *Store) ReportCategoryBreakdown(ctx context.Context, startDate, endDate string) ([]CategoryStatRow, error) {
+	query := `
+		SELECT
+			c.category,
+			COUNT(*) AS total_assigned,
+			SUM(CASE WHEN cc.status IN ('approved', 'completed') THEN 1 ELSE 0 END) AS total_completed
+		FROM chore_completions cc
+		JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
+		JOIN chores c ON c.id = cs.chore_id
+		WHERE cc.completion_date >= ? AND cc.completion_date <= ?
+		GROUP BY c.category
+		ORDER BY c.category`
+
+	rows, err := s.db.QueryContext(ctx, query, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []CategoryStatRow
+	for rows.Next() {
+		var r CategoryStatRow
+		if err := rows.Scan(&r.Category, &r.TotalAssigned, &r.TotalCompleted); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
+
+type PointsSummaryRow struct {
+	UserID        int64
+	Name          string
+	PointsEarned  int
+	PointsDecayed int
+	PointsSpent   int
+}
+
+// ReportPointsSummary returns earned/decayed/spent points per kid.
+func (s *Store) ReportPointsSummary(ctx context.Context, startDate, endDate string) ([]PointsSummaryRow, error) {
+	query := `
+		SELECT
+			u.id,
+			u.name,
+			COALESCE(SUM(CASE WHEN pt.amount > 0 THEN pt.amount ELSE 0 END), 0) AS earned,
+			COALESCE(SUM(CASE WHEN pt.reason = 'points_decay' THEN ABS(pt.amount) ELSE 0 END), 0) AS decayed,
+			COALESCE(SUM(CASE WHEN pt.reason = 'reward_redeem' THEN ABS(pt.amount) ELSE 0 END), 0) AS spent
+		FROM users u
+		LEFT JOIN point_transactions pt
+			ON pt.user_id = u.id
+			AND DATE(pt.created_at) >= ? AND DATE(pt.created_at) <= ?
+		WHERE u.role = 'child'
+		GROUP BY u.id, u.name
+		ORDER BY u.name`
+
+	rows, err := s.db.QueryContext(ctx, query, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []PointsSummaryRow
+	for rows.Next() {
+		var r PointsSummaryRow
+		if err := rows.Scan(&r.UserID, &r.Name, &r.PointsEarned, &r.PointsDecayed, &r.PointsSpent); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
+
+type DayOfWeekStatRow struct {
+	DayOfWeek      int
+	TotalAssigned  int
+	TotalCompleted int
+}
+
+// ReportDayOfWeek returns completion stats grouped by day of the week.
+func (s *Store) ReportDayOfWeek(ctx context.Context, startDate, endDate string) ([]DayOfWeekStatRow, error) {
+	// SQLite: strftime('%w', date) returns 0=Sunday, 1=Monday, ... 6=Saturday
+	query := `
+		SELECT
+			CAST(strftime('%w', cc.completion_date) AS INTEGER) AS dow,
+			COUNT(*) AS total_assigned,
+			SUM(CASE WHEN cc.status IN ('approved', 'completed') THEN 1 ELSE 0 END) AS total_completed
+		FROM chore_completions cc
+		WHERE cc.completion_date >= ? AND cc.completion_date <= ?
+		GROUP BY dow
+		ORDER BY dow`
+
+	rows, err := s.db.QueryContext(ctx, query, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []DayOfWeekStatRow
+	for rows.Next() {
+		var r DayOfWeekStatRow
+		if err := rows.Scan(&r.DayOfWeek, &r.TotalAssigned, &r.TotalCompleted); err != nil {
+			return nil, err
+		}
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}

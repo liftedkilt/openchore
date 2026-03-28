@@ -73,6 +73,9 @@ export const AdminDashboard: React.FC = () => {
           <ArrowLeft size={18} />
         </button>
         <h1 className={styles.title}>Admin</h1>
+        <button className={styles.btnSmall} style={{ marginLeft: 'auto' }} onClick={() => navigate('/admin/reports')}>
+          Reports
+        </button>
       </header>
 
       <nav className={styles.nav}>

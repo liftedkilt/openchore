@@ -27,6 +27,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 	streaks := NewStreakHandler(s)
 	webhooks := NewWebhookHandler(s)
 	setup := NewSetupHandler(s)
+	reports := NewReportsHandler(s)
 
 	// Serve uploaded photos
 	_ = os.MkdirAll("data/uploads", 0750)
@@ -116,6 +117,9 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 
 				// Config export
 				r.Get("/admin/export-config", admin.ExportConfig)
+
+				// Reports
+				r.Get("/admin/reports", reports.GetReports)
 
 				// Webhooks management
 				r.Get("/admin/webhooks", webhooks.List)
