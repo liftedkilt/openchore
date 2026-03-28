@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { User } from '../types';
 import styles from './SetupWizard.module.css';
 import { UserPlus, Check, ArrowRight, Sparkles, Trash2, Palette } from 'lucide-react';
 
@@ -50,41 +49,21 @@ export const SetupWizard: React.FC = () => {
   const handleFinish = async () => {
     setLoading(true);
     try {
-      // 1. Create an admin user first (required for the app to function)
-      const admin = await api.users.create({ name: 'Parent', role: 'admin' });
+      const result = await api.setup({
+        children: children.map(c => ({ name: c.name, theme: c.theme })),
+        chores: selectedPresets.map(idx => {
+          const preset = CHORE_PRESETS[idx];
+          return {
+            title: preset.title,
+            icon: preset.icon,
+            category: preset.category,
+            points_value: preset.points,
+          };
+        }),
+      });
 
-      // 2. Create children
-      const createdChildren: User[] = [];
-      for (const child of children) {
-        const u = await api.users.create({ 
-          name: child.name, 
-          role: 'child', 
-          theme: child.theme 
-        });
-        createdChildren.push(u);
-      }
-
-      // 3. Create selected chores and assign them to everyone
-      for (const idx of selectedPresets) {
-        const preset = CHORE_PRESETS[idx];
-        const chore = await api.chores.create({
-          title: preset.title,
-          icon: preset.icon,
-          category: preset.category,
-          points_value: preset.points,
-        });
-
-        // Assign to all children for every day of the week
-        for (const child of createdChildren) {
-          for (let dow = 0; dow < 7; dow++) {
-            await api.chores.createSchedule(chore.id, {
-              assigned_to: child.id,
-              assignment_type: 'individual',
-              day_of_week: dow,
-            });
-          }
-        }
-      }
+      // Store admin user for subsequent authenticated requests
+      localStorage.setItem('openchore_user', JSON.stringify(result.admin));
 
       setStep('finish');
     } catch (err) {

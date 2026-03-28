@@ -186,6 +186,11 @@ export const api = {
       body: JSON.stringify({ value }),
     }),
   },
+  setup: (data: { children: { name: string; theme: string }[]; chores: { title: string; icon: string; category: string; points_value: number }[] }) =>
+    fetchPublic<{ admin: User; children: User[] }>('/setup', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   webhooks: {
     list: () => fetchWithAuth<Webhook[]>('/admin/webhooks'),
     create: (data: { url: string; secret?: string; events?: string }) =>

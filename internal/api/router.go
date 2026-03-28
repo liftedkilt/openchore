@@ -23,6 +23,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 	rewards := NewRewardHandler(s, dispatcher)
 	streaks := NewStreakHandler(s)
 	webhooks := NewWebhookHandler(s)
+	setup := NewSetupHandler(s)
 
 	// Serve uploaded photos
 	_ = os.MkdirAll("data/uploads", 0755)
@@ -32,6 +33,9 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 		// Public: list users (for profile selection screen)
 		r.Get("/users", users.List)
 		r.Get("/users/{id}", users.Get)
+
+		// Initial setup (only works when no users exist)
+		r.Post("/setup", setup.Setup)
 
 		// Admin passcode verification (no auth required)
 		r.Post("/admin/verify", admin.VerifyPasscode)
