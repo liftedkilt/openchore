@@ -70,6 +70,10 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ avatar_url }),
       }),
+    pause: (id: number) =>
+      fetchWithAuth<User>(`/users/${id}/pause`, { method: 'PUT' }),
+    unpause: (id: number) =>
+      fetchWithAuth<User>(`/users/${id}/unpause`, { method: 'PUT' }),
     getChores: (id: number, view: 'daily' | 'weekly', date: string) =>
       fetchWithAuth<ScheduledChore[]>(`/users/${id}/chores?view=${view}&date=${date}`),
   },

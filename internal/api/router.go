@@ -74,6 +74,8 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 				r.Post("/users", users.Create)
 				r.Put("/users/{id}", users.Update)
 				r.Delete("/users/{id}", users.DeleteUser)
+				r.Put("/users/{id}/pause", users.Pause)
+				r.Put("/users/{id}/unpause", users.Unpause)
 
 				r.Get("/chores", chores.List)
 				r.Post("/chores", chores.Create)
