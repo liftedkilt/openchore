@@ -326,6 +326,49 @@ export const Dashboard: React.FC = () => {
       .filter(g => g.chores.length > 0);
   };
 
+  type TimePeriod = 'morning' | 'afternoon' | 'evening';
+
+  const getTimePeriod = (availableAt?: string): TimePeriod => {
+    if (!availableAt) return 'morning';
+    const [hrs] = availableAt.split(':').map(Number);
+    if (hrs < 12) return 'morning';
+    if (hrs < 17) return 'afternoon';
+    return 'evening';
+  };
+
+  const TIME_PERIOD_CONFIG: { key: TimePeriod; label: string; emoji: string; startHour: number }[] = [
+    { key: 'morning', label: 'Morning', emoji: '\u{1F305}', startHour: 0 },
+    { key: 'afternoon', label: 'Afternoon', emoji: '\u2600\uFE0F', startHour: 12 },
+    { key: 'evening', label: 'Evening', emoji: '\u{1F319}', startHour: 17 },
+  ];
+
+  const isTimePeriodActive = (startHour: number, nextStartHour: number) => {
+    const hour = new Date().getHours();
+    return hour >= startHour && hour < nextStartHour;
+  };
+
+  const isTimePeriodPast = (nextStartHour: number) => {
+    return new Date().getHours() >= nextStartHour;
+  };
+
+  const groupChoresByTimePeriod = (list: ScheduledChore[]) => {
+    const groups: Record<TimePeriod, ScheduledChore[]> = {
+      morning: [],
+      afternoon: [],
+      evening: [],
+    };
+    list.forEach(c => {
+      groups[getTimePeriod(c.available_at)].push(c);
+    });
+    return TIME_PERIOD_CONFIG
+      .map((period, idx) => ({
+        ...period,
+        chores: groups[period.key],
+        nextStartHour: TIME_PERIOD_CONFIG[idx + 1]?.startHour ?? 24,
+      }))
+      .filter(g => g.chores.length > 0);
+  };
+
   // --- Renders ---
   const renderChoreCard = (chore: ScheduledChore, isWeekly = false) => {
     const isToday = chore.date === todayStr;
@@ -433,41 +476,73 @@ export const Dashboard: React.FC = () => {
   };
 
   const renderDailyView = () => {
-    const available = chores.filter(c => c.available || c.completed);
-    const upcoming = chores.filter(c => !c.available && !c.completed);
-    const categoryGroups = groupChoresByCategory(available);
+    const allChores = chores;
+    const timePeriods = groupChoresByTimePeriod(allChores);
 
     return (
       <div className={styles.choreGrid}>
-        {categoryGroups.map(group => (
-          <div key={group.category} className={styles.categoryGroup}>
-            <div className={styles.categoryHeader}>
-              {(() => {
-                const IconComp = CATEGORY_ICON_MAP[config.categoryIcons[group.category]];
-                return IconComp
-                  ? <span className={styles[`catIcon_${group.category}`]}><IconComp size={14} /></span>
-                  : <span className={clsx(styles.categoryDot, styles[`dot_${group.category}`])} />;
-              })()}
-              <span className={styles.categoryLabel}>{group.label}</span>
-              <span className={styles.categoryCount}>
-                {group.chores.filter(c => c.completed).length}/{group.chores.length}
-              </span>
-            </div>
-            {group.chores.map(chore => renderChoreCard(chore))}
-          </div>
-        ))}
+        {timePeriods.map(period => {
+          const active = isTimePeriodActive(period.startHour, period.nextStartHour);
+          const past = isTimePeriodPast(period.nextStartHour);
+          const future = !active && !past;
+          const available = period.chores.filter(c => c.available || c.completed);
+          const upcoming = period.chores.filter(c => !c.available && !c.completed);
+          const categoryGroups = groupChoresByCategory(available);
+          const completedInPeriod = period.chores.filter(c => c.completed).length;
+          const totalInPeriod = period.chores.length;
 
-        {upcoming.length > 0 && (
-          <div className={styles.categoryGroup}>
-            <div className={styles.sectionDivider}>
-              <span className={styles.dividerLine} />
-              <Clock size={14} className={styles.dividerIcon} />
-              <span className={styles.dividerText}>Coming up later</span>
-              <span className={styles.dividerLine} />
+          return (
+            <div
+              key={period.key}
+              className={clsx(
+                styles.timePeriodSection,
+                active && styles.timePeriodActive,
+                future && styles.timePeriodFuture,
+                past && styles.timePeriodPast
+              )}
+            >
+              <div className={styles.timePeriodHeader}>
+                <span className={styles.timePeriodEmoji}>{period.emoji}</span>
+                <span className={styles.timePeriodLabel}>{period.label}</span>
+                <span className={styles.timePeriodCount}>
+                  {completedInPeriod}/{totalInPeriod}
+                </span>
+              </div>
+
+              <div className={styles.timePeriodBody}>
+                {categoryGroups.map(group => (
+                  <div key={group.category} className={styles.categoryGroup}>
+                    <div className={styles.categoryHeader}>
+                      {(() => {
+                        const IconComp = CATEGORY_ICON_MAP[config.categoryIcons[group.category]];
+                        return IconComp
+                          ? <span className={styles[`catIcon_${group.category}`]}><IconComp size={14} /></span>
+                          : <span className={clsx(styles.categoryDot, styles[`dot_${group.category}`])} />;
+                      })()}
+                      <span className={styles.categoryLabel}>{group.label}</span>
+                      <span className={styles.categoryCount}>
+                        {group.chores.filter(c => c.completed).length}/{group.chores.length}
+                      </span>
+                    </div>
+                    {group.chores.map(chore => renderChoreCard(chore))}
+                  </div>
+                ))}
+
+                {upcoming.length > 0 && (
+                  <div className={styles.categoryGroup}>
+                    <div className={styles.sectionDivider}>
+                      <span className={styles.dividerLine} />
+                      <Clock size={14} className={styles.dividerIcon} />
+                      <span className={styles.dividerText}>Coming up later</span>
+                      <span className={styles.dividerLine} />
+                    </div>
+                    {upcoming.map(chore => renderChoreCard(chore))}
+                  </div>
+                )}
+              </div>
             </div>
-            {upcoming.map(chore => renderChoreCard(chore))}
-          </div>
-        )}
+          );
+        })}
       </div>
     );
   };
