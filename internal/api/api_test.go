@@ -2016,3 +2016,665 @@ func TestUploadAcceptsImage(t *testing.T) {
 		t.Fatalf("expected 200 for valid PNG upload, got %d: %s", resp.StatusCode, body)
 	}
 }
+
+// =================== SETUP ENDPOINT TESTS ===================
+
+func TestSetupCreatesAdminAndChildren(t *testing.T) {
+	env := setupTest(t)
+
+	resp := env.expectStatus(t, "POST", "/api/setup", map[string]any{
+		"children": []map[string]any{
+			{"name": "Alice", "theme": "galaxy"},
+			{"name": "Bob", "theme": "forest"},
+		},
+		"chores": []map[string]any{
+			{"title": "Feed cats", "icon": "cat", "category": "required", "points_value": 5},
+		},
+	}, nil, http.StatusCreated)
+	var result map[string]any
+	decodeBody(t, resp, &result)
+
+	admin := result["admin"].(map[string]any)
+	if admin["name"] != "Parent" {
+		t.Fatalf("expected admin name 'Parent', got %v", admin["name"])
+	}
+	if admin["role"] != "admin" {
+		t.Fatalf("expected admin role, got %v", admin["role"])
+	}
+
+	children := result["children"].([]any)
+	if len(children) != 2 {
+		t.Fatalf("expected 2 children, got %d", len(children))
+	}
+}
+
+func TestSetupFailsWhenUsersExist(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "POST", "/api/setup", map[string]any{
+		"children": []map[string]any{
+			{"name": "Alice"},
+		},
+	}, nil, http.StatusConflict)
+}
+
+func TestSetupRequiresChildren(t *testing.T) {
+	env := setupTest(t)
+
+	env.expectStatus(t, "POST", "/api/setup", map[string]any{
+		"children": []map[string]any{},
+	}, nil, http.StatusBadRequest)
+}
+
+func TestSetupInvalidBody(t *testing.T) {
+	env := setupTest(t)
+
+	// Send invalid JSON
+	req, _ := http.NewRequest("POST", env.server.URL+"/api/setup", bytes.NewReader([]byte("not json")))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid body, got %d", resp.StatusCode)
+	}
+}
+
+// =================== ADMIN SETTINGS TESTS ===================
+
+func TestAdminGetAndSetSetting(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	// Set a custom setting
+	resp := env.expectStatus(t, "PUT", "/api/admin/settings/timezone", map[string]any{
+		"value": "America/New_York",
+	}, adminHeaders(), http.StatusOK)
+	var setting map[string]any
+	decodeBody(t, resp, &setting)
+	if setting["key"] != "timezone" {
+		t.Fatalf("expected key 'timezone', got %v", setting["key"])
+	}
+	if setting["value"] != "America/New_York" {
+		t.Fatalf("expected value 'America/New_York', got %v", setting["value"])
+	}
+
+	// Get it back
+	resp = env.expectStatus(t, "GET", "/api/admin/settings/timezone", nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &setting)
+	if setting["value"] != "America/New_York" {
+		t.Fatalf("expected value 'America/New_York', got %v", setting["value"])
+	}
+}
+
+func TestAdminSettingsRequireAdmin(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	env.expectStatus(t, "GET", "/api/admin/settings/timezone", nil, childHeaders(kidID), http.StatusForbidden)
+	env.expectStatus(t, "PUT", "/api/admin/settings/timezone", map[string]any{
+		"value": "test",
+	}, childHeaders(kidID), http.StatusForbidden)
+}
+
+// =================== APPROVAL WORKFLOW TESTS ===================
+
+func TestListPendingCompletions(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Create a chore that requires approval
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":             "Clean room",
+		"category":          "core",
+		"points_value":      10,
+		"requires_approval": true,
+	}, adminHeaders())
+
+	// Schedule for today's weekday
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	// Complete it (should become pending)
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": time.Now().Format(model.DateFormat),
+	}, childHeaders(kidID), http.StatusCreated)
+
+	// List pending
+	resp := env.expectStatus(t, "GET", "/api/completions/pending", nil, adminHeaders(), http.StatusOK)
+	var pending []map[string]any
+	decodeBody(t, resp, &pending)
+	if len(pending) != 1 {
+		t.Fatalf("expected 1 pending completion, got %d", len(pending))
+	}
+}
+
+func TestApproveCompletion(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":             "Clean room",
+		"category":          "core",
+		"points_value":      10,
+		"requires_approval": true,
+	}, adminHeaders())
+
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	resp := env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": time.Now().Format(model.DateFormat),
+	}, childHeaders(kidID), http.StatusCreated)
+	var completion map[string]any
+	decodeBody(t, resp, &completion)
+	completionID := int(completion["id"].(float64))
+
+	// Points should be 0 before approval
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected 0 points before approval, got %v", pts["balance"])
+	}
+
+	// Approve
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%d/approve", completionID), nil, adminHeaders(), http.StatusNoContent)
+
+	// Points should be credited after approval
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 10 {
+		t.Fatalf("expected 10 points after approval, got %v", pts["balance"])
+	}
+}
+
+func TestRejectCompletion(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":             "Clean room",
+		"category":          "core",
+		"points_value":      10,
+		"requires_approval": true,
+	}, adminHeaders())
+
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	resp := env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": time.Now().Format(model.DateFormat),
+	}, childHeaders(kidID), http.StatusCreated)
+	var completion map[string]any
+	decodeBody(t, resp, &completion)
+	completionID := int(completion["id"].(float64))
+
+	// Reject
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%d/reject", completionID), nil, adminHeaders(), http.StatusNoContent)
+
+	// Points should remain 0
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected 0 points after rejection, got %v", pts["balance"])
+	}
+}
+
+func TestApproveNotFoundCompletion(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "POST", "/api/completions/999/approve", nil, adminHeaders(), http.StatusNotFound)
+}
+
+func TestRejectNotFoundCompletion(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "POST", "/api/completions/999/reject", nil, adminHeaders(), http.StatusNotFound)
+}
+
+func TestApproveAlreadyApproved(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":             "Clean room",
+		"category":          "core",
+		"requires_approval": true,
+	}, adminHeaders())
+
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	resp := env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": time.Now().Format(model.DateFormat),
+	}, childHeaders(kidID), http.StatusCreated)
+	var completion map[string]any
+	decodeBody(t, resp, &completion)
+	completionID := int(completion["id"].(float64))
+
+	// Approve once
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%d/approve", completionID), nil, adminHeaders(), http.StatusNoContent)
+
+	// Approve again should fail
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%d/approve", completionID), nil, adminHeaders(), http.StatusBadRequest)
+}
+
+// =================== REWARDS USER LIST TESTS ===================
+
+func TestRewardsListForUser(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Create reward
+	env.expectStatus(t, "POST", "/api/rewards", map[string]any{
+		"name": "Prize", "cost": 10, "icon": "star",
+	}, adminHeaders(), http.StatusCreated)
+
+	// User-facing list endpoint
+	resp := env.expectStatus(t, "GET", "/api/rewards", nil, childHeaders(kidID), http.StatusOK)
+	var rewards []map[string]any
+	decodeBody(t, resp, &rewards)
+	// Without assignments, reward should be visible to all
+	if len(rewards) < 1 {
+		t.Fatalf("expected at least 1 reward for user, got %d", len(rewards))
+	}
+}
+
+func TestRewardUpdateNotFound(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "PUT", "/api/rewards/999", map[string]any{
+		"name": "nope",
+	}, adminHeaders(), http.StatusNotFound)
+}
+
+func TestRewardDeleteInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "DELETE", "/api/rewards/abc", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestRewardSetAssignmentsInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "PUT", "/api/rewards/abc/assignments", map[string]any{
+		"assignments": []map[string]any{},
+	}, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestRewardRedeemInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "POST", "/api/rewards/abc/redeem", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestUndoRedemptionInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "DELETE", "/api/redemptions/abc", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestListRedemptionsInvalidUserID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "GET", "/api/users/abc/redemptions", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+// =================== MIDDLEWARE EDGE CASE TESTS ===================
+
+func TestInvalidUserIDHeader(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	// Non-numeric X-User-ID
+	env.expectStatus(t, "GET", "/api/users/1/chores", nil, map[string]string{
+		"X-User-ID": "not-a-number",
+	}, http.StatusBadRequest)
+}
+
+func TestNonExistentUserIDHeader(t *testing.T) {
+	env := setupTest(t)
+
+	// User ID that doesn't exist in DB
+	env.expectStatus(t, "GET", "/api/users/1/chores", nil, map[string]string{
+		"X-User-ID": "9999",
+	}, http.StatusUnauthorized)
+}
+
+// =================== USER EDGE CASE TESTS ===================
+
+func TestGetUserNotFound(t *testing.T) {
+	env := setupTest(t)
+
+	env.expectStatus(t, "GET", "/api/users/999", nil, nil, http.StatusNotFound)
+}
+
+func TestGetUserInvalidID(t *testing.T) {
+	env := setupTest(t)
+
+	env.expectStatus(t, "GET", "/api/users/abc", nil, nil, http.StatusBadRequest)
+}
+
+func TestUpdateUserNotFound(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "PUT", "/api/users/999", map[string]any{
+		"name": "Nope",
+	}, adminHeaders(), http.StatusNotFound)
+}
+
+func TestUpdateUserInvalidRole(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d", kidID), map[string]any{
+		"role": "superuser",
+	}, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestAvatarUpdateMissingURL(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/avatar", kidID), map[string]any{
+		"avatar_url": "",
+	}, childHeaders(kidID), http.StatusBadRequest)
+}
+
+func TestDeleteUserInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "DELETE", "/api/users/abc", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+// =================== POINTS EDGE CASE TESTS ===================
+
+func TestGetUserPointsInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "GET", "/api/users/abc/points", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestDecayConfigDefaultInterval(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Setting decay_interval_hours to 0 should default to 24
+	resp := env.expectStatus(t, "PUT", fmt.Sprintf("/api/admin/users/%d/decay", kidID), map[string]any{
+		"enabled":              true,
+		"decay_rate":           5,
+		"decay_interval_hours": 0,
+	}, adminHeaders(), http.StatusOK)
+	var cfg map[string]any
+	decodeBody(t, resp, &cfg)
+	if cfg["decay_interval_hours"].(float64) != 24 {
+		t.Fatalf("expected default interval 24, got %v", cfg["decay_interval_hours"])
+	}
+}
+
+func TestDecayConfigInvalidUserID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "GET", "/api/admin/users/abc/decay", nil, adminHeaders(), http.StatusBadRequest)
+	env.expectStatus(t, "PUT", "/api/admin/users/abc/decay", map[string]any{
+		"enabled": true, "decay_rate": 5,
+	}, adminHeaders(), http.StatusBadRequest)
+}
+
+// =================== WEBHOOK EDGE CASE TESTS ===================
+
+func TestWebhookDeleteInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "DELETE", "/api/admin/webhooks/abc", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestWebhookUpdateInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "PUT", "/api/admin/webhooks/abc", map[string]any{
+		"url": "https://example.com",
+	}, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestWebhookDeliveriesInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "GET", "/api/admin/webhooks/abc/deliveries", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+// =================== STREAK EDGE CASE TESTS ===================
+
+func TestGetUserStreakInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "GET", "/api/users/abc/streak", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestStreakRewardDeleteInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "DELETE", "/api/admin/streak-rewards/abc", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestGetUserStreakWithRewards(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Create streak rewards
+	env.expectStatus(t, "POST", "/api/admin/streak-rewards", map[string]any{
+		"streak_days":  3,
+		"bonus_points": 10,
+		"label":        "3 Day Streak",
+	}, adminHeaders(), http.StatusCreated)
+	env.expectStatus(t, "POST", "/api/admin/streak-rewards", map[string]any{
+		"streak_days":  7,
+		"bonus_points": 50,
+		"label":        "Week Warrior",
+	}, adminHeaders(), http.StatusCreated)
+
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/streak", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var streak map[string]any
+	decodeBody(t, resp, &streak)
+	// New user has 0 streak, so next_reward should be the first reward
+	if streak["next_reward"] == nil {
+		t.Fatal("expected next_reward to be set for new user with streak rewards configured")
+	}
+	nextReward := streak["next_reward"].(map[string]any)
+	if nextReward["streak_days"].(float64) != 3 {
+		t.Fatalf("expected next reward at 3 days, got %v", nextReward["streak_days"])
+	}
+}
+
+// =================== CHORE EDGE CASE TESTS ===================
+
+func TestChoreGetInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "GET", "/api/chores/abc", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestChoreUpdateInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "PUT", "/api/chores/abc", map[string]any{
+		"title": "test",
+	}, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestChoreDeleteInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "DELETE", "/api/chores/abc", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestCompleteScheduleNotFound(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "POST", "/api/schedules/999/complete", map[string]any{
+		"completed_by":    1,
+		"completion_date": "2026-03-11",
+	}, adminHeaders(), http.StatusNotFound)
+}
+
+func TestCompleteInvalidScheduleID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "POST", "/api/schedules/abc/complete", map[string]any{
+		"completed_by":    1,
+		"completion_date": "2026-03-11",
+	}, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestUncompleteInvalidScheduleID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "DELETE", "/api/schedules/abc/complete?date=2026-03-11", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestGetUserChoresInvalidID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "GET", "/api/users/abc/chores", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestGetUserChoresInvalidDate(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/chores?date=not-a-date", kidID), nil, childHeaders(kidID), http.StatusBadRequest)
+}
+
+func TestUploadNoPhotoField(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	// Send multipart with wrong field name
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	part, _ := writer.CreateFormFile("wrong_field", "test.png")
+	part.Write([]byte("some data"))
+	writer.Close()
+
+	req, _ := http.NewRequest("POST", env.server.URL+"/api/upload", &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-User-ID", "1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for missing photo field, got %d", resp.StatusCode)
+	}
+}
+
+func TestRequiresPhotoChoreCompletion(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Create a chore that requires photo
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":          "Photo chore",
+		"category":       "core",
+		"requires_photo": true,
+	}, adminHeaders())
+
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	// Try to complete without photo
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": time.Now().Format(model.DateFormat),
+	}, childHeaders(kidID), http.StatusBadRequest)
+
+	// Complete with photo should work
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": time.Now().Format(model.DateFormat),
+		"photo_url":       "/uploads/test.png",
+	}, childHeaders(kidID), http.StatusCreated)
+}
+
+func TestListSchedulesInvalidChoreID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "GET", "/api/chores/abc/schedules", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestDeleteScheduleInvalidScheduleID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	// Only scheduleID is validated in the handler
+	env.expectStatus(t, "DELETE", "/api/chores/1/schedules/abc", nil, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestCreateScheduleInvalidChoreID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	env.expectStatus(t, "POST", "/api/chores/abc/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": 3,
+	}, adminHeaders(), http.StatusBadRequest)
+}
