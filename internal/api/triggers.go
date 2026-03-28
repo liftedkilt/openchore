@@ -113,8 +113,21 @@ func (h *TriggerHandler) FireTrigger(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create one-off schedule for today
+	// Check for duplicate: same chore + user + today
 	today := time.Now().Format(model.DateFormat)
+	exists, err := h.store.ScheduleExistsForDate(ctx, trigger.ChoreID, assignedUserID, today)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to check existing schedules")
+		return
+	}
+	if exists {
+		writeJSON(w, http.StatusConflict, map[string]string{
+			"error": fmt.Sprintf("%s is already assigned to %s for today", chore.Title, assignedUserName),
+		})
+		return
+	}
+
+	// Create one-off schedule for today
 	schedule := &model.ChoreSchedule{
 		ChoreID:        trigger.ChoreID,
 		AssignedTo:     assignedUserID,

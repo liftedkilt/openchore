@@ -244,10 +244,10 @@ func TestFireTrigger_CooldownExpires(t *testing.T) {
 		t.Fatalf("first fire: expected 201, got %d", resp.StatusCode)
 	}
 
-	// Second fire should also succeed (no cooldown)
+	// Second fire should be rejected as duplicate (same chore+user+today)
 	resp = env.request(t, "POST", fmt.Sprintf("/api/hooks/trigger/%s", uuid), nil, nil)
-	if resp.StatusCode != http.StatusCreated {
-		t.Fatalf("second fire (no cooldown): expected 201, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("second fire (duplicate): expected 409, got %d", resp.StatusCode)
 	}
 }
 

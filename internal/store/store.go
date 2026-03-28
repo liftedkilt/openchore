@@ -167,6 +167,15 @@ func (s *Store) DeleteSchedule(ctx context.Context, id int64) error {
 	return err
 }
 
+// ScheduleExistsForDate checks if a one-off schedule already exists for a chore + user + date.
+func (s *Store) ScheduleExistsForDate(ctx context.Context, choreID, userID int64, date string) (bool, error) {
+	var exists bool
+	err := s.db.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM chore_schedules WHERE chore_id = ? AND assigned_to = ? AND specific_date = ?)`,
+		choreID, userID, date).Scan(&exists)
+	return exists, err
+}
+
 func (s *Store) ListSchedulesForChore(ctx context.Context, choreID int64) ([]model.ChoreSchedule, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, chore_id, assigned_to, assignment_type, day_of_week, specific_date, available_at, points_multiplier, start_date, end_date, recurrence_interval, recurrence_start, due_by, expiry_penalty, expiry_penalty_value, created_at

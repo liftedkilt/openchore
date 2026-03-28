@@ -1007,6 +1007,14 @@ select.input {
   opacity: 0.9;
 }
 
+/* Schedule/trigger item actions row */
+.scheduleItemActions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
 /* Trigger URLs */
 .triggerInfo {
   flex: 1;
