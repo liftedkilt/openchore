@@ -1351,7 +1351,49 @@ const SettingsTab: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Webhooks state... (unchanged)
+  // Discord state
+  const [discordUrl, setDiscordUrl] = useState('');
+  const [discordSaving, setDiscordSaving] = useState(false);
+  const [discordMessage, setDiscordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Webhooks state
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [showWebhookForm, setShowWebhookForm] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookSecret, setWebhookSecret] = useState('');
+  const [webhookSelectedEvents, setWebhookSelectedEvents] = useState<Set<string>>(new Set());
+  const [expandedWebhook, setExpandedWebhook] = useState<number | null>(null);
+  const [deliveries, setDeliveries] = useState<WebhookDelivery[]>([]);
+
+  const WEBHOOK_EVENTS = [
+    { id: 'chore.completed', label: 'Completed', icon: '✅' },
+    { id: 'chore.uncompleted', label: 'Uncompleted', icon: '↩️' },
+    { id: 'chore.expired', label: 'Expired', icon: '⏰' },
+    { id: 'chore.missed', label: 'Missed', icon: '❌' },
+    { id: 'reward.redeemed', label: 'Redeemed', icon: '🎁' },
+    { id: 'daily.complete', label: 'Daily Done', icon: '🌟' },
+    { id: 'streak.milestone', label: 'Streak', icon: '🔥' },
+    { id: 'points.decayed', label: 'Decay', icon: '📉' },
+  ];
+
+  const allEventsSelected = webhookSelectedEvents.size === 0 || webhookSelectedEvents.size === WEBHOOK_EVENTS.length;
+  const toggleEvent = (id: string) => {
+    setWebhookSelectedEvents(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      return next;
+    });
+  };
+  const eventsToString = () => allEventsSelected ? '*' : Array.from(webhookSelectedEvents).join(',');
+
+  const loadWebhooks = useCallback(async () => {
+    try {
+      const wh = await api.webhooks.list();
+      setWebhooks(wh);
+    } catch (e) { console.error(e); }
+  }, []);
+
+  useEffect(() => { loadWebhooks(); }, [loadWebhooks]);
 
   // Load initial settings
   useEffect(() => {
@@ -1361,6 +1403,10 @@ const SettingsTab: React.FC = () => {
     fetch('/api/admin/settings/base_url')
       .then(r => r.json())
       .then(data => setBaseUrl(data.value || ''))
+      .catch(() => {});
+    fetch('/api/admin/settings/discord_webhook_url')
+      .then(r => r.json())
+      .then(data => setDiscordUrl(data.value || ''))
       .catch(() => {});
   }, []);
 
@@ -1378,6 +1424,51 @@ const SettingsTab: React.FC = () => {
       setMessage({ type: 'error', text: 'Failed to update Base URL' });
     }
     setSaving(false);
+  };
+
+  const handleSaveDiscordUrl = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDiscordSaving(true);
+    setDiscordMessage(null);
+    try {
+      await fetch('/api/admin/settings/discord_webhook_url', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-User-ID': JSON.parse(localStorage.getItem('openchore_user') || '{}').id?.toString() || '' },
+        body: JSON.stringify({ value: discordUrl })
+      });
+      setDiscordMessage({ type: 'success', text: discordUrl ? 'Discord webhook URL saved' : 'Discord notifications disabled' });
+    } catch {
+      setDiscordMessage({ type: 'error', text: 'Failed to save Discord webhook URL' });
+    }
+    setDiscordSaving(false);
+  };
+
+  const handleTestDiscord = async () => {
+    if (!discordUrl) return;
+    setDiscordSaving(true);
+    setDiscordMessage(null);
+    try {
+      const resp = await fetch(discordUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          embeds: [{
+            title: 'OpenChore Test',
+            description: 'Discord notifications are working!',
+            color: 0x22c55e,
+            timestamp: new Date().toISOString(),
+          }]
+        })
+      });
+      if (resp.ok) {
+        setDiscordMessage({ type: 'success', text: 'Test message sent to Discord!' });
+      } else {
+        setDiscordMessage({ type: 'error', text: `Discord returned status ${resp.status}` });
+      }
+    } catch {
+      setDiscordMessage({ type: 'error', text: 'Failed to reach Discord webhook URL' });
+    }
+    setDiscordSaving(false);
   };
 
   const handleChangePin = async (e: React.FormEvent) => {
@@ -1468,6 +1559,38 @@ const SettingsTab: React.FC = () => {
           <button type="submit" className={styles.btnPrimary} disabled={saving}>
             <Save size={16} /> Save Base URL
           </button>
+        </div>
+      </form>
+
+      <form className={styles.form} onSubmit={handleSaveDiscordUrl}>
+        <div className={styles.formHeader}>
+          <h3>Discord Notifications</h3>
+        </div>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+          Get notified in Discord when chores are completed, approved, or rejected. Paste a Discord webhook URL below.
+        </p>
+        <div className={styles.formGroup}>
+          <input
+            className={styles.input}
+            value={discordUrl}
+            onChange={e => setDiscordUrl(e.target.value)}
+            placeholder="https://discord.com/api/webhooks/..."
+          />
+        </div>
+        {discordMessage && (
+          <p style={{ fontSize: '0.85rem', fontWeight: 600, color: discordMessage.type === 'success' ? '#22c55e' : '#ef4444', marginTop: '0.25rem', marginBottom: '0.25rem' }}>
+            {discordMessage.text}
+          </p>
+        )}
+        <div className={styles.formActions}>
+          <button type="submit" className={styles.btnPrimary} disabled={discordSaving}>
+            <Save size={16} /> Save
+          </button>
+          {discordUrl && (
+            <button type="button" className={styles.btnSecondary} disabled={discordSaving} onClick={handleTestDiscord}>
+              Send Test
+            </button>
+          )}
         </div>
       </form>
 

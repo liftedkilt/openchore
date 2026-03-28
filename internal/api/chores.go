@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/liftedkilt/openchore/internal/discord"
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/webhook"
@@ -12,10 +13,11 @@ import (
 type ChoreHandler struct {
 	store      *store.Store
 	dispatcher *webhook.Dispatcher
+	discord    *discord.Notifier
 }
 
-func NewChoreHandler(s *store.Store, d *webhook.Dispatcher) *ChoreHandler {
-	return &ChoreHandler{store: s, dispatcher: d}
+func NewChoreHandler(s *store.Store, d *webhook.Dispatcher, dn *discord.Notifier) *ChoreHandler {
+	return &ChoreHandler{store: s, dispatcher: d, discord: dn}
 }
 
 func (h *ChoreHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -461,6 +463,13 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		"photo_url":       absolutePhotoURL,
 	})
 
+	// Discord notification (non-blocking)
+	if status == "pending" {
+		h.discord.NotifyPendingApproval(completedByName, choreTitle, absolutePhotoURL)
+	} else {
+		h.discord.NotifyCompleted(completedByName, choreTitle, absolutePhotoURL, pts)
+	}
+
 	// Check if all chores for today are done (only if this one was approved)
 	if status == "approved" {
 		go func() {
@@ -611,6 +620,21 @@ func (h *ChoreHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	// Recalculate streak
 	_ = h.store.RecalculateStreak(r.Context(), completion.CompletedBy, completion.CompletionDate)
 
+	// Discord notification for approval
+	{
+		userName := ""
+		if u, _ := h.store.GetUser(r.Context(), completion.CompletedBy); u != nil {
+			userName = u.Name
+		}
+		choreTitle := ""
+		if schedule != nil {
+			if c, _ := h.store.GetChore(r.Context(), schedule.ChoreID); c != nil {
+				choreTitle = c.Title
+			}
+		}
+		h.discord.NotifyApproved(userName, choreTitle)
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -636,6 +660,21 @@ func (h *ChoreHandler) Reject(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.UpdateCompletionStatus(r.Context(), id, "rejected", admin.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to reject")
 		return
+	}
+
+	// Discord notification for rejection
+	{
+		userName := ""
+		if u, _ := h.store.GetUser(r.Context(), completion.CompletedBy); u != nil {
+			userName = u.Name
+		}
+		choreTitle := ""
+		if schedule, _ := h.store.GetSchedule(r.Context(), completion.ChoreScheduleID); schedule != nil {
+			if c, _ := h.store.GetChore(r.Context(), schedule.ChoreID); c != nil {
+				choreTitle = c.Title
+			}
+		}
+		h.discord.NotifyRejected(userName, choreTitle)
 	}
 
 	w.WriteHeader(http.StatusNoContent)

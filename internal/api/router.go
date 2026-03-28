@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/liftedkilt/openchore/internal/discord"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/webhook"
 )
@@ -16,8 +17,10 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.SetHeader("Content-Type", "application/json"))
 
+	discordNotifier := discord.NewNotifier(s)
+
 	users := NewUserHandler(s)
-	chores := NewChoreHandler(s, dispatcher)
+	chores := NewChoreHandler(s, dispatcher, discordNotifier)
 	admin := NewAdminHandler(s)
 	points := NewPointsHandler(s)
 	rewards := NewRewardHandler(s, dispatcher)
