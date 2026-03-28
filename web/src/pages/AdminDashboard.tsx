@@ -6,6 +6,7 @@ import { DAY_NAMES } from '../types';
 import styles from './AdminDashboard.module.css';
 import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, CalendarPlus, Gift, Coins, Flame, Undo2, Activity, Settings, Check, Pause, Play, Link2, Copy } from 'lucide-react';
 import clsx from 'clsx';
+import CreateChoreWizard from '../components/CreateChoreWizard/CreateChoreWizard';
 
 type Tab = 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'settings';
 
@@ -126,6 +127,7 @@ const ChoresTab: React.FC = () => {
   const [editingChore, setEditingChore] = useState<Chore | null>(null);
   const [expandedChore, setExpandedChore] = useState<number | null>(null);
   const [autoAssign, setAutoAssign] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const load = useCallback(async () => {
     const [c, u] = await Promise.all([api.chores.list(), api.users.list()]);
@@ -161,12 +163,12 @@ const ChoresTab: React.FC = () => {
     <div>
       <div className={styles.sectionHeader}>
         <h2 className={styles.sectionTitle}>All Chores</h2>
-        <button className={styles.addBtn} onClick={() => { setEditingChore(null); setShowForm(true); }}>
+        <button className={styles.addBtn} onClick={() => setWizardOpen(true)}>
           <Plus size={18} /> Add Chore
         </button>
       </div>
 
-      {showForm && (
+      {showForm && editingChore && (
         <ChoreForm
           chore={editingChore}
           users={childUsers}
@@ -174,6 +176,17 @@ const ChoresTab: React.FC = () => {
           onCancel={() => { setShowForm(false); setEditingChore(null); }}
         />
       )}
+
+      <CreateChoreWizard
+        isOpen={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onComplete={(choreId) => {
+          setWizardOpen(false);
+          load();
+          setExpandedChore(choreId);
+        }}
+        users={childUsers}
+      />
 
       <div className={styles.list}>
         {chores.map(chore => (

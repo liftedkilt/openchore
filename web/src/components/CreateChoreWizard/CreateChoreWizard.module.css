@@ -1,0 +1,412 @@
+/* Step indicator */
+.stepper {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 1.5rem;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+
+.stepActive {
+  opacity: 1;
+}
+
+.stepComplete {
+  opacity: 0.7;
+}
+
+.stepDot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary, #94a3b8);
+  border: 2px solid transparent;
+}
+
+.stepActive .stepDot {
+  background: var(--accent-blue, #38bdf8);
+  color: #0f172a;
+  border-color: var(--accent-blue, #38bdf8);
+}
+
+.stepComplete .stepDot {
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+  border-color: #4ade80;
+}
+
+.stepLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.stepActive .stepLabel {
+  color: var(--text-primary, #e2e8f0);
+}
+
+/* Form fields */
+.formGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.formRow {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+}
+
+.label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text-primary, #e2e8f0);
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent-blue, #38bdf8);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+}
+
+.helpText {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #94a3b8);
+}
+
+/* Checkbox row */
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 44px;
+  padding: 0.5rem 0;
+}
+
+.checkRow input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent-blue, #38bdf8);
+}
+
+.checkLabel {
+  font-size: 0.9rem;
+  color: var(--text-primary, #e2e8f0);
+}
+
+/* User picker pills */
+.userPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.userPickerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  min-height: 44px;
+  border-radius: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary, #94a3b8);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.userPickerBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.userPickerBtnActive {
+  background: var(--accent-blue, #38bdf8);
+  color: #0f172a;
+  border-color: var(--accent-blue, #38bdf8);
+}
+
+/* Day picker */
+.dayPicker {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.dayBtn {
+  flex: 1;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.15);
+  color: var(--text-secondary, #94a3b8);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.dayBtnActive {
+  background: var(--accent-blue, #38bdf8);
+  color: #0f172a;
+  border-color: var(--accent-blue, #38bdf8);
+}
+
+.presets {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.presetBtn {
+  padding: 0.4rem 0.75rem;
+  min-height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--text-secondary, #94a3b8);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.presetBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Interval input */
+.intervalInput {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.intervalInput .input {
+  width: 90px;
+  flex: none;
+}
+
+.intervalSuffix {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #94a3b8);
+  white-space: nowrap;
+}
+
+/* Navigation */
+.nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1.5rem;
+  margin-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 0.75rem;
+}
+
+.navLeft {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.navRight {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.75rem 1.5rem;
+  min-height: 48px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent-blue, #38bdf8);
+  color: #0f172a;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnPrimary:hover {
+  opacity: 0.9;
+}
+
+.btnPrimary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.75rem 1.25rem;
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-secondary, #94a3b8);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btnSecondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.skipBtn {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #94a3b8);
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0.5rem;
+}
+
+/* Review step */
+.reviewSection {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.reviewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.reviewTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.editLink {
+  background: none;
+  border: none;
+  color: var(--accent-blue, #38bdf8);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.reviewRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.reviewLabel {
+  color: var(--text-secondary, #94a3b8);
+  min-width: 80px;
+  font-size: 0.8rem;
+}
+
+.reviewValue {
+  color: var(--text-primary, #e2e8f0);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.badge_required {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.badge_core {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+}
+
+.badge_bonus {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+}
+
+.noSchedule {
+  color: var(--text-secondary, #94a3b8);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+/* Error */
+.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  color: #f87171;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+/* Loading */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-top-color: #0f172a;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
