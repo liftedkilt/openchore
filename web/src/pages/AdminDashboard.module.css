@@ -987,6 +987,26 @@ select.input {
   opacity: 0.2;
 }
 
+/* Save / Create button */
+.saveBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent, #4a7bff);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.saveBtn:hover {
+  opacity: 0.9;
+}
+
 /* Trigger URLs */
 .triggerInfo {
   flex: 1;
@@ -995,14 +1015,18 @@ select.input {
 
 .triggerUrl {
   display: inline-block;
-  background: var(--bg-secondary, #f0f0f0);
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary, #e0e0e0);
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
   cursor: pointer;
   word-break: break-all;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 0.35rem;
 }
 
 .triggerUrl:hover {
-  background: var(--bg-tertiary, #e0e0e0);
+  background: rgba(255, 255, 255, 0.12);
 }
