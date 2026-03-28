@@ -90,10 +90,7 @@ func TestReportDayOfWeek_Empty(t *testing.T) {
 
 // --- Tests with data ---
 // Note: DB constraint allows status IN ('pending', 'approved', 'rejected').
-// Report queries treat 'approved' as completed and 'missed' as missed.
-// Since 'missed' is not a valid DB status, the ReportMostMissed query will
-// only return results if the constraint is later updated. We test the queries
-// with the statuses the DB allows.
+// Report queries treat 'approved' as completed and 'rejected' as missed.
 
 func TestReportKidSummaries_WithData(t *testing.T) {
 	s := setupStore(t)
@@ -180,9 +177,8 @@ func TestReportKidSummaries_ExcludesAdmins(t *testing.T) {
 	}
 }
 
-func TestReportMostMissed_NoMissedStatus(t *testing.T) {
-	// With the current DB constraint, 'missed' is not a valid status,
-	// so ReportMostMissed should return empty even with rejected completions.
+func TestReportMostMissed_WithRejectedCompletions(t *testing.T) {
+	// Rejected completions count as "missed" in reports.
 	s := setupStore(t)
 	ctx := context.Background()
 
@@ -206,9 +202,14 @@ func TestReportMostMissed_NoMissedStatus(t *testing.T) {
 		t.Fatalf("ReportMostMissed: %v", err)
 	}
 
-	// 'rejected' != 'missed', so no results
-	if len(rows) != 0 {
-		t.Errorf("expected 0 missed rows (rejected != missed), got %d", len(rows))
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 missed chore row, got %d", len(rows))
+	}
+	if rows[0].ChoreName != "Dishes" {
+		t.Errorf("expected chore name Dishes, got %s", rows[0].ChoreName)
+	}
+	if rows[0].MissCount != 1 {
+		t.Errorf("expected miss count 1, got %d", rows[0].MissCount)
 	}
 }
 

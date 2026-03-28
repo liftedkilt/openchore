@@ -1333,7 +1333,7 @@ func (s *Store) ReportKidSummaries(ctx context.Context, startDate, endDate strin
 			SELECT cc.completed_by, COUNT(*) AS cnt
 			FROM chore_completions cc
 			WHERE cc.completion_date >= ? AND cc.completion_date <= ?
-			AND cc.status = 'missed'
+			AND cc.status = 'rejected'
 			GROUP BY cc.completed_by
 		) missed ON missed.completed_by = u.id
 		LEFT JOIN (
@@ -1386,7 +1386,7 @@ func (s *Store) ReportMostMissed(ctx context.Context, startDate, endDate string)
 		JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
 		JOIN chores c ON c.id = cs.chore_id
 		JOIN users u ON u.id = cc.completed_by
-		WHERE cc.status = 'missed'
+		WHERE cc.status = 'rejected'
 		AND cc.completion_date >= ? AND cc.completion_date <= ?
 		GROUP BY c.id, c.title
 		ORDER BY miss_count DESC
