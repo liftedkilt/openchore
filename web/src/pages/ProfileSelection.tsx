@@ -4,7 +4,7 @@ import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import type { User } from '../types';
 import styles from './ProfileSelection.module.css';
-import { UserCircle, Settings, Monitor } from 'lucide-react';
+import { UserCircle, Settings, Monitor, Sparkles } from 'lucide-react';
 
 export const ProfileSelection: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);

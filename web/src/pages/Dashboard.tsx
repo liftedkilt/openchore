@@ -8,6 +8,7 @@ import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flam
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
+import { localDateStr } from '../utils';
 import { QRCodeSVG } from 'qrcode.react';
 import { useThemeSound } from '../hooks/useThemeSound';
 
@@ -101,13 +102,6 @@ export const Dashboard: React.FC = () => {
       .then(data => setSystemBaseUrl(data.value))
       .catch(() => {});
   }, []);
-
-  const localDateStr = (d: Date) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  };
 
   const [date] = useState(localDateStr(new Date()));
   const todayStr = localDateStr(new Date());

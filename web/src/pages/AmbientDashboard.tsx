@@ -4,10 +4,7 @@ import { fetchAsUser } from '../api';
 import type { User, ScheduledChore, UserStreakData, PointsData } from '../types';
 import styles from './AmbientDashboard.module.css';
 import { Flame } from 'lucide-react';
-
-function localDateStr(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+import { localDateStr } from '../utils';
 
 // Assign each kid a distinct color
 const KID_COLORS = ['#38bdf8', '#a78bfa', '#f472b6', '#34d399', '#fb923c', '#facc15'];

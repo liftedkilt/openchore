@@ -2,17 +2,13 @@ import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalan
 
 const API_BASE = '/api';
 
-async function fetchWithAuth<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function fetchWithAuth<T>(path: string, options: RequestInit = {}, skipContentType = false): Promise<T> {
   const userStr = localStorage.getItem('openchore_user');
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(skipContentType ? {} : { 'Content-Type': 'application/json' }),
     ...(userStr ? { 'X-User-ID': JSON.parse(userStr).id.toString() } : {}),
     ...options.headers as Record<string, string>,
   };
-
-  if (headers['Content-Type'] === 'remove') {
-    delete headers['Content-Type'];
-  }
 
   const resp = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!resp.ok) {
@@ -101,12 +97,11 @@ export const api = {
     upload: (file: File) => {
       const formData = new FormData();
       formData.append('photo', file);
+      // skipContentType: let fetch set Content-Type with the correct multipart boundary
       return fetchWithAuth<{ url: string }>('/upload', {
         method: 'POST',
         body: formData,
-        // Don't set Content-Type header, fetch will set it correctly with boundary
-        headers: { 'Content-Type': 'remove' }
-      });
+      }, true);
     },
     listPending: () => fetchWithAuth<any[]>('/completions/pending'),
     approve: (completionId: number) => fetchWithAuth(`/completions/${completionId}/approve`, { method: 'POST' }),
