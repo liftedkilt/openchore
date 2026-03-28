@@ -8,10 +8,8 @@ import (
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/sqlite3"
+	msqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	_ "github.com/mattn/go-sqlite3"
-
 	"github.com/liftedkilt/openchore/migrations"
 )
 
@@ -21,14 +19,14 @@ func main() {
 		dbPath = "openchore.db"
 	}
 
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		log.Fatalf("failed to open database: %v", err)
 	}
 	defer db.Close()
 
 	// Run migrations to ensure schema exists
-	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
+	driver, err := msqlite.WithInstance(db, &msqlite.Config{})
 	if err != nil {
 		log.Fatalf("failed to create migration driver: %v", err)
 	}
@@ -36,7 +34,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create migration source: %v", err)
 	}
-	m, err := migrate.NewWithInstance("iofs", source, "sqlite3", driver)
+	m, err := migrate.NewWithInstance("iofs", source, "sqlite", driver)
 	if err != nil {
 		log.Fatalf("failed to create migrator: %v", err)
 	}

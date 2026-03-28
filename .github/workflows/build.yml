@@ -21,11 +21,8 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install gcc for CGO
-        run: sudo apt-get update && sudo apt-get install -y gcc
-
       - name: Run tests
-        run: go test ./...
+        run: CGO_ENABLED=0 go test ./...
 
   build-api:
     needs: test

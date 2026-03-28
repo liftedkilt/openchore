@@ -1,13 +1,11 @@
 FROM docker.io/library/golang:1.25-alpine AS builder
 
-RUN apk add --no-cache gcc musl-dev
-
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=1 go build -o /openchore cmd/server/main.go
+RUN CGO_ENABLED=0 go build -o /openchore cmd/server/main.go
 
 FROM docker.io/library/alpine:3.21
 

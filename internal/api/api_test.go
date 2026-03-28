@@ -12,10 +12,8 @@ import (
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
-	msqlite "github.com/golang-migrate/migrate/v4/database/sqlite3"
+	msqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	_ "github.com/mattn/go-sqlite3"
-
 	"github.com/liftedkilt/openchore/internal/api"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/webhook"
@@ -30,7 +28,7 @@ type testEnv struct {
 func setupTest(t *testing.T) *testEnv {
 	t.Helper()
 
-	db, err := sql.Open("sqlite3", ":memory:?_foreign_keys=on&_busy_timeout=5000")
+	db, err := sql.Open("sqlite", ":memory:?_foreign_keys=on&_busy_timeout=5000")
 	if err != nil {
 		t.Fatalf("failed to open db: %v", err)
 	}
@@ -44,7 +42,7 @@ func setupTest(t *testing.T) *testEnv {
 	if err != nil {
 		t.Fatalf("failed to create migration source: %v", err)
 	}
-	m, err := migrate.NewWithInstance("iofs", source, "sqlite3", driver)
+	m, err := migrate.NewWithInstance("iofs", source, "sqlite", driver)
 	if err != nil {
 		t.Fatalf("failed to create migrator: %v", err)
 	}

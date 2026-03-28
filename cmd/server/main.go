@@ -9,10 +9,8 @@ import (
 	"os"
 
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/sqlite3"
+	msqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	_ "github.com/mattn/go-sqlite3"
-
 	"github.com/liftedkilt/openchore/internal/api"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/webhook"
@@ -29,7 +27,7 @@ func main() {
 		port = "8080"
 	}
 
-	db, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
 	if err != nil {
 		log.Fatalf("failed to open database: %v", err)
 	}
@@ -57,7 +55,7 @@ func main() {
 }
 
 func runMigrations(db *sql.DB) error {
-	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
+	driver, err := msqlite.WithInstance(db, &msqlite.Config{})
 	if err != nil {
 		return fmt.Errorf("creating migration driver: %w", err)
 	}
@@ -67,7 +65,7 @@ func runMigrations(db *sql.DB) error {
 		return fmt.Errorf("creating migration source: %w", err)
 	}
 
-	m, err := migrate.NewWithInstance("iofs", source, "sqlite3", driver)
+	m, err := migrate.NewWithInstance("iofs", source, "sqlite", driver)
 	if err != nil {
 		return fmt.Errorf("creating migrator: %w", err)
 	}
