@@ -314,7 +314,7 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.CompletionDate == "" {
-		req.CompletionDate = time.Now().Format("2006-01-02")
+		req.CompletionDate = time.Now().Format(model.DateFormat)
 	}
 
 	// Get the schedule to check time lock
@@ -340,7 +340,7 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 
 	// Check expiry
 	isExpired := false
-	if schedule.DueBy != nil && *schedule.DueBy != "" && req.CompletionDate == now.Format("2006-01-02") {
+	if schedule.DueBy != nil && *schedule.DueBy != "" && req.CompletionDate == now.Format(model.DateFormat) {
 		if nowTime > *schedule.DueBy {
 			isExpired = true
 		}
@@ -495,7 +495,7 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 	}
 	dateStr := r.URL.Query().Get("date")
 	if dateStr == "" {
-		dateStr = time.Now().Format("2006-01-02")
+		dateStr = time.Now().Format(model.DateFormat)
 	}
 
 	// Get completion before deleting so we can reverse points

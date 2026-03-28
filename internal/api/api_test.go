@@ -17,6 +17,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/liftedkilt/openchore/internal/api"
+	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/webhook"
 	"github.com/liftedkilt/openchore/migrations"
@@ -1580,7 +1581,7 @@ func TestExpiryPenaltyBlock(t *testing.T) {
 	// Try to complete — should be blocked because it's past 00:01
 	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
 		"completed_by":    kidID,
-		"completion_date": time.Now().Format("2006-01-02"),
+		"completion_date": time.Now().Format(model.DateFormat),
 	}, adminHeaders(), http.StatusUnprocessableEntity)
 }
 
@@ -1604,7 +1605,7 @@ func TestExpiryPenaltyNoPoints(t *testing.T) {
 	// Should allow completion
 	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
 		"completed_by":    kidID,
-		"completion_date": time.Now().Format("2006-01-02"),
+		"completion_date": time.Now().Format(model.DateFormat),
 	}, adminHeaders(), http.StatusCreated)
 
 	// But should earn 0 points
@@ -1642,7 +1643,7 @@ func TestExpiryPenaltyDeduction(t *testing.T) {
 	// Complete late — should deduct 5 points
 	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
 		"completed_by":    kidID,
-		"completion_date": time.Now().Format("2006-01-02"),
+		"completion_date": time.Now().Format(model.DateFormat),
 	}, adminHeaders(), http.StatusCreated)
 
 	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
@@ -1674,7 +1675,7 @@ func TestExpiryPenaltyNotExpired(t *testing.T) {
 
 	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
 		"completed_by":    kidID,
-		"completion_date": time.Now().Format("2006-01-02"),
+		"completion_date": time.Now().Format(model.DateFormat),
 	}, adminHeaders(), http.StatusCreated)
 
 	// Should get full 10 points, no penalty applied
@@ -1826,7 +1827,7 @@ func TestUncompleteExpiryPenaltyRefund(t *testing.T) {
 		"expiry_penalty_value": 5,
 	}, adminHeaders())
 
-	today := time.Now().Format("2006-01-02")
+	today := time.Now().Format(model.DateFormat)
 
 	// Complete late — penalty of -5 applied, balance should be 45
 	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
@@ -1868,7 +1869,7 @@ func TestUncompleteNormalPointsReversed(t *testing.T) {
 		"expiry_penalty_value": 5,
 	}, adminHeaders())
 
-	today := time.Now().Format("2006-01-02")
+	today := time.Now().Format(model.DateFormat)
 
 	// Complete on time — earns 10 points
 	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{

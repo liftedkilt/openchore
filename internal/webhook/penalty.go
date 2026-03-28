@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/store"
 )
 
@@ -46,7 +47,7 @@ func (pc *DecayChecker) check(ctx context.Context) {
 	}
 
 	now := time.Now()
-	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
+	yesterday := now.AddDate(0, 0, -1).Format(model.DateFormat)
 
 	for _, u := range users {
 		if u.Role != "child" {

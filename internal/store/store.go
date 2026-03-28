@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/liftedkilt/openchore/internal/model"
@@ -208,7 +209,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 	currentTime := now.Format("15:04")
 
 	for _, dateStr := range dates {
-		t, err := time.Parse("2006-01-02", dateStr)
+		t, err := time.Parse(model.DateFormat, dateStr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid date %s: %w", dateStr, err)
 		}
@@ -252,7 +253,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			// Check if chore has expired (past due_by time and not completed)
 			if sc.DueBy != nil && *sc.DueBy != "" && !sc.Completed {
 				// Only check expiry for today's chores
-				if dateStr == now.Format("2006-01-02") && currentTime > *sc.DueBy {
+				if dateStr == now.Format(model.DateFormat) && currentTime > *sc.DueBy {
 					sc.Expired = true
 				}
 			}
@@ -789,7 +790,7 @@ func (s *Store) GetUserStreak(ctx context.Context, userID int64) (*model.UserStr
 }
 
 func (s *Store) RecalculateStreak(ctx context.Context, userID int64, today string) error {
-	now, err := time.Parse("2006-01-02", today)
+	now, err := time.Parse(model.DateFormat, today)
 	if err != nil {
 		return err
 	}
@@ -798,7 +799,7 @@ func (s *Store) RecalculateStreak(ctx context.Context, userID int64, today strin
 	// Walk backwards from yesterday (today may be incomplete)
 	for i := 1; i <= 365; i++ {
 		d := now.AddDate(0, 0, -i)
-		dateStr := d.Format("2006-01-02")
+		dateStr := d.Format(model.DateFormat)
 		chores, err := s.GetScheduledChoresForUser(ctx, userID, []string{dateStr}, d)
 		if err != nil {
 			return err
@@ -851,7 +852,7 @@ func (s *Store) RecalculateStreak(ctx context.Context, userID int64, today strin
 	var startDate *string
 	if streak > 0 {
 		d := now.AddDate(0, 0, -(streak - 1))
-		s := d.Format("2006-01-02")
+		s := d.Format(model.DateFormat)
 		startDate = &s
 	}
 
@@ -859,7 +860,7 @@ func (s *Store) RecalculateStreak(ctx context.Context, userID int64, today strin
 	if todayComplete {
 		lastCompleted = &today
 	} else if streak > 0 {
-		yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
+		yesterday := now.AddDate(0, 0, -1).Format(model.DateFormat)
 		lastCompleted = &yesterday
 	}
 
@@ -1158,31 +1159,11 @@ func containsEvent(events, event string) bool {
 
 func splitEvents(events string) []string {
 	var result []string
-	current := ""
-	for _, c := range events {
-		if c == ',' {
-			trimmed := ""
-			for _, r := range current {
-				if r != ' ' {
-					trimmed += string(r)
-				}
-			}
-			if trimmed != "" {
-				result = append(result, trimmed)
-			}
-			current = ""
-		} else {
-			current += string(c)
+	for _, s := range strings.Split(events, ",") {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			result = append(result, s)
 		}
-	}
-	trimmed := ""
-	for _, r := range current {
-		if r != ' ' {
-			trimmed += string(r)
-		}
-	}
-	if trimmed != "" {
-		result = append(result, trimmed)
 	}
 	return result
 }
@@ -1258,7 +1239,7 @@ func (s *Store) GetExpiredChores(ctx context.Context, date string, currentTime s
 		  AND (cs.start_date IS NULL OR cs.start_date <= ?)
 		  AND (cs.end_date IS NULL OR cs.end_date >= ?)`,
 		date, currentTime,
-		func() int { t, _ := time.Parse("2006-01-02", date); return int(t.Weekday()) }(),
+		func() int { t, _ := time.Parse(model.DateFormat, date); return int(t.Weekday()) }(),
 		date, date, date, date, date)
 	if err != nil {
 		return nil, err
