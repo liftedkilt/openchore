@@ -2,7 +2,7 @@
 
 ## Development Workflow
 - **Migrations:** All schema changes must be accompanied by an Up and Down migration in `migrations/`.
-- **Seed Data:** `seed.go` is used for development (`make dev` or `make seed`). It is **MANDATORY** to update `seed.go` to match any database schema changes (e.g., new required columns, table renames).
+- **Seed Data:** `config/config.example.yaml` defines the development seed data. The server auto-applies `config/config.yaml` on first boot when the DB is empty. `make dev` copies the example if needed, wipes the DB, and starts both servers.
 - **Backend:** Go (Standard Library + SQL).
 - **Frontend:** React (TypeScript) + Vanilla CSS. Prefer functional components and hooks.
 
