@@ -4,7 +4,7 @@ import { api } from '../api';
 import type { Chore, User, ChoreSchedule, Reward, PointBalance, PointTransaction, StreakRewardItem, Theme, Webhook, WebhookDelivery, UserDecayConfig } from '../types';
 import { DAY_NAMES } from '../types';
 import styles from './AdminDashboard.module.css';
-import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, CalendarPlus, Gift, Coins, Flame, Undo2, Activity, Settings, Check } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, CalendarPlus, Gift, Coins, Flame, Undo2, Activity, Settings, Check, Pause, Play } from 'lucide-react';
 import clsx from 'clsx';
 
 type Tab = 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'settings';
@@ -1689,6 +1689,19 @@ const UsersTab: React.FC = () => {
     load();
   };
 
+  const handleTogglePause = async (user: User) => {
+    try {
+      if (user.paused) {
+        await api.users.unpause(user.id);
+      } else {
+        await api.users.pause(user.id);
+      }
+      load();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleSaved = () => {
     setShowForm(false);
     setEditingUser(null);
@@ -1714,7 +1727,7 @@ const UsersTab: React.FC = () => {
 
       <div className={styles.list}>
         {users.map(u => (
-          <div key={u.id} className={styles.listItem}>
+          <div key={u.id} className={clsx(styles.listItem, u.paused && styles.listItemPaused)}>
             <div className={styles.listItemMain}>
               <div className={styles.userAvatar}>
                 {u.avatar_url ? <img src={u.avatar_url} alt={u.name} /> : <div className={styles.userAvatarPlaceholder} />}
@@ -1723,10 +1736,20 @@ const UsersTab: React.FC = () => {
                 <h3 className={styles.listItemTitle}>{u.name}</h3>
                 <div className={styles.listItemMeta}>
                   <span className={clsx(styles.badge, u.role === 'admin' ? styles.badge_admin : styles.badge_child)}>{u.role}</span>
+                  {u.paused && <span className={clsx(styles.badge, styles.badge_paused)}>Paused</span>}
                   {u.age && <span>Age {u.age}</span>}
                 </div>
               </div>
               <div className={styles.listItemActions}>
+                {u.role === 'child' && (
+                  <button
+                    className={clsx(styles.iconBtn, u.paused && styles.iconBtnActive)}
+                    onClick={() => handleTogglePause(u)}
+                    title={u.paused ? 'Unpause (resume chores)' : 'Pause (vacation/sick mode)'}
+                  >
+                    {u.paused ? <Play size={16} /> : <Pause size={16} />}
+                  </button>
+                )}
                 {u.role === 'child' && (
                   <button className={styles.iconBtn} onClick={() => setExpandedDecay(expandedDecay === u.id ? null : u.id)} title="Points decay settings">
                     <Clock size={16} />

@@ -729,47 +729,75 @@ export const Dashboard: React.FC = () => {
         />
       )}
 
-      {view === 'daily' && renderProgressBar()}
-      {view === 'daily' && renderPointsSummary()}
-      {view === 'daily' && renderStreakBanner()}
-
-      <nav className={styles.nav}>
-        <button
-          className={clsx(styles.navItem, view === 'daily' && styles.navItemActive)}
-          onClick={() => setView('daily')}
-        >
-          <LayoutDashboard size={18} />
-          Today
-        </button>
-        <button
-          className={clsx(styles.navItem, view === 'weekly' && styles.navItemActive)}
-          onClick={() => setView('weekly')}
-        >
-          <Calendar size={18} />
-          Week
-        </button>
-        <button
-          className={clsx(styles.navItem, view === 'rewards' && styles.navItemActive)}
-          onClick={() => setView('rewards')}
-        >
-          <ShoppingBag size={18} />
-          Rewards
-        </button>
-      </nav>
-
-      <main className={styles.content}>
-        {view === 'rewards' ? (
-          renderRewardsView()
-        ) : chores.length === 0 ? (
-          <div className={styles.empty}>
-            <Trophy size={48} className={styles.emptyIcon} />
-            <h3>{config.messages.allDone}</h3>
-            <p>{config.messages.empty}</p>
+      {user?.paused ? (
+        <>
+          <div className={styles.pausedBanner}>
+            <div className={styles.pausedIcon}>🏖️</div>
+            <h2 className={styles.pausedTitle}>You're on a break!</h2>
+            <p className={styles.pausedText}>Enjoy your time off. Your chores are paused and no points will be deducted while you're away.</p>
           </div>
-        ) : (
-          view === 'daily' ? renderDailyView() : renderWeeklyView()
-        )}
-      </main>
+
+          <nav className={styles.nav}>
+            <button
+              className={clsx(styles.navItem, view === 'rewards' && styles.navItemActive)}
+              onClick={() => setView('rewards')}
+            >
+              <ShoppingBag size={18} />
+              Rewards
+            </button>
+          </nav>
+
+          {view === 'rewards' && (
+            <main className={styles.content}>
+              {renderRewardsView()}
+            </main>
+          )}
+        </>
+      ) : (
+        <>
+          {view === 'daily' && renderProgressBar()}
+          {view === 'daily' && renderPointsSummary()}
+          {view === 'daily' && renderStreakBanner()}
+
+          <nav className={styles.nav}>
+            <button
+              className={clsx(styles.navItem, view === 'daily' && styles.navItemActive)}
+              onClick={() => setView('daily')}
+            >
+              <LayoutDashboard size={18} />
+              Today
+            </button>
+            <button
+              className={clsx(styles.navItem, view === 'weekly' && styles.navItemActive)}
+              onClick={() => setView('weekly')}
+            >
+              <Calendar size={18} />
+              Week
+            </button>
+            <button
+              className={clsx(styles.navItem, view === 'rewards' && styles.navItemActive)}
+              onClick={() => setView('rewards')}
+            >
+              <ShoppingBag size={18} />
+              Rewards
+            </button>
+          </nav>
+
+          <main className={styles.content}>
+            {view === 'rewards' ? (
+              renderRewardsView()
+            ) : chores.length === 0 ? (
+              <div className={styles.empty}>
+                <Trophy size={48} className={styles.emptyIcon} />
+                <h3>{config.messages.allDone}</h3>
+                <p>{config.messages.empty}</p>
+              </div>
+            ) : (
+              view === 'daily' ? renderDailyView() : renderWeeklyView()
+            )}
+          </main>
+        </>
+      )}
     </div>
   );
 };

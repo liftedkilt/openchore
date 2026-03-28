@@ -21,9 +21,13 @@ func New(db *sql.DB) *Store {
 // --- Users ---
 
 func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
+	paused := 0
+	if u.Paused {
+		paused = 1
+	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO users (name, avatar_url, role, age, theme) VALUES (?, ?, ?, ?, ?)`,
-		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme)
+		`INSERT INTO users (name, avatar_url, role, age, theme, paused) VALUES (?, ?, ?, ?, ?, ?)`,
+		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, paused)
 	if err != nil {
 		return err
 	}
@@ -33,18 +37,20 @@ func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
 
 func (s *Store) GetUser(ctx context.Context, id int64) (*model.User, error) {
 	u := &model.User{}
+	var paused int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, created_at FROM users WHERE id = ?`, id).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.CreatedAt)
+		`SELECT id, name, avatar_url, role, age, theme, paused, created_at FROM users WHERE id = ?`, id).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &paused, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
+	u.Paused = paused == 1
 	return u, err
 }
 
 func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, created_at FROM users ORDER BY name`)
+		`SELECT id, name, avatar_url, role, age, theme, paused, created_at FROM users ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -52,9 +58,11 @@ func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 	var users []model.User
 	for rows.Next() {
 		var u model.User
-		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.CreatedAt); err != nil {
+		var paused int
+		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &paused, &u.CreatedAt); err != nil {
 			return nil, err
 		}
+		u.Paused = paused == 1
 		users = append(users, u)
 	}
 	return users, rows.Err()
@@ -412,9 +420,13 @@ func (s *Store) ListSettings(ctx context.Context) (map[string]string, error) {
 // --- Users (update) ---
 
 func (s *Store) UpdateUser(ctx context.Context, u *model.User) error {
+	paused := 0
+	if u.Paused {
+		paused = 1
+	}
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE users SET name=?, avatar_url=?, role=?, age=?, theme=? WHERE id=?`,
-		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.ID)
+		`UPDATE users SET name=?, avatar_url=?, role=?, age=?, theme=?, paused=? WHERE id=?`,
+		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, paused, u.ID)
 	return err
 }
 
@@ -1242,7 +1254,8 @@ func (s *Store) GetExpiredChores(ctx context.Context, date string, currentTime s
 		JOIN chores c ON c.id = cs.chore_id
 		JOIN users u ON u.id = cs.assigned_to
 		LEFT JOIN chore_completions cc ON cc.chore_schedule_id = cs.id AND cc.completion_date = ?
-		WHERE cs.due_by IS NOT NULL
+		WHERE u.paused = 0
+		  AND cs.due_by IS NOT NULL
 		  AND cs.due_by != ''
 		  AND cs.due_by <= ?
 		  AND cc.id IS NULL

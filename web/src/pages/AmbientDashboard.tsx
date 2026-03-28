@@ -175,7 +175,7 @@ export const AmbientDashboard: React.FC = () => {
   const fetchData = useCallback(async () => {
     try {
       const allUsers: User[] = await api.users.list();
-      const childUsers = allUsers.filter(u => u.role === 'child');
+      const childUsers = allUsers.filter(u => u.role === 'child' && !u.paused);
       const today = localDateStr(new Date());
 
       const results = await Promise.allSettled(

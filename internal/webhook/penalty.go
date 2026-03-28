@@ -50,7 +50,7 @@ func (pc *DecayChecker) check(ctx context.Context) {
 	yesterday := now.AddDate(0, 0, -1).Format(model.DateFormat)
 
 	for _, u := range users {
-		if u.Role != "child" {
+		if u.Role != "child" || u.Paused {
 			continue
 		}
 

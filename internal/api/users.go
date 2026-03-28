@@ -213,6 +213,52 @@ func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, existing)
 }
 
+func (h *UserHandler) Pause(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+	existing, err := h.store.GetUser(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get user")
+		return
+	}
+	if existing == nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	existing.Paused = true
+	if err := h.store.UpdateUser(r.Context(), existing); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to pause user")
+		return
+	}
+	writeJSON(w, http.StatusOK, existing)
+}
+
+func (h *UserHandler) Unpause(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+	existing, err := h.store.GetUser(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get user")
+		return
+	}
+	if existing == nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	existing.Paused = false
+	if err := h.store.UpdateUser(r.Context(), existing); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to unpause user")
+		return
+	}
+	writeJSON(w, http.StatusOK, existing)
+}
+
 func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	id, err := urlParamInt64(r, "id")
 	if err != nil {

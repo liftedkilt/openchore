@@ -707,6 +707,34 @@
   white-space: nowrap;
 }
 
+/* --- Paused State --- */
+.pausedBanner {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: var(--bg-secondary);
+  border-radius: 20px;
+  margin-bottom: 1.5rem;
+}
+
+.pausedIcon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.pausedTitle {
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.pausedText {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  max-width: 320px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
 /* --- Empty State --- */
 .empty {
   text-align: center;

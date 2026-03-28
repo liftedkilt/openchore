@@ -196,6 +196,7 @@ export interface User {
   role: 'admin' | 'child';
   age?: number;
   theme: Theme;
+  paused: boolean;
   created_at: string;
 }
 
