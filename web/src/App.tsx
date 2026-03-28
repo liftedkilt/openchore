@@ -6,6 +6,7 @@ import { Dashboard } from './pages/Dashboard';
 import { AdminPasscode } from './pages/AdminPasscode';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AmbientDashboard } from './pages/AmbientDashboard';
+import { Reports } from './pages/Reports';
 import { SetupWizard } from './pages/SetupWizard';
 import { PhotoUpload } from './pages/PhotoUpload';
 import { useIdleRedirect } from './hooks/useIdleRedirect';
@@ -31,6 +32,9 @@ export const App: React.FC = () => {
       <Route path="/admin" element={<AdminPasscode />} />
       <Route path="/admin/dashboard" element={
         <RequireAdmin><AdminDashboard /></RequireAdmin>
+      } />
+      <Route path="/admin/reports" element={
+        <RequireAdmin><Reports /></RequireAdmin>
       } />
       <Route path="/ambient" element={<AmbientDashboard />} />
       <Route

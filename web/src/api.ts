@@ -164,6 +164,10 @@ export const api = {
         body: JSON.stringify(data),
       }),
   },
+  reports: {
+    get: (period: string, date: string) =>
+      fetchWithAuth<any>(`/admin/reports?period=${period}&date=${date}`),
+  },
   admin: {
     verifyPasscode: (passcode: string) =>
       fetchPublic<{ valid: boolean }>('/admin/verify', {
