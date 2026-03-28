@@ -43,7 +43,7 @@ func main() {
 	// Load and apply config file (only populates an empty database)
 	configPath := os.Getenv("CONFIG_PATH")
 	if configPath == "" {
-		configPath = "config.yaml"
+		configPath = "config/config.yaml"
 	}
 	cfg, err := config.Load(configPath)
 	if err != nil {

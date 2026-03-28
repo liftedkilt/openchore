@@ -8,12 +8,10 @@ services:
     restart: unless-stopped
     environment:
       - TZ=America/Los_Angeles
-      - CONFIG_PATH=/app/config.yaml
+      - CONFIG_PATH=/app/config/config.yaml
     volumes:
       - openchore-data:/data
-      # Optional: mount a config file to bootstrap the database on first start.
-      # Create config.yaml from config.example.yaml, then uncomment:
-      # - ./config.yaml:/app/config.yaml:ro
+      - ./config:/app/config:ro
     expose:
       - "8080"
     healthcheck:
