@@ -24,18 +24,18 @@
 - [x] Configurable expiry penalties per schedule (block/no_points/penalty)
 - [x] Bonus chore points only count once required + core chores are complete
 
-## Phase 3: Approval & Notifications
-- [ ] Parent approval workflow for chore completions (pending/approved/rejected)
-- [ ] Push notifications for approval requests
-- [ ] Photo proof of completion (photo_url on completions)
-- [ ] Weekly report for parents (completion rates, streaks, points earned)
+## Phase 3: Approval & Notifications (Partially Complete)
+- [x] Parent approval workflow for chore completions (pending/approved/rejected)
+- [x] Discord notifications for approval requests and chore events
+- [x] Photo proof of completion (photo_url on completions)
+- [x] Admin reports page (weekly/monthly/yearly views with charts — kid scorecards, most-missed chores, completion trends, category breakdown, points flow, day-of-week analysis)
 
 ## Phase 4: Smart Scheduling
 - [ ] Schedule overrides (temporary changes for a specific week without editing recurring schedule)
 - [ ] Proposal system (proposals table: type, payload JSON, status, reviewed_by)
 - [ ] LLM-powered chore rebalancing (calendar integration detects absences, generates proposals)
 - [ ] Chore rotation — auto-rotate assignments weekly
-- [ ] Vacation/sick mode — pause a kid's chores without deleting schedules
+- [x] Vacation/sick mode — pause a kid's chores without deleting schedules
 - [ ] Fair distribution dashboard for parents
 
 ## Phase 5: Social & Gamification (Partially Complete)
@@ -45,12 +45,12 @@
 - [ ] Leaderboard (optional per-family setting)
 - [ ] Chore swaps/trading between siblings (parent-approved)
 - [ ] Helper mode — partial credit for helping on someone else's chore
-- [ ] Family chores (assignment_type: family — anyone can complete, points only if their own chores are done)
+- [x] Family chores (assignment_type: family — anyone can complete, points only if their own chores are done)
 
 ## Phase 6: Integrations & Plugins (Partially Complete)
 - [x] Webhook system with HMAC signing and delivery logging
 - [ ] Plugin architecture for external chore sources (source + external_id on chores)
-- [ ] Home Assistant integration (e.g., laundry done notification creates a chore)
+- [x] Chore trigger webhooks — per-chore trigger URLs for external systems (Home Assistant, etc.) with cooldown, default assignee, and query param overrides
 - [ ] Calendar integration (Google/Apple Calendar for absence detection)
 - [ ] Event bus for plugin subscriptions (chore.completed, chore.created, etc.)
 
@@ -61,5 +61,5 @@
 - [x] Time estimates on chores (estimated_minutes)
 - [x] Tooltips on admin UI form fields
 - [ ] Text-to-speech for younger kids (age/birth_date on users, simplified TTS descriptions)
-- [ ] Morning/afternoon/evening chore grouping (using available_at)
+- [x] Morning/afternoon/evening chore grouping (using available_at)
 - [ ] Chore templates (age-appropriate packs parents can import)
