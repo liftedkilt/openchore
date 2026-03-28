@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Broom handle -->
+  <line x1="20" y1="8" x2="38" y2="42" stroke="#8B6914" stroke-width="4" stroke-linecap="round"/>
+  <!-- Broom head binding -->
+  <rect x="30" y="40" width="20" height="5" rx="1.5" fill="#8B6914" transform="rotate(-10, 40, 42)"/>
+  <!-- Broom bristles -->
+  <path d="M28 44 C26 56, 24 58, 20 60" stroke="#D4A843" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M32 45 C31 57, 30 59, 28 61" stroke="#D4A843" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M36 44 C36 56, 36 58, 36 61" stroke="#D4A843" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M40 43 C41 55, 42 57, 44 60" stroke="#D4A843" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M44 42 C46 54, 48 56, 52 59" stroke="#D4A843" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- Sparkle -->
+  <g fill="#FFD700">
+    <polygon points="12,18 14,14 16,18 14,22" />
+    <polygon points="8,18 14,16 20,18 14,20" />
+  </g>
+  <g fill="#FFD700" transform="translate(40,6) scale(0.6)">
+    <polygon points="4,8 6,4 8,8 6,12" />
+    <polygon points="0,8 6,6 12,8 6,10" />
+  </g>
+</svg>
