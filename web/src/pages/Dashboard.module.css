@@ -131,6 +131,20 @@
   color: var(--text-primary);
 }
 
+.ttsToggle {
+  color: var(--text-secondary);
+  padding: 0.5rem;
+  border-radius: 50%;
+}
+
+.ttsToggle:hover {
+  background: var(--bg-secondary);
+}
+
+.ttsToggleActive {
+  color: var(--accent-blue);
+}
+
 /* --- Theme Picker --- */
 .themePicker {
   display: grid;

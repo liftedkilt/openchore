@@ -4,7 +4,7 @@ import { useTheme } from '../ThemeContext';
 import { api } from '../api';
 import type { ScheduledChore, UserStreakData, PointsData, Reward, RedemptionHistory, Theme } from '../types';
 import styles from './Dashboard.module.css';
-import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2 } from 'lucide-react';
+import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
@@ -83,9 +83,13 @@ export const Dashboard: React.FC = () => {
   const { user, setUser } = useAuth();
   const { theme, setTheme, config } = useTheme();
   const { playComplete, playAllDone } = useThemeSound();
-  const { speak } = useTextToSpeech();
+  const { speak, stop } = useTextToSpeech();
   const prevProgressRef = useRef(0);
-  const showTts = user?.age !== undefined && user.age <= 7;
+  const [ttsEnabled, setTtsEnabled] = useState(() => {
+    const saved = localStorage.getItem(`openchore_tts_${user?.id}`);
+    if (saved !== null) return saved === '1';
+    return user?.age !== undefined && user.age <= 7;
+  });
   const [view, setView] = useState<'daily' | 'weekly' | 'rewards'>('daily');
   const [chores, setChores] = useState<ScheduledChore[]>([]);
   const [streakData, setStreakData] = useState<UserStreakData | null>(null);
@@ -431,7 +435,7 @@ export const Dashboard: React.FC = () => {
             {chore.icon && <span className={styles.choreIcon}>{chore.icon}</span>}
             {chore.title}
             {isLocked && <Lock size={14} className={styles.titleLockIcon} />}
-            {showTts && (
+            {ttsEnabled && (
               <button
                 className={styles.ttsBtn}
                 onClick={(e) => { e.stopPropagation(); speak(chore.title + (chore.description ? '. ' + chore.description : '')); }}
@@ -777,6 +781,18 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
         <div className={styles.headerActions}>
+          <button
+            onClick={() => {
+              const next = !ttsEnabled;
+              setTtsEnabled(next);
+              localStorage.setItem(`openchore_tts_${user?.id}`, next ? '1' : '0');
+              if (!next) stop();
+            }}
+            className={clsx(styles.ttsToggle, ttsEnabled && styles.ttsToggleActive)}
+            aria-label={ttsEnabled ? 'Disable read aloud' : 'Enable read aloud'}
+          >
+            {ttsEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+          </button>
           <button onClick={() => { setShowThemePicker(!showThemePicker); setShowAvatarPicker(false); }} className={styles.themeBtn} aria-label="Change theme">
             <Palette size={20} />
           </button>
