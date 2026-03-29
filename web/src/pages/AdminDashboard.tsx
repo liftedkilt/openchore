@@ -36,12 +36,7 @@ export const AdminDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!sessionStorage.getItem('openchore_admin')) {
-      navigate('/admin', { replace: true });
-      return;
-    }
     const ensureAdminUser = async () => {
-      // Double-check in case sessionStorage was cleared between the outer check and this running
       if (!sessionStorage.getItem('openchore_admin')) {
         navigate('/admin', { replace: true });
         return;
@@ -308,10 +303,7 @@ const ScheduleManager: React.FC<{
   const [expiryPenalty, setExpiryPenalty] = useState<'block' | 'no_points' | 'penalty'>('block');
   const [expiryPenaltyValue, setExpiryPenaltyValue] = useState('5');
   const [intervalDays, setIntervalDays] = useState('2');
-  const [intervalStart, setIntervalStart] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  });
+  const [intervalStart, setIntervalStart] = useState(() => new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -342,44 +334,32 @@ const ScheduleManager: React.FC<{
     setSaving(true);
 
     try {
-      for (const userId of selectedUsers) {
-        const penaltyFields = dueBy ? {
-          expiry_penalty: expiryPenalty,
-          ...(expiryPenalty === 'penalty' ? { expiry_penalty_value: parseInt(expiryPenaltyValue) || 0 } : {}),
-        } : {};
+      const penaltyFields = dueBy ? {
+        expiry_penalty: expiryPenalty,
+        ...(expiryPenalty === 'penalty' ? { expiry_penalty_value: parseInt(expiryPenaltyValue) || 0 } : {}),
+      } : {};
+      const common = {
+        available_at: availableAt || undefined,
+        due_by: dueBy || undefined,
+        ...penaltyFields,
+      };
 
+      const promises: Promise<unknown>[] = [];
+      for (const userId of selectedUsers) {
         if (schedType === 'recurring') {
           for (const day of selectedDays) {
-            await api.chores.createSchedule(choreId, {
-              assigned_to: userId,
-              day_of_week: day,
-              available_at: availableAt || undefined,
-              due_by: dueBy || undefined,
-              ...penaltyFields,
-            });
+            promises.push(api.chores.createSchedule(choreId, { assigned_to: userId, day_of_week: day, ...common }));
           }
         } else if (schedType === 'interval') {
           const interval = parseInt(intervalDays);
           if (!interval || interval < 1 || !intervalStart) continue;
-          await api.chores.createSchedule(choreId, {
-            assigned_to: userId,
-            recurrence_interval: interval,
-            recurrence_start: intervalStart,
-            available_at: availableAt || undefined,
-            due_by: dueBy || undefined,
-            ...penaltyFields,
-          });
+          promises.push(api.chores.createSchedule(choreId, { assigned_to: userId, recurrence_interval: interval, recurrence_start: intervalStart, ...common }));
         } else {
           if (!specificDate) continue;
-          await api.chores.createSchedule(choreId, {
-            assigned_to: userId,
-            specific_date: specificDate,
-            available_at: availableAt || undefined,
-            due_by: dueBy || undefined,
-            ...penaltyFields,
-          });
+          promises.push(api.chores.createSchedule(choreId, { assigned_to: userId, specific_date: specificDate, ...common }));
         }
       }
+      await Promise.all(promises);
 
       setAdding(false);
       setSelectedDays([]);
