@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, type TouchEvent as ReactTouchEvent } from 'react';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../ThemeContext';
 import { api } from '../api';
 import type { ScheduledChore, UserStreakData, PointsData, Reward, RedemptionHistory, Theme } from '../types';
 import styles from './Dashboard.module.css';
-import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2 } from 'lucide-react';
+import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
@@ -13,6 +13,7 @@ import { getTimePeriod, groupChoresByTimePeriod, isTimePeriodActive, isTimePerio
 import type { TimePeriod } from '../timeGrouping';
 import { QRCodeSVG } from 'qrcode.react';
 import { useThemeSound } from '../hooks/useThemeSound';
+import { useTextToSpeech } from '../hooks/useTextToSpeech';
 
 const QRCodeModal: React.FC<{
   chore: ScheduledChore;
@@ -82,7 +83,9 @@ export const Dashboard: React.FC = () => {
   const { user, setUser } = useAuth();
   const { theme, setTheme, config } = useTheme();
   const { playComplete, playAllDone } = useThemeSound();
+  const { speak } = useTextToSpeech();
   const prevProgressRef = useRef(0);
+  const showTts = user?.age !== undefined && user.age <= 7;
   const [view, setView] = useState<'daily' | 'weekly' | 'rewards'>('daily');
   const [chores, setChores] = useState<ScheduledChore[]>([]);
   const [streakData, setStreakData] = useState<UserStreakData | null>(null);
@@ -330,6 +333,41 @@ export const Dashboard: React.FC = () => {
 
   // Time period grouping functions imported from '../timeGrouping'
 
+  // --- Swipe-to-complete ---
+  const swipeRef = useRef<{ startX: number; startY: number; cardEl: HTMLDivElement | null; choreKey: string }>({ startX: 0, startY: 0, cardEl: null, choreKey: '' });
+
+  const handleTouchStart = (e: ReactTouchEvent<HTMLDivElement>, choreKey: string) => {
+    const touch = e.touches[0];
+    swipeRef.current = { startX: touch.clientX, startY: touch.clientY, cardEl: e.currentTarget, choreKey };
+  };
+
+  const handleTouchMove = (e: ReactTouchEvent<HTMLDivElement>) => {
+    const { startX, startY, cardEl } = swipeRef.current;
+    if (!cardEl) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    // Only track horizontal swipes (ignore vertical scrolling)
+    if (Math.abs(dy) > Math.abs(dx)) return;
+    const clamped = Math.max(0, Math.min(dx, 120));
+    if (clamped > 10) {
+      const progress = Math.min(clamped / 100, 1);
+      cardEl.style.transform = `translateX(${clamped}px)`;
+      cardEl.style.background = `rgba(74, 222, 128, ${progress * 0.15})`;
+    }
+  };
+
+  const handleSwipeEnd = (e: ReactTouchEvent<HTMLDivElement>, chore: ScheduledChore) => {
+    const { startX, cardEl } = swipeRef.current;
+    if (!cardEl) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    cardEl.style.transform = '';
+    cardEl.style.background = '';
+    swipeRef.current = { startX: 0, startY: 0, cardEl: null, choreKey: '' };
+    if (dx >= 100 && !chore.completed && chore.available && !chore.expired) {
+      handleToggleComplete(chore);
+    }
+  };
+
   // --- Renders ---
   const renderChoreCard = (chore: ScheduledChore, isWeekly = false) => {
     const isToday = chore.date === todayStr;
@@ -370,22 +408,38 @@ export const Dashboard: React.FC = () => {
       );
     }
 
+    const canSwipe = isToday && !chore.completed && chore.available && !(isExpired && chore.expiry_penalty === 'block');
+    const choreKey = `${chore.schedule_id}-${chore.date}`;
+
     return (
-      <div
-        key={`${chore.schedule_id}-${chore.date}`}
-        className={clsx(
-          styles.choreCard,
-          chore.completed && styles.choreCardCompleted,
-          isLocked && styles.choreCardLocked,
-          isExpired && styles.choreCardExpired,
-          isPointsLocked && styles.choreCardPointsLocked
-        )}
-      >
+      <div key={choreKey} className={clsx(styles.choreCardWrap, canSwipe && styles.choreCardSwipeable)}>
+        {canSwipe && <div className={styles.swipeHint}><CheckCircle size={20} /> Done!</div>}
+        <div
+          className={clsx(
+            styles.choreCard,
+            chore.completed && styles.choreCardCompleted,
+            isLocked && styles.choreCardLocked,
+            isExpired && styles.choreCardExpired,
+            isPointsLocked && styles.choreCardPointsLocked
+          )}
+          onTouchStart={canSwipe ? (e) => handleTouchStart(e, choreKey) : undefined}
+          onTouchMove={canSwipe ? handleTouchMove : undefined}
+          onTouchEnd={canSwipe ? (e) => handleSwipeEnd(e, chore) : undefined}
+        >
         <div className={styles.choreInfo}>
           <h3 className={styles.choreTitle}>
             {chore.icon && <span className={styles.choreIcon}>{chore.icon}</span>}
             {chore.title}
             {isLocked && <Lock size={14} className={styles.titleLockIcon} />}
+            {showTts && (
+              <button
+                className={styles.ttsBtn}
+                onClick={(e) => { e.stopPropagation(); speak(chore.title + (chore.description ? '. ' + chore.description : '')); }}
+                aria-label={`Read ${chore.title} aloud`}
+              >
+                <Volume2 size={16} />
+              </button>
+            )}
           </h3>
           {chore.description && (
             <p className={styles.choreDescription}>{chore.description}</p>
@@ -432,6 +486,7 @@ export const Dashboard: React.FC = () => {
             </button>
           )}
         </div>
+      </div>
       </div>
     );
   };

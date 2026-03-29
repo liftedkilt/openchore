@@ -516,7 +516,8 @@
   border: 1px solid rgba(255, 255, 255, 0.04);
   transition: var(--transition);
   animation: slideIn 0.3s ease-out backwards;
-  margin-bottom: 0.5rem;
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes slideIn {
@@ -657,6 +658,58 @@
   0% { transform: scale(0.5); }
   50% { transform: scale(1.2); }
   100% { transform: scale(1); }
+}
+
+/* --- Text-to-Speech Button --- */
+.ttsBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: 0.4rem;
+  border: none;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--accent-blue);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+
+.ttsBtn:hover {
+  background: rgba(56, 189, 248, 0.25);
+}
+
+.ttsBtn:active {
+  transform: scale(0.9);
+}
+
+/* --- Swipe-to-Complete --- */
+.choreCardWrap {
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+.choreCardSwipeable {
+  overflow: hidden;
+  border-radius: 16px;
+  touch-action: pan-y;
+}
+
+.swipeHint {
+  position: absolute;
+  left: 1.25rem;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent-green);
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* --- Countdown --- */
