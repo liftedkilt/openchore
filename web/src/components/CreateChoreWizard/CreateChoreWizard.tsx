@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, ChevronRight, ChevronLeft, Loader } from 'lucide-react';
+import { Check, ChevronRight, ChevronLeft } from 'lucide-react';
 import clsx from 'clsx';
 import Modal from '../Modal/Modal';
 import { api } from '../../api';
@@ -123,50 +123,40 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
       });
 
       if (!skipSchedule && schedule.selectedUsers.length > 0) {
-        const errors: string[] = [];
+        const penaltyFields = schedule.dueBy
+          ? { expiry_penalty: schedule.expiryPenalty, expiry_penalty_value: schedule.expiryPenalty === 'penalty' ? schedule.expiryPenaltyValue : 0 }
+          : {};
+        const common = {
+          assignment_type: 'individual' as const,
+          available_at: schedule.availableAt || undefined,
+          due_by: schedule.dueBy || undefined,
+          points_multiplier: 1,
+          ...penaltyFields,
+        };
+
+        const promises: Promise<{ userId: number }>[] = [];
         for (const userId of schedule.selectedUsers) {
-          try {
-            if (schedule.scheduleType === 'weekly') {
-              for (const day of schedule.selectedDays) {
-                await api.chores.createSchedule(created.id, {
-                  assigned_to: userId,
-                  assignment_type: 'individual',
-                  day_of_week: day,
-                  available_at: schedule.availableAt || undefined,
-                  due_by: schedule.dueBy || undefined,
-                  expiry_penalty: schedule.dueBy ? schedule.expiryPenalty : 'block',
-                  expiry_penalty_value: schedule.expiryPenalty === 'penalty' ? schedule.expiryPenaltyValue : 0,
-                  points_multiplier: 1,
-                });
-              }
-            } else if (schedule.scheduleType === 'interval') {
-              await api.chores.createSchedule(created.id, {
-                assigned_to: userId,
-                assignment_type: 'individual',
-                recurrence_interval: schedule.interval,
-                recurrence_start: schedule.intervalStart,
-                available_at: schedule.availableAt || undefined,
-                due_by: schedule.dueBy || undefined,
-                expiry_penalty: schedule.dueBy ? schedule.expiryPenalty : 'block',
-                expiry_penalty_value: schedule.expiryPenalty === 'penalty' ? schedule.expiryPenaltyValue : 0,
-                points_multiplier: 1,
-              });
-            } else {
-              await api.chores.createSchedule(created.id, {
-                assigned_to: userId,
-                assignment_type: 'individual',
-                specific_date: schedule.specificDate,
-                available_at: schedule.availableAt || undefined,
-                due_by: schedule.dueBy || undefined,
-                expiry_penalty: schedule.dueBy ? schedule.expiryPenalty : 'block',
-                expiry_penalty_value: schedule.expiryPenalty === 'penalty' ? schedule.expiryPenaltyValue : 0,
-                points_multiplier: 1,
-              });
+          if (schedule.scheduleType === 'weekly') {
+            for (const day of schedule.selectedDays) {
+              promises.push(
+                api.chores.createSchedule(created.id, { assigned_to: userId, day_of_week: day, ...common }).then(() => ({ userId }))
+              );
             }
-          } catch (e: any) {
-            errors.push(`Schedule for ${users.find(u => u.id === userId)?.name}: ${e.message}`);
+          } else if (schedule.scheduleType === 'interval') {
+            promises.push(
+              api.chores.createSchedule(created.id, { assigned_to: userId, recurrence_interval: schedule.interval, recurrence_start: schedule.intervalStart, ...common }).then(() => ({ userId }))
+            );
+          } else {
+            promises.push(
+              api.chores.createSchedule(created.id, { assigned_to: userId, specific_date: schedule.specificDate, ...common }).then(() => ({ userId }))
+            );
           }
         }
+
+        const results = await Promise.allSettled(promises);
+        const errors = results
+          .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+          .map(r => r.reason?.message || 'Unknown error');
         if (errors.length > 0) {
           setError(`Chore created, but some schedules failed: ${errors.join('; ')}`);
         }
