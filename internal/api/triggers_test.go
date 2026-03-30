@@ -194,8 +194,8 @@ func TestFireTrigger_DisabledTrigger(t *testing.T) {
 
 	// Try to fire
 	resp := env.request(t, "POST", fmt.Sprintf("/api/hooks/trigger/%s", uuid), nil, nil)
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("expected 404 for disabled trigger, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 for disabled trigger, got %d", resp.StatusCode)
 	}
 }
 
