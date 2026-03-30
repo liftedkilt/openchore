@@ -60,6 +60,7 @@ type createChoreRequest struct {
 	EstimatedMinutes   *int   `json:"estimated_minutes"`
 	RequiresApproval   bool   `json:"requires_approval"`
 	RequiresPhoto      bool   `json:"requires_photo"`
+	PhotoSource        string `json:"photo_source"`
 }
 
 func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -80,6 +81,15 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	photoSource := req.PhotoSource
+	if photoSource == "" {
+		photoSource = "child"
+	}
+	if photoSource != "child" && photoSource != "external" && photoSource != "both" {
+		writeError(w, http.StatusBadRequest, "photo_source must be child, external, or both")
+		return
+	}
+
 	user := UserFromContext(r.Context())
 	chore := &model.Chore{
 		Title:              req.Title,
@@ -91,6 +101,7 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		EstimatedMinutes:   req.EstimatedMinutes,
 		RequiresApproval:   req.RequiresApproval,
 		RequiresPhoto:      req.RequiresPhoto,
+		PhotoSource:        photoSource,
 		Source:             "manual",
 		CreatedBy:          user.ID,
 	}
@@ -150,6 +161,13 @@ func (h *ChoreHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Always update booleans as they might be toggled off (or we could rely on a PATCH approach, but here we just assign)
 	existing.RequiresApproval = req.RequiresApproval
 	existing.RequiresPhoto = req.RequiresPhoto
+	if req.PhotoSource != "" {
+		if req.PhotoSource != "child" && req.PhotoSource != "external" && req.PhotoSource != "both" {
+			writeError(w, http.StatusBadRequest, "photo_source must be child, external, or both")
+			return
+		}
+		existing.PhotoSource = req.PhotoSource
+	}
 
 	if err := h.store.UpdateChore(r.Context(), existing); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update chore")

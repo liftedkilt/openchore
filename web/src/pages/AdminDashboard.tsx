@@ -359,7 +359,11 @@ const ScheduleManager: React.FC<{
           promises.push(api.chores.createSchedule(choreId, { assigned_to: userId, specific_date: specificDate, ...common }));
         }
       }
-      await Promise.all(promises);
+      const results = await Promise.allSettled(promises);
+      const failures = results.filter(r => r.status === 'rejected');
+      if (failures.length > 0) {
+        console.error('Some schedules failed to create:', failures);
+      }
 
       setAdding(false);
       setSelectedDays([]);
@@ -541,10 +545,10 @@ const ScheduleManager: React.FC<{
             }
           }
           const handleDeleteGroup = async (ids: number[]) => {
-            try {
-              await Promise.all(ids.map(id => api.chores.deleteSchedule(choreId, id)));
-            } catch (err) {
-              console.error('Failed to delete some schedules:', err);
+            const results = await Promise.allSettled(ids.map(id => api.chores.deleteSchedule(choreId, id)));
+            const failures = results.filter(r => r.status === 'rejected');
+            if (failures.length > 0) {
+              console.error('Failed to delete some schedules:', failures);
             }
             load();
           };

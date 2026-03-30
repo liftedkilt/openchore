@@ -28,10 +28,11 @@ func main() {
 		port = "8080"
 	}
 
-	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL")
+	db, err := sql.Open("sqlite", dbPath+"?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
 		log.Fatalf("failed to open database: %v", err)
 	}
+	db.SetMaxOpenConns(1)
 	defer db.Close()
 
 	if err := runMigrations(db); err != nil {
