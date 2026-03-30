@@ -90,6 +90,7 @@ func Apply(ctx context.Context, s *store.Store, cfg *Config) error {
 			MissedPenaltyValue: c.MissedPenalty,
 			RequiresApproval: c.RequiresApproval,
 			RequiresPhoto:    c.RequiresPhoto,
+			PhotoSource:      c.PhotoSource,
 		}
 		// Find admin user for created_by
 		for _, u := range cfg.Users {

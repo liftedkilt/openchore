@@ -211,6 +211,7 @@ export interface Chore {
   estimated_minutes?: number;
   requires_approval: boolean;
   requires_photo: boolean;
+  photo_source?: 'child' | 'external' | 'both';
 }
 
 export interface ChoreSchedule {
@@ -314,6 +315,7 @@ export interface ScheduledChore {
   estimated_minutes?: number;
   requires_approval: boolean;
   requires_photo: boolean;
+  photo_source?: 'child' | 'external' | 'both';
   assignment_type: string;
   available_at?: string;
   due_by?: string;

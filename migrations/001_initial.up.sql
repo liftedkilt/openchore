@@ -6,6 +6,7 @@ CREATE TABLE users (
     role TEXT NOT NULL CHECK (role IN ('admin', 'child')) DEFAULT 'child',
     age INTEGER,
     theme TEXT NOT NULL DEFAULT '',
+    paused INTEGER NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -25,7 +26,11 @@ CREATE TABLE chores (
     category TEXT NOT NULL CHECK (category IN ('required', 'core', 'bonus')) DEFAULT 'core',
     icon TEXT NOT NULL DEFAULT '',
     points_value INTEGER NOT NULL DEFAULT 0,
+    missed_penalty_value INTEGER NOT NULL DEFAULT 0,
     estimated_minutes INTEGER,
+    requires_approval INTEGER NOT NULL DEFAULT 0,
+    requires_photo INTEGER NOT NULL DEFAULT 0,
+    photo_source TEXT NOT NULL DEFAULT 'child' CHECK (photo_source IN ('child', 'external', 'both')),
     source TEXT NOT NULL DEFAULT 'manual',
     external_id TEXT NOT NULL DEFAULT '',
     created_by INTEGER NOT NULL REFERENCES users(id),
@@ -77,7 +82,7 @@ CREATE TABLE point_transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     amount INTEGER NOT NULL,
-    reason TEXT NOT NULL CHECK (reason IN ('chore_complete', 'chore_uncomplete', 'reward_redeem', 'streak_bonus', 'admin_adjust', 'expiry_penalty', 'points_decay')),
+    reason TEXT NOT NULL CHECK (reason IN ('chore_complete', 'chore_uncomplete', 'reward_redeem', 'streak_bonus', 'admin_adjust', 'expiry_penalty', 'points_decay', 'missed_chore')),
     reference_id INTEGER,
     note TEXT NOT NULL DEFAULT '',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -175,3 +180,19 @@ CREATE TABLE user_decay_config (
     last_decay_at DATETIME,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Chore triggers (external webhook-based chore creation)
+CREATE TABLE chore_triggers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid TEXT NOT NULL UNIQUE,
+    chore_id INTEGER NOT NULL REFERENCES chores(id) ON DELETE CASCADE,
+    default_assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    default_due_by TEXT,
+    default_available_at TEXT,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    cooldown_minutes INTEGER NOT NULL DEFAULT 0,
+    last_triggered_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX idx_chore_triggers_uuid ON chore_triggers(uuid);

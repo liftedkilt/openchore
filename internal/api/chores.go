@@ -368,7 +368,16 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	// Fetch chore details to check category and requirements
 	chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
 
-	if chore != nil && chore.RequiresPhoto && req.PhotoURL == "" {
+	// For "child" photo source, require photo at completion time.
+	// For "external" or "both", photo can be attached later.
+	photoSource := "child"
+	if chore != nil {
+		photoSource = chore.PhotoSource
+		if photoSource == "" {
+			photoSource = "child"
+		}
+	}
+	if chore != nil && chore.RequiresPhoto && req.PhotoURL == "" && photoSource == "child" {
 		writeError(w, http.StatusBadRequest, "a photo is required to complete this chore")
 		return
 	}
@@ -453,6 +462,7 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.dispatcher.Fire(webhook.EventChoreCompleted, map[string]any{
+		"completion_id":   completion.ID,
 		"schedule_id":     scheduleID,
 		"chore_title":     choreTitle,
 		"user_id":         completedBy,
@@ -461,6 +471,7 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		"points_earned":   pts,
 		"status":          status,
 		"photo_url":       absolutePhotoURL,
+		"photo_source":    photoSource,
 	})
 
 	// Discord notification (non-blocking)
@@ -678,4 +689,44 @@ func (h *ChoreHandler) Reject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// AttachPhoto allows attaching or replacing a photo on a pending completion.
+// This is used by external systems (e.g. Home Assistant) to provide photo proof
+// after a chore has been marked complete.
+func (h *ChoreHandler) AttachPhoto(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid completion id")
+		return
+	}
+
+	completion, err := h.store.GetCompletion(r.Context(), id)
+	if err != nil || completion == nil {
+		writeError(w, http.StatusNotFound, "completion not found")
+		return
+	}
+
+	if completion.Status != "pending" {
+		writeError(w, http.StatusBadRequest, "completion is not pending")
+		return
+	}
+
+	var req struct {
+		PhotoURL string `json:"photo_url"`
+	}
+	if err := decodeJSON(r, &req); err != nil || req.PhotoURL == "" {
+		writeError(w, http.StatusBadRequest, "photo_url is required")
+		return
+	}
+
+	if err := h.store.UpdateCompletionPhoto(r.Context(), id, req.PhotoURL); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to attach photo")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id":        id,
+		"photo_url": req.PhotoURL,
+	})
 }

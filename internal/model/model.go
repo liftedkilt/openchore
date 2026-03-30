@@ -27,6 +27,7 @@ type Chore struct {
 	EstimatedMinutes   *int      `json:"estimated_minutes,omitempty"`
 	RequiresApproval   bool      `json:"requires_approval"`
 	RequiresPhoto      bool      `json:"requires_photo"`
+	PhotoSource        string    `json:"photo_source"`
 	Source             string    `json:"source"`
 	ExternalID         string    `json:"external_id,omitempty"`
 	CreatedBy          int64     `json:"created_by"`
@@ -182,6 +183,7 @@ type ScheduledChore struct {
 	EstimatedMinutes *int    `json:"estimated_minutes,omitempty"`
 	RequiresApproval bool    `json:"requires_approval"`
 	RequiresPhoto    bool    `json:"requires_photo"`
+	PhotoSource      string  `json:"photo_source"`
 	AssignmentType   string  `json:"assignment_type"`
 	AvailableAt      *string `json:"available_at,omitempty"`
 	DueBy              *string `json:"due_by,omitempty"`

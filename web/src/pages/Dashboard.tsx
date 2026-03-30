@@ -241,7 +241,8 @@ export const Dashboard: React.FC = () => {
       if (chore.completed) {
         await api.chores.uncomplete(chore.schedule_id, chore.date);
       } else {
-        if (chore.requires_photo) {
+        const photoSource = chore.photo_source || 'child';
+        if (chore.requires_photo && photoSource === 'child') {
           setQrChore(chore);
           return;
         }

@@ -15,6 +15,7 @@ interface ChoreData {
   estimatedMinutes: number;
   requiresApproval: boolean;
   requiresPhoto: boolean;
+  photoSource: 'child' | 'external' | 'both';
 }
 
 interface ScheduleData {
@@ -41,7 +42,7 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const defaultChoreData: ChoreData = {
   title: '', description: '', category: 'core', icon: '', points: 5,
-  estimatedMinutes: 5, requiresApproval: false, requiresPhoto: false,
+  estimatedMinutes: 5, requiresApproval: false, requiresPhoto: false, photoSource: 'child',
 };
 
 const defaultScheduleData: ScheduleData = {
@@ -120,6 +121,7 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
         estimated_minutes: chore.estimatedMinutes || undefined,
         requires_approval: chore.requiresApproval,
         requires_photo: chore.requiresPhoto,
+        photo_source: chore.requiresPhoto ? chore.photoSource : 'child',
       });
 
       if (!skipSchedule && schedule.selectedUsers.length > 0) {
@@ -218,6 +220,16 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
         <input type="checkbox" checked={chore.requiresPhoto} onChange={e => setChore(c => ({ ...c, requiresPhoto: e.target.checked }))} />
         <span className={styles.checkLabel}>Requires photo proof</span>
       </div>
+      {chore.requiresPhoto && (
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Photo source</label>
+          <select className={styles.input} value={chore.photoSource} onChange={e => setChore(c => ({ ...c, photoSource: e.target.value as ChoreData['photoSource'] }))}>
+            <option value="child">Child uploads photo</option>
+            <option value="external">External system (e.g. camera)</option>
+            <option value="both">External with manual fallback</option>
+          </select>
+        </div>
+      )}
     </div>
   );
 
@@ -370,7 +382,10 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
             <div className={styles.reviewRow}>
               <span className={styles.reviewLabel}>Flags</span>
               <span className={styles.reviewValue}>
-                {[chore.requiresApproval && 'Approval', chore.requiresPhoto && 'Photo'].filter(Boolean).join(', ')}
+                {[
+                  chore.requiresApproval && 'Approval',
+                  chore.requiresPhoto && `Photo (${chore.photoSource === 'child' ? 'child uploads' : chore.photoSource === 'external' ? 'external system' : 'external + fallback'})`,
+                ].filter(Boolean).join(', ')}
               </span>
             </div>
           )}

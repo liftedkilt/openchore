@@ -67,6 +67,7 @@ func Export(ctx context.Context, s *store.Store, sections []string) (*Config, er
 				MissedPenalty:    c.MissedPenaltyValue,
 				RequiresApproval: c.RequiresApproval,
 				RequiresPhoto:    c.RequiresPhoto,
+				PhotoSource:      c.PhotoSource,
 			}
 
 			schedules, err := s.ListSchedulesForChore(ctx, c.ID)

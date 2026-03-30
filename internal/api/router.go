@@ -65,6 +65,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 			r.Post("/schedules/{scheduleID}/complete", chores.Complete)
 			r.Delete("/schedules/{scheduleID}/complete", chores.Uncomplete)
 			r.Post("/upload", chores.UploadPhoto)
+			r.Put("/completions/{id}/photo", chores.AttachPhoto)
 
 			// Any user can view and redeem rewards
 			r.Get("/rewards", rewards.List)

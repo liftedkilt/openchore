@@ -26,6 +26,7 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
   const [icon, setIcon] = useState(chore.icon || '');
   const [requiresApproval, setRequiresApproval] = useState(chore.requires_approval);
   const [requiresPhoto, setRequiresPhoto] = useState(chore.requires_photo);
+  const [photoSource, setPhotoSource] = useState<'child' | 'external' | 'both'>(chore.photo_source || 'child');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -44,6 +45,7 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
         estimated_minutes: minutes || undefined,
         requires_approval: requiresApproval,
         requires_photo: requiresPhoto,
+        photo_source: requiresPhoto ? photoSource : 'child',
       });
       setSaved(true);
       onSaved();
@@ -105,6 +107,16 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
             <input type="checkbox" checked={requiresPhoto} onChange={e => setRequiresPhoto(e.target.checked)} />
             <span className={styles.checkLabel}>Requires photo proof</span>
           </div>
+          {requiresPhoto && (
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Photo source</label>
+              <select className={styles.input} value={photoSource} onChange={e => setPhotoSource(e.target.value as 'child' | 'external' | 'both')}>
+                <option value="child">Child uploads photo</option>
+                <option value="external">External system (e.g. camera)</option>
+                <option value="both">External with manual fallback</option>
+              </select>
+            </div>
+          )}
 
           <div className={styles.saveRow}>
             {saved && <span className={styles.saved}><Check size={14} /> Saved</span>}

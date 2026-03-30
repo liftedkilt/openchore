@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS chore_triggers;
 DROP TABLE IF EXISTS user_decay_config;
 DROP TABLE IF EXISTS webhook_deliveries;
 DROP TABLE IF EXISTS webhooks;
