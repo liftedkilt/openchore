@@ -145,7 +145,7 @@ The compose setup runs:
 │   │   ├── rewards.go        # Rewards store, redemptions
 │   │   ├── reports.go        # Admin analytics/reports
 │   │   ├── api_test.go       # Integration test suite
-��   │   ├── reports_test.go   # Reports endpoint tests
+│   │   ├── reports_test.go   # Reports endpoint tests
 │   │   └── triggers_test.go  # Trigger endpoint tests
 │   ├── discord/              # Discord webhook notifications
 │   │   └── notifier.go       # Sends approval requests, chore events to Discord
@@ -175,7 +175,7 @@ The compose setup runs:
 │       │   ├── EditChoreModal/        # Chore editing with schedules + triggers
 │       │   └── charts/               # BarChart and LineChart (SVG)
 │       └── hooks/
-│           ├─��� useIdleRedirect.ts     # Auto-redirect after inactivity
+│           ├── useIdleRedirect.ts     # Auto-redirect after inactivity
 │           ├── useTextToSpeech.ts     # Browser SpeechSynthesis wrapper
 │           └── useThemeSound.ts       # Web Audio API completion sounds
 ├── compose.yaml              # Container orchestration
