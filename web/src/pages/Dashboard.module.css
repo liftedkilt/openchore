@@ -633,6 +633,24 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  gap: 2px;
+}
+
+.photoUploadBtn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  border-radius: 50%;
+  transition: var(--transition);
+  margin-right: 4px;
+}
+
+.photoUploadBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--accent-blue, #60a5fa);
 }
 
 .completeBtn {

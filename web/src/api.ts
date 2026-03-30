@@ -107,6 +107,11 @@ export const api = {
         body: formData,
       }, true);
     },
+    attachPhoto: (completionId: number, photoUrl: string) =>
+      fetchWithAuth(`/completions/${completionId}/photo`, {
+        method: 'PUT',
+        body: JSON.stringify({ photo_url: photoUrl }),
+      }),
     listPending: () => fetchWithAuth<any[]>('/completions/pending'),
     approve: (completionId: number) => fetchWithAuth(`/completions/${completionId}/approve`, { method: 'POST' }),
     reject: (completionId: number) => fetchWithAuth(`/completions/${completionId}/reject`, { method: 'POST' }),

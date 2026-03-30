@@ -26,21 +26,25 @@ const QRCodeModal: React.FC<{
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Poll for completion status
+  const alreadyCompleted = chore.completed;
+
+  // Poll for completion/photo status
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
         const chores = await api.users.getChores(userId, 'daily', chore.date);
         const updated = chores.find(c => c.schedule_id === chore.schedule_id);
-        if (updated?.completed) {
-          onComplete();
+        if (alreadyCompleted) {
+          if (updated?.photo_url) onComplete();
+        } else {
+          if (updated?.completed) onComplete();
         }
       } catch (e) {
         console.error('Polling failed:', e);
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, [chore, userId, onComplete]);
+  }, [chore, userId, alreadyCompleted, onComplete]);
 
   const origin = baseUrl || window.location.origin;
   const uploadUrl = `${origin}/upload?scheduleId=${chore.schedule_id}&date=${chore.date}&userId=${userId}`;
@@ -52,7 +56,11 @@ const QRCodeModal: React.FC<{
     setUploadError(null);
     try {
       const { url } = await api.chores.upload(file);
-      await api.chores.complete(chore.schedule_id, chore.date, url);
+      if (alreadyCompleted && chore.completion_id) {
+        await api.chores.attachPhoto(chore.completion_id, url);
+      } else {
+        await api.chores.complete(chore.schedule_id, chore.date, url);
+      }
       onComplete();
     } catch (err: any) {
       setUploadError(err.message || 'Upload failed');
@@ -83,7 +91,7 @@ const QRCodeModal: React.FC<{
     <div className={styles.modalOverlay}>
       <div className={styles.qrModal}>
         <button className={styles.closeBtn} onClick={onClose}><X size={24} /></button>
-        <h2>Photo Proof Needed</h2>
+        <h2>{alreadyCompleted ? 'Add Photo Proof' : 'Photo Proof Needed'}</h2>
         <p>Scan this code with another device, or upload directly from this one.</p>
 
         <div className={styles.qrWrapper}>
@@ -117,7 +125,7 @@ const QRCodeModal: React.FC<{
           <span>Waiting for photo...</span>
         </div>
 
-        <p className={styles.qrHelp}>Your chore will be finished automatically once you upload the photo.</p>
+        <p className={styles.qrHelp}>{alreadyCompleted ? 'Upload a photo to add proof for this chore.' : 'Your chore will be finished automatically once you upload the photo.'}</p>
       </div>
     </div>
   );
@@ -562,13 +570,25 @@ export const Dashboard: React.FC = () => {
               <span className={styles.countdownTime}>Expired</span>
             </div>
           ) : (
-            <button
-              onClick={() => handleToggleComplete(chore)}
-              className={clsx(styles.completeBtn, chore.completed && styles.completeBtnActive)}
-              aria-label={chore.completed ? "Mark incomplete" : "Mark complete"}
-            >
-              {chore.completed ? <CheckCircle size={32} /> : <div className={styles.circle} />}
-            </button>
+            <>
+              {chore.completed && chore.requires_photo && (chore.photo_source === 'both' || chore.photo_source === 'external') && !chore.photo_url && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setQrChore(chore); }}
+                  className={styles.photoUploadBtn}
+                  aria-label="Upload photo proof"
+                  title="Upload photo proof"
+                >
+                  <Camera size={20} />
+                </button>
+              )}
+              <button
+                onClick={() => handleToggleComplete(chore)}
+                className={clsx(styles.completeBtn, chore.completed && styles.completeBtnActive)}
+                aria-label={chore.completed ? "Mark incomplete" : "Mark complete"}
+              >
+                {chore.completed ? <CheckCircle size={32} /> : <div className={styles.circle} />}
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -913,7 +933,10 @@ export const Dashboard: React.FC = () => {
           userId={user.id}
           baseUrl={systemBaseUrl}
           onClose={() => setQrChore(null)}
-          onComplete={onChoreFinished}
+          onComplete={qrChore.completed ? async () => {
+            setQrChore(null);
+            await loadChores();
+          } : onChoreFinished}
         />
       )}
 

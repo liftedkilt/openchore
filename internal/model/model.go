@@ -194,5 +194,6 @@ type ScheduledChore struct {
 	Completed        bool       `json:"completed"`
 	CompletionID     *int64     `json:"completion_id,omitempty"`
 	CompletedAt      *time.Time `json:"completed_at,omitempty"`
+	PhotoURL         *string    `json:"photo_url,omitempty"`
 	Date             string     `json:"date"`
 }

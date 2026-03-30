@@ -214,7 +214,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			cs.id, c.id, c.title, c.description, c.category, c.icon, c.points_value, c.missed_penalty_value, c.estimated_minutes, c.requires_approval, c.requires_photo, c.photo_source,
 			cs.assignment_type, cs.available_at, cs.due_by, cs.expiry_penalty, cs.expiry_penalty_value,
 			cs.day_of_week, cs.specific_date,
-			cc.id, cc.id, cc.completed_at
+			cc.id, cc.id, cc.completed_at, cc.photo_url
 		FROM chore_schedules cs
 		JOIN chores c ON c.id = cs.chore_id
 		LEFT JOIN chore_completions cc ON cc.chore_schedule_id = cs.id AND cc.completion_date = ?
@@ -249,12 +249,13 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			var dayOfWeek sql.NullInt64
 			var specificDate sql.NullString
 			var completedAt sql.NullTime
+			var photoURL sql.NullString
 			var reqApp, reqPho int
 			if err := rows.Scan(&sc.ScheduleID, &sc.ChoreID, &sc.Title, &sc.Description, &sc.Category, &sc.Icon,
 				&sc.PointsValue, &sc.MissedPenaltyValue, &sc.EstimatedMinutes, &reqApp, &reqPho, &sc.PhotoSource, &sc.AssignmentType, &sc.AvailableAt, &sc.DueBy,
 				&sc.ExpiryPenalty, &sc.ExpiryPenaltyValue,
 				&dayOfWeek, &specificDate,
-				&compID, &compIDCheck, &completedAt); err != nil {
+				&compID, &compIDCheck, &completedAt, &photoURL); err != nil {
 				rows.Close()
 				return nil, err
 			}
@@ -269,6 +270,10 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			if completedAt.Valid {
 				t := completedAt.Time
 				sc.CompletedAt = &t
+			}
+			if photoURL.Valid && photoURL.String != "" {
+				s := photoURL.String
+				sc.PhotoURL = &s
 			}
 			if sc.AvailableAt != nil && *sc.AvailableAt != "" {
 				sc.Available = currentTime >= *sc.AvailableAt

@@ -326,6 +326,7 @@ export interface ScheduledChore {
   completed: boolean;
   completion_id?: number;
   completed_at?: string;
+  photo_url?: string;
   date: string;
 }
 
