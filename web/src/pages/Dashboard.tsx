@@ -4,7 +4,7 @@ import { useTheme } from '../ThemeContext';
 import { api } from '../api';
 import type { ScheduledChore, UserStreakData, PointsData, Reward, RedemptionHistory, Theme } from '../types';
 import styles from './Dashboard.module.css';
-import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX } from 'lucide-react';
+import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX, Undo2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
@@ -337,26 +337,37 @@ export const Dashboard: React.FC = () => {
 
   // Time period grouping functions imported from '../timeGrouping'
 
-  // --- Swipe-to-complete ---
-  const swipeRef = useRef<{ startX: number; startY: number; cardEl: HTMLDivElement | null; choreKey: string }>({ startX: 0, startY: 0, cardEl: null, choreKey: '' });
+  // --- Swipe-to-complete/uncomplete ---
+  const swipeRef = useRef<{ startX: number; startY: number; cardEl: HTMLDivElement | null; choreKey: string; locked: boolean }>({ startX: 0, startY: 0, cardEl: null, choreKey: '', locked: false });
 
   const handleTouchStart = (e: ReactTouchEvent<HTMLDivElement>, choreKey: string) => {
     const touch = e.touches[0];
-    swipeRef.current = { startX: touch.clientX, startY: touch.clientY, cardEl: e.currentTarget, choreKey };
+    swipeRef.current = { startX: touch.clientX, startY: touch.clientY, cardEl: e.currentTarget, choreKey, locked: false };
   };
 
-  const handleTouchMove = (e: ReactTouchEvent<HTMLDivElement>) => {
-    const { startX, startY, cardEl } = swipeRef.current;
-    if (!cardEl) return;
-    const dx = e.touches[0].clientX - startX;
-    const dy = e.touches[0].clientY - startY;
-    // Only track horizontal swipes (ignore vertical scrolling)
-    if (Math.abs(dy) > Math.abs(dx)) return;
-    const clamped = Math.max(0, Math.min(dx, 120));
+  const handleTouchMove = (e: ReactTouchEvent<HTMLDivElement>, chore: ScheduledChore) => {
+    const ref = swipeRef.current;
+    if (!ref.cardEl) return;
+    const dx = e.touches[0].clientX - ref.startX;
+    const dy = e.touches[0].clientY - ref.startY;
+    // Lock to vertical scrolling if that's the dominant direction on first significant move
+    if (!ref.locked && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) {
+      ref.cardEl = null;
+      return;
+    }
+    ref.locked = true;
+    // Right swipe to complete, left swipe to uncomplete
+    const direction = chore.completed ? -1 : 1;
+    const raw = dx * direction;
+    const clamped = Math.max(0, Math.min(raw, 120));
     if (clamped > 10) {
       const progress = Math.min(clamped / 100, 1);
-      cardEl.style.transform = `translateX(${clamped}px)`;
-      cardEl.style.background = `rgba(74, 222, 128, ${progress * 0.15})`;
+      ref.cardEl.style.transform = `translateX(${dx > 0 ? clamped : -clamped}px)`;
+      const hintEl = ref.cardEl.parentElement?.querySelector(`.${styles.swipeHint}`) as HTMLElement | null;
+      if (hintEl) hintEl.style.opacity = String(progress);
+      ref.cardEl.style.background = chore.completed
+        ? `rgba(239, 68, 68, ${progress * 0.15})`
+        : `rgba(74, 222, 128, ${progress * 0.15})`;
     }
   };
 
@@ -366,8 +377,11 @@ export const Dashboard: React.FC = () => {
     const dx = e.changedTouches[0].clientX - startX;
     cardEl.style.transform = '';
     cardEl.style.background = '';
-    swipeRef.current = { startX: 0, startY: 0, cardEl: null, choreKey: '' };
-    if (dx >= 100 && !chore.completed && chore.available && !chore.expired) {
+    const hintEl = cardEl.parentElement?.querySelector(`.${styles.swipeHint}`) as HTMLElement | null;
+    if (hintEl) hintEl.style.opacity = '';
+    swipeRef.current = { startX: 0, startY: 0, cardEl: null, choreKey: '', locked: false };
+    const direction = chore.completed ? -1 : 1;
+    if (dx * direction >= 100) {
       handleToggleComplete(chore);
     }
   };
@@ -412,12 +426,18 @@ export const Dashboard: React.FC = () => {
       );
     }
 
-    const canSwipe = isToday && !chore.completed && chore.available && !(isExpired && chore.expiry_penalty === 'block');
+    const canSwipeComplete = isToday && !chore.completed && chore.available && !(isExpired && chore.expiry_penalty === 'block');
+    const canSwipeUndo = isToday && chore.completed;
+    const canSwipe = canSwipeComplete || canSwipeUndo;
     const choreKey = `${chore.schedule_id}-${chore.date}`;
 
     return (
       <div key={choreKey} className={clsx(styles.choreCardWrap, canSwipe && styles.choreCardSwipeable)}>
-        {canSwipe && <div className={styles.swipeHint}><CheckCircle size={20} /> Done!</div>}
+        {canSwipe && (
+          <div className={clsx(styles.swipeHint, canSwipeUndo ? styles.swipeHintUndo : styles.swipeHintDone)} style={canSwipeUndo ? { right: '1.25rem', left: 'auto' } : undefined}>
+            {canSwipeUndo ? <><Undo2 size={20} /> Undo</> : <><CheckCircle size={20} /> Done!</>}
+          </div>
+        )}
         <div
           className={clsx(
             styles.choreCard,
@@ -427,7 +447,7 @@ export const Dashboard: React.FC = () => {
             isPointsLocked && styles.choreCardPointsLocked
           )}
           onTouchStart={canSwipe ? (e) => handleTouchStart(e, choreKey) : undefined}
-          onTouchMove={canSwipe ? handleTouchMove : undefined}
+          onTouchMove={canSwipe ? (e) => handleTouchMove(e, chore) : undefined}
           onTouchEnd={canSwipe ? (e) => handleSwipeEnd(e, chore) : undefined}
         >
         <div className={styles.choreInfo}>

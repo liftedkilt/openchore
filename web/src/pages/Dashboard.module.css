@@ -721,9 +721,18 @@
   gap: 0.4rem;
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--accent-green);
   pointer-events: none;
   z-index: 0;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.swipeHintDone {
+  color: var(--accent-green);
+}
+
+.swipeHintUndo {
+  color: #f87171;
 }
 
 /* --- Countdown --- */
