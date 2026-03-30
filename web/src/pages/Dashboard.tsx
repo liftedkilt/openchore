@@ -4,7 +4,7 @@ import { useTheme } from '../ThemeContext';
 import { api } from '../api';
 import type { ScheduledChore, UserStreakData, PointsData, Reward, RedemptionHistory, Theme } from '../types';
 import styles from './Dashboard.module.css';
-import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX, Undo2 } from 'lucide-react';
+import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX, Undo2, Camera, Copy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
@@ -22,6 +22,10 @@ const QRCodeModal: React.FC<{
   onClose: () => void;
   onComplete: () => void;
 }> = ({ chore, userId, baseUrl, onClose, onComplete }) => {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
   // Poll for completion status
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -41,16 +45,72 @@ const QRCodeModal: React.FC<{
   const origin = baseUrl || window.location.origin;
   const uploadUrl = `${origin}/upload?scheduleId=${chore.schedule_id}&date=${chore.date}&userId=${userId}`;
 
+  const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const { url } = await api.chores.upload(file);
+      await api.chores.complete(chore.schedule_id, chore.date, url);
+      onComplete();
+    } catch (err: any) {
+      setUploadError(err.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(uploadUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const input = document.createElement('input');
+      input.value = uploadUrl;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
     <div className={styles.modalOverlay}>
       <div className={styles.qrModal}>
         <button className={styles.closeBtn} onClick={onClose}><X size={24} /></button>
         <h2>Photo Proof Needed</h2>
-        <p>Scan this code with another iPad or phone to take a picture of your work!</p>
-        
+        <p>Scan this code with another device, or upload directly from this one.</p>
+
         <div className={styles.qrWrapper}>
           <QRCodeSVG value={uploadUrl} size={256} marginSize={4} />
         </div>
+
+        <div className={styles.qrActions}>
+          <label className={styles.directUploadBtn}>
+            {uploading ? <Loader2 className={styles.spinner} size={18} /> : <Camera size={18} />}
+            {uploading ? 'Uploading...' : 'Take Photo on This Device'}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleDirectUpload}
+              disabled={uploading}
+              hidden
+            />
+          </label>
+
+          <button className={styles.copyLinkBtn} onClick={handleCopyLink}>
+            <Copy size={18} />
+            {copied ? 'Copied!' : 'Copy Link'}
+          </button>
+        </div>
+
+        {uploadError && <p className={styles.qrError}>{uploadError}</p>}
 
         <div className={styles.qrStatus}>
           <Loader2 className={styles.spinner} size={20} />
