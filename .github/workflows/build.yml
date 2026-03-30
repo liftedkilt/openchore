@@ -21,11 +21,49 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Run tests
-        run: CGO_ENABLED=0 go test ./...
+      - name: Run Go tests
+        run: go test ./...
+
+  test-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install frontend dependencies
+        run: cd web && npm ci
+
+      - name: Install e2e dependencies
+        run: cd e2e && npm ci
+
+      - name: Install Playwright browsers
+        run: cd e2e && npx playwright install --with-deps chromium
+
+      - name: Copy seed config
+        run: cp config/config.example.yaml config/config.yaml
+
+      - name: Run e2e tests
+        run: cd e2e && npx playwright test
+        env:
+          CI: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/test-results/
+          retention-days: 7
 
   build-api:
-    needs: test
+    needs: [test, test-e2e]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
@@ -57,7 +95,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   build-web:
-    needs: test
+    needs: [test, test-e2e]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:

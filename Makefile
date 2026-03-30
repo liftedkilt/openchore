@@ -1,4 +1,4 @@
-.PHONY: all api ui dev install build test clean help
+.PHONY: all api ui dev install build test test-e2e test-e2e-install test-all clean help
 
 # Default target
 all: help
@@ -32,6 +32,18 @@ build:
 test:
 	go test ./...
 
+# Install e2e test dependencies
+test-e2e-install:
+	cd e2e && npm install && npx playwright install --with-deps chromium
+
+# Run e2e tests (starts servers automatically, fresh DB)
+test-e2e:
+	@test -f config/config.yaml || (cp config/config.example.yaml config/config.yaml && echo "Created config/config.yaml from example")
+	cd e2e && npx playwright test
+
+# Run all tests (Go unit + e2e)
+test-all: test test-e2e
+
 # Clean up build artifacts and database
 clean:
 	rm -f server openchore.db openchore.db-shm openchore.db-wal
@@ -44,5 +56,8 @@ help:
 	@echo "  dev     - Run both API and UI concurrently (fresh DB, auto-seeded from config)"
 	@echo "  install - Install dependencies for both API and UI"
 	@echo "  build   - Build both API and UI"
-	@echo "  test    - Run Go tests"
-	@echo "  clean   - Clean up build artifacts and database"
+	@echo "  test              - Run Go tests"
+	@echo "  test-e2e-install  - Install e2e test dependencies (Playwright + Chromium)"
+	@echo "  test-e2e          - Run e2e tests (starts servers automatically)"
+	@echo "  test-all          - Run Go tests + e2e tests"
+	@echo "  clean             - Clean up build artifacts and database"

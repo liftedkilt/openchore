@@ -54,6 +54,14 @@
 - [ ] Calendar integration (Google/Apple Calendar for absence detection)
 - [ ] Event bus for plugin subscriptions (chore.completed, chore.created, etc.)
 
+## Testing: Harden UI-level e2e tests for admin flows
+The e2e suite (52 tests) verifies most complex admin interactions via API calls because CSS module class names are unstable and many admin UI elements (icon-only buttons, inline forms, overlapping modals) lack accessible selectors. The areas that need UI-level coverage are the same areas where bugs tend to hide:
+- [ ] Add `data-testid` attributes to key admin interactive elements (edit/delete buttons on cards, schedule group delete, pause/unpause toggle, reward/user/point form inputs)
+- [ ] Edit Chore Modal: open, modify fields, save — currently verified via API PUT only
+- [ ] Inline schedule deletion via trash icon in the edit modal
+- [ ] Admin form interactions: reward creation, user creation, point adjustment through actual UI controls
+- [ ] Pause/unpause user via icon buttons on user cards
+
 ## Phase 7: UX Enhancements (Partially Complete)
 - [x] Per-kid themes (4 themes with custom labels, icons, greetings, sounds, confetti)
 - [x] Visual chore icons (emoji/icon on chores)
