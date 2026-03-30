@@ -368,6 +368,14 @@ export interface Webhook {
   created_at: string;
 }
 
+export interface APIToken {
+  id: number;
+  name: string;
+  last_used_at?: string;
+  revoked: boolean;
+  created_at: string;
+}
+
 export interface WebhookDelivery {
   id: number;
   webhook_id: number;

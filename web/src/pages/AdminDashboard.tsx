@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import type { Chore, User, ChoreSchedule, ChoreTrigger, Reward, PointBalance, PointTransaction, StreakRewardItem, Theme, Webhook, WebhookDelivery, UserDecayConfig } from '../types';
+import type { Chore, User, ChoreSchedule, ChoreTrigger, Reward, PointBalance, PointTransaction, StreakRewardItem, Theme, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from '../types';
 import { DAY_NAMES } from '../types';
 import styles from './AdminDashboard.module.css';
-import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, Gift, Coins, Flame, Undo2, Activity, Settings, Check, Pause, Play, Link2, Copy } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, Gift, Coins, Flame, Undo2, Activity, Settings, Check, Pause, Play, Link2, Copy, Key, AlertTriangle } from 'lucide-react';
 import clsx from 'clsx';
 import CreateChoreWizard from '../components/CreateChoreWizard/CreateChoreWizard';
 import EditChoreModal from '../components/EditChoreModal/EditChoreModal';
@@ -1842,6 +1842,207 @@ const SettingsTab: React.FC = () => {
         ))}
 
       </div>
+
+      {/* API Tokens Section */}
+      <APITokensSection />
+    </div>
+  );
+};
+
+// =================== API TOKENS SECTION ===================
+
+const APITokensSection: React.FC = () => {
+  const [tokens, setTokens] = useState<APIToken[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [tokenName, setTokenName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [newToken, setNewToken] = useState<{ name: string; token: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const loadTokens = useCallback(async () => {
+    try {
+      const t = await api.tokens.list();
+      setTokens(t);
+    } catch (e) { console.error(e); }
+  }, []);
+
+  useEffect(() => { loadTokens(); }, [loadTokens]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tokenName.trim()) return;
+    setCreating(true);
+    try {
+      const result = await api.tokens.create(tokenName.trim());
+      setNewToken({ name: result.name, token: result.token });
+      setTokenName('');
+      setShowForm(false);
+      loadTokens();
+    } catch (e) { console.error(e); }
+    setCreating(false);
+  };
+
+  const handleRevoke = async (id: number) => {
+    try {
+      await api.tokens.revoke(id);
+      loadTokens();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const activeTokens = tokens.filter(t => !t.revoked);
+  const revokedTokens = tokens.filter(t => t.revoked);
+
+  return (
+    <div className={styles.form} style={{ marginTop: '1.5rem' }}>
+      <div className={styles.formHeader}>
+        <h3>API Tokens</h3>
+        <button className={styles.btnSmall} onClick={() => { setShowForm(f => !f); setNewToken(null); }}>
+          <Plus size={14} /> Add
+        </button>
+      </div>
+      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+        Generate tokens for external integrations (Home Assistant, scripts, etc.) to authenticate with the API.
+      </p>
+
+      {/* New token reveal banner */}
+      {newToken && (
+        <div style={{
+          background: 'rgba(34, 197, 94, 0.08)',
+          border: '1px solid rgba(34, 197, 94, 0.25)',
+          borderRadius: '12px',
+          padding: '1rem',
+          marginBottom: '1rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <AlertTriangle size={16} style={{ color: '#f59e0b' }} />
+            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b' }}>
+              Copy this token now — it will not be shown again
+            </span>
+          </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+            Token for <strong>{newToken.name}</strong>:
+          </p>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.5rem',
+          }}>
+            <code style={{
+              flex: 1, background: 'rgba(255, 255, 255, 0.08)',
+              padding: '0.5rem 0.75rem', borderRadius: '8px',
+              fontSize: '0.75rem', fontFamily: "'SF Mono', 'Menlo', 'Monaco', monospace",
+              color: 'var(--text-primary)', wordBreak: 'break-all',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+            }}>
+              {newToken.token}
+            </code>
+            <button
+              className={styles.btnSmall}
+              onClick={() => handleCopy(newToken.token)}
+              style={{ flexShrink: 0 }}
+            >
+              {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
+            </button>
+          </div>
+          <button
+            onClick={() => setNewToken(null)}
+            style={{
+              marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)',
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              textDecoration: 'underline',
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Create form */}
+      {showForm && (
+        <form onSubmit={handleCreate} style={{ marginBottom: '1rem' }}>
+          <div className={styles.formGrid}>
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Token Name</label>
+              <input
+                className={styles.input}
+                value={tokenName}
+                onChange={e => setTokenName(e.target.value)}
+                placeholder="e.g. Home Assistant, CI Pipeline"
+                required
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className={styles.formActions}>
+            <button type="submit" className={styles.btnPrimary} disabled={creating || !tokenName.trim()}>
+              <Key size={14} /> {creating ? 'Creating...' : 'Create Token'}
+            </button>
+            <button type="button" className={styles.btnSecondary} onClick={() => setShowForm(false)}>Cancel</button>
+          </div>
+        </form>
+      )}
+
+      {/* Token list */}
+      {activeTokens.length === 0 && revokedTokens.length === 0 && !showForm && (
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No API tokens created</p>
+      )}
+
+      {activeTokens.map(t => (
+        <div key={t.id} className={styles.listItem} style={{ marginBottom: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', width: '100%' }}>
+            <Key size={16} style={{ color: 'var(--accent-blue)', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{t.name}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '0.75rem', marginTop: '0.15rem', flexWrap: 'wrap' }}>
+                <span>Created {new Date(t.created_at).toLocaleDateString()}</span>
+                {t.last_used_at && <span>Last used {new Date(t.last_used_at).toLocaleDateString()}</span>}
+                {!t.last_used_at && <span style={{ fontStyle: 'italic' }}>Never used</span>}
+              </div>
+            </div>
+            <button className={clsx(styles.btnSmall, styles.btnDanger)} onClick={() => handleRevoke(t.id)}>
+              <Trash2 size={14} /> Revoke
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {revokedTokens.length > 0 && (
+        <>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.04em', marginTop: '1rem', marginBottom: '0.5rem' }}>
+            Revoked
+          </div>
+          {revokedTokens.map(t => (
+            <div key={t.id} className={styles.listItem} style={{ marginBottom: '0.5rem', opacity: 0.5 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', width: '100%' }}>
+                <Key size={16} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 600, textDecoration: 'line-through' }}>{t.name}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '0.75rem', marginTop: '0.15rem' }}>
+                    <span>Created {new Date(t.created_at).toLocaleDateString()}</span>
+                    <span style={{ color: '#ef4444', fontWeight: 600 }}>Revoked</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 };

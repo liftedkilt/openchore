@@ -148,6 +148,44 @@ type ChoreTrigger struct {
 	CreatedAt         string  `json:"created_at"`
 }
 
+// --- Triggerable Chore (HA integration discovery) ---
+
+type TriggerableChoreInfo struct {
+	ID          int64  `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+	Icon        string `json:"icon,omitempty"`
+	PointsValue int    `json:"points_value"`
+}
+
+type TriggerInfo struct {
+	ID                  int64   `json:"id"`
+	UUID                string  `json:"uuid"`
+	DefaultAssignedTo   *int64  `json:"default_assigned_to,omitempty"`
+	DefaultAssignedName string  `json:"default_assigned_name,omitempty"`
+	DefaultDueBy        *string `json:"default_due_by,omitempty"`
+	DefaultAvailableAt  *string `json:"default_available_at,omitempty"`
+	Enabled             bool    `json:"enabled"`
+	CooldownMinutes     int     `json:"cooldown_minutes"`
+}
+
+type TriggerableChore struct {
+	TriggerableChoreInfo
+	Triggers []TriggerInfo `json:"triggers"`
+}
+
+// --- API Tokens ---
+
+type APIToken struct {
+	ID         int64      `json:"id"`
+	Name       string     `json:"name"`
+	TokenHash  string     `json:"-"`
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+	Revoked    bool       `json:"revoked"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
 // --- Webhooks ---
 
 type Webhook struct {

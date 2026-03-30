@@ -1,4 +1,4 @@
-import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, Reward, RewardAssignment, RewardRedemption, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig } from './types';
+import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, Reward, RewardAssignment, RewardRedemption, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from './types';
 
 const API_BASE = '/api';
 
@@ -223,6 +223,14 @@ export const api = {
       }),
     delete: (triggerId: number) =>
       fetchWithAuth(`/triggers/${triggerId}`, { method: 'DELETE' }),
+  },
+  tokens: {
+    list: () => fetchWithAuth<APIToken[]>('/admin/tokens'),
+    create: (name: string) => fetchWithAuth<{ id: number; name: string; token: string }>('/admin/tokens', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+    revoke: (id: number) => fetchWithAuth('/admin/tokens/' + id, { method: 'DELETE' }),
   },
   webhooks: {
     list: () => fetchWithAuth<Webhook[]>('/admin/webhooks'),

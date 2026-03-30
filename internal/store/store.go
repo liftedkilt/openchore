@@ -1234,6 +1234,119 @@ func (s *Store) GetUserByName(ctx context.Context, name string) (*model.User, er
 	return u, err
 }
 
+// --- API Tokens ---
+
+func (s *Store) CreateAPIToken(ctx context.Context, t *model.APIToken) error {
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO api_tokens (name, token_hash) VALUES (?, ?)`,
+		t.Name, t.TokenHash)
+	if err != nil {
+		return err
+	}
+	t.ID, _ = res.LastInsertId()
+	return nil
+}
+
+func (s *Store) ValidateAPIToken(ctx context.Context, tokenHash string) (*model.APIToken, error) {
+	t := &model.APIToken{}
+	var revoked int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, name, token_hash, last_used_at, revoked, created_at
+		 FROM api_tokens WHERE token_hash = ? AND revoked = 0`, tokenHash).
+		Scan(&t.ID, &t.Name, &t.TokenHash, &t.LastUsedAt, &revoked, &t.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	t.Revoked = revoked == 1
+	return t, err
+}
+
+func (s *Store) UpdateTokenLastUsed(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE api_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
+	return err
+}
+
+func (s *Store) ListAPITokens(ctx context.Context) ([]model.APIToken, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, name, last_used_at, revoked, created_at FROM api_tokens ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var tokens []model.APIToken
+	for rows.Next() {
+		var t model.APIToken
+		var revoked int
+		if err := rows.Scan(&t.ID, &t.Name, &t.LastUsedAt, &revoked, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		t.Revoked = revoked == 1
+		tokens = append(tokens, t)
+	}
+	return tokens, rows.Err()
+}
+
+func (s *Store) RevokeAPIToken(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE api_tokens SET revoked = 1 WHERE id = ?`, id)
+	return err
+}
+
+// ListTriggersWithChores returns all chores that have at least one enabled trigger.
+func (s *Store) ListTriggersWithChores(ctx context.Context) ([]model.TriggerableChore, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT c.id, c.title, c.description, c.category, c.icon, c.points_value,
+		       ct.id, ct.uuid, ct.default_assigned_to, ct.default_due_by, ct.default_available_at,
+		       ct.enabled, ct.cooldown_minutes,
+		       COALESCE(u.name, '') AS default_assigned_name
+		FROM chore_triggers ct
+		JOIN chores c ON c.id = ct.chore_id
+		LEFT JOIN users u ON u.id = ct.default_assigned_to
+		WHERE ct.enabled = 1
+		ORDER BY c.title, ct.id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	choreMap := make(map[int64]*model.TriggerableChore)
+	var order []int64
+	for rows.Next() {
+		var choreID int64
+		var tc model.TriggerableChoreInfo
+		var tr model.TriggerInfo
+		if err := rows.Scan(
+			&choreID, &tc.Title, &tc.Description, &tc.Category, &tc.Icon, &tc.PointsValue,
+			&tr.ID, &tr.UUID, &tr.DefaultAssignedTo, &tr.DefaultDueBy, &tr.DefaultAvailableAt,
+			&tr.Enabled, &tr.CooldownMinutes,
+			&tr.DefaultAssignedName,
+		); err != nil {
+			return nil, err
+		}
+		if existing, ok := choreMap[choreID]; ok {
+			existing.Triggers = append(existing.Triggers, tr)
+		} else {
+			tc.ID = choreID
+			entry := &model.TriggerableChore{
+				TriggerableChoreInfo: tc,
+				Triggers:             []model.TriggerInfo{tr},
+			}
+			choreMap[choreID] = entry
+			order = append(order, choreID)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	result := make([]model.TriggerableChore, 0, len(order))
+	for _, id := range order {
+		result = append(result, *choreMap[id])
+	}
+	return result, nil
+}
+
 // --- Webhooks ---
 
 func (s *Store) CreateWebhook(ctx context.Context, w *model.Webhook) error {

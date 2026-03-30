@@ -51,8 +51,22 @@
 - [x] Webhook system with HMAC signing and delivery logging
 - [ ] Plugin architecture for external chore sources (source + external_id on chores)
 - [x] Chore trigger webhooks — per-chore trigger URLs for external systems (Home Assistant, etc.) with cooldown, default assignee, and query param overrides
+- [x] API token auth (Bearer tokens, SHA-256 hashed, admin-level access for integrations)
+- [x] Integration discovery endpoint (`GET /api/chores/triggerable` — chores with triggers + user list)
+- [x] Home Assistant custom integration (openchore-ha) — config flow, service calls, HACS-ready
+- [x] Admin UI for API token management (create, list, revoke)
+- [ ] Add `chore.triggered` webhook event when FireTrigger succeeds
+- [ ] HA integration: dynamic service selectors populated from coordinator data
+- [ ] Trigger execution audit log table
+- [ ] Trigger dry-run mode (`?dry_run=true`)
 - [ ] Calendar integration (Google/Apple Calendar for absence detection)
 - [ ] Event bus for plugin subscriptions (chore.completed, chore.created, etc.)
+
+### Integration Quick Wins
+- [x] Add missing DB index on `chore_triggers.chore_id`
+- [x] FireTrigger: reject assignments to paused users
+- [x] FireTrigger: return 403 for disabled triggers instead of 404
+- [x] FireTrigger: return richer response with schedule details
 
 ## Testing: Harden UI-level e2e tests for admin flows
 The e2e suite (52 tests) verifies most complex admin interactions via API calls because CSS module class names are unstable and many admin UI elements (icon-only buttons, inline forms, overlapping modals) lack accessible selectors. The areas that need UI-level coverage are the same areas where bugs tend to hide:

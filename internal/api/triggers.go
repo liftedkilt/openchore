@@ -43,8 +43,14 @@ func (h *TriggerHandler) FireTrigger(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to look up trigger")
 		return
 	}
-	if trigger == nil || !trigger.Enabled {
+	if trigger == nil {
 		writeError(w, http.StatusNotFound, "trigger not found")
+		return
+	}
+	if !trigger.Enabled {
+		writeJSON(w, http.StatusForbidden, map[string]string{
+			"error": "trigger is disabled",
+		})
 		return
 	}
 
@@ -93,6 +99,13 @@ func (h *TriggerHandler) FireTrigger(w http.ResponseWriter, r *http.Request) {
 		assignedUserName = user.Name
 	} else {
 		writeError(w, http.StatusBadRequest, "no assignee: set assign_to param or configure a default")
+		return
+	}
+
+	// Check if assigned user is paused
+	assignedUser, err := h.store.GetUser(ctx, assignedUserID)
+	if err == nil && assignedUser != nil && assignedUser.Paused {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("user %q is paused and cannot be assigned chores", assignedUserName))
 		return
 	}
 
@@ -151,10 +164,46 @@ func (h *TriggerHandler) FireTrigger(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"message":     "Chore triggered",
-		"schedule_id": schedule.ID,
-		"assigned_to": assignedUserName,
-		"chore":       chore.Title,
+		"message":      "Chore triggered",
+		"schedule_id":  schedule.ID,
+		"chore_id":     chore.ID,
+		"chore":        chore.Title,
+		"assigned_to":  assignedUserName,
+		"date":         today,
+		"available_at": schedule.AvailableAt,
+		"due_by":       schedule.DueBy,
+	})
+}
+
+// ListTriggerable returns all chores that have enabled triggers, with user list.
+// Designed for integration discovery (e.g. Home Assistant).
+func (h *TriggerHandler) ListTriggerable(w http.ResponseWriter, r *http.Request) {
+	chores, err := h.store.ListTriggersWithChores(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list triggerable chores")
+		return
+	}
+
+	// Also include the user list so integrations can build assignment UIs
+	users, err := h.store.ListUsers(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list users")
+		return
+	}
+
+	type userInfo struct {
+		ID   int64  `json:"id"`
+		Name string `json:"name"`
+		Role string `json:"role"`
+	}
+	userList := make([]userInfo, len(users))
+	for i, u := range users {
+		userList[i] = userInfo{ID: u.ID, Name: u.Name, Role: u.Role}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"chores": chores,
+		"users":  userList,
 	})
 }
 

@@ -26,6 +26,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 	streaks := NewStreakHandler(s)
 	webhooks := NewWebhookHandler(s)
 	triggers := NewTriggerHandler(s)
+	tokens := NewTokenHandler(s)
 	setup := NewSetupHandler(s)
 	reports := NewReportsHandler(s)
 
@@ -47,9 +48,9 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 		// Admin passcode verification (no auth required)
 		r.Post("/admin/verify", admin.VerifyPasscode)
 
-		// Authenticated routes
+		// Authenticated routes (Bearer token or X-User-ID)
 		r.Group(func(r chi.Router) {
-			r.Use(RequireUser(s))
+			r.Use(RequireUserOrToken(s))
 
 			// Any user can view their chores, points, streak
 			r.Get("/users/{id}/chores", users.GetChores)
@@ -139,6 +140,14 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 				r.Put("/admin/webhooks/{id}", webhooks.Update)
 				r.Delete("/admin/webhooks/{id}", webhooks.Delete)
 				r.Get("/admin/webhooks/{id}/deliveries", webhooks.ListDeliveries)
+
+				// API token management
+				r.Get("/admin/tokens", tokens.List)
+				r.Post("/admin/tokens", tokens.Create)
+				r.Delete("/admin/tokens/{id}", tokens.Revoke)
+
+				// Integration discovery: chores with triggers
+				r.Get("/chores/triggerable", triggers.ListTriggerable)
 			})
 		})
 	})
