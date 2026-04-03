@@ -69,7 +69,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 2px solid #334155;
+  border: 2px solid var(--border-subtle);
   transition: all 0.15s ease;
 }
 

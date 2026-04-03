@@ -41,14 +41,14 @@
 
 .stepActive .stepDot {
   background: var(--accent-blue, #38bdf8);
-  color: #0f172a;
+  color: var(--bg-primary);
   border-color: var(--accent-blue, #38bdf8);
 }
 
 .stepComplete .stepDot {
   background: rgba(74, 222, 128, 0.2);
-  color: #4ade80;
-  border-color: #4ade80;
+  color: var(--accent-green);
+  border-color: var(--accent-green);
 }
 
 .stepLabel {
@@ -162,7 +162,7 @@
 
 .userPickerBtnActive {
   background: var(--accent-blue, #38bdf8);
-  color: #0f172a;
+  color: var(--bg-primary);
   border-color: var(--accent-blue, #38bdf8);
 }
 
@@ -187,7 +187,7 @@
 
 .dayBtnActive {
   background: var(--accent-blue, #38bdf8);
-  color: #0f172a;
+  color: var(--bg-primary);
   border-color: var(--accent-blue, #38bdf8);
 }
 
@@ -261,7 +261,7 @@
   border: none;
   border-radius: 12px;
   background: var(--accent-blue, #38bdf8);
-  color: #0f172a;
+  color: var(--bg-primary);
   font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
@@ -366,17 +366,17 @@
 
 .badge_required {
   background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  color: var(--status-required);
 }
 
 .badge_core {
   background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
+  color: var(--accent-blue);
 }
 
 .badge_bonus {
   background: rgba(168, 85, 247, 0.15);
-  color: #c084fc;
+  color: var(--accent-purple);
 }
 
 .noSchedule {
@@ -391,7 +391,7 @@
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 8px;
   padding: 0.75rem 1rem;
-  color: #f87171;
+  color: var(--status-required);
   font-size: 0.85rem;
   margin-bottom: 1rem;
 }
@@ -402,7 +402,7 @@
   width: 16px;
   height: 16px;
   border: 2px solid rgba(0, 0, 0, 0.2);
-  border-top-color: #0f172a;
+  border-top-color: var(--bg-primary);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }

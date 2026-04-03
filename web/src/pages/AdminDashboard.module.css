@@ -41,10 +41,18 @@
   padding: 4px;
   border-radius: 12px;
   margin-bottom: 1.25rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.nav::-webkit-scrollbar {
+  display: none;
 }
 
 .navItem {
   flex: 1;
+  flex-shrink: 0;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -68,7 +76,7 @@
   position: absolute;
   top: 6px;
   right: 6px;
-  background: #ef4444;
+  background: var(--badge-danger);
   color: white;
   font-size: 0.65rem;
   font-weight: 800;
@@ -96,7 +104,7 @@
   align-items: center;
   gap: 0.5rem;
   background: var(--accent-blue);
-  color: #0f172a;
+  color: var(--bg-primary);
   padding: 0.75rem 1.25rem;
   border-radius: 12px;
   font-weight: 700;
@@ -211,12 +219,12 @@
   flex-shrink: 0;
 }
 
-.badge_required { background: #fee2e2; color: #ef4444; }
-.badge_core { background: #dbeafe; color: #3b82f6; }
-.badge_bonus { background: #fef3c7; color: #f59e0b; }
-.badge_admin { background: #ede9fe; color: #8b5cf6; }
-.badge_child { background: #d1fae5; color: #059669; }
-.badge_paused { background: #fef3c7; color: #d97706; }
+.badge_required { background: var(--badge-required-bg); color: var(--badge-required-text); }
+.badge_core { background: var(--badge-core-bg); color: var(--badge-core-text); }
+.badge_bonus { background: var(--badge-bonus-bg); color: var(--badge-bonus-text); }
+.badge_admin { background: var(--badge-admin-bg); color: var(--badge-admin-text); }
+.badge_child { background: var(--badge-child-bg); color: var(--badge-child-text); }
+.badge_paused { background: var(--badge-paused-bg); color: var(--badge-paused-text); }
 
 /* --- Icon Buttons (44px min touch target) --- */
 .iconBtn {
@@ -236,17 +244,17 @@
 
 .iconBtnActive {
   background: rgba(234, 179, 8, 0.15);
-  color: #d97706;
+  color: var(--badge-paused-text);
 }
 
 .iconBtnActive:hover {
   background: rgba(34, 197, 94, 0.15);
-  color: #16a34a;
+  color: var(--accent-green);
 }
 
 .iconBtnDanger:hover {
   background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  color: var(--status-required);
 }
 
 .iconBtnSm {
@@ -274,7 +282,7 @@
 .userAvatarPlaceholder {
   width: 100%;
   height: 100%;
-  background: #334155;
+  background: var(--border-subtle);
 }
 
 /* --- Forms --- */
@@ -364,7 +372,7 @@ select.input {
   align-items: center;
   gap: 0.5rem;
   background: var(--accent-blue);
-  color: #0f172a;
+  color: var(--bg-primary);
   padding: 0.75rem 1.25rem;
   border-radius: 12px;
   font-weight: 700;
@@ -412,7 +420,7 @@ select.input {
 }
 
 .btnDanger {
-  color: #ef4444;
+  color: var(--status-required);
   border-color: rgba(239, 68, 68, 0.2);
 }
 
@@ -475,7 +483,7 @@ select.input {
 
 .dayBtnActive {
   background: var(--accent-blue);
-  color: #0f172a;
+  color: var(--bg-primary);
   border-color: var(--accent-blue);
 }
 
@@ -561,7 +569,7 @@ select.input {
 
 .userPickerBtnActive {
   background: var(--accent-blue);
-  color: #0f172a;
+  color: var(--bg-primary);
   border-color: var(--accent-blue);
 }
 
@@ -627,7 +635,7 @@ select.input {
 }
 
 .statusActive {
-  color: #22c55e;
+  color: var(--accent-green);
   font-weight: 700;
 }
 
@@ -647,7 +655,7 @@ select.input {
   justify-content: center;
   font-size: 0.85rem;
   font-weight: 800;
-  color: #f59e0b;
+  color: var(--status-bonus);
   flex-shrink: 0;
 }
 
@@ -791,11 +799,11 @@ select.input {
 }
 
 .activityAmountPos {
-  color: #22c55e;
+  color: var(--accent-green);
 }
 
 .activityAmountNeg {
-  color: #ef4444;
+  color: var(--status-required);
 }
 
 /* --- Reward Assignments --- */
@@ -949,7 +957,7 @@ select.input {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: #22c55e;
+  background: var(--accent-green);
   color: white;
   padding: 0.75rem;
   border-radius: 12px;
@@ -964,7 +972,7 @@ select.input {
   justify-content: center;
   gap: 0.5rem;
   background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  color: var(--status-required);
   border: 1px solid rgba(239, 68, 68, 0.2);
   padding: 0.75rem;
   border-radius: 12px;

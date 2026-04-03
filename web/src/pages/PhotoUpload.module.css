@@ -1,16 +1,17 @@
 .container {
   min-height: 100vh;
-  background-color: #f3f4f6;
-  color: #111827;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
 }
 
 .header {
-  background-color: white;
+  background-color: var(--bg-secondary);
   padding: 1.5rem;
   text-align: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .header h1 {
@@ -20,7 +21,7 @@
 }
 
 .header p {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.875rem;
   margin-top: 0.25rem;
 }
@@ -34,13 +35,14 @@
 }
 
 .uploadCard {
-  background: white;
+  background: var(--bg-secondary);
   padding: 2.5rem 2rem;
-  border-radius: 1.5rem;
+  border-radius: var(--radius-lg);
   width: 100%;
   max-width: 400px;
   text-align: center;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -48,7 +50,7 @@
 }
 
 .cameraIcon {
-  color: #3b82f6;
+  color: var(--accent-blue);
   margin-bottom: 0.5rem;
 }
 
@@ -59,15 +61,15 @@
 }
 
 .uploadCard p {
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-bottom: 1rem;
 }
 
 .uploadBtn {
-  background-color: #3b82f6;
-  color: white;
+  background: var(--accent-blue);
+  color: var(--bg-primary);
   padding: 1rem 2rem;
-  border-radius: 1rem;
+  border-radius: var(--radius-md);
   font-weight: 700;
   font-size: 1.125rem;
   cursor: pointer;
@@ -75,16 +77,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s;
+  transition: var(--transition);
 }
 
 .uploadBtn:active {
-  background-color: #2563eb;
+  filter: brightness(0.85);
   transform: scale(0.98);
 }
 
 .errorText {
-  color: #ef4444;
+  color: var(--status-required);
   font-size: 0.875rem;
   font-weight: 600;
   margin-top: 0.5rem;
@@ -104,20 +106,20 @@
 .checkCircle {
   width: 80px;
   height: 80px;
-  background-color: #10b981;
-  color: white;
+  background-color: var(--accent-green);
+  color: var(--bg-primary);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.successBox h1 { color: #111827; }
-.successBox p { color: #6b7280; font-size: 1.125rem; }
+.successBox h1 { color: var(--text-primary); }
+.successBox p { color: var(--text-secondary); font-size: 1.125rem; }
 
-.errorBox { color: #ef4444; }
-.errorBox h1 { color: #111827; }
-.errorBox p { color: #6b7280; }
+.errorBox { color: var(--status-required); }
+.errorBox h1 { color: var(--text-primary); }
+.errorBox p { color: var(--text-secondary); }
 
 .spinner {
   animation: spin 1s linear infinite;

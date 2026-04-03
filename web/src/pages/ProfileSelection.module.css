@@ -59,7 +59,7 @@
   justify-content: center;
   margin-bottom: 1rem;
   overflow: hidden;
-  border: 4px solid #334155;
+  border: 4px solid var(--border-subtle);
 }
 
 .avatar {
@@ -69,7 +69,7 @@
 }
 
 .placeholder {
-  color: #334155;
+  color: var(--border-subtle);
 }
 
 .name {

@@ -23,6 +23,29 @@
   --shadow-sm: 0 4px 6px -1px rgb(0 0 0 / 0.1);
   --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.1);
 
+  /* Borders */
+  --border-subtle: #334155;
+  --border-faint: rgba(255, 255, 255, 0.04);
+  --border-hover: rgba(255, 255, 255, 0.12);
+
+  /* Badge colors (dark theme) */
+  --badge-required-bg: rgba(248, 113, 113, 0.15);
+  --badge-required-text: #f87171;
+  --badge-core-bg: rgba(96, 165, 250, 0.15);
+  --badge-core-text: #60a5fa;
+  --badge-bonus-bg: rgba(251, 191, 36, 0.15);
+  --badge-bonus-text: #fbbf24;
+  --badge-admin-bg: rgba(167, 139, 250, 0.15);
+  --badge-admin-text: #a78bfa;
+  --badge-child-bg: rgba(52, 211, 153, 0.15);
+  --badge-child-text: #34d399;
+  --badge-paused-bg: rgba(251, 191, 36, 0.15);
+  --badge-paused-text: #d97706;
+  --badge-danger: #ef4444;
+
+  /* Radius */
+  --radius-pill: 100px;
+
   /* Theme background pattern (none for default) */
   --bg-pattern: none;
   --bg-pattern-opacity: 0;
@@ -156,7 +179,7 @@ body.theme-forest {
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Nunito', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.5;

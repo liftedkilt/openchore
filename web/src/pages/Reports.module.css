@@ -190,15 +190,15 @@
 }
 
 .rateGreen {
-  color: #22c55e;
+  color: var(--accent-green);
 }
 
 .rateYellow {
-  color: #f59e0b;
+  color: var(--status-bonus);
 }
 
 .rateRed {
-  color: #ef4444;
+  color: var(--status-required);
 }
 
 /* --- Points Flow --- */
@@ -231,17 +231,17 @@
 }
 
 .pointsEarned {
-  color: #22c55e;
+  color: var(--accent-green);
   font-weight: 700;
 }
 
 .pointsDecayed {
-  color: #f59e0b;
+  color: var(--status-bonus);
   font-weight: 700;
 }
 
 .pointsSpent {
-  color: #ef4444;
+  color: var(--status-required);
   font-weight: 700;
 }
 
@@ -266,7 +266,7 @@
 }
 
 .categoryRequired { color: #ef4444; }
-.categoryCore { color: #3b82f6; }
+.categoryCore { color: var(--status-core); }
 .categoryBonus { color: #f59e0b; }
 
 .categoryBar {
