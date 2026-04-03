@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/liftedkilt/openchore/internal/model"
 )
@@ -96,6 +97,11 @@ func TestReportKidSummaries_WithData(t *testing.T) {
 	s := setupStore(t)
 	ctx := context.Background()
 
+	now := time.Now()
+	today := now.Format("2006-01-02")
+	startOfMonth := now.Format("2006-01") + "-01"
+	endOfMonth := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+
 	admin := createTestUser(t, s, "Admin", "admin")
 	kid1 := createTestUser(t, s, "Alice", "child")
 	kid2 := createTestUser(t, s, "Bob", "child")
@@ -110,7 +116,7 @@ func TestReportKidSummaries_WithData(t *testing.T) {
 		ChoreScheduleID: sched1k1.ID,
 		CompletedBy:     kid1.ID,
 		Status:          "approved",
-		CompletionDate:  "2026-03-23",
+		CompletionDate:  today,
 	}
 	if err := s.CompleteChore(ctx, cc1); err != nil {
 		t.Fatalf("CompleteChore: %v", err)
@@ -121,7 +127,7 @@ func TestReportKidSummaries_WithData(t *testing.T) {
 		t.Fatalf("CreditChorePoints: %v", err)
 	}
 
-	rows, err := s.ReportKidSummaries(ctx, "2026-03-01", "2026-03-31")
+	rows, err := s.ReportKidSummaries(ctx, startOfMonth, endOfMonth)
 	if err != nil {
 		t.Fatalf("ReportKidSummaries: %v", err)
 	}
@@ -343,6 +349,11 @@ func TestReportPointsSummary_WithData(t *testing.T) {
 	s := setupStore(t)
 	ctx := context.Background()
 
+	now := time.Now()
+	today := now.Format("2006-01-02")
+	startOfMonth := now.Format("2006-01") + "-01"
+	endOfMonth := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+
 	admin := createTestUser(t, s, "Admin", "admin")
 	kid := createTestUser(t, s, "Alice", "child")
 	chore := createTestChore(t, s, "Dishes", 10, admin.ID)
@@ -350,7 +361,7 @@ func TestReportPointsSummary_WithData(t *testing.T) {
 
 	cc := &model.ChoreCompletion{
 		ChoreScheduleID: sched.ID, CompletedBy: kid.ID,
-		Status: "approved", CompletionDate: "2026-03-23",
+		Status: "approved", CompletionDate: today,
 	}
 	if err := s.CompleteChore(ctx, cc); err != nil {
 		t.Fatalf("CompleteChore: %v", err)
@@ -361,7 +372,7 @@ func TestReportPointsSummary_WithData(t *testing.T) {
 		t.Fatalf("CreditChorePoints: %v", err)
 	}
 
-	rows, err := s.ReportPointsSummary(ctx, "2026-03-01", "2026-03-31")
+	rows, err := s.ReportPointsSummary(ctx, startOfMonth, endOfMonth)
 	if err != nil {
 		t.Fatalf("ReportPointsSummary: %v", err)
 	}
