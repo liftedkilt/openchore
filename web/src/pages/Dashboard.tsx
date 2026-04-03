@@ -299,6 +299,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const logout = () => {
+    document.body.className = 'theme-default';
     setUser(null);
     navigate('/login');
   };
