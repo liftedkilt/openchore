@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { Lock, Delete, ArrowLeft } from 'lucide-react';
@@ -10,23 +10,7 @@ export const AdminPasscode: React.FC = () => {
   const [shaking, setShaking] = useState(false);
   const navigate = useNavigate();
 
-  const handleDigit = (digit: string) => {
-    if (code.length >= 6) return;
-    const newCode = code + digit;
-    setCode(newCode);
-    setError('');
-
-    if (newCode.length >= 4) {
-      verify(newCode);
-    }
-  };
-
-  const handleDelete = () => {
-    setCode(prev => prev.slice(0, -1));
-    setError('');
-  };
-
-  const verify = async (passcode: string) => {
+  const verify = useCallback(async (passcode: string) => {
     try {
       await api.admin.verifyPasscode(passcode);
       sessionStorage.setItem('openchore_admin', 'true');
@@ -36,7 +20,36 @@ export const AdminPasscode: React.FC = () => {
       setShaking(true);
       setTimeout(() => { setShaking(false); setCode(''); }, 600);
     }
-  };
+  }, [navigate]);
+
+  const handleDigit = useCallback((digit: string) => {
+    setCode(prev => {
+      if (prev.length >= 6) return prev;
+      const newCode = prev + digit;
+      setError('');
+      if (newCode.length >= 4) {
+        verify(newCode);
+      }
+      return newCode;
+    });
+  }, [verify]);
+
+  const handleDelete = useCallback(() => {
+    setCode(prev => prev.slice(0, -1));
+    setError('');
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key >= '0' && e.key <= '9') {
+        handleDigit(e.key);
+      } else if (e.key === 'Backspace' || e.key === 'Delete') {
+        handleDelete();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleDigit, handleDelete]);
 
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
