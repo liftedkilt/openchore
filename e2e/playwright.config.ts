@@ -25,7 +25,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'cd .. && rm -f openchore.db openchore.db-shm openchore.db-wal && go run cmd/server/main.go',
+      command: 'cd .. && rm -f openchore.db openchore.db-shm openchore.db-wal && cp -n config/config.example.yaml config/config.yaml 2>/dev/null; go run cmd/server/main.go',
       port: 8080,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
