@@ -623,7 +623,7 @@ select.input {
 }
 
 .content {
-  padding-bottom: 2rem;
+  padding-bottom: 5rem;
 }
 
 /* --- Rewards Tab --- */
@@ -1045,4 +1045,33 @@ select.input {
 
 .triggerUrl:hover {
   background: rgba(255, 255, 255, 0.12);
+}
+
+/* --- Quick Assign FAB --- */
+.fab {
+  position: fixed;
+  bottom: max(1.5rem, env(safe-area-inset-bottom, 1.5rem));
+  right: 1.5rem;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--accent-blue);
+  color: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(56, 189, 248, 0.3);
+  z-index: 1000;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.fab:hover {
+  transform: scale(1.05);
+  box-shadow: 0 10px 30px rgba(56, 189, 248, 0.4);
+}
+
+.fab:active {
+  transform: scale(0.95);
 }

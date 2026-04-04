@@ -8,6 +8,7 @@ import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star
 import clsx from 'clsx';
 import CreateChoreWizard from '../components/CreateChoreWizard/CreateChoreWizard';
 import EditChoreModal from '../components/EditChoreModal/EditChoreModal';
+import QuickAssign from '../components/QuickAssign/QuickAssign';
 
 type Tab = 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'settings';
 
@@ -16,6 +17,7 @@ export const AdminDashboard: React.FC = () => {
   const [tab, setTab] = useState<Tab>('chores');
   const [ready, setReady] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [quickAssignOpen, setQuickAssignOpen] = useState(false);
 
   // Fetch pending count periodically
   useEffect(() => {
@@ -110,6 +112,12 @@ export const AdminDashboard: React.FC = () => {
         {tab === 'activity' && <ActivityTab />}
         {tab === 'settings' && <SettingsTab />}
       </main>
+
+      <button className={styles.fab} onClick={() => setQuickAssignOpen(true)} title="Quick Assign">
+        <Plus size={24} />
+      </button>
+
+      <QuickAssign isOpen={quickAssignOpen} onClose={() => setQuickAssignOpen(false)} />
     </div>
   );
 };

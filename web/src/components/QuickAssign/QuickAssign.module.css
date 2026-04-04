@@ -1,0 +1,187 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.labelSmall {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.select,
+.input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  color: var(--text-primary);
+  min-height: 44px;
+  width: 100%;
+  font-family: inherit;
+}
+
+.select:focus,
+.input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
+
+.newChoreFields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.pointsRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pointsInput {
+  width: 80px;
+  flex: none;
+}
+
+/* --- Avatar picker --- */
+.avatarPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.avatarBubble {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem;
+  border-radius: 16px;
+  border: 2px solid transparent;
+  background: var(--bg-primary);
+  cursor: pointer;
+  transition: var(--transition);
+  min-width: 72px;
+}
+
+.avatarBubble:hover {
+  border-color: var(--border-hover);
+}
+
+.avatarBubbleActive {
+  border-color: var(--accent-blue);
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.avatarImg {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatarPlaceholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+}
+
+.avatarName {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.avatarBubbleActive .avatarName {
+  color: var(--accent-blue);
+}
+
+/* --- Date picker --- */
+.datePicker {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dateChip {
+  flex: 1;
+  padding: 0.625rem 0.75rem;
+  border-radius: 100px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: var(--transition);
+  min-height: 44px;
+}
+
+.dateChip:hover {
+  border-color: var(--border-hover);
+}
+
+.dateChipActive {
+  background: var(--accent-blue);
+  color: var(--bg-primary);
+  border-color: var(--accent-blue);
+}
+
+/* --- Assign button --- */
+.assignBtn {
+  width: 100%;
+  padding: 0.875rem;
+  border-radius: 12px;
+  background: var(--accent-blue);
+  color: var(--bg-primary);
+  font-size: 1rem;
+  font-weight: 700;
+  min-height: 48px;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: 0.25rem;
+}
+
+.assignBtn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.assignBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --- Error --- */
+.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
