@@ -22,6 +22,7 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
   const [description, setDescription] = useState(chore.description);
   const [category, setCategory] = useState(chore.category);
   const [points, setPoints] = useState(chore.points_value);
+  const [missedPenalty, setMissedPenalty] = useState(chore.missed_penalty_value || 0);
   const [minutes, setMinutes] = useState(chore.estimated_minutes || 0);
   const [icon, setIcon] = useState(chore.icon || '');
   const [requiresApproval, setRequiresApproval] = useState(chore.requires_approval);
@@ -42,6 +43,7 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
         category,
         icon,
         points_value: points,
+        missed_penalty_value: missedPenalty || 0,
         estimated_minutes: minutes || undefined,
         requires_approval: requiresApproval,
         requires_photo: requiresPhoto,
@@ -92,6 +94,10 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
             <div className={styles.formGroup}>
               <label className={styles.label}>Points</label>
               <input className={styles.input} type="number" min={0} value={points} onChange={e => setPoints(parseInt(e.target.value) || 0)} />
+            </div>
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Penalty</label>
+              <input className={styles.input} type="number" min={0} value={missedPenalty} onChange={e => setMissedPenalty(parseInt(e.target.value) || 0)} placeholder="0" />
             </div>
             <div className={styles.formGroup}>
               <label className={styles.label}>Minutes</label>

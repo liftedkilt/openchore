@@ -12,6 +12,7 @@ interface ChoreData {
   category: 'required' | 'core' | 'bonus';
   icon: string;
   points: number;
+  missedPenalty: number;
   estimatedMinutes: number;
   requiresApproval: boolean;
   requiresPhoto: boolean;
@@ -41,7 +42,7 @@ interface Props {
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const defaultChoreData: ChoreData = {
-  title: '', description: '', category: 'core', icon: '', points: 5,
+  title: '', description: '', category: 'core', icon: '', points: 5, missedPenalty: 0,
   estimatedMinutes: 5, requiresApproval: false, requiresPhoto: false, photoSource: 'child',
 };
 
@@ -118,6 +119,7 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
         category: chore.category,
         icon: chore.icon,
         points_value: chore.points,
+        missed_penalty_value: chore.missedPenalty || 0,
         estimated_minutes: chore.estimatedMinutes || undefined,
         requires_approval: chore.requiresApproval,
         requires_photo: chore.requiresPhoto,
@@ -205,6 +207,10 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
         <div className={styles.formGroup}>
           <label className={styles.label}>Points</label>
           <input className={styles.input} type="number" min={0} value={chore.points} onChange={e => setChore(c => ({ ...c, points: parseInt(e.target.value) || 0 }))} />
+        </div>
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Penalty</label>
+          <input className={styles.input} type="number" min={0} value={chore.missedPenalty} onChange={e => setChore(c => ({ ...c, missedPenalty: parseInt(e.target.value) || 0 }))} placeholder="0" />
         </div>
         <div className={styles.formGroup}>
           <label className={styles.label}>Minutes</label>
@@ -364,7 +370,7 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
           </div>
           <div className={styles.reviewRow}>
             <span className={styles.reviewLabel}>Points</span>
-            <span className={styles.reviewValue}>{chore.points} pts</span>
+            <span className={styles.reviewValue}>{chore.points} pts{chore.missedPenalty > 0 && ` / −${chore.missedPenalty} penalty`}</span>
           </div>
           {chore.estimatedMinutes > 0 && (
             <div className={styles.reviewRow}>
