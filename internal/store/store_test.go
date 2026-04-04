@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -1579,5 +1580,250 @@ func TestGetScheduledChoresForUser(t *testing.T) {
 	chores, _ = s.GetScheduledChoresForUser(ctx, child.ID, []string{"2026-03-29"}, now)
 	if len(chores) != 0 {
 		t.Errorf("expected 0 chores for Sunday, got %d", len(chores))
+	}
+}
+
+// ===== User LineColor =====
+
+func TestUserLineColorPersistence(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := &model.User{Name: "ColorKid", Role: "child", LineColor: "#ff5733"}
+	if err := s.CreateUser(ctx, u); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	// Verify line_color persists through GetUser
+	got, err := s.GetUser(ctx, u.ID)
+	if err != nil {
+		t.Fatalf("GetUser: %v", err)
+	}
+	if got.LineColor != "#ff5733" {
+		t.Errorf("expected LineColor '#ff5733', got %q", got.LineColor)
+	}
+}
+
+func TestUserLineColorUpdate(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Kid", "child")
+
+	// Initially empty
+	got, _ := s.GetUser(ctx, u.ID)
+	if got.LineColor != "" {
+		t.Errorf("expected empty LineColor initially, got %q", got.LineColor)
+	}
+
+	// Update line_color
+	u.LineColor = "#00ff00"
+	if err := s.UpdateUser(ctx, u); err != nil {
+		t.Fatalf("UpdateUser: %v", err)
+	}
+
+	got, _ = s.GetUser(ctx, u.ID)
+	if got.LineColor != "#00ff00" {
+		t.Errorf("expected LineColor '#00ff00' after update, got %q", got.LineColor)
+	}
+}
+
+func TestUserLineColorInListUsers(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u1 := &model.User{Name: "Alice", Role: "child", LineColor: "#aaa"}
+	s.CreateUser(ctx, u1)
+	u2 := &model.User{Name: "Bob", Role: "child", LineColor: "#bbb"}
+	s.CreateUser(ctx, u2)
+
+	users, err := s.ListUsers(ctx)
+	if err != nil {
+		t.Fatalf("ListUsers: %v", err)
+	}
+	if len(users) != 2 {
+		t.Fatalf("expected 2 users, got %d", len(users))
+	}
+	// Users ordered by name: Alice, Bob
+	if users[0].LineColor != "#aaa" {
+		t.Errorf("expected Alice LineColor '#aaa', got %q", users[0].LineColor)
+	}
+	if users[1].LineColor != "#bbb" {
+		t.Errorf("expected Bob LineColor '#bbb', got %q", users[1].LineColor)
+	}
+}
+
+func TestUserLineColorPreservedOnOtherFieldUpdate(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := &model.User{Name: "Kid", Role: "child", LineColor: "#123456"}
+	s.CreateUser(ctx, u)
+
+	// Update name only (simulating admin update flow: get, modify name, save)
+	got, _ := s.GetUser(ctx, u.ID)
+	got.Name = "Updated Kid"
+	if err := s.UpdateUser(ctx, got); err != nil {
+		t.Fatalf("UpdateUser: %v", err)
+	}
+
+	final, _ := s.GetUser(ctx, u.ID)
+	if final.Name != "Updated Kid" {
+		t.Errorf("expected name 'Updated Kid', got %q", final.Name)
+	}
+	if final.LineColor != "#123456" {
+		t.Errorf("expected LineColor preserved as '#123456', got %q", final.LineColor)
+	}
+}
+
+// ===== One-Off Schedule (specific_date) =====
+
+func TestCreateScheduleWithSpecificDate(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "One-off task", 10, u.ID)
+
+	date := "2026-04-10"
+	cs := &model.ChoreSchedule{
+		ChoreID:          c.ID,
+		AssignedTo:       u.ID,
+		AssignmentType:   "individual",
+		SpecificDate:     &date,
+		PointsMultiplier: 1.0,
+		ExpiryPenalty:    "none",
+	}
+	err := s.CreateSchedule(ctx, cs)
+	if err != nil {
+		t.Fatalf("CreateSchedule with specific_date: %v", err)
+	}
+	if cs.ID == 0 {
+		t.Fatal("expected non-zero schedule ID")
+	}
+
+	// Retrieve and verify
+	got, err := s.GetSchedule(ctx, cs.ID)
+	if err != nil {
+		t.Fatalf("GetSchedule: %v", err)
+	}
+	if got.SpecificDate == nil {
+		t.Error("expected SpecificDate to contain '2026-04-10', got nil")
+	} else if !strings.HasPrefix(*got.SpecificDate, "2026-04-10") {
+		t.Errorf("expected SpecificDate to start with '2026-04-10', got %q", *got.SpecificDate)
+	}
+	if got.DayOfWeek != nil {
+		t.Errorf("expected DayOfWeek nil for one-off, got %v", got.DayOfWeek)
+	}
+}
+
+func TestOneOffScheduleAppearsForCorrectDate(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	child := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Special task", 15, child.ID)
+
+	date := "2026-04-15"
+	cs := &model.ChoreSchedule{
+		ChoreID:          c.ID,
+		AssignedTo:       child.ID,
+		AssignmentType:   "individual",
+		SpecificDate:     &date,
+		PointsMultiplier: 1.0,
+		ExpiryPenalty:    "none",
+	}
+	s.CreateSchedule(ctx, cs)
+
+	now, _ := time.Parse(model.DateFormat, "2026-04-15")
+
+	// Should appear on the correct date
+	chores, err := s.GetScheduledChoresForUser(ctx, child.ID, []string{"2026-04-15"}, now)
+	if err != nil {
+		t.Fatalf("GetScheduledChoresForUser: %v", err)
+	}
+	if len(chores) != 1 {
+		t.Fatalf("expected 1 chore on 2026-04-15, got %d", len(chores))
+	}
+	if chores[0].Title != "Special task" {
+		t.Errorf("expected 'Special task', got %q", chores[0].Title)
+	}
+
+	// Should NOT appear on a different date
+	chores, _ = s.GetScheduledChoresForUser(ctx, child.ID, []string{"2026-04-16"}, now)
+	if len(chores) != 0 {
+		t.Errorf("expected 0 chores on 2026-04-16, got %d", len(chores))
+	}
+}
+
+func TestOneOffAndRecurringSchedulesTogether(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	child := createTestUser(t, s, "Child", "child")
+	c1 := createTestChore(t, s, "Recurring chore", 5, child.ID)
+	c2 := createTestChore(t, s, "One-off chore", 10, child.ID)
+
+	// 2026-04-08 is a Wednesday (day_of_week = 3)
+	createTestSchedule(t, s, c1.ID, child.ID, 3)
+
+	date := "2026-04-08"
+	cs := &model.ChoreSchedule{
+		ChoreID:          c2.ID,
+		AssignedTo:       child.ID,
+		AssignmentType:   "individual",
+		SpecificDate:     &date,
+		PointsMultiplier: 1.0,
+		ExpiryPenalty:    "none",
+	}
+	s.CreateSchedule(ctx, cs)
+
+	now, _ := time.Parse(model.DateFormat, "2026-04-08")
+
+	// Both should appear on 2026-04-08
+	chores, err := s.GetScheduledChoresForUser(ctx, child.ID, []string{"2026-04-08"}, now)
+	if err != nil {
+		t.Fatalf("GetScheduledChoresForUser: %v", err)
+	}
+	if len(chores) != 2 {
+		t.Fatalf("expected 2 chores (recurring + one-off), got %d", len(chores))
+	}
+
+	// On Thursday, only recurring if it matches — since recurring is Wednesday only, expect 0
+	chores, _ = s.GetScheduledChoresForUser(ctx, child.ID, []string{"2026-04-09"}, now)
+	if len(chores) != 0 {
+		t.Errorf("expected 0 chores on Thursday, got %d", len(chores))
+	}
+}
+
+func TestScheduleExistsForDate(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	child := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Task", 5, child.ID)
+
+	date := "2026-04-20"
+	cs := &model.ChoreSchedule{
+		ChoreID:          c.ID,
+		AssignedTo:       child.ID,
+		AssignmentType:   "individual",
+		SpecificDate:     &date,
+		PointsMultiplier: 1.0,
+		ExpiryPenalty:    "none",
+	}
+	s.CreateSchedule(ctx, cs)
+
+	exists, err := s.ScheduleExistsForDate(ctx, c.ID, child.ID, "2026-04-20")
+	if err != nil {
+		t.Fatalf("ScheduleExistsForDate: %v", err)
+	}
+	if !exists {
+		t.Error("expected schedule to exist for date 2026-04-20")
+	}
+
+	exists, _ = s.ScheduleExistsForDate(ctx, c.ID, child.ID, "2026-04-21")
+	if exists {
+		t.Error("expected no schedule for date 2026-04-21")
 	}
 }

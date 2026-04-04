@@ -2694,3 +2694,265 @@ func TestCreateScheduleInvalidChoreID(t *testing.T) {
 		"day_of_week": 3,
 	}, adminHeaders(), http.StatusBadRequest)
 }
+
+// =================== LINE COLOR TESTS ===================
+
+func TestUserLineColorUpdate(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Kid updates own line color
+	resp := env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/line-color", kidID), map[string]any{
+		"line_color": "#ff5733",
+	}, childHeaders(kidID), http.StatusOK)
+	var user map[string]any
+	decodeBody(t, resp, &user)
+	if user["line_color"] != "#ff5733" {
+		t.Fatalf("expected line_color '#ff5733', got %v", user["line_color"])
+	}
+
+	// Verify it persists via GET
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d", kidID), nil, nil, http.StatusOK)
+	decodeBody(t, resp, &user)
+	if user["line_color"] != "#ff5733" {
+		t.Fatalf("expected line_color to persist, got %v", user["line_color"])
+	}
+}
+
+func TestUserLineColorForbiddenForOthers(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kid1 := env.createChild(t, "Kid1")
+	kid2 := env.createChild(t, "Kid2")
+	_ = kid1
+
+	// Kid2 tries to update Kid1's line color
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/line-color", kid1), map[string]any{
+		"line_color": "#aabbcc",
+	}, childHeaders(kid2), http.StatusForbidden)
+}
+
+func TestUserLineColorRequiresValue(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Empty line_color should fail
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/line-color", kidID), map[string]any{
+		"line_color": "",
+	}, childHeaders(kidID), http.StatusBadRequest)
+}
+
+func TestUserLineColorNotClobberedByAdminUpdate(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Kid sets line color
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/line-color", kidID), map[string]any{
+		"line_color": "#00ff00",
+	}, childHeaders(kidID), http.StatusOK)
+
+	// Admin updates the user's name (should not clobber line_color)
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d", kidID), map[string]any{
+		"name": "Renamed Kid",
+	}, adminHeaders(), http.StatusOK)
+
+	// Verify line_color is preserved
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d", kidID), nil, nil, http.StatusOK)
+	var user map[string]any
+	decodeBody(t, resp, &user)
+	if user["name"] != "Renamed Kid" {
+		t.Fatalf("expected name 'Renamed Kid', got %v", user["name"])
+	}
+	if user["line_color"] != "#00ff00" {
+		t.Fatalf("expected line_color preserved as '#00ff00', got %v", user["line_color"])
+	}
+}
+
+func TestUserLineColorInvalidUserID(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "PUT", "/api/users/abc/line-color", map[string]any{
+		"line_color": "#ff0000",
+	}, adminHeaders(), http.StatusBadRequest)
+}
+
+func TestUserLineColorVisibleInListUsers(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Set line color
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/line-color", kidID), map[string]any{
+		"line_color": "#123456",
+	}, childHeaders(kidID), http.StatusOK)
+
+	// List users should include line_color
+	resp := env.expectStatus(t, "GET", "/api/users", nil, nil, http.StatusOK)
+	var users []map[string]any
+	decodeBody(t, resp, &users)
+
+	found := false
+	for _, u := range users {
+		if u["name"] == "Kid" {
+			if u["line_color"] != "#123456" {
+				t.Fatalf("expected line_color '#123456' in list, got %v", u["line_color"])
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("Kid not found in user list")
+	}
+}
+
+// =================== ONE-OFF SCHEDULE (QUICK ASSIGN) TESTS ===================
+
+func TestOneOffScheduleCreation(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Create chore
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":    "One-off task",
+		"category": "core",
+	}, adminHeaders())
+
+	// Schedule with specific_date only (no day_of_week)
+	resp := env.expectStatus(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": "2026-04-10",
+	}, adminHeaders(), http.StatusCreated)
+
+	var schedule map[string]any
+	decodeBody(t, resp, &schedule)
+	if schedule["specific_date"] != "2026-04-10" {
+		t.Fatalf("expected specific_date '2026-04-10', got %v", schedule["specific_date"])
+	}
+	if schedule["day_of_week"] != nil {
+		t.Fatalf("expected day_of_week nil for one-off, got %v", schedule["day_of_week"])
+	}
+}
+
+func TestOneOffScheduleAppearsOnCorrectDate(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":    "Special task",
+		"category": "bonus",
+	}, adminHeaders())
+
+	// Schedule as one-off on 2026-04-15
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": "2026-04-15",
+	}, adminHeaders())
+
+	// Should appear on 2026-04-15
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/chores?view=daily&date=2026-04-15", kidID), nil, adminHeaders(), http.StatusOK)
+	var chores []map[string]any
+	decodeBody(t, resp, &chores)
+	if len(chores) != 1 {
+		t.Fatalf("expected 1 chore on 2026-04-15, got %d", len(chores))
+	}
+	if chores[0]["title"] != "Special task" {
+		t.Fatalf("expected 'Special task', got %v", chores[0]["title"])
+	}
+
+	// Should NOT appear on 2026-04-16
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/chores?view=daily&date=2026-04-16", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &chores)
+	if len(chores) != 0 {
+		t.Fatalf("expected 0 chores on 2026-04-16, got %d", len(chores))
+	}
+
+	// Should NOT appear on 2026-04-14
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/chores?view=daily&date=2026-04-14", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &chores)
+	if len(chores) != 0 {
+		t.Fatalf("expected 0 chores on 2026-04-14, got %d", len(chores))
+	}
+}
+
+func TestOneOffScheduleCompletionAndPoints(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":        "Quick assign chore",
+		"category":     "bonus",
+		"points_value": 15,
+	}, adminHeaders())
+
+	// Schedule as one-off
+	resp := env.expectStatus(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": "2026-04-20",
+	}, adminHeaders(), http.StatusCreated)
+	var schedule map[string]any
+	decodeBody(t, resp, &schedule)
+
+	// Complete the one-off chore
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": "2026-04-20",
+	}, adminHeaders(), http.StatusCreated)
+
+	// Check points were credited
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 15 {
+		t.Fatalf("expected 15 points for one-off chore, got %v", pts["balance"])
+	}
+
+	// Verify shows as completed in daily view
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/chores?view=daily&date=2026-04-20", kidID), nil, adminHeaders(), http.StatusOK)
+	var chores []map[string]any
+	decodeBody(t, resp, &chores)
+	if len(chores) != 1 {
+		t.Fatalf("expected 1 chore, got %d", len(chores))
+	}
+	if chores[0]["completed"] != true {
+		t.Fatal("expected one-off chore to show as completed")
+	}
+}
+
+func TestOneOffScheduleInWeeklyView(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":    "Weekly one-off",
+		"category": "core",
+	}, adminHeaders())
+
+	// Schedule one-off for 2026-04-08 (Wednesday)
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": "2026-04-08",
+	}, adminHeaders())
+
+	// Weekly view for week of 2026-04-06 (Monday) should include it
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/chores?view=weekly&date=2026-04-06", kidID), nil, adminHeaders(), http.StatusOK)
+	var chores []map[string]any
+	decodeBody(t, resp, &chores)
+	if len(chores) != 1 {
+		t.Fatalf("expected 1 chore in weekly view, got %d", len(chores))
+	}
+
+	// Weekly view for a different week should NOT include it
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/chores?view=weekly&date=2026-04-13", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &chores)
+	if len(chores) != 0 {
+		t.Fatalf("expected 0 chores in different week, got %d", len(chores))
+	}
+}
