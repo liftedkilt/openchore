@@ -23,12 +23,15 @@
 - [x] Redemption history with admin undo
 - [x] Configurable expiry penalties per schedule (block/no_points/penalty)
 - [x] Bonus chore points only count once required + core chores are complete
+- [x] Missed penalty value on chores (UI in create wizard and edit modal)
 
 ## Phase 3: Approval & Notifications (Partially Complete)
 - [x] Parent approval workflow for chore completions (pending/approved/rejected)
 - [x] Discord notifications for approval requests and chore events
 - [x] Photo proof of completion (photo_url on completions)
 - [x] Admin reports page (weekly/monthly/yearly views with charts — kid scorecards, most-missed chores, completion trends, category breakdown, points flow, day-of-week analysis)
+- [ ] Push notifications for approval requests
+- [ ] Weekly summary email/notification for parents
 
 ## Phase 4: Smart Scheduling
 - [ ] Schedule overrides (temporary changes for a specific week without editing recurring schedule)
@@ -68,8 +71,8 @@
 - [x] FireTrigger: return 403 for disabled triggers instead of 404
 - [x] FireTrigger: return richer response with schedule details
 
-## Testing: Harden UI-level e2e tests for admin flows
-The e2e suite (52 tests) verifies most complex admin interactions via API calls because CSS module class names are unstable and many admin UI elements (icon-only buttons, inline forms, overlapping modals) lack accessible selectors. The areas that need UI-level coverage are the same areas where bugs tend to hide:
+## Testing
+267 integration tests across API, store, config, discord, triggers, and webhook layers.
 - [ ] Add `data-testid` attributes to key admin interactive elements (edit/delete buttons on cards, schedule group delete, pause/unpause toggle, reward/user/point form inputs)
 - [ ] Edit Chore Modal: open, modify fields, save — currently verified via API PUT only
 - [ ] Inline schedule deletion via trash icon in the edit modal
@@ -82,6 +85,11 @@ The e2e suite (52 tests) verifies most complex admin interactions via API calls 
 - [x] Ambient dashboard mode for wall-mounted iPad (family overview when idle)
 - [x] Time estimates on chores (estimated_minutes)
 - [x] Tooltips on admin UI form fields
-- [ ] Text-to-speech for younger kids (age/birth_date on users, simplified TTS descriptions)
+- [x] Text-to-speech for younger kids (toggle in header, auto-enabled for age 7 and under)
 - [x] Morning/afternoon/evening chore grouping (using available_at)
+- [x] Quick Assign FAB — floating button for instant one-off chore assignment from admin dashboard
+- [x] PWA manifest — fullscreen home screen app on iOS/Android (no Safari chrome)
+- [x] Per-kid line color for ambient dashboard race graph
+- [x] Avatar picker with 12 DiceBear styles and pastel backgrounds
+- [x] Design system overhaul — typography, dark theme, CSS variables
 - [ ] Chore templates (age-appropriate packs parents can import)

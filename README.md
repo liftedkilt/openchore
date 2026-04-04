@@ -1,6 +1,6 @@
 # OpenChore
 
-A family chore management system designed for a wall-mounted iPad. Gamifies household tasks with a points economy, rewards store, streaks, approval workflows, and per-kid theming.
+A family chore management system designed for a wall-mounted iPad. Gamifies household tasks with a points economy, rewards store, streaks, approval workflows, and per-kid theming. Installable as a fullscreen PWA on iOS and Android.
 
 ## Features
 
@@ -52,10 +52,21 @@ A family chore management system designed for a wall-mounted iPad. Gamifies hous
 - **Vacation mode**: pause a kid's chores without deleting schedules
 - **Config export**: export current configuration as YAML
 
-### Theming
+### Theming & Personalization
 - 4 built-in themes: Default, Quest, Galaxy, Forest
 - Per-kid theme selection with custom category labels, icons, greetings, sounds, and confetti colors
+- **Line color picker**: kids choose their color on the ambient dashboard race graph
+- **Avatar picker**: 12 DiceBear styles with shuffle and pastel backgrounds
 - Synthesized sound effects on completion (Web Audio API)
+
+### Quick Assign
+- **Floating action button** on admin dashboard for instant one-off chore assignment
+- Pick an existing chore or create a new one, select kids, pick today/tomorrow/custom date
+- No need to navigate through the full chore wizard for ad-hoc tasks
+
+### PWA Support
+- Web app manifest with `standalone` display for fullscreen home screen apps
+- Apple mobile web app meta tags for iOS Safari
 
 ### Accessibility
 - **Text-to-speech**: speaker button on chore cards reads title and description aloud (browser SpeechSynthesis API). Defaults on for kids age 7 and under; any user can toggle via header button. Preference persisted per-user.
@@ -73,7 +84,7 @@ A family chore management system designed for a wall-mounted iPad. Gamifies hous
 | Styling | CSS Modules |
 | Icons | lucide-react |
 | Charts | Custom SVG (BarChart, LineChart components) |
-| Testing | Go standard library + httptest (142 integration tests) |
+| Testing | Go standard library + httptest (267 integration tests) |
 | Containers | Multi-stage Alpine builds, Podman/Docker Compose |
 
 ## Getting Started
@@ -155,7 +166,7 @@ The compose setup runs:
 │       ├── dispatcher.go     # Event firing, HMAC signing, delivery logging
 │       ├── expiry.go         # Background expiry checker (1-min interval)
 │       └── decay.go          # Background decay checker (15-min interval)
-├── migrations/               # Embedded SQL migrations (001–006)
+├── migrations/               # Embedded SQL migrations (001–004)
 ├── web/                      # React frontend
 │   └── src/
 │       ├── api.ts            # Typed API client
@@ -173,6 +184,7 @@ The compose setup runs:
 │       │   ├── Modal/                 # Reusable modal component
 │       │   ├── CreateChoreWizard/     # Multi-step chore creation
 │       │   ├── EditChoreModal/        # Chore editing with schedules + triggers
+│       │   ├── QuickAssign/           # One-off chore assignment FAB + modal
 │       │   └── charts/               # BarChart and LineChart (SVG)
 │       └── hooks/
 │           ├── useIdleRedirect.ts     # Auto-redirect after inactivity
@@ -208,6 +220,7 @@ The compose setup runs:
 | GET | `/api/users/{id}/redemptions` | Redemption history |
 | PUT | `/api/users/{id}/theme` | Update theme preference |
 | PUT | `/api/users/{id}/avatar` | Update avatar URL |
+| PUT | `/api/users/{id}/line-color` | Update ambient graph line color |
 
 ### Admin (requires admin role)
 | Method | Path | Description |
