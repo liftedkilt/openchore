@@ -26,8 +26,8 @@ func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
 		paused = 1
 	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO users (name, avatar_url, role, age, theme, paused) VALUES (?, ?, ?, ?, ?, ?)`,
-		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, paused)
+		`INSERT INTO users (name, avatar_url, role, age, theme, line_color, paused) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.LineColor, paused)
 	if err != nil {
 		return err
 	}
@@ -39,8 +39,8 @@ func (s *Store) GetUser(ctx context.Context, id int64) (*model.User, error) {
 	u := &model.User{}
 	var paused int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, paused, created_at FROM users WHERE id = ?`, id).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &paused, &u.CreatedAt)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, created_at FROM users WHERE id = ?`, id).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -50,7 +50,7 @@ func (s *Store) GetUser(ctx context.Context, id int64) (*model.User, error) {
 
 func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, paused, created_at FROM users ORDER BY name`)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, created_at FROM users ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 	for rows.Next() {
 		var u model.User
 		var paused int
-		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &paused, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		u.Paused = paused == 1
@@ -454,8 +454,8 @@ func (s *Store) UpdateUser(ctx context.Context, u *model.User) error {
 		paused = 1
 	}
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE users SET name=?, avatar_url=?, role=?, age=?, theme=?, paused=? WHERE id=?`,
-		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, paused, u.ID)
+		`UPDATE users SET name=?, avatar_url=?, role=?, age=?, theme=?, line_color=?, paused=? WHERE id=?`,
+		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.LineColor, paused, u.ID)
 	return err
 }
 
@@ -1225,8 +1225,8 @@ func (s *Store) GetUserByName(ctx context.Context, name string) (*model.User, er
 	u := &model.User{}
 	var paused int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, paused, created_at FROM users WHERE LOWER(name) = LOWER(?)`, name).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &paused, &u.CreatedAt)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, created_at FROM users WHERE LOWER(name) = LOWER(?)`, name).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

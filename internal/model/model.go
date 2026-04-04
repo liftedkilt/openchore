@@ -12,6 +12,7 @@ type User struct {
 	Role      string    `json:"role"`
 	Age       *int      `json:"age,omitempty"`
 	Theme     string    `json:"theme,omitempty"`
+	LineColor string    `json:"line_color,omitempty"`
 	Paused    bool      `json:"paused"`
 	CreatedAt time.Time `json:"created_at"`
 }

@@ -61,6 +61,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 			// Any user can update their own profile preferences
 			r.Put("/users/{id}/theme", users.UpdateTheme)
 			r.Put("/users/{id}/avatar", users.UpdateAvatar)
+			r.Put("/users/{id}/line-color", users.UpdateLineColor)
 
 			// Any user can complete/uncomplete chores
 			r.Post("/schedules/{scheduleID}/complete", chores.Complete)

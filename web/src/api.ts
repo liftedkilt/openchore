@@ -70,6 +70,11 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ avatar_url }),
       }),
+    updateLineColor: (id: number, line_color: string) =>
+      fetchWithAuth<User>(`/users/${id}/line-color`, {
+        method: 'PUT',
+        body: JSON.stringify({ line_color }),
+      }),
     pause: (id: number) =>
       fetchWithAuth<User>(`/users/${id}/pause`, { method: 'PUT' }),
     unpause: (id: number) =>

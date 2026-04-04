@@ -169,6 +169,7 @@ export const Dashboard: React.FC = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
   const [qrChore, setQrChore] = useState<ScheduledChore | null>(null);
   const [systemBaseUrl, setSystemBaseUrl] = useState<string>('');
   const navigate = useNavigate();
@@ -874,7 +875,7 @@ export const Dashboard: React.FC = () => {
       )}
       <header className={styles.header}>
         <div className={styles.userProfile}>
-          <button className={styles.avatarMini} onClick={() => { setShowAvatarPicker(!showAvatarPicker); setShowThemePicker(false); }} aria-label="Change avatar">
+          <button className={styles.avatarMini} onClick={() => { setShowAvatarPicker(!showAvatarPicker); setShowThemePicker(false); setShowColorPicker(false); }} aria-label="Change avatar">
             {user?.avatar_url ? <img src={user.avatar_url} alt={user.name} /> : <div className={styles.avatarPlaceholder} />}
           </button>
           <div>
@@ -895,7 +896,10 @@ export const Dashboard: React.FC = () => {
           >
             {ttsEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
           </button>
-          <button onClick={() => { setShowThemePicker(!showThemePicker); setShowAvatarPicker(false); }} className={styles.themeBtn} aria-label="Change theme">
+          <button onClick={() => { setShowColorPicker(!showColorPicker); setShowThemePicker(false); setShowAvatarPicker(false); }} className={styles.themeBtn} aria-label="Change line color">
+            <Sparkles size={20} />
+          </button>
+          <button onClick={() => { setShowThemePicker(!showThemePicker); setShowAvatarPicker(false); setShowColorPicker(false); }} className={styles.themeBtn} aria-label="Change theme">
             <Palette size={20} />
           </button>
           <button onClick={logout} className={styles.logoutBtn} aria-label="Logout">
@@ -908,6 +912,21 @@ export const Dashboard: React.FC = () => {
         <ThemePicker
           current={theme}
           onSelect={(t) => { setTheme(t); setShowThemePicker(false); }}
+        />
+      )}
+
+      {showColorPicker && user && (
+        <LineColorPicker
+          current={user.line_color || ''}
+          onSelect={async (color) => {
+            try {
+              const updated = await api.users.updateLineColor(user.id, color);
+              setUser({ ...user, ...updated });
+            } catch (e) {
+              console.error('Failed to update line color:', e);
+            }
+            setShowColorPicker(false);
+          }}
         />
       )}
 
@@ -1118,3 +1137,33 @@ const AvatarPicker: React.FC<{
     </div>
   );
 };
+
+const LINE_COLORS = [
+  { color: '#38bdf8', name: 'Sky' },
+  { color: '#a78bfa', name: 'Lavender' },
+  { color: '#f472b6', name: 'Pink' },
+  { color: '#34d399', name: 'Mint' },
+  { color: '#fb923c', name: 'Orange' },
+  { color: '#facc15', name: 'Yellow' },
+  { color: '#f87171', name: 'Red' },
+  { color: '#22d3ee', name: 'Cyan' },
+  { color: '#818cf8', name: 'Indigo' },
+  { color: '#e879f9', name: 'Magenta' },
+  { color: '#4ade80', name: 'Green' },
+  { color: '#ffffff', name: 'White' },
+];
+
+const LineColorPicker: React.FC<{ current: string; onSelect: (color: string) => void }> = ({ current, onSelect }) => (
+  <div className={styles.themePicker}>
+    {LINE_COLORS.map(c => (
+      <button
+        key={c.color}
+        className={clsx(styles.themeOption, current === c.color && styles.themeOptionActive)}
+        onClick={() => onSelect(c.color)}
+      >
+        <div className={styles.themePreview} style={{ backgroundColor: c.color }} />
+        <span className={styles.themeName}>{c.name}</span>
+      </button>
+    ))}
+  </div>
+);

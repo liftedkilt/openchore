@@ -213,6 +213,44 @@ func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, existing)
 }
 
+func (h *UserHandler) UpdateLineColor(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+
+	caller := UserFromContext(r.Context())
+	if caller.ID != id {
+		writeError(w, http.StatusForbidden, "can only update your own line color")
+		return
+	}
+
+	var req struct {
+		LineColor string `json:"line_color"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.LineColor == "" {
+		writeError(w, http.StatusBadRequest, "line_color is required")
+		return
+	}
+
+	existing, err := h.store.GetUser(r.Context(), id)
+	if err != nil || existing == nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	existing.LineColor = req.LineColor
+	if err := h.store.UpdateUser(r.Context(), existing); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update line color")
+		return
+	}
+	writeJSON(w, http.StatusOK, existing)
+}
+
 func (h *UserHandler) Pause(w http.ResponseWriter, r *http.Request) {
 	id, err := urlParamInt64(r, "id")
 	if err != nil {

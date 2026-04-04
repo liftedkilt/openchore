@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN line_color TEXT NOT NULL DEFAULT '';

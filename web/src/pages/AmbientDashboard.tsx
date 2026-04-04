@@ -262,11 +262,11 @@ export const AmbientDashboard: React.FC = () => {
   const timeStr = currentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   const dateStr = currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-  // Stable color assignment by user ID order
+  // Stable color assignment: prefer user's chosen line_color, fall back to palette
   const sortedKids = useMemo(() => [...kids].sort((a, b) => a.user.id - b.user.id), [kids]);
   const colorMap = useMemo(() => {
     const map = new Map<number, string>();
-    sortedKids.forEach((k, i) => map.set(k.user.id, KID_COLORS[i % KID_COLORS.length]));
+    sortedKids.forEach((k, i) => map.set(k.user.id, k.user.line_color || KID_COLORS[i % KID_COLORS.length]));
     return map;
   }, [sortedKids]);
 
