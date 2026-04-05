@@ -147,7 +147,7 @@ func initAIServices(s *store.Store, choreHandler *api.ChoreHandler) {
 	ttsGen := ai.NewTTSGenerator(aiClient, aiModel, ttsClient, ttsVoice)
 
 	choreHandler.SetAIServices(reviewer, ttsGen)
-	log.Printf("AI services initialized (endpoint=%s, model=%s)", aiEndpoint, aiModel)
+	log.Printf("AI services initialized (%s at %s, model=%s)", aiClient.ServerType(context.Background()), aiEndpoint, aiModel)
 }
 
 func runMigrations(db *sql.DB) error {

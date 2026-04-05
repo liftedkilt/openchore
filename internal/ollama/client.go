@@ -159,6 +159,23 @@ func (c *Client) Healthy(ctx context.Context) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
+// ServerType returns "LiteRT" or "Ollama" based on which server is responding.
+func (c *Client) ServerType(ctx context.Context) string {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.endpoint+"/health", nil)
+	if err != nil {
+		return "Ollama"
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "Ollama"
+	}
+	resp.Body.Close()
+	if resp.StatusCode == http.StatusOK {
+		return "LiteRT"
+	}
+	return "Ollama"
+}
+
 // --- Model Management ---
 
 // HasModel checks if a model is already downloaded.
