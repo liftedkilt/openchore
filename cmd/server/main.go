@@ -67,7 +67,7 @@ func main() {
 	decayChecker := webhook.NewDecayChecker(s, dispatcher)
 	go decayChecker.Start(context.Background())
 
-	// Initialize optional AI services (Ollama for vision/text, Kokoro for TTS audio)
+	// Initialize optional AI services (LiteRT or Ollama for vision/text, Kokoro for TTS audio)
 	var reviewer *ai.Reviewer
 	var ttsGen *ai.TTSGenerator
 	ollamaEndpoint := os.Getenv("OLLAMA_ENDPOINT")
@@ -91,7 +91,7 @@ func main() {
 			go func() {
 				if err := ollamaClient.Pull(context.Background(), aiModel); err != nil {
 					log.Printf("WARNING: failed to pull model %s: %v", aiModel, err)
-					log.Printf("AI features will not work until the model is available. Pull manually: ollama pull %s", aiModel)
+					log.Printf("AI features will not work until the model is available")
 				} else {
 					log.Printf("Model %s pulled successfully — AI features are now ready", aiModel)
 				}
@@ -100,7 +100,7 @@ func main() {
 
 		reviewer = ai.NewReviewer(ollamaClient, aiModel)
 
-		// Initialize TTS: Ollama for text descriptions, Kokoro for audio synthesis
+		// Initialize TTS: LLM for text descriptions, Kokoro for audio synthesis
 		var ttsClient *tts.Client
 		ttsEndpoint := os.Getenv("TTS_ENDPOINT")
 		if ttsEndpoint == "" {
@@ -124,9 +124,9 @@ func main() {
 		}
 		ttsGen = ai.NewTTSGenerator(ollamaClient, aiModel, ttsClient, ttsVoice)
 
-		log.Printf("AI services initialized (ollama=%s, model=%s)", ollamaEndpoint, aiModel)
+		log.Printf("AI services initialized (endpoint=%s, model=%s)", ollamaEndpoint, aiModel)
 	} else {
-		log.Printf("Ollama not available at %s — AI features disabled", ollamaEndpoint)
+		log.Printf("AI endpoint not available at %s — AI features disabled", ollamaEndpoint)
 	}
 
 	router := api.NewRouter(s, dispatcher, reviewer, ttsGen)

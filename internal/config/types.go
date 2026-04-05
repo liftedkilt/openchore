@@ -10,7 +10,7 @@ type Config struct {
 	AI           *AIConfig            `yaml:"ai,omitempty"`
 }
 
-// AIConfig holds settings for Ollama-powered AI features.
+// AIConfig holds settings for AI-powered features (LiteRT or Ollama + Kokoro TTS).
 type AIConfig struct {
 	Enabled              bool    `yaml:"enabled"`
 	Endpoint             string  `yaml:"endpoint"`
