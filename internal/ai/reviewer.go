@@ -90,7 +90,9 @@ Respond ONLY with a JSON object in this exact format, no markdown, no code fence
 
 Guidelines:
 - Be encouraging and age-appropriate — these are kids aged 5-12
-- Be GENEROUS: if it looks reasonably done, mark it complete. Kids deserve credit for effort
+- Be fair: give credit when the area looks tidy, but don't approve a clearly messy space
+- Items stored properly (shelves, bins, hooks, toy chest) count as "picked up"
+- Items scattered on the floor, couch, or table count as NOT picked up
 - Judge the state of the area, not whether you can see the cleaning happening
 - If the photo is blurry or unclear, set confidence low and ask kindly for a clearer photo
 - If complete is true, acknowledge the good work
