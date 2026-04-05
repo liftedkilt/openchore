@@ -638,7 +638,7 @@ export const Dashboard: React.FC = () => {
               <span className={styles.aiFeedbackIcon}>{isRejected ? '❌' : '✅'}</span>
               <span className={styles.aiFeedbackText}>{feedbackText}</span>
               <button
-                className={styles.aiFeedbackAudio}
+                className={styles.ttsBtn}
                 onClick={() => {
                   if (feedbackAudioUrl) {
                     new Audio(feedbackAudioUrl).play().catch(() => speak(feedbackText));
@@ -647,7 +647,9 @@ export const Dashboard: React.FC = () => {
                   }
                 }}
                 aria-label="Listen to feedback"
-              >🔊</button>
+              >
+                <Volume2 size={16} />
+              </button>
             </div>
           );
         })()}
