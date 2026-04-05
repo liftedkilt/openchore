@@ -20,6 +20,7 @@ type ChoreHandler struct {
 	discord    *discord.Notifier
 	reviewer   *ai.Reviewer
 	ttsGen     *ai.TTSGenerator
+	ttsSyncer  *ai.TTSSyncer
 	descGen    *ai.DescriptionGenerator
 	summarizer *ai.Summarizer
 }
@@ -29,9 +30,10 @@ func NewChoreHandler(s *store.Store, d *webhook.Dispatcher, dn *discord.Notifier
 }
 
 // SetAIServices sets the optional AI reviewer and TTS generator.
-func (h *ChoreHandler) SetAIServices(reviewer *ai.Reviewer, ttsGen *ai.TTSGenerator) {
+func (h *ChoreHandler) SetAIServices(reviewer *ai.Reviewer, ttsGen *ai.TTSGenerator, syncer *ai.TTSSyncer) {
 	h.reviewer = reviewer
 	h.ttsGen = ttsGen
+	h.ttsSyncer = syncer
 }
 
 // SetAIExtras sets the optional AI description generator and summarizer.
@@ -1006,6 +1008,16 @@ func (h *ChoreHandler) SynthesizeTTS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"audio_url": url})
+}
+
+// TriggerTTSSync triggers an immediate TTS sync for all chores.
+func (h *ChoreHandler) TriggerTTSSync(w http.ResponseWriter, r *http.Request) {
+	if h.ttsSyncer == nil {
+		writeError(w, http.StatusServiceUnavailable, "TTS sync not available")
+		return
+	}
+	h.ttsSyncer.Trigger()
+	writeJSON(w, http.StatusOK, map[string]any{"status": "sync triggered"})
 }
 
 // GenerateDescription lets admins generate a chore description using AI.

@@ -16,13 +16,23 @@ import (
 // TTSSyncer periodically ensures all chores have TTS descriptions and audio files,
 // and cleans up orphaned audio from deleted chores.
 type TTSSyncer struct {
-	store  *store.Store
-	ttsGen *TTSGenerator
+	store   *store.Store
+	ttsGen  *TTSGenerator
+	trigger chan struct{}
 }
 
 // NewTTSSyncer creates a new TTS syncer.
 func NewTTSSyncer(s *store.Store, ttsGen *TTSGenerator) *TTSSyncer {
-	return &TTSSyncer{store: s, ttsGen: ttsGen}
+	return &TTSSyncer{store: s, ttsGen: ttsGen, trigger: make(chan struct{}, 1)}
+}
+
+// Trigger requests an immediate sync. Non-blocking; if a sync is already
+// pending the request is coalesced.
+func (s *TTSSyncer) Trigger() {
+	select {
+	case s.trigger <- struct{}{}:
+	default: // already pending
+	}
 }
 
 // Start runs the sync loop. It checks every interval and generates missing TTS.
@@ -39,6 +49,8 @@ func (s *TTSSyncer) Start(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			s.sync(ctx)
+		case <-s.trigger:
 			s.sync(ctx)
 		}
 	}

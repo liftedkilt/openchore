@@ -255,6 +255,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ text }),
       }),
+    triggerTTSSync: () =>
+      fetchWithAuth<{ status: string }>('/admin/ai/tts-sync', { method: 'POST' }),
     generateDescription: (title: string, category: string) =>
       fetchWithAuth<{ description: string }>('/admin/ai/generate-description', {
         method: 'POST',

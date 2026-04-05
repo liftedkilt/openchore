@@ -154,6 +154,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 				// AI test endpoints
 				r.Post("/admin/ai/test", chores.TestAIReview)
 				r.Post("/admin/ai/tts", chores.SynthesizeTTS)
+				r.Post("/admin/ai/tts-sync", chores.TriggerTTSSync)
 				r.Post("/admin/ai/generate-description", chores.GenerateDescription)
 				r.Post("/admin/ai/suggest-points", chores.SuggestPoints)
 

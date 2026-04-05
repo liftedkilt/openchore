@@ -1573,6 +1573,9 @@ const SettingsTab: React.FC = () => {
         api.admin.setSetting('ai_auto_approve_threshold', aiThreshold),
         api.admin.setSetting('ai_tts_enabled', aiTtsEnabled ? 'true' : 'false'),
       ]);
+      if (aiTtsEnabled) {
+        api.admin.triggerTTSSync().catch(() => {});
+      }
       setAiMessage({ type: 'success', text: 'AI settings saved' });
     } catch {
       setAiMessage({ type: 'error', text: 'Failed to save AI settings' });
