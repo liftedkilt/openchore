@@ -19,7 +19,7 @@ except ImportError:
     print("ERROR: litert-lm-api not installed. Run: pip install litert-lm-api")
     sys.exit(1)
 
-MODEL_PATH = os.environ.get("MODEL_PATH", "/app/model/gemma-4-E2B-it.litertlm")
+MODEL_PATH = os.environ.get("MODEL_PATH", "/app/model/gemma-4-E4B-it.litertlm")
 PORT = int(os.environ.get("PORT", "8080"))
 
 engine = None
@@ -102,7 +102,7 @@ class Handler(BaseHTTPRequestHandler):
             duration = time.time() - start
 
             self._respond_json(200, {
-                "model": "gemma4:e2b",
+                "model": "gemma4:e4b",
                 "message": {"role": "assistant", "content": resp_text},
                 "done": True,
                 "total_duration": int(duration * 1e9),
@@ -135,7 +135,7 @@ class Handler(BaseHTTPRequestHandler):
             duration = time.time() - start
 
             self._respond_json(200, {
-                "model": "gemma4:e2b",
+                "model": "gemma4:e4b",
                 "response": resp_text,
                 "done": True,
                 "total_duration": int(duration * 1e9),
@@ -148,8 +148,8 @@ class Handler(BaseHTTPRequestHandler):
     def _handle_tags(self):
         self._respond_json(200, {
             "models": [{
-                "name": "gemma4:e2b",
-                "model": "gemma4:e2b",
+                "name": "gemma4:e4b",
+                "model": "gemma4:e4b",
                 "size": os.path.getsize(MODEL_PATH)
                 if os.path.exists(MODEL_PATH) else 0,
             }]

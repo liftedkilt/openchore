@@ -149,7 +149,7 @@ func (h *TriggerHandler) FireTrigger(w http.ResponseWriter, r *http.Request) {
 		AvailableAt:    strPtrOrNil(availableAt),
 		DueBy:          strPtrOrNil(dueBy),
 		PointsMultiplier: 1.0,
-		ExpiryPenalty:  "block",
+		ExpiryPenalty:  model.ExpiryBlock,
 	}
 
 	if err := h.store.CreateSchedule(ctx, schedule); err != nil {

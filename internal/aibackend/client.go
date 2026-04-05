@@ -1,4 +1,4 @@
-package ollama
+package aibackend
 
 import (
 	"bytes"
@@ -11,14 +11,14 @@ import (
 	"time"
 )
 
-// Client is an HTTP client for the Ollama API.
+// Client is an HTTP client for Ollama-compatible AI APIs (Ollama, LiteRT, etc.).
 type Client struct {
 	endpoint   string
 	httpClient *http.Client
 }
 
-// NewClient creates a new Ollama API client.
-// endpoint should be the base URL, e.g. "http://ollama:11434".
+// NewClient creates a new AI backend client.
+// endpoint should be the base URL, e.g. "http://litert:8080" or "http://ollama:11434".
 func NewClient(endpoint string) *Client {
 	return &Client{
 		endpoint: endpoint,
@@ -83,7 +83,7 @@ func (c *Client) Chat(ctx context.Context, req *ChatRequest) (*ChatResponse, err
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("ollama returned status %d: %s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("AI backend returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	var chatResp ChatResponse
@@ -133,7 +133,7 @@ func (c *Client) Generate(ctx context.Context, req *GenerateRequest) (*GenerateR
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("ollama returned status %d: %s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("AI backend returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	var genResp GenerateResponse
@@ -145,7 +145,7 @@ func (c *Client) Generate(ctx context.Context, req *GenerateRequest) (*GenerateR
 
 // --- Health ---
 
-// Healthy checks if the Ollama server is reachable.
+// Healthy checks if the AI backend server is reachable.
 func (c *Client) Healthy(ctx context.Context) bool {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.endpoint+"/api/tags", nil)
 	if err != nil {
@@ -217,7 +217,7 @@ func (c *Client) Pull(ctx context.Context, name string) error {
 		return fmt.Errorf("pull failed for %s (status %d): %s", name, resp.StatusCode, string(respBody))
 	}
 
-	// Drain the response body (Ollama sends progress JSON lines even with stream=false)
+	// Drain the response body (server may send progress JSON lines even with stream=false)
 	io.Copy(io.Discard, resp.Body)
 	return nil
 }

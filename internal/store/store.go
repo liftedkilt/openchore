@@ -14,6 +14,13 @@ type Store struct {
 	db *sql.DB
 }
 
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
 func New(db *sql.DB) *Store {
 	return &Store{db: db}
 }
@@ -21,10 +28,7 @@ func New(db *sql.DB) *Store {
 // --- Users ---
 
 func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
-	paused := 0
-	if u.Paused {
-		paused = 1
-	}
+	paused := boolToInt(u.Paused)
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO users (name, avatar_url, role, age, theme, line_color, paused) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.LineColor, paused)
@@ -71,17 +75,11 @@ func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 // --- Chores ---
 
 func (s *Store) CreateChore(ctx context.Context, c *model.Chore) error {
-	requiresApproval := 0
-	if c.RequiresApproval {
-		requiresApproval = 1
-	}
-	requiresPhoto := 0
-	if c.RequiresPhoto {
-		requiresPhoto = 1
-	}
+	requiresApproval := boolToInt(c.RequiresApproval)
+	requiresPhoto := boolToInt(c.RequiresPhoto)
 	photoSource := c.PhotoSource
 	if photoSource == "" {
-		photoSource = "child"
+		photoSource = model.PhotoSourceChild
 	}
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO chores (title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_description, tts_audio_url, created_by)
@@ -132,17 +130,11 @@ func (s *Store) ListChores(ctx context.Context) ([]model.Chore, error) {
 }
 
 func (s *Store) UpdateChore(ctx context.Context, c *model.Chore) error {
-	requiresApproval := 0
-	if c.RequiresApproval {
-		requiresApproval = 1
-	}
-	requiresPhoto := 0
-	if c.RequiresPhoto {
-		requiresPhoto = 1
-	}
+	requiresApproval := boolToInt(c.RequiresApproval)
+	requiresPhoto := boolToInt(c.RequiresPhoto)
 	photoSource := c.PhotoSource
 	if photoSource == "" {
-		photoSource = "child"
+		photoSource = model.PhotoSourceChild
 	}
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE chores SET title=?, description=?, category=?, icon=?, points_value=?, missed_penalty_value=?, estimated_minutes=?, requires_approval=?, requires_photo=?, photo_source=?, source=?, external_id=?, tts_description=?, tts_audio_url=?
@@ -226,7 +218,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			cs.id, c.id, c.title, c.description, c.category, c.icon, c.points_value, c.missed_penalty_value, c.estimated_minutes, c.requires_approval, c.requires_photo, c.photo_source,
 			cs.assignment_type, cs.available_at, cs.due_by, cs.expiry_penalty, cs.expiry_penalty_value,
 			cs.day_of_week, cs.specific_date,
-			cc.id, cc.id, cc.completed_at, cc.photo_url, cc.status, cc.ai_feedback,
+			cc.id, cc.completed_at, cc.photo_url, cc.status, cc.ai_feedback,
 			c.tts_description, c.tts_audio_url
 		FROM chore_schedules cs
 		JOIN chores c ON c.id = cs.chore_id
@@ -258,7 +250,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 		}
 		for rows.Next() {
 			var sc model.ScheduledChore
-			var compID, compIDCheck sql.NullInt64
+			var compID sql.NullInt64
 			var dayOfWeek sql.NullInt64
 			var specificDate sql.NullString
 			var completedAt sql.NullTime
@@ -270,7 +262,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 				&sc.PointsValue, &sc.MissedPenaltyValue, &sc.EstimatedMinutes, &reqApp, &reqPho, &sc.PhotoSource, &sc.AssignmentType, &sc.AvailableAt, &sc.DueBy,
 				&sc.ExpiryPenalty, &sc.ExpiryPenaltyValue,
 				&dayOfWeek, &specificDate,
-				&compID, &compIDCheck, &completedAt, &photoURL, &compStatus, &aiFeedback,
+				&compID, &completedAt, &photoURL, &compStatus, &aiFeedback,
 				&sc.TTSDescription, &sc.TTSAudioURL); err != nil {
 				rows.Close()
 				return nil, err
@@ -279,7 +271,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			sc.RequiresPhoto = reqPho == 1
 			sc.Date = dateStr
 			// ai_rejected completions are not "completed" from the kid's perspective
-			sc.Completed = compID.Valid && compStatus.String != "ai_rejected"
+			sc.Completed = compID.Valid && compStatus.String != model.StatusAIRejected
 			if compID.Valid {
 				id := compID.Int64
 				sc.CompletionID = &id
@@ -397,9 +389,9 @@ func (s *Store) ListPendingCompletions(ctx context.Context) ([]PendingCompletion
 		JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
 		JOIN chores c ON c.id = cs.chore_id
 		JOIN users u ON u.id = cc.completed_by
-		WHERE cc.status = 'pending'
+		WHERE cc.status = ?
 		ORDER BY cc.completed_at DESC
-	`)
+	`, model.StatusPending)
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +409,7 @@ func (s *Store) ListPendingCompletions(ctx context.Context) ([]PendingCompletion
 
 func (s *Store) UpdateCompletionStatus(ctx context.Context, id int64, status string, adminID int64) error {
 	var err error
-	if status == "approved" {
+	if status == model.StatusApproved {
 		_, err = s.db.ExecContext(ctx,
 			`UPDATE chore_completions SET status = ?, approved_by = ?, approved_at = CURRENT_TIMESTAMP WHERE id = ?`,
 			status, adminID, id)
@@ -474,10 +466,7 @@ func (s *Store) ListSettings(ctx context.Context) (map[string]string, error) {
 // --- Users (update) ---
 
 func (s *Store) UpdateUser(ctx context.Context, u *model.User) error {
-	paused := 0
-	if u.Paused {
-		paused = 1
-	}
+	paused := boolToInt(u.Paused)
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE users SET name=?, avatar_url=?, role=?, age=?, theme=?, line_color=?, paused=? WHERE id=?`,
 		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.LineColor, paused, u.ID)
@@ -503,16 +492,16 @@ func (s *Store) GetChorePointsForSchedule(ctx context.Context, scheduleID int64)
 func (s *Store) CreditChorePoints(ctx context.Context, userID, completionID int64, amount int) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
-		 VALUES (?, ?, 'chore_complete', ?, '')`,
-		userID, amount, completionID)
+		 VALUES (?, ?, ?, ?, '')`,
+		userID, amount, model.ReasonChoreComplete, completionID)
 	return err
 }
 
 func (s *Store) DebitChorePoints(ctx context.Context, userID, completionID int64, amount int) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
-		 VALUES (?, ?, 'chore_uncomplete', ?, '')`,
-		userID, -amount, completionID)
+		 VALUES (?, ?, ?, ?, '')`,
+		userID, -amount, model.ReasonChoreUncomplete, completionID)
 	return err
 }
 
@@ -522,8 +511,8 @@ func (s *Store) GetNetPointsForCompletion(ctx context.Context, completionID int6
 	var total int
 	err := s.db.QueryRowContext(ctx,
 		`SELECT COALESCE(SUM(amount), 0) FROM point_transactions
-		 WHERE reference_id = ? AND reason IN ('chore_complete', 'expiry_penalty')`,
-		completionID).Scan(&total)
+		 WHERE reference_id = ? AND reason IN (?, ?)`,
+		completionID, model.ReasonChoreComplete, model.ReasonExpiryPenalty).Scan(&total)
 	return total, err
 }
 
@@ -581,7 +570,7 @@ func (s *Store) ListPointTransactions(ctx context.Context, userID int64, limit i
 func (s *Store) AdminAdjustPoints(ctx context.Context, userID int64, amount int, note string) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO point_transactions (user_id, amount, reason, note)
-		 VALUES (?, ?, 'admin_adjust', ?)`, userID, amount, note)
+		 VALUES (?, ?, ?, ?)`, userID, amount, model.ReasonAdminAdjust, note)
 	return err
 }
 
@@ -738,10 +727,7 @@ func (s *Store) SetRewardAssignments(ctx context.Context, rewardID int64, assign
 }
 
 func (s *Store) UpdateReward(ctx context.Context, r *model.Reward) error {
-	active := 0
-	if r.Active {
-		active = 1
-	}
+	active := boolToInt(r.Active)
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE rewards SET name=?, description=?, icon=?, cost=?, stock=?, active=? WHERE id=?`,
 		r.Name, r.Description, r.Icon, r.Cost, r.Stock, active, r.ID)
@@ -832,8 +818,8 @@ func (s *Store) RedeemReward(ctx context.Context, userID, rewardID int64) (*mode
 	// Debit points
 	_, err = tx.ExecContext(ctx,
 		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
-		 VALUES (?, ?, 'reward_redeem', ?, '')`,
-		userID, -cost, redemptionID)
+		 VALUES (?, ?, ?, ?, '')`,
+		userID, -cost, model.ReasonRewardRedeem, redemptionID)
 	if err != nil {
 		return nil, err
 	}
@@ -890,7 +876,7 @@ func (s *Store) RecalculateStreak(ctx context.Context, userID int64, today strin
 		// Filter to required + core only
 		var nonBonus []model.ScheduledChore
 		for _, c := range chores {
-			if c.Category != "bonus" {
+			if c.Category != model.CategoryBonus {
 				nonBonus = append(nonBonus, c)
 			}
 		}
@@ -917,7 +903,7 @@ func (s *Store) RecalculateStreak(ctx context.Context, userID int64, today strin
 	}
 	var todayNonBonus []model.ScheduledChore
 	for _, c := range todayChores {
-		if c.Category != "bonus" {
+		if c.Category != model.CategoryBonus {
 			todayNonBonus = append(todayNonBonus, c)
 		}
 	}
@@ -1047,7 +1033,8 @@ func (s *Store) UndoRedemption(ctx context.Context, redemptionID int64) error {
 
 	// Delete the point transaction that debited points
 	_, err = tx.ExecContext(ctx,
-		`DELETE FROM point_transactions WHERE reason = 'reward_redeem' AND reference_id = ?`,
+		`DELETE FROM point_transactions WHERE reason = ? AND reference_id = ?`,
+		model.ReasonRewardRedeem,
 		redemptionID)
 	if err != nil {
 		return err
@@ -1098,10 +1085,7 @@ func (s *Store) GetUserDecayConfig(ctx context.Context, userID int64) (*model.Us
 }
 
 func (s *Store) SetUserDecayConfig(ctx context.Context, cfg *model.UserDecayConfig) error {
-	enabled := 0
-	if cfg.Enabled {
-		enabled = 1
-	}
+	enabled := boolToInt(cfg.Enabled)
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO user_decay_config (user_id, enabled, decay_rate, decay_interval_hours)
 		 VALUES (?, ?, ?, ?)
@@ -1142,16 +1126,16 @@ func (s *Store) UpdateLastDecayAt(ctx context.Context, userID int64, t time.Time
 func (s *Store) DebitExpiryPenalty(ctx context.Context, userID, completionID int64, amount int) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
-		 VALUES (?, ?, 'expiry_penalty', ?, 'Late completion penalty')`,
-		userID, -amount, completionID)
+		 VALUES (?, ?, ?, ?, 'Late completion penalty')`,
+		userID, -amount, model.ReasonExpiryPenalty, completionID)
 	return err
 }
 
 func (s *Store) DebitDecay(ctx context.Context, userID int64, amount int) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO point_transactions (user_id, amount, reason, note)
-		 VALUES (?, ?, 'points_decay', 'Daily points decay')`,
-		userID, -amount)
+		 VALUES (?, ?, ?, 'Daily points decay')`,
+		userID, -amount, model.ReasonPointsDecay)
 	return err
 }
 
@@ -1174,10 +1158,7 @@ func (s *Store) HasMissedChorePenalty(ctx context.Context, scheduleID int64, dat
 // --- Chore Triggers ---
 
 func (s *Store) CreateChoreTrigger(ctx context.Context, t *model.ChoreTrigger) error {
-	enabled := 0
-	if t.Enabled {
-		enabled = 1
-	}
+	enabled := boolToInt(t.Enabled)
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO chore_triggers (uuid, chore_id, default_assigned_to, default_due_by, default_available_at, enabled, cooldown_minutes)
 		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -1225,10 +1206,7 @@ func (s *Store) ListChoreTriggersForChore(ctx context.Context, choreID int64) ([
 }
 
 func (s *Store) UpdateChoreTrigger(ctx context.Context, t *model.ChoreTrigger) error {
-	enabled := 0
-	if t.Enabled {
-		enabled = 1
-	}
+	enabled := boolToInt(t.Enabled)
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE chore_triggers SET default_assigned_to = ?, default_due_by = ?, default_available_at = ?, enabled = ?, cooldown_minutes = ? WHERE id = ?`,
 		t.DefaultAssignedTo, t.DefaultDueBy, t.DefaultAvailableAt, enabled, t.CooldownMinutes, t.ID)
@@ -1375,10 +1353,7 @@ func (s *Store) ListTriggersWithChores(ctx context.Context) ([]model.Triggerable
 // --- Webhooks ---
 
 func (s *Store) CreateWebhook(ctx context.Context, w *model.Webhook) error {
-	active := 0
-	if w.Active {
-		active = 1
-	}
+	active := boolToInt(w.Active)
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO webhooks (url, secret, events, active) VALUES (?, ?, ?, ?)`,
 		w.URL, w.Secret, w.Events, active)
@@ -1453,10 +1428,7 @@ func splitEvents(events string) []string {
 }
 
 func (s *Store) UpdateWebhook(ctx context.Context, w *model.Webhook) error {
-	active := 0
-	if w.Active {
-		active = 1
-	}
+	active := boolToInt(w.Active)
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE webhooks SET url=?, secret=?, events=?, active=? WHERE id=?`,
 		w.URL, w.Secret, w.Events, active, w.ID)
@@ -1581,7 +1553,7 @@ func (s *Store) ReportKidSummaries(ctx context.Context, startDate, endDate strin
 			SELECT cc.completed_by, COUNT(*) AS cnt
 			FROM chore_completions cc
 			WHERE cc.completion_date >= ? AND cc.completion_date <= ?
-			AND cc.status IN ('approved', 'completed')
+			AND cc.status = 'approved'
 			GROUP BY cc.completed_by
 		) completed ON completed.completed_by = u.id
 		LEFT JOIN (
@@ -1675,7 +1647,7 @@ func (s *Store) ReportCompletionTrend(ctx context.Context, startDate, endDate st
 	query := `
 		SELECT
 			cc.completion_date,
-			SUM(CASE WHEN cc.status IN ('approved', 'completed') THEN 1 ELSE 0 END) AS completed,
+			SUM(CASE WHEN cc.status = 'approved' THEN 1 ELSE 0 END) AS completed,
 			COUNT(*) AS assigned
 		FROM chore_completions cc
 		WHERE cc.completion_date >= ? AND cc.completion_date <= ?
@@ -1711,7 +1683,7 @@ func (s *Store) ReportCategoryBreakdown(ctx context.Context, startDate, endDate 
 		SELECT
 			c.category,
 			COUNT(*) AS total_assigned,
-			SUM(CASE WHEN cc.status IN ('approved', 'completed') THEN 1 ELSE 0 END) AS total_completed
+			SUM(CASE WHEN cc.status = 'approved' THEN 1 ELSE 0 END) AS total_completed
 		FROM chore_completions cc
 		JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
 		JOIN chores c ON c.id = cs.chore_id
@@ -1791,7 +1763,7 @@ func (s *Store) ReportDayOfWeek(ctx context.Context, startDate, endDate string) 
 		SELECT
 			CAST(strftime('%w', cc.completion_date) AS INTEGER) AS dow,
 			COUNT(*) AS total_assigned,
-			SUM(CASE WHEN cc.status IN ('approved', 'completed') THEN 1 ELSE 0 END) AS total_completed
+			SUM(CASE WHEN cc.status = 'approved' THEN 1 ELSE 0 END) AS total_completed
 		FROM chore_completions cc
 		WHERE cc.completion_date >= ? AND cc.completion_date <= ?
 		GROUP BY dow

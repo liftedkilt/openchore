@@ -7,7 +7,7 @@
 - **Frontend:** React (TypeScript) + Vanilla CSS. Prefer functional components and hooks.
 
 ## Technical Rules
-- Ensure `CGO_ENABLED=1` for SQLite support in Go.
+- The project uses `modernc.org/sqlite` (pure Go) and builds with `CGO_ENABLED=0`. No C compiler required.
 - Use `internal/model/model.go` as the single source of truth for data structures.
 - All points-related changes must record a transaction in `point_transactions`.
 - Bonus chore points must not be awarded unless all `required` and `core` chores for the day are complete.

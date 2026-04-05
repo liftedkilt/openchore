@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"strconv"
@@ -85,18 +86,18 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Category == "" {
-		req.Category = "core"
+		req.Category = model.CategoryCore
 	}
-	if req.Category != "required" && req.Category != "core" && req.Category != "bonus" {
+	if req.Category != model.CategoryRequired && req.Category != model.CategoryCore && req.Category != model.CategoryBonus {
 		writeError(w, http.StatusBadRequest, "category must be required, core, or bonus")
 		return
 	}
 
 	photoSource := req.PhotoSource
 	if photoSource == "" {
-		photoSource = "child"
+		photoSource = model.PhotoSourceChild
 	}
-	if photoSource != "child" && photoSource != "external" && photoSource != "both" {
+	if photoSource != model.PhotoSourceChild && photoSource != model.PhotoSourceExternal && photoSource != model.PhotoSourceBoth {
 		writeError(w, http.StatusBadRequest, "photo_source must be child, external, or both")
 		return
 	}
@@ -126,16 +127,17 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ttsEnabled, _ := h.store.GetSetting(r.Context(), "ai_tts_enabled")
 		if ttsEnabled == "true" {
 			go func() {
-				desc, audioURL, err := h.ttsGen.GenerateAndSynthesize(r.Context(), chore.Title, chore.Description, chore.ID)
+				ctx := context.Background()
+				desc, audioURL, err := h.ttsGen.GenerateAndSynthesize(ctx, chore.Title, chore.Description, chore.ID)
 				if err != nil {
 					log.Printf("ai: TTS generation failed for chore %d: %v", chore.ID, err)
 					return
 				}
 				if desc != "" {
-					_ = h.store.UpdateChoreTTSDescription(r.Context(), chore.ID, desc)
+					_ = h.store.UpdateChoreTTSDescription(ctx, chore.ID, desc)
 				}
 				if audioURL != "" {
-					_ = h.store.UpdateChoreTTSAudioURL(r.Context(), chore.ID, audioURL)
+					_ = h.store.UpdateChoreTTSAudioURL(ctx, chore.ID, audioURL)
 				}
 			}()
 		}
@@ -172,7 +174,7 @@ func (h *ChoreHandler) Update(w http.ResponseWriter, r *http.Request) {
 		existing.Description = req.Description
 	}
 	if req.Category != "" {
-		if req.Category != "required" && req.Category != "core" && req.Category != "bonus" {
+		if req.Category != model.CategoryRequired && req.Category != model.CategoryCore && req.Category != model.CategoryBonus {
 			writeError(w, http.StatusBadRequest, "category must be required, core, or bonus")
 			return
 		}
@@ -194,7 +196,7 @@ func (h *ChoreHandler) Update(w http.ResponseWriter, r *http.Request) {
 	existing.RequiresApproval = req.RequiresApproval
 	existing.RequiresPhoto = req.RequiresPhoto
 	if req.PhotoSource != "" {
-		if req.PhotoSource != "child" && req.PhotoSource != "external" && req.PhotoSource != "both" {
+		if req.PhotoSource != model.PhotoSourceChild && req.PhotoSource != model.PhotoSourceExternal && req.PhotoSource != model.PhotoSourceBoth {
 			writeError(w, http.StatusBadRequest, "photo_source must be child, external, or both")
 			return
 		}
@@ -280,13 +282,13 @@ func (h *ChoreHandler) CreateSchedule(w http.ResponseWriter, r *http.Request) {
 		req.PointsMultiplier = 1.0
 	}
 	if req.ExpiryPenalty == "" {
-		req.ExpiryPenalty = "block"
+		req.ExpiryPenalty = model.ExpiryBlock
 	}
-	if req.ExpiryPenalty != "block" && req.ExpiryPenalty != "no_points" && req.ExpiryPenalty != "penalty" {
+	if req.ExpiryPenalty != model.ExpiryBlock && req.ExpiryPenalty != model.ExpiryNoPoints && req.ExpiryPenalty != model.ExpiryPenalty {
 		writeError(w, http.StatusBadRequest, "expiry_penalty must be block, no_points, or penalty")
 		return
 	}
-	if req.ExpiryPenalty == "penalty" && req.ExpiryPenaltyValue <= 0 {
+	if req.ExpiryPenalty == model.ExpiryPenalty && req.ExpiryPenaltyValue <= 0 {
 		writeError(w, http.StatusBadRequest, "expiry_penalty_value must be positive for penalty mode")
 		return
 	}
@@ -399,7 +401,7 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Enforce expiry penalty
-	if isExpired && schedule.ExpiryPenalty == "block" {
+	if isExpired && schedule.ExpiryPenalty == model.ExpiryBlock {
 		writeError(w, http.StatusUnprocessableEntity, "this chore has expired and can no longer be completed")
 		return
 	}
@@ -411,7 +413,7 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if existing != nil {
-		if existing.Status == "ai_rejected" {
+		if existing.Status == model.StatusAIRejected {
 			// Allow retry — delete the rejected attempt
 			_ = h.store.UncompleteChore(r.Context(), scheduleID, req.CompletionDate)
 		} else {
@@ -425,14 +427,14 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 
 	// For "child" photo source, require photo at completion time.
 	// For "external" or "both", photo can be attached later.
-	photoSource := "child"
+	photoSource := model.PhotoSourceChild
 	if chore != nil {
 		photoSource = chore.PhotoSource
 		if photoSource == "" {
-			photoSource = "child"
+			photoSource = model.PhotoSourceChild
 		}
 	}
-	if chore != nil && chore.RequiresPhoto && req.PhotoURL == "" && photoSource == "child" {
+	if chore != nil && chore.RequiresPhoto && req.PhotoURL == "" && photoSource == model.PhotoSourceChild {
 		writeError(w, http.StatusBadRequest, "a photo is required to complete this chore")
 		return
 	}
@@ -480,7 +482,7 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 					rejection := &model.ChoreCompletion{
 						ChoreScheduleID: scheduleID,
 						CompletedBy:     completedBy,
-						Status:          "ai_rejected",
+						Status:          model.StatusAIRejected,
 						PhotoURL:        req.PhotoURL,
 						CompletionDate:  req.CompletionDate,
 						AIFeedback:      result.Feedback,
@@ -514,9 +516,9 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	status := "approved"
+	status := model.StatusApproved
 	if chore != nil && chore.RequiresApproval {
-		status = "pending"
+		status = model.StatusPending
 	}
 
 	user := UserFromContext(r.Context())
@@ -541,38 +543,38 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 
 	var pts int
 	// Only calculate points and streak if immediately approved
-	if status == "approved" {
+	if status == model.StatusApproved {
 		// Credit or penalize points based on expiry status
 		pts, _ = h.store.GetChorePointsForSchedule(r.Context(), scheduleID)
 
 		// Bonus chore points only count once required + core chores are complete
-		if chore != nil && chore.Category == "bonus" {
-			todayChores, err := h.store.GetScheduledChoresForUser(r.Context(), completedBy, []string{req.CompletionDate}, time.Now())
-			if err == nil {
-				for _, c := range todayChores {
-					if !c.Completed && (c.Category == "required" || c.Category == "core") {
-						pts = 0 // Required/Core chores still pending, no bonus points yet
-						break
-					}
-				}
+		if chore != nil && chore.Category == model.CategoryBonus {
+			if !h.shouldAwardBonusPoints(r.Context(), completedBy, req.CompletionDate) {
+				pts = 0
 			}
 		}
 
 		if isExpired {
 			switch schedule.ExpiryPenalty {
-			case "no_points":
+			case model.ExpiryNoPoints:
 				pts = 0
-			case "penalty":
+			case model.ExpiryPenalty:
 				pts = 0
-				_ = h.store.DebitExpiryPenalty(r.Context(), completedBy, completion.ID, schedule.ExpiryPenaltyValue)
+				if err := h.store.DebitExpiryPenalty(r.Context(), completedBy, completion.ID, schedule.ExpiryPenaltyValue); err != nil {
+					log.Printf("error debiting expiry penalty for user %d completion %d: %v", completedBy, completion.ID, err)
+				}
 			}
 		}
 		if pts > 0 {
-			_ = h.store.CreditChorePoints(r.Context(), completedBy, completion.ID, pts)
+			if err := h.store.CreditChorePoints(r.Context(), completedBy, completion.ID, pts); err != nil {
+				log.Printf("error crediting chore points for user %d completion %d: %v", completedBy, completion.ID, err)
+			}
 		}
 
 		// Recalculate streak
-		_ = h.store.RecalculateStreak(r.Context(), completedBy, req.CompletionDate)
+		if err := h.store.RecalculateStreak(r.Context(), completedBy, req.CompletionDate); err != nil {
+			log.Printf("error recalculating streak for user %d: %v", completedBy, err)
+		}
 	}
 
 	// Fire webhook
@@ -609,20 +611,20 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Discord notification (non-blocking)
-	if status == "pending" {
+	if status == model.StatusPending {
 		h.discord.NotifyPendingApproval(completedByName, choreTitle, absolutePhotoURL)
 	} else {
 		h.discord.NotifyCompleted(completedByName, choreTitle, absolutePhotoURL, pts)
 	}
 
 	// Check if all chores for today are done (only if this one was approved)
-	if status == "approved" {
+	if status == model.StatusApproved {
 		go func() {
-			todayChores, err := h.store.GetScheduledChoresForUser(r.Context(), completedBy, []string{req.CompletionDate}, time.Now())
+			todayChores, err := h.store.GetScheduledChoresForUser(context.Background(), completedBy, []string{req.CompletionDate}, time.Now())
 			if err == nil {
 				allDone := len(todayChores) > 0
 				for _, c := range todayChores {
-					if !c.Completed && c.Category != "bonus" {
+					if !c.Completed && c.Category != model.CategoryBonus {
 						allDone = false
 						break
 					}
@@ -660,7 +662,9 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 		// Reverse the actual net points for this completion (handles normal credit and penalty debits)
 		net, err := h.store.GetNetPointsForCompletion(r.Context(), existing.ID)
 		if err == nil && net != 0 {
-			_ = h.store.DebitChorePoints(r.Context(), existing.CompletedBy, existing.ID, net)
+			if err := h.store.DebitChorePoints(r.Context(), existing.CompletedBy, existing.ID, net); err != nil {
+				log.Printf("error debiting chore points for user %d completion %d: %v", existing.CompletedBy, existing.ID, err)
+			}
 		}
 	}
 
@@ -671,7 +675,9 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 
 	// Recalculate streak
 	if completedBy > 0 {
-		_ = h.store.RecalculateStreak(r.Context(), completedBy, dateStr)
+		if err := h.store.RecalculateStreak(r.Context(), completedBy, dateStr); err != nil {
+			log.Printf("error recalculating streak for user %d: %v", completedBy, err)
+		}
 	}
 
 	// Fire webhook
@@ -726,13 +732,13 @@ func (h *ChoreHandler) Approve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if completion.Status != "pending" {
+	if completion.Status != model.StatusPending {
 		writeError(w, http.StatusBadRequest, "completion is not pending")
 		return
 	}
 
 	admin := UserFromContext(r.Context())
-	if err := h.store.UpdateCompletionStatus(r.Context(), id, "approved", admin.ID); err != nil {
+	if err := h.store.UpdateCompletionStatus(r.Context(), id, model.StatusApproved, admin.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to approve")
 		return
 	}
@@ -743,27 +749,25 @@ func (h *ChoreHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	if schedule != nil {
 		pts, _ = h.store.GetChorePointsForSchedule(r.Context(), schedule.ID)
 		chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
-		
+
 		// Bonus logic
-		if chore != nil && chore.Category == "bonus" {
-			todayChores, err := h.store.GetScheduledChoresForUser(r.Context(), completion.CompletedBy, []string{completion.CompletionDate}, time.Now())
-			if err == nil {
-				for _, c := range todayChores {
-					if !c.Completed && (c.Category == "required" || c.Category == "core") {
-						pts = 0
-						break
-					}
-				}
+		if chore != nil && chore.Category == model.CategoryBonus {
+			if !h.shouldAwardBonusPoints(r.Context(), completion.CompletedBy, completion.CompletionDate) {
+				pts = 0
 			}
 		}
 
 		if pts > 0 {
-			_ = h.store.CreditChorePoints(r.Context(), completion.CompletedBy, completion.ID, pts)
+			if err := h.store.CreditChorePoints(r.Context(), completion.CompletedBy, completion.ID, pts); err != nil {
+				log.Printf("error crediting chore points for user %d completion %d: %v", completion.CompletedBy, completion.ID, err)
+			}
 		}
 	}
 
 	// Recalculate streak
-	_ = h.store.RecalculateStreak(r.Context(), completion.CompletedBy, completion.CompletionDate)
+	if err := h.store.RecalculateStreak(r.Context(), completion.CompletedBy, completion.CompletionDate); err != nil {
+		log.Printf("error recalculating streak for user %d: %v", completion.CompletedBy, err)
+	}
 
 	// Discord notification for approval
 	{
@@ -796,13 +800,13 @@ func (h *ChoreHandler) Reject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if completion.Status != "pending" {
+	if completion.Status != model.StatusPending {
 		writeError(w, http.StatusBadRequest, "completion is not pending")
 		return
 	}
 
 	admin := UserFromContext(r.Context())
-	if err := h.store.UpdateCompletionStatus(r.Context(), id, "rejected", admin.ID); err != nil {
+	if err := h.store.UpdateCompletionStatus(r.Context(), id, model.StatusRejected, admin.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to reject")
 		return
 	}
@@ -841,7 +845,7 @@ func (h *ChoreHandler) AttachPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if completion.Status != "pending" {
+	if completion.Status != model.StatusPending {
 		writeError(w, http.StatusBadRequest, "completion is not pending")
 		return
 	}
@@ -901,9 +905,14 @@ func (h *ChoreHandler) TestAIReview(w http.ResponseWriter, r *http.Request) {
 	if h.ttsGen != nil {
 		ttsEnabled, _ := h.store.GetSetting(r.Context(), "ai_tts_enabled")
 		if ttsEnabled == "true" {
-			if url, err := h.ttsGen.SynthesizeFeedback(r.Context(), result.Feedback, 0); err == nil {
+			url, err := h.ttsGen.SynthesizeFeedback(r.Context(), result.Feedback, 0)
+			if err != nil {
+				log.Printf("ai: TTS synthesis failed for chore checker: %v", err)
+			} else {
 				feedbackAudioURL = url
 			}
+		} else {
+			log.Printf("ai: TTS disabled in settings (ai_tts_enabled=%q)", ttsEnabled)
 		}
 	}
 
@@ -913,4 +922,44 @@ func (h *ChoreHandler) TestAIReview(w http.ResponseWriter, r *http.Request) {
 		"feedback":       result.Feedback,
 		"feedback_audio": feedbackAudioURL,
 	})
+}
+
+// SynthesizeTTS lets the admin retry TTS audio synthesis for given feedback text.
+func (h *ChoreHandler) SynthesizeTTS(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Text string `json:"text"`
+	}
+	if err := decodeJSON(r, &req); err != nil || req.Text == "" {
+		writeError(w, http.StatusBadRequest, "text is required")
+		return
+	}
+
+	if h.ttsGen == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI services not available")
+		return
+	}
+
+	url, err := h.ttsGen.SynthesizeFeedback(r.Context(), req.Text, 0)
+	if err != nil {
+		log.Printf("ai: TTS synthesis failed: %v", err)
+		writeError(w, http.StatusServiceUnavailable, "TTS synthesis failed: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"audio_url": url})
+}
+
+// shouldAwardBonusPoints returns true if all required and core chores for the
+// given user and date are complete, meaning bonus points should be awarded.
+func (h *ChoreHandler) shouldAwardBonusPoints(ctx context.Context, userID int64, date string) bool {
+	todayChores, err := h.store.GetScheduledChoresForUser(ctx, userID, []string{date}, time.Now())
+	if err != nil {
+		return false
+	}
+	for _, c := range todayChores {
+		if !c.Completed && (c.Category == model.CategoryRequired || c.Category == model.CategoryCore) {
+			return false
+		}
+	}
+	return true
 }

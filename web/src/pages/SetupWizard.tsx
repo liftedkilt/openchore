@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
 import { api } from '../api';
 import styles from './SetupWizard.module.css';
 import { UserPlus, Check, ArrowRight, Sparkles, Trash2, Palette } from 'lucide-react';
@@ -7,10 +8,10 @@ import { UserPlus, Check, ArrowRight, Sparkles, Trash2, Palette } from 'lucide-r
 type Step = 'welcome' | 'children' | 'themes' | 'chores' | 'finish';
 
 const THEMES = [
-  { id: 'classic', name: 'Classic Blue', color: '#3b82f6' },
-  { id: 'nature', name: 'Nature Green', color: '#10b981' },
-  { id: 'sunset', name: 'Sunset Orange', color: '#f59e0b' },
+  { id: 'default', name: 'Classic Blue', color: '#3b82f6' },
+  { id: 'quest', name: 'Quest Adventure', color: '#f59e0b' },
   { id: 'galaxy', name: 'Galaxy Purple', color: '#8b5cf6' },
+  { id: 'forest', name: 'Nature Forest', color: '#10b981' },
 ];
 
 const CHORE_PRESETS = [
@@ -30,10 +31,11 @@ export const SetupWizard: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { setUser } = useAuth();
 
   const addChild = () => {
     if (!newName.trim()) return;
-    setChildren([...children, { name: newName, theme: 'classic' }]);
+    setChildren([...children, { name: newName, theme: 'default' }]);
     setNewName('');
   };
 
@@ -65,7 +67,7 @@ export const SetupWizard: React.FC = () => {
       });
 
       // Store admin user for subsequent authenticated requests
-      localStorage.setItem('openchore_user', JSON.stringify(result.admin));
+      setUser(result.admin);
 
       setStep('finish');
     } catch (err) {

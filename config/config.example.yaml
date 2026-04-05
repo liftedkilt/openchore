@@ -300,7 +300,7 @@ settings:
 ai:
   enabled: false
   endpoint: "http://litert:8080"     # LiteRT sidecar (or http://ollama:11434 for Ollama)
-  model: "gemma4:e2b"              # Vision + text model
+  model: "gemma4:e4b"              # Vision + text model
   auto_approve_threshold: 0.85
   tts_enabled: false
   tts_endpoint: "http://kokoro:8880"  # Kokoro-FastAPI (OpenAI-compatible TTS)

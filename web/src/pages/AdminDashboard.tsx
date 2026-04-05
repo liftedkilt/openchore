@@ -4,6 +4,7 @@ import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import type { Chore, User, ChoreSchedule, ChoreTrigger, Reward, PointBalance, PointTransaction, StreakRewardItem, Theme, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from '../types';
 import { DAY_NAMES } from '../types';
+import { toggleInArray } from '../utils';
 import styles from './AdminDashboard.module.css';
 import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, Gift, Coins, Flame, Undo2, Activity, Settings, Check, Pause, Play, Link2, Copy, Key, AlertTriangle, Camera, Volume2, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
@@ -134,7 +135,6 @@ const ChoresTab: React.FC = () => {
   const [chores, setChores] = useState<Chore[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [editingChore, setEditingChore] = useState<Chore | null>(null);
-  const [expandedChore, setExpandedChore] = useState<number | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -179,10 +179,9 @@ const ChoresTab: React.FC = () => {
       <CreateChoreWizard
         isOpen={wizardOpen}
         onClose={() => setWizardOpen(false)}
-        onComplete={(choreId) => {
+        onComplete={() => {
           setWizardOpen(false);
           load();
-          setExpandedChore(choreId);
         }}
         users={users}
       />
@@ -328,11 +327,11 @@ const ScheduleManager: React.FC<{
 
 
   const toggleDay = (d: number) => {
-    setSelectedDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
+    setSelectedDays(prev => toggleInArray(prev, d));
   };
 
   const toggleUser = (id: number) => {
-    setSelectedUsers(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    setSelectedUsers(prev => toggleInArray(prev, id));
   };
 
   const setDayPreset = (days: number[]) => {
@@ -1428,8 +1427,6 @@ const SettingsTab: React.FC = () => {
 
   // AI settings state
   const [aiEnabled, setAiEnabled] = useState(false);
-  const [aiEndpoint, setAiEndpoint] = useState('http://litert:8080');
-  const [aiModel, setAiModel] = useState('gemma4:e2b');
   const [aiThreshold, setAiThreshold] = useState('0.85');
   const [aiTtsEnabled, setAiTtsEnabled] = useState(false);
   const [aiSaving, setAiSaving] = useState(false);
@@ -1488,8 +1485,6 @@ const SettingsTab: React.FC = () => {
     api.admin.getAISettings()
       .then(settings => {
         setAiEnabled(settings.ai_enabled === 'true');
-        setAiEndpoint(settings.ai_endpoint || 'http://litert:8080');
-        setAiModel(settings.ai_model || 'gemma4:e2b');
         setAiThreshold(settings.ai_auto_approve_threshold || '0.85');
         setAiTtsEnabled(settings.ai_tts_enabled === 'true');
       })
@@ -1556,8 +1551,6 @@ const SettingsTab: React.FC = () => {
     try {
       await Promise.all([
         api.admin.setSetting('ai_enabled', aiEnabled ? 'true' : 'false'),
-        api.admin.setSetting('ai_endpoint', aiEndpoint),
-        api.admin.setSetting('ai_model', aiModel),
         api.admin.setSetting('ai_auto_approve_threshold', aiThreshold),
         api.admin.setSetting('ai_tts_enabled', aiTtsEnabled ? 'true' : 'false'),
       ]);
@@ -1704,28 +1697,6 @@ const SettingsTab: React.FC = () => {
             <input type="checkbox" checked={aiEnabled} onChange={e => setAiEnabled(e.target.checked)} />
             Enable AI photo review
           </label>
-
-          <div className={styles.formGroup}>
-            <label className={styles.label}>AI Endpoint</label>
-            <input
-              className={styles.input}
-              value={aiEndpoint}
-              onChange={e => setAiEndpoint(e.target.value)}
-              placeholder="http://litert:8080"
-              disabled={!aiEnabled}
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label className={styles.label}>Model Name</label>
-            <input
-              className={styles.input}
-              value={aiModel}
-              onChange={e => setAiModel(e.target.value)}
-              placeholder="gemma4:e2b"
-              disabled={!aiEnabled}
-            />
-          </div>
 
           <div className={styles.formGroup}>
             <label className={styles.label}>Auto-Approve Threshold (0 &ndash; 1)</label>
@@ -2393,6 +2364,7 @@ const AIChoreChecker: React.FC = () => {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [playingAudio, setPlayingAudio] = useState(false);
+  const [retryingAudio, setRetryingAudio] = useState(false);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2421,11 +2393,7 @@ const AIChoreChecker: React.FC = () => {
       const res = await api.admin.testAIReview(choreTitle, url);
       setResult(res);
 
-      if (res.feedback_audio) {
-        setStep('done');
-      } else {
-        setStep('done');
-      }
+      setStep('done');
     } catch (err: any) {
       setError(err.message || 'Test failed');
       setStep('error');
@@ -2439,6 +2407,19 @@ const AIChoreChecker: React.FC = () => {
     audio.onended = () => setPlayingAudio(false);
     audio.onerror = () => setPlayingAudio(false);
     audio.play().catch(() => setPlayingAudio(false));
+  };
+
+  const handleRetryAudio = async () => {
+    if (!result?.feedback) return;
+    setRetryingAudio(true);
+    try {
+      const { audio_url } = await api.admin.synthesizeTTS(result.feedback);
+      setResult({ ...result, feedback_audio: audio_url });
+    } catch (err: unknown) {
+      setError(`TTS failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setRetryingAudio(false);
+    }
   };
 
   const stepLabels = [
@@ -2538,7 +2519,14 @@ const AIChoreChecker: React.FC = () => {
                 {playingAudio ? <Loader2 size={16} className={styles.spinning} /> : <Volume2 size={16} />}
               </button>
             ) : (
-              <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>No audio</span>
+              <button
+                onClick={handleRetryAudio}
+                disabled={retryingAudio}
+                className={styles.audioPlayBtn}
+                aria-label="Generate audio"
+              >
+                {retryingAudio ? <Loader2 size={16} className={styles.spinning} /> : <Volume2 size={16} />}
+              </button>
             )}
           </div>
         </div>

@@ -3,7 +3,9 @@ import { Check, ChevronRight, ChevronLeft } from 'lucide-react';
 import clsx from 'clsx';
 import Modal from '../Modal/Modal';
 import { api } from '../../api';
+import { DAY_NAMES } from '../../types';
 import type { User } from '../../types';
+import { localDateStr, toggleInArray } from '../../utils';
 import styles from './CreateChoreWizard.module.css';
 
 interface ChoreData {
@@ -39,7 +41,7 @@ interface Props {
   users: User[];
 }
 
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_LABELS = DAY_NAMES;
 
 const defaultChoreData: ChoreData = {
   title: '', description: '', category: 'core', icon: '', points: 5, missedPenalty: 0,
@@ -48,8 +50,8 @@ const defaultChoreData: ChoreData = {
 
 const defaultScheduleData: ScheduleData = {
   selectedUsers: [], scheduleType: 'weekly', selectedDays: [],
-  interval: 2, intervalStart: new Date().toISOString().slice(0, 10),
-  specificDate: new Date().toISOString().slice(0, 10),
+  interval: 2, intervalStart: localDateStr(new Date()),
+  specificDate: localDateStr(new Date()),
   availableAt: '', dueBy: '', expiryPenalty: 'block', expiryPenaltyValue: 5,
 };
 
@@ -82,9 +84,7 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
   const toggleUser = (id: number) => {
     setSchedule(s => ({
       ...s,
-      selectedUsers: s.selectedUsers.includes(id)
-        ? s.selectedUsers.filter(u => u !== id)
-        : [...s.selectedUsers, id],
+      selectedUsers: toggleInArray(s.selectedUsers, id),
     }));
   };
 
@@ -99,9 +99,7 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
   const toggleDay = (d: number) => {
     setSchedule(s => ({
       ...s,
-      selectedDays: s.selectedDays.includes(d)
-        ? s.selectedDays.filter(x => x !== d)
-        : [...s.selectedDays, d],
+      selectedDays: toggleInArray(s.selectedDays, d),
     }));
   };
 

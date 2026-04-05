@@ -2105,25 +2105,34 @@ func TestAdminGetAndSetSetting(t *testing.T) {
 	env := setupTest(t)
 	env.createAdmin(t)
 
-	// Set a custom setting
-	resp := env.expectStatus(t, "PUT", "/api/admin/settings/timezone", map[string]any{
-		"value": "America/New_York",
+	// Set a valid setting from the allowlist
+	resp := env.expectStatus(t, "PUT", "/api/admin/settings/base_url", map[string]any{
+		"value": "https://example.com",
 	}, adminHeaders(), http.StatusOK)
 	var setting map[string]any
 	decodeBody(t, resp, &setting)
-	if setting["key"] != "timezone" {
-		t.Fatalf("expected key 'timezone', got %v", setting["key"])
+	if setting["key"] != "base_url" {
+		t.Fatalf("expected key 'base_url', got %v", setting["key"])
 	}
-	if setting["value"] != "America/New_York" {
-		t.Fatalf("expected value 'America/New_York', got %v", setting["value"])
+	if setting["value"] != "https://example.com" {
+		t.Fatalf("expected value 'https://example.com', got %v", setting["value"])
 	}
 
 	// Get it back
-	resp = env.expectStatus(t, "GET", "/api/admin/settings/timezone", nil, adminHeaders(), http.StatusOK)
+	resp = env.expectStatus(t, "GET", "/api/admin/settings/base_url", nil, adminHeaders(), http.StatusOK)
 	decodeBody(t, resp, &setting)
-	if setting["value"] != "America/New_York" {
-		t.Fatalf("expected value 'America/New_York', got %v", setting["value"])
+	if setting["value"] != "https://example.com" {
+		t.Fatalf("expected value 'https://example.com', got %v", setting["value"])
 	}
+}
+
+func TestAdminSetSettingRejectsUnknownKey(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.expectStatus(t, "PUT", "/api/admin/settings/not_a_real_key", map[string]any{
+		"value": "foo",
+	}, adminHeaders(), http.StatusBadRequest)
 }
 
 func TestAdminSettingsRequireAdmin(t *testing.T) {
@@ -2131,8 +2140,8 @@ func TestAdminSettingsRequireAdmin(t *testing.T) {
 	env.createAdmin(t)
 	kidID := env.createChild(t, "Kid")
 
-	env.expectStatus(t, "GET", "/api/admin/settings/timezone", nil, childHeaders(kidID), http.StatusForbidden)
-	env.expectStatus(t, "PUT", "/api/admin/settings/timezone", map[string]any{
+	env.expectStatus(t, "GET", "/api/admin/settings/base_url", nil, childHeaders(kidID), http.StatusForbidden)
+	env.expectStatus(t, "PUT", "/api/admin/settings/base_url", map[string]any{
 		"value": "test",
 	}, childHeaders(kidID), http.StatusForbidden)
 }

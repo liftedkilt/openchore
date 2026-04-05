@@ -10,6 +10,20 @@ import (
 	"github.com/liftedkilt/openchore/internal/store"
 )
 
+// writableSettings is the allowlist of setting keys that can be written via
+// the admin API.  Keys not in this set are rejected with 400.
+var writableSettings = map[string]bool{
+	"ai_enabled":                true,
+	"ai_endpoint":               true,
+	"ai_model":                  true,
+	"ai_auto_approve_threshold": true,
+	"ai_tts_enabled":            true,
+	"ai_tts_endpoint":           true,
+	"ai_tts_voice":              true,
+	"base_url":                  true,
+	"discord_webhook_url":       true,
+}
+
 type AdminHandler struct {
 	store *store.Store
 }
@@ -101,6 +115,10 @@ func (h *AdminHandler) SetSetting(w http.ResponseWriter, r *http.Request) {
 	key := urlParam(r, "key")
 	if key == "" {
 		writeError(w, http.StatusBadRequest, "key required")
+		return
+	}
+	if !writableSettings[key] {
+		writeError(w, http.StatusBadRequest, "unknown setting key")
 		return
 	}
 	var req struct {

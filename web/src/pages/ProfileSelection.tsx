@@ -4,7 +4,7 @@ import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import type { User } from '../types';
 import styles from './ProfileSelection.module.css';
-import { UserCircle, Settings, Monitor, Sparkles } from 'lucide-react';
+import { UserCircle, Settings, Monitor } from 'lucide-react';
 
 export const ProfileSelection: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -80,17 +80,10 @@ export const ProfileSelection: React.FC = () => {
           <Monitor size={18} />
           <span>Wall Display</span>
         </button>
-        {users.length === 0 ? (
-          <button className={styles.settingsBtn} onClick={() => navigate('/setup')}>
-            <Sparkles size={18} />
-            <span>Get Started</span>
-          </button>
-        ) : (
-          <button className={styles.settingsBtn} onClick={() => navigate('/admin')}>
-            <Settings size={18} />
-            <span>Manage</span>
-          </button>
-        )}
+        <button className={styles.settingsBtn} onClick={() => navigate('/admin')}>
+          <Settings size={18} />
+          <span>Manage</span>
+        </button>
       </div>
     </div>
   );

@@ -15,20 +15,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/liftedkilt/openchore/internal/ollama"
+	"github.com/liftedkilt/openchore/internal/aibackend"
 	"github.com/liftedkilt/openchore/internal/tts"
 )
 
-// Integration tests that start real Ollama and Kokoro containers.
+// Integration tests that start real AI backend (LiteRT or Ollama) and Kokoro containers.
 //
 // Run with:
-//   CGO_ENABLED=1 go test -tags integration -v -timeout 10m ./internal/ai/
+//   go test -tags integration -v -timeout 10m ./internal/ai/
 //
 // First run will be slow (pulls model + container images).
-// Set OLLAMA_MODEL to override the default model (gemma4:e2b).
+// Set OLLAMA_MODEL to override the default model (gemma4:e4b).
 
 var (
-	testOllamaClient *ollama.Client
+	testAIClient *aibackend.Client
 	testTTSClient    *tts.Client
 	testModel        string
 	projectRoot      string
@@ -37,7 +37,7 @@ var (
 func TestMain(m *testing.M) {
 	testModel = os.Getenv("OLLAMA_MODEL")
 	if testModel == "" {
-		testModel = "gemma4:e2b"
+		testModel = "gemma4:e4b"
 	}
 
 	// Find project root (walk up looking for compose.yaml)
@@ -56,9 +56,12 @@ func TestMain(m *testing.M) {
 	}
 
 	// If endpoints are already set externally, use those (skip container management)
-	ollamaEP := os.Getenv("OLLAMA_ENDPOINT")
+	aiEP := os.Getenv("AI_ENDPOINT")
+	if aiEP == "" {
+		aiEP = os.Getenv("OLLAMA_ENDPOINT") // backward compat
+	}
 	ttsEP := os.Getenv("TTS_ENDPOINT")
-	managedContainers := ollamaEP == "" && ttsEP == ""
+	managedContainers := aiEP == "" && ttsEP == ""
 
 	if managedContainers {
 		fmt.Println("=== Starting AI containers (docker compose --profile ai) ===")
@@ -66,30 +69,30 @@ func TestMain(m *testing.M) {
 			fmt.Fprintf(os.Stderr, "FATAL: failed to start containers: %v\n", err)
 			os.Exit(1)
 		}
-		ollamaEP = "http://localhost:28080"  // LiteRT sidecar (Ollama-compatible API)
+		aiEP = "http://localhost:28080"  // LiteRT sidecar (Ollama-compatible API)
 		ttsEP = "http://localhost:28880"
 	}
 
-	testOllamaClient = ollama.NewClient(ollamaEP)
+	testAIClient = aibackend.NewClient(aiEP)
 	testTTSClient = tts.NewClient(ttsEP)
 
-	// Wait for Ollama to be healthy
-	fmt.Printf("=== Waiting for Ollama at %s ===\n", ollamaEP)
+	// Wait for AI backend to be healthy
+	fmt.Printf("=== Waiting for AI backend at %s ===\n", aiEP)
 	if err := waitForHealthy(func(ctx context.Context) bool {
-		return testOllamaClient.Healthy(ctx)
+		return testAIClient.Healthy(ctx)
 	}, 60*time.Second); err != nil {
-		fmt.Fprintf(os.Stderr, "FATAL: Ollama did not become healthy: %v\n", err)
+		fmt.Fprintf(os.Stderr, "FATAL: AI backend did not become healthy: %v\n", err)
 		if managedContainers {
 			composeDown()
 		}
 		os.Exit(1)
 	}
-	fmt.Println("=== Ollama is healthy ===")
+	fmt.Println("=== AI backend is healthy ===")
 
 	// Pull model if needed
-	if !testOllamaClient.HasModel(context.Background(), testModel) {
+	if !testAIClient.HasModel(context.Background(), testModel) {
 		fmt.Printf("=== Pulling model %s (this may take several minutes) ===\n", testModel)
-		if err := testOllamaClient.Pull(context.Background(), testModel); err != nil {
+		if err := testAIClient.Pull(context.Background(), testModel); err != nil {
 			fmt.Fprintf(os.Stderr, "FATAL: failed to pull model %s: %v\n", testModel, err)
 			if managedContainers {
 				composeDown()
@@ -165,10 +168,10 @@ func waitForHealthy(check func(context.Context) bool, timeout time.Duration) err
 
 // --- Test helpers ---
 
-func requireOllama(t *testing.T) {
+func requireAIBackend(t *testing.T) {
 	t.Helper()
-	if testOllamaClient == nil {
-		t.Fatal("Ollama client not initialized")
+	if testAIClient == nil {
+		t.Fatal("AI backend client not initialized")
 	}
 }
 
@@ -203,8 +206,8 @@ func testImage(t *testing.T) string {
 // --- Ollama / Photo Review Tests ---
 
 func TestIntegration_ReviewPhoto(t *testing.T) {
-	requireOllama(t)
-	reviewer := NewReviewer(testOllamaClient, testModel)
+	requireAIBackend(t)
+	reviewer := NewReviewer(testAIClient, testModel)
 	imgPath := testImage(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
@@ -230,8 +233,8 @@ func TestIntegration_ReviewPhoto(t *testing.T) {
 }
 
 func TestIntegration_ReviewPhoto_MultipleChores(t *testing.T) {
-	requireOllama(t)
-	reviewer := NewReviewer(testOllamaClient, testModel)
+	requireAIBackend(t)
+	reviewer := NewReviewer(testAIClient, testModel)
 	imgPath := testImage(t)
 
 	chores := []struct{ title, desc string }{
@@ -263,8 +266,8 @@ func TestIntegration_ReviewPhoto_MultipleChores(t *testing.T) {
 }
 
 func TestIntegration_ReviewPhoto_FeedbackIsKidFriendly(t *testing.T) {
-	requireOllama(t)
-	reviewer := NewReviewer(testOllamaClient, testModel)
+	requireAIBackend(t)
+	reviewer := NewReviewer(testAIClient, testModel)
 	imgPath := testImage(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
@@ -291,8 +294,8 @@ func TestIntegration_ReviewPhoto_FeedbackIsKidFriendly(t *testing.T) {
 // --- TTS Text Generation Tests ---
 
 func TestIntegration_GenerateTTSDescription(t *testing.T) {
-	requireOllama(t)
-	gen := NewTTSGenerator(testOllamaClient, testModel, nil, "")
+	requireAIBackend(t)
+	gen := NewTTSGenerator(testAIClient, testModel, nil, "", "")
 
 	var desc string
 	var err error
@@ -363,10 +366,10 @@ func TestIntegration_SynthesizeAudio_MultipleVoices(t *testing.T) {
 // --- End-to-End Tests ---
 
 func TestIntegration_EndToEnd_TTSGenAndSynth(t *testing.T) {
-	requireOllama(t)
+	requireAIBackend(t)
 	requireTTS(t)
 
-	gen := NewTTSGenerator(testOllamaClient, testModel, testTTSClient, "af_heart")
+	gen := NewTTSGenerator(testAIClient, testModel, testTTSClient, "", "af_heart")
 
 	// Retry up to 3 times — CPU inference can occasionally produce empty output
 	var desc, audioURL string

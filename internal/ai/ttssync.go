@@ -50,7 +50,7 @@ func (s *TTSSyncer) sync(ctx context.Context) {
 		return
 	}
 
-	if s.ttsGen == nil || s.ttsGen.ttsClient == nil {
+	if s.ttsGen == nil || !s.ttsGen.TTSAvailable() {
 		return
 	}
 
@@ -60,7 +60,7 @@ func (s *TTSSyncer) sync(ctx context.Context) {
 		return
 	}
 
-	dir := "data/tts"
+	dir := ttsDir
 	_ = os.MkdirAll(dir, 0750)
 
 	// Track which chore IDs are valid (for cleanup)
@@ -95,7 +95,7 @@ func (s *TTSSyncer) sync(ctx context.Context) {
 
 		// Synthesize audio
 		log.Printf("tts-sync: synthesizing audio for chore %d (%s)", chore.ID, chore.Title)
-		audio, err := s.ttsGen.ttsClient.Synthesize(ctx, desc, s.ttsGen.ttsVoice)
+		audio, err := s.ttsGen.Synthesize(ctx, desc, s.ttsGen.ttsVoice)
 		if err != nil {
 			log.Printf("tts-sync: failed to synthesize audio for chore %d: %v", chore.ID, err)
 			continue

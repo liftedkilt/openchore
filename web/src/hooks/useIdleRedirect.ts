@@ -8,13 +8,15 @@ export function useIdleRedirect(targetPath: string, excludePaths: string[] = [])
   const navigate = useNavigate();
   const location = useLocation();
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const excludeRef = useRef(excludePaths);
+  excludeRef.current = excludePaths;
 
   useEffect(() => {
     // Don't set up idle redirect if already on the target page
     if (location.pathname === targetPath) return;
 
     // Don't set up idle redirect if on an excluded path
-    if (excludePaths.some(p => location.pathname.startsWith(p))) return;
+    if (excludeRef.current.some(p => location.pathname.startsWith(p))) return;
 
     const reset = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -34,5 +36,5 @@ export function useIdleRedirect(targetPath: string, excludePaths: string[] = [])
         window.removeEventListener(event, reset);
       }
     };
-  }, [navigate, location.pathname, targetPath, excludePaths]);
+  }, [navigate, location.pathname, targetPath]);
 }

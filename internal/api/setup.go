@@ -80,7 +80,7 @@ func (h *SetupHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	for _, ch := range req.Chores {
 		category := ch.Category
 		if category == "" {
-			category = "core"
+			category = model.CategoryCore
 		}
 		chore := &model.Chore{
 			Title:       ch.Title,
@@ -104,7 +104,7 @@ func (h *SetupHandler) Setup(w http.ResponseWriter, r *http.Request) {
 					AssignmentType:   "individual",
 					DayOfWeek:        &dayOfWeek,
 					PointsMultiplier: 1.0,
-					ExpiryPenalty:    "block",
+					ExpiryPenalty:    model.ExpiryBlock,
 				}
 				if err := h.store.CreateSchedule(r.Context(), schedule); err != nil {
 					writeError(w, http.StatusInternalServerError, "failed to create schedule")

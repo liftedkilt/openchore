@@ -5,6 +5,46 @@ import "time"
 // DateFormat is the standard YYYY-MM-DD date layout used throughout the application.
 const DateFormat = "2006-01-02"
 
+// Chore categories
+const (
+	CategoryRequired = "required"
+	CategoryCore     = "core"
+	CategoryBonus    = "bonus"
+)
+
+// Completion statuses
+const (
+	StatusPending    = "pending"
+	StatusApproved   = "approved"
+	StatusRejected   = "rejected"
+	StatusAIRejected = "ai_rejected"
+)
+
+// Point transaction reasons
+const (
+	ReasonChoreComplete   = "chore_complete"
+	ReasonChoreUncomplete = "chore_uncomplete"
+	ReasonAdminAdjust     = "admin_adjust"
+	ReasonRewardRedeem    = "reward_redeem"
+	ReasonExpiryPenalty   = "expiry_penalty"
+	ReasonPointsDecay     = "points_decay"
+	ReasonMissedChore     = "missed_chore"
+)
+
+// Photo source modes
+const (
+	PhotoSourceChild    = "child"
+	PhotoSourceExternal = "external"
+	PhotoSourceBoth     = "both"
+)
+
+// Expiry penalty modes
+const (
+	ExpiryBlock    = "block"
+	ExpiryNoPoints = "no_points"
+	ExpiryPenalty  = "penalty"
+)
+
 type User struct {
 	ID        int64     `json:"id"`
 	Name      string    `json:"name"`

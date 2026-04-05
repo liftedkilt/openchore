@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import Modal from '../Modal/Modal';
 import { api } from '../../api';
-import { localDateStr } from '../../utils';
+import { localDateStr, toggleInArray } from '../../utils';
 import type { Chore, User } from '../../types';
 import styles from './QuickAssign.module.css';
 import clsx from 'clsx';
@@ -53,9 +53,7 @@ const QuickAssign: React.FC<Props> = ({ isOpen, onClose }) => {
   };
 
   const toggleUser = (id: number) => {
-    setSelectedUserIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    setSelectedUserIds(prev => toggleInArray(prev, id));
   };
 
   const canAssign =

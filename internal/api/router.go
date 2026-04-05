@@ -151,8 +151,9 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 				r.Post("/admin/tokens", tokens.Create)
 				r.Delete("/admin/tokens/{id}", tokens.Revoke)
 
-				// AI test endpoint
+				// AI test endpoints
 				r.Post("/admin/ai/test", chores.TestAIReview)
+				r.Post("/admin/ai/tts", chores.SynthesizeTTS)
 
 				// Integration discovery: chores with triggers
 				r.Get("/chores/triggerable", triggers.ListTriggerable)

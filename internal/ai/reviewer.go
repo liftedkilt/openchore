@@ -9,17 +9,17 @@ import (
 	"strings"
 
 	"github.com/liftedkilt/openchore/internal/model"
-	"github.com/liftedkilt/openchore/internal/ollama"
+	"github.com/liftedkilt/openchore/internal/aibackend"
 )
 
-// Reviewer uses an Ollama vision model to verify chore completion photos.
+// Reviewer uses a vision model to verify chore completion photos.
 type Reviewer struct {
-	client *ollama.Client
+	client *aibackend.Client
 	model  string
 }
 
 // NewReviewer creates a new AI reviewer.
-func NewReviewer(client *ollama.Client, model string) *Reviewer {
+func NewReviewer(client *aibackend.Client, model string) *Reviewer {
 	return &Reviewer{client: client, model: model}
 }
 
@@ -32,16 +32,16 @@ func (r *Reviewer) ReviewPhoto(ctx context.Context, choreTitle, choreDescription
 	}
 	defer f.Close()
 
-	imageB64, err := ollama.EncodeImageBase64(f)
+	imageB64, err := aibackend.EncodeImageBase64(f)
 	if err != nil {
 		return nil, fmt.Errorf("encoding photo: %w", err)
 	}
 
 	prompt := buildReviewPrompt(choreTitle, choreDescription)
 
-	resp, err := r.client.Chat(ctx, &ollama.ChatRequest{
+	resp, err := r.client.Chat(ctx, &aibackend.ChatRequest{
 		Model: r.model,
-		Messages: []ollama.ChatMessage{
+		Messages: []aibackend.ChatMessage{
 			{
 				Role:    "user",
 				Content: prompt,
@@ -49,7 +49,7 @@ func (r *Reviewer) ReviewPhoto(ctx context.Context, choreTitle, choreDescription
 			},
 		},
 		Format: "json",
-		Options: &ollama.ModelOptions{
+		Options: &aibackend.ModelOptions{
 			Temperature: 0.3, // low temperature for consistent evaluation
 			NumPredict:  1024, // needs headroom for model thinking tokens
 		},

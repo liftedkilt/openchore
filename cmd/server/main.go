@@ -15,7 +15,7 @@ import (
 	"github.com/liftedkilt/openchore/internal/ai"
 	"github.com/liftedkilt/openchore/internal/api"
 	"github.com/liftedkilt/openchore/internal/config"
-	"github.com/liftedkilt/openchore/internal/ollama"
+	"github.com/liftedkilt/openchore/internal/aibackend"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/tts"
 	"github.com/liftedkilt/openchore/internal/webhook"
@@ -80,25 +80,20 @@ func main() {
 }
 
 func initAIServices(s *store.Store, choreHandler *api.ChoreHandler) {
-	aiEndpoint := os.Getenv("OLLAMA_ENDPOINT")
+	aiEndpoint := os.Getenv("AI_ENDPOINT")
 	if aiEndpoint == "" {
-		if ep, _ := s.GetSetting(context.Background(), "ai_endpoint"); ep != "" {
-			aiEndpoint = ep
-		} else {
-			aiEndpoint = "http://litert:8080"
-		}
+		aiEndpoint = os.Getenv("OLLAMA_ENDPOINT") // backward compat
+	}
+	if aiEndpoint == "" {
+		aiEndpoint = "http://litert:8080"
 	}
 
 	ttsEndpoint := os.Getenv("TTS_ENDPOINT")
 	if ttsEndpoint == "" {
-		if ep, _ := s.GetSetting(context.Background(), "ai_tts_endpoint"); ep != "" {
-			ttsEndpoint = ep
-		} else {
-			ttsEndpoint = "http://kokoro:8880"
-		}
+		ttsEndpoint = "http://kokoro:8880"
 	}
 
-	aiClient := ollama.NewClient(aiEndpoint)
+	aiClient := aibackend.NewClient(aiEndpoint)
 
 	// Wait for the AI endpoint to become available (retry every 5s for up to 2 minutes)
 	log.Printf("Waiting for AI endpoint at %s...", aiEndpoint)
@@ -113,9 +108,9 @@ func initAIServices(s *store.Store, choreHandler *api.ChoreHandler) {
 		time.Sleep(5 * time.Second)
 	}
 
-	aiModel, _ := s.GetSetting(context.Background(), "ai_model")
+	aiModel := os.Getenv("AI_MODEL")
 	if aiModel == "" {
-		aiModel = "gemma4:e2b"
+		aiModel = "gemma4:e4b"
 	}
 
 	// Auto-pull model if not present
@@ -130,21 +125,28 @@ func initAIServices(s *store.Store, choreHandler *api.ChoreHandler) {
 
 	reviewer := ai.NewReviewer(aiClient, aiModel)
 
-	// Check for TTS sidecar
+	// Wait for TTS sidecar (retry every 5s for up to 30s)
 	var ttsClient *tts.Client
 	ttsC := tts.NewClient(ttsEndpoint)
-	if ttsC.Healthy(context.Background()) {
-		ttsClient = ttsC
-		log.Printf("TTS audio service available at %s", ttsEndpoint)
-	} else {
-		log.Printf("TTS audio service not available at %s — browser TTS will be used as fallback", ttsEndpoint)
+	log.Printf("Checking for TTS service at %s...", ttsEndpoint)
+	for attempt := 1; attempt <= 6; attempt++ {
+		if ttsC.Healthy(context.Background()) {
+			ttsClient = ttsC
+			log.Printf("TTS audio service available at %s", ttsEndpoint)
+			break
+		}
+		if attempt == 6 {
+			log.Printf("TTS audio service not available at %s — will retry lazily on first use", ttsEndpoint)
+			break
+		}
+		time.Sleep(5 * time.Second)
 	}
 
 	ttsVoice, _ := s.GetSetting(context.Background(), "ai_tts_voice")
 	if ttsVoice == "" {
 		ttsVoice = "af_heart"
 	}
-	ttsGen := ai.NewTTSGenerator(aiClient, aiModel, ttsClient, ttsVoice)
+	ttsGen := ai.NewTTSGenerator(aiClient, aiModel, ttsClient, ttsEndpoint, ttsVoice)
 
 	choreHandler.SetAIServices(reviewer, ttsGen)
 	log.Printf("AI services initialized (%s at %s, model=%s)", aiClient.ServerType(context.Background()), aiEndpoint, aiModel)

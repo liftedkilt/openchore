@@ -9,7 +9,7 @@ services:
     environment:
       - TZ=America/Los_Angeles
       - CONFIG_PATH=/app/config/config.yaml
-      - OLLAMA_ENDPOINT=${OLLAMA_ENDPOINT:-http://litert:8080}
+      - AI_ENDPOINT=${AI_ENDPOINT:-${OLLAMA_ENDPOINT:-http://litert:8080}}  # OLLAMA_ENDPOINT still accepted for backward compat
       - TTS_ENDPOINT=${TTS_ENDPOINT:-http://kokoro:8880}
     volumes:
       - openchore-data:/data
