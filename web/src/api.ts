@@ -13,6 +13,7 @@ function resizeImage(file: File, maxDim: number): Promise<File> {
     }
     const img = new Image();
     img.onload = () => {
+      URL.revokeObjectURL(img.src);
       const { width, height } = img;
       if (width <= maxDim && height <= maxDim) {
         resolve(file);

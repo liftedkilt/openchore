@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import { useAuth } from '../AuthContext';
 import type { Chore, User, ChoreSchedule, ChoreTrigger, Reward, PointBalance, PointTransaction, StreakRewardItem, Theme, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from '../types';
 import { DAY_NAMES } from '../types';
 import styles from './AdminDashboard.module.css';
@@ -14,6 +15,7 @@ type Tab = 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' 
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { setUser } = useAuth();
   const [tab, setTab] = useState<Tab>('chores');
   const [ready, setReady] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -47,11 +49,11 @@ export const AdminDashboard: React.FC = () => {
         const users = await api.users.list();
         const admin = users.find((u: User) => u.role === 'admin');
         if (admin) {
-          localStorage.setItem('openchore_user', JSON.stringify(admin));
+          setUser(admin);
           setReady(true);
         } else {
           // No admin exists — redirect to setup
-          localStorage.removeItem('openchore_user');
+          setUser(null);
           sessionStorage.removeItem('openchore_admin');
           navigate('/setup', { replace: true });
         }
@@ -60,7 +62,7 @@ export const AdminDashboard: React.FC = () => {
       }
     };
     ensureAdminUser();
-  }, [navigate]);
+  }, [navigate, setUser]);
 
   // Block render if not authenticated (synchronous check + useEffect redirect)
   if (!ready || !sessionStorage.getItem('openchore_admin')) return null;
@@ -163,6 +165,7 @@ const ChoresTab: React.FC = () => {
 
       {editingChore && (
         <EditChoreModal
+          key={editingChore.id}
           chore={editingChore}
           isOpen={!!editingChore}
           onClose={() => { setEditingChore(null); load(); }}

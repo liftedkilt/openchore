@@ -12,6 +12,10 @@ export const ProfileSelection: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    document.body.className = 'theme-default';
+  }, []);
+
+  useEffect(() => {
     api.users.list().then(data => {
       setUsers(data);
       if (data.length === 0) {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import Modal from '../Modal/Modal';
 import { api } from '../../api';
+import { localDateStr } from '../../utils';
 import type { Chore, User } from '../../types';
 import styles from './QuickAssign.module.css';
 import clsx from 'clsx';
@@ -42,11 +43,11 @@ const QuickAssign: React.FC<Props> = ({ isOpen, onClose }) => {
 
   const getDateString = (): string => {
     const today = new Date();
-    if (dateMode === 'today') return today.toISOString().slice(0, 10);
+    if (dateMode === 'today') return localDateStr(today);
     if (dateMode === 'tomorrow') {
       const t = new Date(today);
       t.setDate(t.getDate() + 1);
-      return t.toISOString().slice(0, 10);
+      return localDateStr(t);
     }
     return customDate;
   };
