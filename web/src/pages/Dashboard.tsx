@@ -1013,9 +1013,13 @@ export const Dashboard: React.FC = () => {
           baseUrl={systemBaseUrl}
           onClose={() => setQrChore(null)}
           onComplete={qrChore.completed ? async () => {
+            setAiFeedback(prev => { const next = { ...prev }; delete next[qrChore.schedule_id]; return next; });
             setQrChore(null);
             await loadChores();
-          } : onChoreFinished}
+          } : async () => {
+            setAiFeedback(prev => { const next = { ...prev }; delete next[qrChore.schedule_id]; return next; });
+            onChoreFinished();
+          }}
           onAIReject={(scheduleId, feedback, audioUrl) => {
             setAiFeedback(prev => ({ ...prev, [scheduleId]: { text: feedback, audioUrl } }));
             setQrChore(null);
