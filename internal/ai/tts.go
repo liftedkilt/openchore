@@ -85,7 +85,7 @@ func (t *TTSGenerator) SynthesizeAudio(ctx context.Context, text string, choreID
 		return "", fmt.Errorf("creating TTS directory: %w", err)
 	}
 
-	filename := fmt.Sprintf("chore_%d_%d.mp3", choreID, time.Now().UnixNano())
+	filename := fmt.Sprintf("chore_%d.mp3", choreID)
 	filePath := filepath.Join(dir, filename)
 	if err := os.WriteFile(filePath, audio, 0640); err != nil {
 		return "", fmt.Errorf("saving TTS audio: %w", err)

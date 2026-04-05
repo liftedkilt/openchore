@@ -148,6 +148,10 @@ func initAIServices(s *store.Store, choreHandler *api.ChoreHandler) {
 
 	choreHandler.SetAIServices(reviewer, ttsGen)
 	log.Printf("AI services initialized (%s at %s, model=%s)", aiClient.ServerType(context.Background()), aiEndpoint, aiModel)
+
+	// Start TTS sync loop — generates audio for all chores, cleans up orphans
+	syncer := ai.NewTTSSyncer(s, ttsGen)
+	go syncer.Start(context.Background(), 5*time.Minute)
 }
 
 func runMigrations(db *sql.DB) error {
