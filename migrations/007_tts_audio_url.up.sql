@@ -1,0 +1,1 @@
+ALTER TABLE chores ADD COLUMN tts_audio_url TEXT NOT NULL DEFAULT '';

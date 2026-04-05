@@ -2,6 +2,17 @@ import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalan
 
 const API_BASE = '/api';
 
+export class APIError extends Error {
+  status: number;
+  data: any;
+  constructor(message: string, status: number, data: any) {
+    super(message);
+    this.name = 'APIError';
+    this.status = status;
+    this.data = data;
+  }
+}
+
 async function fetchWithAuth<T>(path: string, options: RequestInit = {}, skipContentType = false): Promise<T> {
   const userStr = localStorage.getItem('openchore_user');
   const headers: Record<string, string> = {
@@ -13,7 +24,7 @@ async function fetchWithAuth<T>(path: string, options: RequestInit = {}, skipCon
   const resp = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(err.error || `HTTP error! status: ${resp.status}`);
+    throw new APIError(err.error || `HTTP error! status: ${resp.status}`, resp.status, err);
   }
   if (resp.status === 204) return {} as T;
   return resp.json();
@@ -198,6 +209,13 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ value }),
     }),
+    getAISettings: () => Promise.all([
+      fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_enabled').catch(() => ({ key: 'ai_enabled', value: 'false' })),
+      fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_endpoint').catch(() => ({ key: 'ai_endpoint', value: 'http://ollama:11434' })),
+      fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_model').catch(() => ({ key: 'ai_model', value: 'gemma4:e2b' })),
+      fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_auto_approve_threshold').catch(() => ({ key: 'ai_auto_approve_threshold', value: '0.85' })),
+      fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_tts_enabled').catch(() => ({ key: 'ai_tts_enabled', value: 'false' })),
+    ]).then(settings => Object.fromEntries(settings.map(s => [s.key, s.value]))),
     exportConfig: async (sections: string[]) => {
       const userStr = localStorage.getItem('openchore_user');
       const headers: Record<string, string> = userStr

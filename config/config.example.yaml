@@ -291,3 +291,16 @@ streak_rewards:
 
 settings:
   admin_passcode: "1234"
+
+# AI-powered features (requires Ollama + Kokoro — see compose.yaml)
+# Enable with: docker compose --profile ai up
+# These settings are stored in the database and can be changed from the admin UI.
+# Values here are applied only on first boot (like all config).
+ai:
+  enabled: false
+  endpoint: "http://litert:8080"     # LiteRT sidecar (or http://ollama:11434 for Ollama)
+  model: "gemma4:e2b"              # Vision + text model
+  auto_approve_threshold: 0.85
+  tts_enabled: false
+  tts_endpoint: "http://kokoro:8880"  # Kokoro-FastAPI (OpenAI-compatible TTS)
+  tts_voice: "af_heart"               # Warm, kid-friendly voice

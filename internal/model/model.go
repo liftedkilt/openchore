@@ -31,6 +31,8 @@ type Chore struct {
 	PhotoSource        string    `json:"photo_source"`
 	Source             string    `json:"source"`
 	ExternalID         string    `json:"external_id,omitempty"`
+	TTSDescription     string    `json:"tts_description,omitempty"`
+	TTSAudioURL        string    `json:"tts_audio_url,omitempty"`
 	CreatedBy          int64     `json:"created_by"`
 	CreatedAt          time.Time `json:"created_at"`
 }
@@ -58,12 +60,14 @@ type ChoreCompletion struct {
 	ID              int64      `json:"id"`
 	ChoreScheduleID int64     `json:"chore_schedule_id"`
 	CompletedBy     int64      `json:"completed_by"`
-	Status          string     `json:"status"`
+	Status          string     `json:"status"` // approved, pending, rejected, ai_rejected
 	PhotoURL        string     `json:"photo_url,omitempty"`
 	ApprovedBy      *int64     `json:"approved_by,omitempty"`
 	ApprovedAt      *time.Time `json:"approved_at,omitempty"`
 	CompletedAt     time.Time  `json:"completed_at"`
 	CompletionDate  string     `json:"completion_date"`
+	AIFeedback      string     `json:"ai_feedback,omitempty"`
+	AIConfidence    float64    `json:"ai_confidence,omitempty"`
 }
 
 // --- Points & Rewards ---
@@ -230,9 +234,20 @@ type ScheduledChore struct {
 	ExpiryPenaltyValue int     `json:"expiry_penalty_value"`
 	Available          bool    `json:"available"`
 	Expired            bool    `json:"expired"`
-	Completed        bool       `json:"completed"`
-	CompletionID     *int64     `json:"completion_id,omitempty"`
-	CompletedAt      *time.Time `json:"completed_at,omitempty"`
-	PhotoURL         *string    `json:"photo_url,omitempty"`
-	Date             string     `json:"date"`
+	Completed          bool       `json:"completed"`
+	CompletionID       *int64     `json:"completion_id,omitempty"`
+	CompletedAt        *time.Time `json:"completed_at,omitempty"`
+	PhotoURL           *string    `json:"photo_url,omitempty"`
+	CompletionStatus   *string    `json:"completion_status,omitempty"`
+	AIFeedback         *string    `json:"ai_feedback,omitempty"`
+	TTSDescription     string     `json:"tts_description,omitempty"`
+	TTSAudioURL        string     `json:"tts_audio_url,omitempty"`
+	Date               string     `json:"date"`
+}
+
+// AIReviewResult holds the parsed response from an AI photo review.
+type AIReviewResult struct {
+	Complete   bool    `json:"complete"`
+	Confidence float64 `json:"confidence"`
+	Feedback   string  `json:"feedback"`
 }

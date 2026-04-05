@@ -1418,6 +1418,15 @@ const SettingsTab: React.FC = () => {
   const [discordSaving, setDiscordSaving] = useState(false);
   const [discordMessage, setDiscordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // AI settings state
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiEndpoint, setAiEndpoint] = useState('http://ollama:11434');
+  const [aiModel, setAiModel] = useState('gemma4:e2b');
+  const [aiThreshold, setAiThreshold] = useState('0.85');
+  const [aiTtsEnabled, setAiTtsEnabled] = useState(false);
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiMessage, setAiMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   // Webhooks state
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [showWebhookForm, setShowWebhookForm] = useState(false);
@@ -1469,6 +1478,15 @@ const SettingsTab: React.FC = () => {
     fetch('/api/admin/settings/discord_webhook_url')
       .then(r => r.json())
       .then(data => setDiscordUrl(data.value || ''))
+      .catch(() => {});
+    api.admin.getAISettings()
+      .then(settings => {
+        setAiEnabled(settings.ai_enabled === 'true');
+        setAiEndpoint(settings.ai_endpoint || 'http://ollama:11434');
+        setAiModel(settings.ai_model || 'gemma4:e2b');
+        setAiThreshold(settings.ai_auto_approve_threshold || '0.85');
+        setAiTtsEnabled(settings.ai_tts_enabled === 'true');
+      })
       .catch(() => {});
   }, []);
 
@@ -1531,6 +1549,25 @@ const SettingsTab: React.FC = () => {
       setDiscordMessage({ type: 'error', text: 'Failed to reach Discord webhook URL' });
     }
     setDiscordSaving(false);
+  };
+
+  const handleSaveAISettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAiSaving(true);
+    setAiMessage(null);
+    try {
+      await Promise.all([
+        api.admin.setSetting('ai_enabled', aiEnabled ? 'true' : 'false'),
+        api.admin.setSetting('ai_endpoint', aiEndpoint),
+        api.admin.setSetting('ai_model', aiModel),
+        api.admin.setSetting('ai_auto_approve_threshold', aiThreshold),
+        api.admin.setSetting('ai_tts_enabled', aiTtsEnabled ? 'true' : 'false'),
+      ]);
+      setAiMessage({ type: 'success', text: 'AI settings saved' });
+    } catch {
+      setAiMessage({ type: 'error', text: 'Failed to save AI settings' });
+    }
+    setAiSaving(false);
   };
 
   const handleChangePin = async (e: React.FormEvent) => {
@@ -1653,6 +1690,81 @@ const SettingsTab: React.FC = () => {
               Send Test
             </button>
           )}
+        </div>
+      </form>
+
+      <form className={styles.form} onSubmit={handleSaveAISettings}>
+        <div className={styles.formHeader}>
+          <h3>AI Photo Review</h3>
+        </div>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+          Use AI (Ollama) to automatically verify chore completion photos. When enabled, uploaded photos are analyzed before marking a chore complete.
+        </p>
+
+        <div className={styles.formGrid}>
+          <label className={styles.checkboxLabel}>
+            <input type="checkbox" checked={aiEnabled} onChange={e => setAiEnabled(e.target.checked)} />
+            Enable AI photo review
+          </label>
+
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Ollama Endpoint</label>
+            <input
+              className={styles.input}
+              value={aiEndpoint}
+              onChange={e => setAiEndpoint(e.target.value)}
+              placeholder="http://ollama:11434"
+              disabled={!aiEnabled}
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Model Name</label>
+            <input
+              className={styles.input}
+              value={aiModel}
+              onChange={e => setAiModel(e.target.value)}
+              placeholder="gemma4:e2b"
+              disabled={!aiEnabled}
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Auto-Approve Threshold (0 &ndash; 1)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={aiThreshold}
+                onChange={e => setAiThreshold(e.target.value)}
+                disabled={!aiEnabled}
+                style={{ flex: 1, accentColor: 'var(--accent-blue)' }}
+              />
+              <span style={{ fontSize: '0.9rem', fontWeight: 700, minWidth: '3ch', textAlign: 'right' }}>{aiThreshold}</span>
+            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+              Photos with confidence above this threshold are auto-approved. Lower values are more lenient.
+            </p>
+          </div>
+
+          <label className={styles.checkboxLabel}>
+            <input type="checkbox" checked={aiTtsEnabled} onChange={e => setAiTtsEnabled(e.target.checked)} disabled={!aiEnabled} />
+            Generate TTS descriptions for chores
+          </label>
+        </div>
+
+        {aiMessage && (
+          <p style={{ fontSize: '0.85rem', fontWeight: 600, color: aiMessage.type === 'success' ? '#22c55e' : '#ef4444', marginTop: '0.5rem' }}>
+            {aiMessage.text}
+          </p>
+        )}
+
+        <div className={styles.formActions}>
+          <button type="submit" className={styles.btnPrimary} disabled={aiSaving}>
+            <Save size={16} /> {aiSaving ? 'Saving...' : 'Save AI Settings'}
+          </button>
         </div>
       </form>
 

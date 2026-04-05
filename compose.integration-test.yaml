@@ -1,0 +1,12 @@
+# Override for integration tests — publishes AI service ports to the host.
+# Uses non-standard ports to avoid conflicts with existing services.
+services:
+  litert:
+    ports:
+      - "28080:8080"
+  ollama:
+    ports:
+      - "21434:11434"
+  kokoro:
+    ports:
+      - "28880:8880"

@@ -14,6 +14,8 @@ A family chore management system designed for a wall-mounted iPad. Gamifies hous
 - **Multi-step creation wizard**: guided chore + schedule setup in one flow
 - **Photo proof**: chores can require photo evidence via QR code scan from a second device
 - **Chore triggers**: per-chore webhook URLs for external systems (Home Assistant, etc.) with cooldown and default assignee
+- **AI photo review**: optional LLM-powered verification of photo proof submissions (Gemma 4 via Ollama)
+- **Text-to-speech**: AI-generated audio descriptions of chores via Kokoro TTS
 
 ### Approval Workflow
 - Chores can require parent approval before points are awarded
@@ -68,8 +70,26 @@ A family chore management system designed for a wall-mounted iPad. Gamifies hous
 - Web app manifest with `standalone` display for fullscreen home screen apps
 - Apple mobile web app meta tags for iOS Safari
 
+### AI Features (Optional)
+- **AI photo review**: submitted photo proofs are automatically verified by a local LLM (Gemma 4 via Ollama) — checks whether the photo matches the chore description before approval
+- **Text-to-speech**: AI-generated chore descriptions read aloud via Kokoro-FastAPI, replacing browser SpeechSynthesis for higher-quality audio
+
+AI services run as optional containers:
+```bash
+docker compose --profile ai up        # Start with AI services
+```
+
+First-time setup — pull the vision model:
+```bash
+docker exec openchore-ollama ollama pull gemma4:e2b
+```
+
+**Resource requirements:** Ollama (gemma4:e2b) needs ~7.3 GB RAM; Kokoro TTS adds ~2 GB. Total AI stack is ~10 GB additional. A VM with 12-14 GB total RAM is recommended when running the full AI stack alongside the OS and OpenChore.
+
+Configure from **Admin --> Settings --> AI Photo Review**.
+
 ### Accessibility
-- **Text-to-speech**: speaker button on chore cards reads title and description aloud (browser SpeechSynthesis API). Defaults on for kids age 7 and under; any user can toggle via header button. Preference persisted per-user.
+- **Text-to-speech**: speaker button on chore cards reads title and description aloud. When Kokoro TTS is enabled, uses AI-generated audio; otherwise falls back to browser SpeechSynthesis API. Defaults on for kids age 7 and under; any user can toggle via header button. Preference persisted per-user.
 - **Swipe-to-complete**: swipe right on a chore card to mark it done (touch devices). Visual green "Done!" hint with 100px threshold.
 - **Ambient dashboard**: wall-mounted family overview mode with auto-rotation between kids
 
@@ -158,10 +178,13 @@ The compose setup runs:
 │   │   ├── api_test.go       # Integration test suite
 │   │   ├── reports_test.go   # Reports endpoint tests
 │   │   └── triggers_test.go  # Trigger endpoint tests
+│   ├── ai/                   # AI photo review + TTS description generation
 │   ├── discord/              # Discord webhook notifications
 │   │   └── notifier.go       # Sends approval requests, chore events to Discord
 │   ├── model/model.go        # Data types (User, Chore, Schedule, Trigger, etc.)
+│   ├── ollama/               # Ollama API client (Gemma 4 vision model)
 │   ├── store/store.go        # SQLite data access layer
+│   ├── tts/                  # Kokoro TTS client (text-to-speech via Kokoro-FastAPI)
 │   └── webhook/              # Async webhook dispatcher + background checkers
 │       ├── dispatcher.go     # Event firing, HMAC signing, delivery logging
 │       ├── expiry.go         # Background expiry checker (1-min interval)

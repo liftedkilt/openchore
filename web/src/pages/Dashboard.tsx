@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, type TouchEvent as ReactTouchEvent } from 'react';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../ThemeContext';
-import { api } from '../api';
+import { api, APIError } from '../api';
 import type { ScheduledChore, UserStreakData, PointsData, Reward, RedemptionHistory, Theme } from '../types';
 import styles from './Dashboard.module.css';
 import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX, Undo2, Camera, Copy } from 'lucide-react';
@@ -63,7 +63,11 @@ const QRCodeModal: React.FC<{
       }
       onComplete();
     } catch (err: any) {
-      setUploadError(err.message || 'Upload failed');
+      if (err instanceof APIError && err.status === 422 && err.data?.ai_review) {
+        setUploadError(err.data.ai_review.feedback);
+      } else {
+        setUploadError(err.message || 'Upload failed');
+      }
     } finally {
       setUploading(false);
     }
@@ -171,6 +175,7 @@ export const Dashboard: React.FC = () => {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [qrChore, setQrChore] = useState<ScheduledChore | null>(null);
+  const [aiFeedback, setAiFeedback] = useState<Record<number, { text: string; audioUrl?: string }>>({});
   const [systemBaseUrl, setSystemBaseUrl] = useState<string>('');
   const navigate = useNavigate();
 
@@ -256,13 +261,24 @@ export const Dashboard: React.FC = () => {
           return;
         }
         await api.chores.complete(chore.schedule_id, chore.date);
+        // Clear any previous AI feedback for this chore on success
+        setAiFeedback(prev => {
+          const next = { ...prev };
+          delete next[chore.schedule_id];
+          return next;
+        });
         onChoreFinished();
         return; // onChoreFinished handles reload
       }
       await loadChores();
       await loadExtras();
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      if (err instanceof APIError && err.status === 422 && err.data?.ai_review) {
+        setAiFeedback(prev => ({ ...prev, [chore.schedule_id]: { text: err.data.ai_review.feedback, audioUrl: err.data.ai_review.feedback_audio } }));
+        await loadChores();
+      } else {
+        console.error(err);
+      }
     }
   };
 
@@ -529,7 +545,16 @@ export const Dashboard: React.FC = () => {
             {ttsEnabled && (
               <button
                 className={styles.ttsBtn}
-                onClick={(e) => { e.stopPropagation(); speak(chore.title + (chore.description ? '. ' + chore.description : '')); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const ttsText = chore.tts_description || (chore.title + (chore.description ? '. ' + chore.description : ''));
+                  if (chore.tts_audio_url) {
+                    const audio = new Audio(chore.tts_audio_url);
+                    audio.play().catch(() => speak(ttsText));
+                    return;
+                  }
+                  speak(ttsText);
+                }}
                 aria-label={`Read ${chore.title} aloud`}
               >
                 <Volume2 size={16} />
@@ -594,6 +619,24 @@ export const Dashboard: React.FC = () => {
           )}
         </div>
       </div>
+        {(aiFeedback[chore.schedule_id] || (chore.completion_status === 'ai_rejected' && chore.ai_feedback)) && (() => {
+          const fb = aiFeedback[chore.schedule_id];
+          const feedbackText = fb?.text || chore.ai_feedback;
+          const feedbackAudioUrl = fb?.audioUrl;
+          return (
+            <div className={styles.aiFeedback}>
+              <span className={styles.aiFeedbackIcon}>💬</span>
+              <span>{feedbackText}</span>
+              {feedbackAudioUrl && (
+                <button
+                  className={styles.aiFeedbackAudio}
+                  onClick={() => new Audio(feedbackAudioUrl).play()}
+                  aria-label="Listen to feedback"
+                >🔊</button>
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   };

@@ -11,9 +11,12 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	msqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/liftedkilt/openchore/internal/ai"
 	"github.com/liftedkilt/openchore/internal/api"
 	"github.com/liftedkilt/openchore/internal/config"
+	"github.com/liftedkilt/openchore/internal/ollama"
 	"github.com/liftedkilt/openchore/internal/store"
+	"github.com/liftedkilt/openchore/internal/tts"
 	"github.com/liftedkilt/openchore/internal/webhook"
 	"github.com/liftedkilt/openchore/migrations"
 )
@@ -64,7 +67,69 @@ func main() {
 	decayChecker := webhook.NewDecayChecker(s, dispatcher)
 	go decayChecker.Start(context.Background())
 
-	router := api.NewRouter(s, dispatcher)
+	// Initialize optional AI services (Ollama for vision/text, Kokoro for TTS audio)
+	var reviewer *ai.Reviewer
+	var ttsGen *ai.TTSGenerator
+	ollamaEndpoint := os.Getenv("OLLAMA_ENDPOINT")
+	if ollamaEndpoint == "" {
+		if ep, _ := s.GetSetting(context.Background(), "ai_endpoint"); ep != "" {
+			ollamaEndpoint = ep
+		} else {
+			ollamaEndpoint = "http://litert:8080"
+		}
+	}
+	ollamaClient := ollama.NewClient(ollamaEndpoint)
+	if ollamaClient.Healthy(context.Background()) {
+		aiModel, _ := s.GetSetting(context.Background(), "ai_model")
+		if aiModel == "" {
+			aiModel = "gemma4:e2b"
+		}
+
+		// Auto-pull model if not present (runs in background so server starts immediately)
+		if !ollamaClient.HasModel(context.Background(), aiModel) {
+			log.Printf("Model %s not found — pulling in background (this may take a few minutes on first run)...", aiModel)
+			go func() {
+				if err := ollamaClient.Pull(context.Background(), aiModel); err != nil {
+					log.Printf("WARNING: failed to pull model %s: %v", aiModel, err)
+					log.Printf("AI features will not work until the model is available. Pull manually: ollama pull %s", aiModel)
+				} else {
+					log.Printf("Model %s pulled successfully — AI features are now ready", aiModel)
+				}
+			}()
+		}
+
+		reviewer = ai.NewReviewer(ollamaClient, aiModel)
+
+		// Initialize TTS: Ollama for text descriptions, Kokoro for audio synthesis
+		var ttsClient *tts.Client
+		ttsEndpoint := os.Getenv("TTS_ENDPOINT")
+		if ttsEndpoint == "" {
+			if ep, _ := s.GetSetting(context.Background(), "ai_tts_endpoint"); ep != "" {
+				ttsEndpoint = ep
+			} else {
+				ttsEndpoint = "http://kokoro:8880"
+			}
+		}
+		ttsC := tts.NewClient(ttsEndpoint)
+		if ttsC.Healthy(context.Background()) {
+			ttsClient = ttsC
+			log.Printf("TTS audio service available at %s", ttsEndpoint)
+		} else {
+			log.Printf("TTS audio service not available at %s — browser TTS will be used as fallback", ttsEndpoint)
+		}
+
+		ttsVoice, _ := s.GetSetting(context.Background(), "ai_tts_voice")
+		if ttsVoice == "" {
+			ttsVoice = "af_heart"
+		}
+		ttsGen = ai.NewTTSGenerator(ollamaClient, aiModel, ttsClient, ttsVoice)
+
+		log.Printf("AI services initialized (ollama=%s, model=%s)", ollamaEndpoint, aiModel)
+	} else {
+		log.Printf("Ollama not available at %s — AI features disabled", ollamaEndpoint)
+	}
+
+	router := api.NewRouter(s, dispatcher, reviewer, ttsGen)
 
 	log.Printf("starting server on :%s", port)
 	if err := http.ListenAndServe(":"+port, router); err != nil {

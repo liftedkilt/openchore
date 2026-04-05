@@ -1,0 +1,21 @@
+FROM python:3.12-slim
+
+RUN pip install --no-cache-dir litert-lm-api huggingface_hub
+
+WORKDIR /app
+COPY server.py .
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
+ENV MODEL_PATH=/app/model/gemma-4-E2B-it.litertlm
+ENV MODEL_REPO=litert-community/gemma-4-E2B-it-litert-lm
+ENV MODEL_FILE=gemma-4-E2B-it.litertlm
+ENV PORT=8080
+
+VOLUME /app/model
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=120s \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"
+
+ENTRYPOINT ["./entrypoint.sh"]

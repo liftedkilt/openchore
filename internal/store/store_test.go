@@ -1827,3 +1827,291 @@ func TestScheduleExistsForDate(t *testing.T) {
 		t.Error("expected no schedule for date 2026-04-21")
 	}
 }
+
+// ===== AI Verification Fields =====
+
+func TestCompleteChoreWithAIFields(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Clean Room", 10, u.ID)
+	cs := createTestSchedule(t, s, c.ID, u.ID, 1) // Monday
+
+	cc := &model.ChoreCompletion{
+		ChoreScheduleID: cs.ID,
+		CompletedBy:     u.ID,
+		Status:          "approved",
+		PhotoURL:        "/uploads/test.jpg",
+		CompletionDate:  "2026-03-30",
+		AIFeedback:      "Great job! The room looks very clean.",
+		AIConfidence:    0.92,
+	}
+	err := s.CompleteChore(ctx, cc)
+	if err != nil {
+		t.Fatalf("CompleteChore with AI fields: %v", err)
+	}
+	if cc.ID == 0 {
+		t.Fatal("expected non-zero completion ID")
+	}
+
+	// Verify via GetCompletion
+	got, err := s.GetCompletion(ctx, cc.ID)
+	if err != nil {
+		t.Fatalf("GetCompletion: %v", err)
+	}
+	if got.AIFeedback != "Great job! The room looks very clean." {
+		t.Errorf("expected AI feedback preserved, got %q", got.AIFeedback)
+	}
+	if got.AIConfidence != 0.92 {
+		t.Errorf("expected AI confidence 0.92, got %f", got.AIConfidence)
+	}
+
+	// Verify via GetCompletionForScheduleDate
+	got2, err := s.GetCompletionForScheduleDate(ctx, cs.ID, "2026-03-30")
+	if err != nil {
+		t.Fatalf("GetCompletionForScheduleDate: %v", err)
+	}
+	if got2.AIFeedback != "Great job! The room looks very clean." {
+		t.Errorf("expected AI feedback preserved, got %q", got2.AIFeedback)
+	}
+	if got2.AIConfidence != 0.92 {
+		t.Errorf("expected AI confidence 0.92, got %f", got2.AIConfidence)
+	}
+}
+
+func TestCompleteChoreAIRejected(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Make Bed", 5, u.ID)
+	cs := createTestSchedule(t, s, c.ID, u.ID, 2) // Tuesday
+
+	cc := &model.ChoreCompletion{
+		ChoreScheduleID: cs.ID,
+		CompletedBy:     u.ID,
+		Status:          "ai_rejected",
+		PhotoURL:        "/uploads/bed.jpg",
+		CompletionDate:  "2026-03-31",
+		AIFeedback:      "Almost! The pillows need to be straightened.",
+		AIConfidence:    0.35,
+	}
+	err := s.CompleteChore(ctx, cc)
+	if err != nil {
+		t.Fatalf("CompleteChore ai_rejected: %v", err)
+	}
+
+	got, err := s.GetCompletion(ctx, cc.ID)
+	if err != nil {
+		t.Fatalf("GetCompletion: %v", err)
+	}
+	if got.Status != "ai_rejected" {
+		t.Errorf("expected status ai_rejected, got %q", got.Status)
+	}
+	if got.AIFeedback != "Almost! The pillows need to be straightened." {
+		t.Errorf("unexpected AI feedback: %q", got.AIFeedback)
+	}
+}
+
+func TestGetScheduledChoresIncludesAIFields(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	child := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Sweep Floor", 10, child.ID)
+	// Saturday 2026-04-04 = day_of_week 6
+	cs := createTestSchedule(t, s, c.ID, child.ID, 6)
+
+	// Complete with ai_rejected status
+	cc := &model.ChoreCompletion{
+		ChoreScheduleID: cs.ID,
+		CompletedBy:     child.ID,
+		Status:          "ai_rejected",
+		PhotoURL:        "/uploads/floor.jpg",
+		CompletionDate:  "2026-04-04",
+		AIFeedback:      "There is still dirt in the corner.",
+		AIConfidence:    0.25,
+	}
+	if err := s.CompleteChore(ctx, cc); err != nil {
+		t.Fatalf("CompleteChore: %v", err)
+	}
+
+	now, _ := time.Parse(model.DateFormat, "2026-04-04")
+	chores, err := s.GetScheduledChoresForUser(ctx, child.ID, []string{"2026-04-04"}, now)
+	if err != nil {
+		t.Fatalf("GetScheduledChoresForUser: %v", err)
+	}
+	if len(chores) != 1 {
+		t.Fatalf("expected 1 scheduled chore, got %d", len(chores))
+	}
+
+	sc := chores[0]
+
+	// ai_rejected completions should NOT be considered "completed"
+	if sc.Completed {
+		t.Error("expected Completed=false for ai_rejected completion")
+	}
+
+	// CompletionStatus should be set to ai_rejected
+	if sc.CompletionStatus == nil || *sc.CompletionStatus != "ai_rejected" {
+		t.Errorf("expected CompletionStatus=ai_rejected, got %v", sc.CompletionStatus)
+	}
+
+	// AIFeedback should be populated
+	if sc.AIFeedback == nil || *sc.AIFeedback != "There is still dirt in the corner." {
+		t.Errorf("expected AI feedback to be set, got %v", sc.AIFeedback)
+	}
+
+	// CompletionID should still be set (so the frontend knows there's a record)
+	if sc.CompletionID == nil {
+		t.Error("expected CompletionID to be set even for ai_rejected")
+	}
+}
+
+func TestGetScheduledChoresApprovedIncludesAIFeedback(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	child := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Dishes", 10, child.ID)
+	// Saturday 2026-04-04 = day_of_week 6
+	cs := createTestSchedule(t, s, c.ID, child.ID, 6)
+
+	cc := &model.ChoreCompletion{
+		ChoreScheduleID: cs.ID,
+		CompletedBy:     child.ID,
+		Status:          "approved",
+		PhotoURL:        "/uploads/dishes.jpg",
+		CompletionDate:  "2026-04-04",
+		AIFeedback:      "Looks great, nice and clean!",
+		AIConfidence:    0.95,
+	}
+	if err := s.CompleteChore(ctx, cc); err != nil {
+		t.Fatalf("CompleteChore: %v", err)
+	}
+
+	now, _ := time.Parse(model.DateFormat, "2026-04-04")
+	chores, err := s.GetScheduledChoresForUser(ctx, child.ID, []string{"2026-04-04"}, now)
+	if err != nil {
+		t.Fatalf("GetScheduledChoresForUser: %v", err)
+	}
+	if len(chores) != 1 {
+		t.Fatalf("expected 1 chore, got %d", len(chores))
+	}
+
+	sc := chores[0]
+	// Approved completion should be "completed"
+	if !sc.Completed {
+		t.Error("expected Completed=true for approved completion")
+	}
+	// AI feedback should still be available
+	if sc.AIFeedback == nil || *sc.AIFeedback != "Looks great, nice and clean!" {
+		t.Errorf("expected AI feedback for approved completion, got %v", sc.AIFeedback)
+	}
+}
+
+func TestUpdateChoreTTSDescription(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Parent", "admin")
+	c := createTestChore(t, s, "Feed Cat", 5, u.ID)
+
+	// Initially empty
+	got, _ := s.GetChore(ctx, c.ID)
+	if got.TTSDescription != "" {
+		t.Errorf("expected empty TTS description initially, got %q", got.TTSDescription)
+	}
+
+	// Update TTS description
+	err := s.UpdateChoreTTSDescription(ctx, c.ID, "Time to feed the kitty cat! Give them their food and fresh water.")
+	if err != nil {
+		t.Fatalf("UpdateChoreTTSDescription: %v", err)
+	}
+
+	// Verify it persists
+	got, _ = s.GetChore(ctx, c.ID)
+	if got.TTSDescription != "Time to feed the kitty cat! Give them their food and fresh water." {
+		t.Errorf("TTS description not updated, got %q", got.TTSDescription)
+	}
+
+	// Update again to empty
+	err = s.UpdateChoreTTSDescription(ctx, c.ID, "")
+	if err != nil {
+		t.Fatalf("UpdateChoreTTSDescription to empty: %v", err)
+	}
+	got, _ = s.GetChore(ctx, c.ID)
+	if got.TTSDescription != "" {
+		t.Errorf("expected empty TTS description, got %q", got.TTSDescription)
+	}
+}
+
+func TestTTSDescriptionInScheduledChores(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	child := createTestUser(t, s, "Child", "child")
+
+	// Create chore with TTS description set via the model
+	c := &model.Chore{
+		Title:          "Brush Teeth",
+		Description:    "Brush your teeth for two minutes",
+		Category:       "required",
+		PointsValue:    5,
+		Source:         "manual",
+		TTSDescription: "Time to brush your teeth! Make sure to brush for two whole minutes.",
+		CreatedBy:      child.ID,
+	}
+	if err := s.CreateChore(ctx, c); err != nil {
+		t.Fatalf("CreateChore with TTS: %v", err)
+	}
+
+	// Saturday 2026-04-04 = day_of_week 6
+	cs := createTestSchedule(t, s, c.ID, child.ID, 6)
+	_ = cs
+
+	now, _ := time.Parse(model.DateFormat, "2026-04-04")
+	chores, err := s.GetScheduledChoresForUser(ctx, child.ID, []string{"2026-04-04"}, now)
+	if err != nil {
+		t.Fatalf("GetScheduledChoresForUser: %v", err)
+	}
+	if len(chores) != 1 {
+		t.Fatalf("expected 1 chore, got %d", len(chores))
+	}
+	if chores[0].TTSDescription != "Time to brush your teeth! Make sure to brush for two whole minutes." {
+		t.Errorf("expected TTS description in scheduled chore, got %q", chores[0].TTSDescription)
+	}
+}
+
+func TestCompleteChoreWithEmptyAIFields(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Walk Dog", 10, u.ID)
+	cs := createTestSchedule(t, s, c.ID, u.ID, 1)
+
+	// Complete without AI fields (normal non-AI flow)
+	cc := &model.ChoreCompletion{
+		ChoreScheduleID: cs.ID,
+		CompletedBy:     u.ID,
+		Status:          "approved",
+		CompletionDate:  "2026-03-30",
+	}
+	err := s.CompleteChore(ctx, cc)
+	if err != nil {
+		t.Fatalf("CompleteChore without AI fields: %v", err)
+	}
+
+	got, err := s.GetCompletion(ctx, cc.ID)
+	if err != nil {
+		t.Fatalf("GetCompletion: %v", err)
+	}
+	if got.AIFeedback != "" {
+		t.Errorf("expected empty AI feedback, got %q", got.AIFeedback)
+	}
+	if got.AIConfidence != 0 {
+		t.Errorf("expected zero AI confidence, got %f", got.AIConfidence)
+	}
+}

@@ -181,6 +181,40 @@ func Apply(ctx context.Context, s *store.Store, cfg *Config) error {
 		log.Printf("config: created streak reward %q", sr.Label)
 	}
 
+	// 6. Apply AI settings (if provided)
+	if cfg.AI != nil {
+		aiSettings := map[string]string{
+			"ai_enabled": "false",
+		}
+		if cfg.AI.Enabled {
+			aiSettings["ai_enabled"] = "true"
+		}
+		if cfg.AI.Endpoint != "" {
+			aiSettings["ai_endpoint"] = cfg.AI.Endpoint
+		}
+		if cfg.AI.Model != "" {
+			aiSettings["ai_model"] = cfg.AI.Model
+		}
+		if cfg.AI.AutoApproveThreshold > 0 {
+			aiSettings["ai_auto_approve_threshold"] = fmt.Sprintf("%.2f", cfg.AI.AutoApproveThreshold)
+		}
+		if cfg.AI.TTSEnabled {
+			aiSettings["ai_tts_enabled"] = "true"
+		}
+		if cfg.AI.TTSEndpoint != "" {
+			aiSettings["ai_tts_endpoint"] = cfg.AI.TTSEndpoint
+		}
+		if cfg.AI.TTSVoice != "" {
+			aiSettings["ai_tts_voice"] = cfg.AI.TTSVoice
+		}
+		for k, v := range aiSettings {
+			if err := s.SetSetting(ctx, k, v); err != nil {
+				return fmt.Errorf("setting AI config %q: %w", k, err)
+			}
+		}
+		log.Println("config: AI settings applied")
+	}
+
 	log.Println("config: configuration applied successfully")
 	return nil
 }

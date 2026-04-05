@@ -213,6 +213,8 @@ export interface Chore {
   requires_approval: boolean;
   requires_photo: boolean;
   photo_source?: 'child' | 'external' | 'both';
+  tts_description?: string;
+  tts_audio_url?: string;
 }
 
 export interface ChoreSchedule {
@@ -329,6 +331,10 @@ export interface ScheduledChore {
   completed_at?: string;
   photo_url?: string;
   date: string;
+  completion_status?: 'approved' | 'pending' | 'rejected' | 'ai_rejected';
+  ai_feedback?: string;
+  tts_description?: string;
+  tts_audio_url?: string;
 }
 
 export interface UserDecayConfig {
@@ -386,4 +392,14 @@ export interface WebhookDelivery {
   response_body?: string;
   error?: string;
   created_at: string;
+}
+
+export interface AIReviewError {
+  error: string;
+  ai_review: {
+    complete: boolean;
+    confidence: number;
+    feedback: string;
+    feedback_audio?: string;
+  };
 }

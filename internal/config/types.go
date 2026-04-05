@@ -7,6 +7,18 @@ type Config struct {
 	Rewards      []RewardConfig       `yaml:"rewards,omitempty"`
 	StreakRewards []StreakRewardConfig `yaml:"streak_rewards,omitempty"`
 	Settings     map[string]string    `yaml:"settings,omitempty"`
+	AI           *AIConfig            `yaml:"ai,omitempty"`
+}
+
+// AIConfig holds settings for Ollama-powered AI features.
+type AIConfig struct {
+	Enabled              bool    `yaml:"enabled"`
+	Endpoint             string  `yaml:"endpoint"`
+	Model                string  `yaml:"model"`
+	AutoApproveThreshold float64 `yaml:"auto_approve_threshold"`
+	TTSEnabled           bool    `yaml:"tts_enabled"`
+	TTSEndpoint          string  `yaml:"tts_endpoint"`
+	TTSVoice             string  `yaml:"tts_voice"`
 }
 
 type UserConfig struct {

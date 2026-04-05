@@ -6,12 +6,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/liftedkilt/openchore/internal/ai"
 	"github.com/liftedkilt/openchore/internal/discord"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/webhook"
 )
 
-func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
+func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, reviewer *ai.Reviewer, ttsGen *ai.TTSGenerator) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -20,6 +21,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 
 	users := NewUserHandler(s)
 	chores := NewChoreHandler(s, dispatcher, discordNotifier)
+	chores.SetAIServices(reviewer, ttsGen)
 	admin := NewAdminHandler(s)
 	points := NewPointsHandler(s)
 	rewards := NewRewardHandler(s, dispatcher)
@@ -33,6 +35,10 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) *chi.Mux {
 	// Serve uploaded photos
 	_ = os.MkdirAll("data/uploads", 0750)
 	r.Handle("/uploads/*", http.StripPrefix("/uploads/", http.FileServer(http.Dir("data/uploads"))))
+
+	// Serve TTS audio files
+	_ = os.MkdirAll("data/tts", 0750)
+	r.Handle("/tts/*", http.StripPrefix("/tts/", http.FileServer(http.Dir("data/tts"))))
 
 	r.Route("/api", func(r chi.Router) {
 		// Public: list users (for profile selection screen)

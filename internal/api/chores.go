@@ -1,9 +1,12 @@
 package api
 
 import (
+	"log"
 	"net/http"
+	"strconv"
 	"time"
 
+	"github.com/liftedkilt/openchore/internal/ai"
 	"github.com/liftedkilt/openchore/internal/discord"
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/store"
@@ -14,10 +17,18 @@ type ChoreHandler struct {
 	store      *store.Store
 	dispatcher *webhook.Dispatcher
 	discord    *discord.Notifier
+	reviewer   *ai.Reviewer
+	ttsGen     *ai.TTSGenerator
 }
 
 func NewChoreHandler(s *store.Store, d *webhook.Dispatcher, dn *discord.Notifier) *ChoreHandler {
 	return &ChoreHandler{store: s, dispatcher: d, discord: dn}
+}
+
+// SetAIServices sets the optional AI reviewer and TTS generator.
+func (h *ChoreHandler) SetAIServices(reviewer *ai.Reviewer, ttsGen *ai.TTSGenerator) {
+	h.reviewer = reviewer
+	h.ttsGen = ttsGen
 }
 
 func (h *ChoreHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +120,27 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to create chore")
 		return
 	}
+
+	// Generate TTS description + audio in background if AI TTS is enabled
+	if h.ttsGen != nil {
+		ttsEnabled, _ := h.store.GetSetting(r.Context(), "ai_tts_enabled")
+		if ttsEnabled == "true" {
+			go func() {
+				desc, audioURL, err := h.ttsGen.GenerateAndSynthesize(r.Context(), chore.Title, chore.Description, chore.ID)
+				if err != nil {
+					log.Printf("ai: TTS generation failed for chore %d: %v", chore.ID, err)
+					return
+				}
+				if desc != "" {
+					_ = h.store.UpdateChoreTTSDescription(r.Context(), chore.ID, desc)
+				}
+				if audioURL != "" {
+					_ = h.store.UpdateChoreTTSAudioURL(r.Context(), chore.ID, audioURL)
+				}
+			}()
+		}
+	}
+
 	writeJSON(w, http.StatusCreated, chore)
 }
 
@@ -379,8 +411,13 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if existing != nil {
-		writeError(w, http.StatusConflict, "chore already completed for this date")
-		return
+		if existing.Status == "ai_rejected" {
+			// Allow retry — delete the rejected attempt
+			_ = h.store.UncompleteChore(r.Context(), scheduleID, req.CompletionDate)
+		} else {
+			writeError(w, http.StatusConflict, "chore already completed for this date")
+			return
+		}
 	}
 
 	// Fetch chore details to check category and requirements
@@ -400,6 +437,80 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// AI photo review (if enabled and photo provided)
+	var aiFeedback string
+	var aiConfidence float64
+	if req.PhotoURL != "" && h.reviewer != nil {
+		aiEnabled, _ := h.store.GetSetting(r.Context(), "ai_enabled")
+		if aiEnabled == "true" {
+			photoPath := req.PhotoURL
+			// Convert relative URL to file path
+			if len(photoPath) > 0 && photoPath[0] == '/' {
+				photoPath = "data" + photoPath // /uploads/x.jpg -> data/uploads/x.jpg
+			}
+
+			thresholdStr, _ := h.store.GetSetting(r.Context(), "ai_auto_approve_threshold")
+			threshold := 0.85
+			if t, err := strconv.ParseFloat(thresholdStr, 64); err == nil && t > 0 {
+				threshold = t
+			}
+
+			choreDesc := ""
+			if chore != nil {
+				choreDesc = chore.Description
+			}
+			result, err := h.reviewer.ReviewPhoto(r.Context(), chore.Title, choreDesc, photoPath)
+			if err != nil {
+				log.Printf("ai: review failed (proceeding without): %v", err)
+				// Fall through to normal flow if AI is unavailable
+			} else {
+				aiFeedback = result.Feedback
+				aiConfidence = result.Confidence
+
+				if !result.Complete || result.Confidence < threshold {
+					// AI says not complete — save as ai_rejected with feedback
+					user := UserFromContext(r.Context())
+					completedBy := user.ID
+					if req.CompletedBy != 0 {
+						completedBy = req.CompletedBy
+					}
+					rejection := &model.ChoreCompletion{
+						ChoreScheduleID: scheduleID,
+						CompletedBy:     completedBy,
+						Status:          "ai_rejected",
+						PhotoURL:        req.PhotoURL,
+						CompletionDate:  req.CompletionDate,
+						AIFeedback:      result.Feedback,
+						AIConfidence:    result.Confidence,
+					}
+					_ = h.store.CompleteChore(r.Context(), rejection)
+
+					// Synthesize feedback audio in background if TTS available
+					var feedbackAudioURL string
+					if h.ttsGen != nil {
+						ttsEnabled, _ := h.store.GetSetting(r.Context(), "ai_tts_enabled")
+						if ttsEnabled == "true" {
+							if url, err := h.ttsGen.SynthesizeFeedback(r.Context(), result.Feedback, rejection.ID); err == nil {
+								feedbackAudioURL = url
+							}
+						}
+					}
+
+					writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+						"error": result.Feedback,
+						"ai_review": map[string]any{
+							"complete":        result.Complete,
+							"confidence":      result.Confidence,
+							"feedback":        result.Feedback,
+							"feedback_audio":  feedbackAudioURL,
+						},
+					})
+					return
+				}
+			}
+		}
+	}
+
 	status := "approved"
 	if chore != nil && chore.RequiresApproval {
 		status = "pending"
@@ -417,6 +528,8 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		Status:          status,
 		PhotoURL:        req.PhotoURL,
 		CompletionDate:  req.CompletionDate,
+		AIFeedback:      aiFeedback,
+		AIConfidence:    aiConfidence,
 	}
 	if err := h.store.CompleteChore(r.Context(), completion); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to complete chore")

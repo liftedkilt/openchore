@@ -9,6 +9,8 @@ services:
     environment:
       - TZ=America/Los_Angeles
       - CONFIG_PATH=/app/config/config.yaml
+      - OLLAMA_ENDPOINT=${OLLAMA_ENDPOINT:-http://litert:8080}
+      - TTS_ENDPOINT=${TTS_ENDPOINT:-http://kokoro:8880}
     volumes:
       - openchore-data:/data
       - ./config:/app/config:ro
@@ -34,5 +36,65 @@ services:
       api:
         condition: service_healthy
 
+  # Optional: AI photo review via LiteRT (recommended) or Ollama.
+  # Enable with: docker compose --profile ai up
+  #
+  # LiteRT is 15x faster and uses 3x less RAM than Ollama for Gemma 4.
+  # Ollama is provided as an alternative for users who prefer it.
+
+  # Default: LiteRT-LM — Gemma 4 E2B vision + text (~2.3GB RAM, ~5s per review)
+  litert:
+    build:
+      context: ./litert
+      dockerfile: Containerfile
+    container_name: openchore-litert
+    restart: unless-stopped
+    profiles:
+      - ai
+    volumes:
+      - litert-model:/app/model
+    expose:
+      - "8080"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  # Alternative: Ollama — heavier but supports model hot-swapping (~7.3GB RAM, ~75s per review)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: openchore-ollama
+    restart: unless-stopped
+    profiles:
+      - ollama
+    volumes:
+      - ollama-models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    expose:
+      - "11434"
+
+  # Optional: Text-to-speech via Kokoro (~2GB RAM)
+  # Kokoro-82M: high-quality TTS (4.5 MOS), OpenAI-compatible API, CPU-friendly
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.2.4
+    container_name: openchore-kokoro
+    restart: unless-stopped
+    profiles:
+      - ai
+    volumes:
+      - kokoro-data:/app/api/src/voices/v1_0
+    environment:
+      - KOKORO_DEFAULT_VOICE=${KOKORO_VOICE:-af_heart}
+    expose:
+      - "8880"
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+
 volumes:
   openchore-data:
+  litert-model:
+  ollama-models:
+  kokoro-data:

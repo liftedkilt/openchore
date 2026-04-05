@@ -85,7 +85,7 @@
 - [x] Ambient dashboard mode for wall-mounted iPad (family overview when idle)
 - [x] Time estimates on chores (estimated_minutes)
 - [x] Tooltips on admin UI form fields
-- [x] Text-to-speech for younger kids (toggle in header, auto-enabled for age 7 and under)
+- [x] Text-to-speech for younger kids (toggle in header, auto-enabled for age 7 and under; AI-generated via Kokoro TTS when enabled)
 - [x] Morning/afternoon/evening chore grouping (using available_at)
 - [x] Quick Assign FAB — floating button for instant one-off chore assignment from admin dashboard
 - [x] PWA manifest — fullscreen home screen app on iOS/Android (no Safari chrome)
@@ -93,3 +93,12 @@
 - [x] Avatar picker with 12 DiceBear styles and pastel backgrounds
 - [x] Design system overhaul — typography, dark theme, CSS variables
 - [ ] Chore templates (age-appropriate packs parents can import)
+
+## Phase 8: AI (Partially Complete)
+- [x] Ollama integration — local LLM inference via Docker sidecar
+- [x] AI photo review — Gemma 4 vision model verifies photo proof matches chore description
+- [x] Kokoro TTS integration — AI-generated text-to-speech via Kokoro-FastAPI container
+- [x] Admin settings UI for AI photo review configuration
+- [ ] Reference photo comparison — compare submissions against known-good reference photos
+- [ ] Auto-evolving reference photos — approved photos become new references over time
+- [ ] Voice cloning — personalized TTS per kid
