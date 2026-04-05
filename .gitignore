@@ -26,6 +26,11 @@ config/config.yaml
 # OS
 .DS_Store
 
+# Runtime data (uploads, TTS audio, profiling)
+data/
+default.profraw
+internal/*/data/
+
 # Temp
 /tmp/
 
