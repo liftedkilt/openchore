@@ -88,17 +88,23 @@ func (t *TTSGenerator) Synthesize(ctx context.Context, text, voice string) ([]by
 // GenerateDescription creates a natural, kid-friendly spoken description for a chore.
 // This text is designed to be read aloud by browser text-to-speech or a TTS service.
 func (t *TTSGenerator) GenerateDescription(ctx context.Context, choreTitle, choreDescription string) (string, error) {
-	prompt := fmt.Sprintf(`Create a short, friendly spoken description of this chore for a child. The description should sound natural when read aloud by a text-to-speech system.
+	prompt := fmt.Sprintf(`Rewrite this chore name as a short phrase that sounds natural when read aloud by a text-to-speech system.
 
 Chore title: %s
 Chore description: %s
 
 Rules:
-- Keep it to 1-2 sentences
-- Use simple words a 6-year-old would understand
-- Be encouraging and positive
+- If the description is empty, just rephrase the title as a short spoken phrase
+- If the description has details, include them briefly (1-2 sentences max)
+- Just describe the task plainly — no praise, no encouragement, no filler
 - Don't use emoji or special characters
-- Respond with ONLY the description text, nothing else`, choreTitle, choreDescription)
+- Respond with ONLY the phrase, nothing else
+
+Examples:
+- "Make Bed" (no description) → "Make your bed"
+- "Feed Cats (Morning)" (no description) → "Feed the cats"
+- "Clean Room" + "Pick up toys and put dirty clothes in the hamper" → "Clean your room. Pick up toys and put dirty clothes in the hamper"
+- "Empty Dishwasher" (no description) → "Empty the dishwasher"`, choreTitle, choreDescription)
 
 	resp, err := t.llmClient.Generate(ctx, &aibackend.GenerateRequest{
 		Model:  t.llmModel,
