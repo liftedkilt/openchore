@@ -29,7 +29,7 @@ const QuickAssign: React.FC<Props> = ({ isOpen, onClose }) => {
     if (!isOpen) return;
     Promise.all([api.chores.list(), api.users.list()]).then(([c, u]) => {
       setChores(c);
-      setUsers(u.filter(user => user.role === 'child'));
+      setUsers(u);
     });
     setSelectedChoreId('');
     setNewTitle('');

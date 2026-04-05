@@ -148,8 +148,6 @@ const ChoresTab: React.FC = () => {
     setEditingChore(chore);
   };
 
-  const childUsers = users.filter(u => u.role === 'child');
-
   return (
     <div>
       <div className={styles.sectionHeader}>
@@ -165,7 +163,7 @@ const ChoresTab: React.FC = () => {
           isOpen={!!editingChore}
           onClose={() => { setEditingChore(null); load(); }}
           onSaved={load}
-          users={childUsers}
+          users={users}
           renderSchedules={(choreId, users) => <ScheduleManager choreId={choreId} users={users} />}
           renderTriggers={(choreId, users) => <TriggerManager choreId={choreId} users={users} />}
         />
@@ -179,7 +177,7 @@ const ChoresTab: React.FC = () => {
           load();
           setExpandedChore(choreId);
         }}
-        users={childUsers}
+        users={users}
       />
 
       <div className={styles.list}>
