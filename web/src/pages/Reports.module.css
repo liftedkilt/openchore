@@ -129,11 +129,17 @@
 
 .kidCard {
   display: flex;
-  align-items: center;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.5rem;
   padding: 1rem;
   background: rgba(0, 0, 0, 0.15);
   border-radius: 14px;
+}
+
+.kidCardMain {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .kidAvatar {
@@ -306,6 +312,59 @@
 
 .emptyIcon {
   opacity: 0.2;
+}
+
+/* --- AI Summary --- */
+.aiSummaryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 8px;
+  background: rgba(168, 85, 247, 0.08);
+  color: var(--accent-purple, #a855f7);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background 0.15s;
+}
+
+.aiSummaryBtn:hover {
+  background: rgba(168, 85, 247, 0.15);
+}
+
+.aiSummaryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.aiSummaryCard {
+  padding: 0.6rem 0.75rem;
+  background: rgba(168, 85, 247, 0.06);
+  border: 1px solid rgba(168, 85, 247, 0.12);
+  border-radius: 8px;
+}
+
+.aiSummaryText {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-primary, #e2e8f0);
+}
+
+.spinnerSmall {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(168, 85, 247, 0.2);
+  border-top-color: var(--accent-purple, #a855f7);
+  border-radius: 50%;
+  animation: spinSmall 0.6s linear infinite;
+}
+
+@keyframes spinSmall {
+  to { transform: rotate(360deg); }
 }
 
 /* --- Loading --- */

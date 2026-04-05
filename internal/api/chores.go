@@ -20,6 +20,8 @@ type ChoreHandler struct {
 	discord    *discord.Notifier
 	reviewer   *ai.Reviewer
 	ttsGen     *ai.TTSGenerator
+	descGen    *ai.DescriptionGenerator
+	summarizer *ai.Summarizer
 }
 
 func NewChoreHandler(s *store.Store, d *webhook.Dispatcher, dn *discord.Notifier) *ChoreHandler {
@@ -30,6 +32,12 @@ func NewChoreHandler(s *store.Store, d *webhook.Dispatcher, dn *discord.Notifier
 func (h *ChoreHandler) SetAIServices(reviewer *ai.Reviewer, ttsGen *ai.TTSGenerator) {
 	h.reviewer = reviewer
 	h.ttsGen = ttsGen
+}
+
+// SetAIExtras sets the optional AI description generator and summarizer.
+func (h *ChoreHandler) SetAIExtras(descGen *ai.DescriptionGenerator, summarizer *ai.Summarizer) {
+	h.descGen = descGen
+	h.summarizer = summarizer
 }
 
 func (h *ChoreHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -406,6 +414,15 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// FCFS race condition check: if a sibling already completed this FCFS group, reject
+	if schedule.AssignmentType == model.AssignmentFCFS && schedule.FcfsGroupID != nil {
+		done, err := h.store.FcfsGroupCompletedForDate(r.Context(), *schedule.FcfsGroupID, req.CompletionDate)
+		if err == nil && done {
+			writeError(w, http.StatusConflict, "a sibling already completed this chore")
+			return
+		}
+	}
+
 	// Check if already completed
 	existing, err := h.store.GetCompletionForScheduleDate(r.Context(), scheduleID, req.CompletionDate)
 	if err != nil {
@@ -577,6 +594,34 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// FCFS: complete sibling schedules with shadow completions
+	if schedule.AssignmentType == model.AssignmentFCFS && schedule.FcfsGroupID != nil && status == model.StatusApproved {
+		if err := h.store.CompleteFCFSSiblings(r.Context(), *schedule.FcfsGroupID, completedBy, scheduleID, req.CompletionDate); err != nil {
+			log.Printf("error completing FCFS siblings: %v", err)
+		}
+
+		// Fire FCFS-specific webhook
+		completedByUser, _ := h.store.GetUser(r.Context(), completedBy)
+		fcfsName := ""
+		if completedByUser != nil {
+			fcfsName = completedByUser.Name
+		}
+		fcfsTitle := ""
+		if chore != nil {
+			fcfsTitle = chore.Title
+		}
+		h.dispatcher.Fire(webhook.EventChoreFCFSCompleted, map[string]any{
+			"completion_id":   completion.ID,
+			"schedule_id":     scheduleID,
+			"fcfs_group_id":   *schedule.FcfsGroupID,
+			"chore_title":     fcfsTitle,
+			"user_id":         completedBy,
+			"user_name":       fcfsName,
+			"completion_date": req.CompletionDate,
+			"points_earned":   pts,
+		})
+	}
+
 	// Fire webhook
 	choreTitle := ""
 	if chore != nil {
@@ -654,6 +699,9 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 		dateStr = time.Now().Format(model.DateFormat)
 	}
 
+	// Get the schedule to check for FCFS
+	schedule, _ := h.store.GetSchedule(r.Context(), scheduleID)
+
 	// Get completion before deleting so we can reverse points
 	existing, _ := h.store.GetCompletionForScheduleDate(r.Context(), scheduleID, dateStr)
 	var completedBy int64
@@ -668,9 +716,17 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := h.store.UncompleteChore(r.Context(), scheduleID, dateStr); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to uncomplete chore")
-		return
+	// FCFS: uncomplete all siblings in the group
+	if schedule != nil && schedule.AssignmentType == model.AssignmentFCFS && schedule.FcfsGroupID != nil {
+		if err := h.store.UncompleteByFCFSGroup(r.Context(), *schedule.FcfsGroupID, dateStr); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to uncomplete FCFS group")
+			return
+		}
+	} else {
+		if err := h.store.UncompleteChore(r.Context(), scheduleID, dateStr); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to uncomplete chore")
+			return
+		}
 	}
 
 	// Recalculate streak
@@ -681,7 +737,6 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fire webhook
-	schedule, _ := h.store.GetSchedule(r.Context(), scheduleID)
 	choreTitle := ""
 	if schedule != nil {
 		chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
@@ -951,6 +1006,69 @@ func (h *ChoreHandler) SynthesizeTTS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"audio_url": url})
+}
+
+// GenerateDescription lets admins generate a chore description using AI.
+func (h *ChoreHandler) GenerateDescription(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Title    string `json:"title"`
+		Category string `json:"category"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Title == "" {
+		writeError(w, http.StatusBadRequest, "title is required")
+		return
+	}
+
+	if h.descGen == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI services not available")
+		return
+	}
+
+	desc, err := h.descGen.GenerateDescription(r.Context(), req.Title, req.Category)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "AI generation failed: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"description": desc})
+}
+
+// SuggestPoints lets admins get AI-recommended point values for a chore.
+func (h *ChoreHandler) SuggestPoints(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Category    string `json:"category"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Title == "" {
+		writeError(w, http.StatusBadRequest, "title is required")
+		return
+	}
+
+	if h.descGen == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI services not available")
+		return
+	}
+
+	points, minutes, reasoning, err := h.descGen.SuggestPoints(r.Context(), req.Title, req.Description, req.Category)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "AI suggestion failed: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"points":            points,
+		"estimated_minutes": minutes,
+		"reasoning":         reasoning,
+	})
 }
 
 // shouldAwardBonusPoints returns true if all required and core chores for the

@@ -255,6 +255,18 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ text }),
       }),
+    generateDescription: (title: string, category: string) =>
+      fetchWithAuth<{ description: string }>('/admin/ai/generate-description', {
+        method: 'POST',
+        body: JSON.stringify({ title, category }),
+      }),
+    suggestPoints: (title: string, description: string, category: string) =>
+      fetchWithAuth<{ points: number; estimated_minutes: number; reasoning: string }>('/admin/ai/suggest-points', {
+        method: 'POST',
+        body: JSON.stringify({ title, description, category }),
+      }),
+    getAISummary: (userId: number, period: string, date: string) =>
+      fetchWithAuth<{ summary: string }>(`/admin/reports/ai-summary?user_id=${userId}&period=${period}&date=${date}`),
     getAISettings: () => Promise.all([
       fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_enabled').catch(() => ({ key: 'ai_enabled', value: 'false' })),
       fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_auto_approve_threshold').catch(() => ({ key: 'ai_auto_approve_threshold', value: '0.85' })),

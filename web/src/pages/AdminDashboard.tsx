@@ -610,6 +610,7 @@ const TriggerManager: React.FC<{
   const [defaultDueBy, setDefaultDueBy] = useState('');
   const [defaultAvailableAt, setDefaultAvailableAt] = useState('');
   const [cooldownMinutes, setCooldownMinutes] = useState('0');
+  const [assignmentType, setAssignmentType] = useState('individual');
   const [copied, setCopied] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -625,6 +626,7 @@ const TriggerManager: React.FC<{
       default_due_by: defaultDueBy || undefined,
       default_available_at: defaultAvailableAt || undefined,
       cooldown_minutes: parseInt(cooldownMinutes) || 0,
+      assignment_type: assignmentType,
     });
     setAdding(false);
     resetForm();
@@ -637,6 +639,7 @@ const TriggerManager: React.FC<{
       default_due_by: defaultDueBy || undefined,
       default_available_at: defaultAvailableAt || undefined,
       cooldown_minutes: parseInt(cooldownMinutes) || 0,
+      assignment_type: assignmentType,
     });
     setEditingId(null);
     resetForm();
@@ -649,6 +652,7 @@ const TriggerManager: React.FC<{
       default_due_by: trigger.default_due_by,
       default_available_at: trigger.default_available_at,
       cooldown_minutes: trigger.cooldown_minutes,
+      assignment_type: trigger.assignment_type,
       enabled: !trigger.enabled,
     });
     load();
@@ -665,6 +669,7 @@ const TriggerManager: React.FC<{
     setDefaultDueBy(trigger.default_due_by ?? '');
     setDefaultAvailableAt(trigger.default_available_at ?? '');
     setCooldownMinutes(String(trigger.cooldown_minutes));
+    setAssignmentType(trigger.assignment_type || 'individual');
   };
 
   const resetForm = () => {
@@ -672,6 +677,7 @@ const TriggerManager: React.FC<{
     setDefaultDueBy('');
     setDefaultAvailableAt('');
     setCooldownMinutes('0');
+    setAssignmentType('individual');
   };
 
   const copyUrl = (uuid: string, id: number) => {
@@ -686,12 +692,24 @@ const TriggerManager: React.FC<{
   const triggerForm = (
     <div className={styles.scheduleForm}>
       <div className={styles.formGroup}>
-        <label className={styles.label}>Default assigned to</label>
-        <select className={styles.input} value={defaultAssignedTo} onChange={e => setDefaultAssignedTo(e.target.value ? Number(e.target.value) : '')}>
-          <option value="">-- None (require param) --</option>
-          {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+        <label className={styles.label}>Assignment type</label>
+        <select className={styles.input} value={assignmentType} onChange={e => setAssignmentType(e.target.value)}>
+          <option value="individual">Individual</option>
+          <option value="fcfs">First-Come-First-Serve</option>
         </select>
+        <span className={styles.helpText}>
+          {assignmentType === 'fcfs' ? 'Assigned to all kids — first to complete wins' : 'Assigned to one person'}
+        </span>
       </div>
+      {assignmentType !== 'fcfs' && (
+        <div className={styles.formGroup}>
+          <label className={styles.label}>Default assigned to</label>
+          <select className={styles.input} value={defaultAssignedTo} onChange={e => setDefaultAssignedTo(e.target.value ? Number(e.target.value) : '')}>
+            <option value="">-- None (require param) --</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+        </div>
+      )}
       <div className={styles.formRow}>
         <div className={styles.formGroup}>
           <label className={styles.label}>Default available at</label>
@@ -753,6 +771,7 @@ const TriggerManager: React.FC<{
                     /api/hooks/trigger/{trigger.uuid.substring(0, 8)}...
                   </code>
                   <div className={styles.listItemMeta}>
+                    {trigger.assignment_type === 'fcfs' && <span className={styles.fcfsBadge}>FCFS</span>}
                     {trigger.default_assigned_to && <span>Assigned: {getUserName(trigger.default_assigned_to)}</span>}
                     {trigger.default_due_by && <span>Due: {trigger.default_due_by}</span>}
                     {trigger.cooldown_minutes > 0 && <span>Cooldown: {trigger.cooldown_minutes}m</span>}

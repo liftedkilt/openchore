@@ -164,9 +164,9 @@ func (s *Store) UpdateChoreTTSAudioURL(ctx context.Context, choreID int64, url s
 
 func (s *Store) CreateSchedule(ctx context.Context, cs *model.ChoreSchedule) error {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO chore_schedules (chore_id, assigned_to, assignment_type, day_of_week, specific_date, available_at, points_multiplier, start_date, end_date, recurrence_interval, recurrence_start, due_by, expiry_penalty, expiry_penalty_value)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		cs.ChoreID, cs.AssignedTo, cs.AssignmentType, cs.DayOfWeek, cs.SpecificDate, cs.AvailableAt, cs.PointsMultiplier, cs.StartDate, cs.EndDate, cs.RecurrenceInterval, cs.RecurrenceStart, cs.DueBy, cs.ExpiryPenalty, cs.ExpiryPenaltyValue)
+		`INSERT INTO chore_schedules (chore_id, assigned_to, assignment_type, fcfs_group_id, day_of_week, specific_date, available_at, points_multiplier, start_date, end_date, recurrence_interval, recurrence_start, due_by, expiry_penalty, expiry_penalty_value)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		cs.ChoreID, cs.AssignedTo, cs.AssignmentType, cs.FcfsGroupID, cs.DayOfWeek, cs.SpecificDate, cs.AvailableAt, cs.PointsMultiplier, cs.StartDate, cs.EndDate, cs.RecurrenceInterval, cs.RecurrenceStart, cs.DueBy, cs.ExpiryPenalty, cs.ExpiryPenaltyValue)
 	if err != nil {
 		return err
 	}
@@ -190,7 +190,7 @@ func (s *Store) ScheduleExistsForDate(ctx context.Context, choreID, userID int64
 
 func (s *Store) ListSchedulesForChore(ctx context.Context, choreID int64) ([]model.ChoreSchedule, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, chore_id, assigned_to, assignment_type, day_of_week, specific_date, available_at, points_multiplier, start_date, end_date, recurrence_interval, recurrence_start, due_by, expiry_penalty, expiry_penalty_value, created_at
+		`SELECT id, chore_id, assigned_to, assignment_type, fcfs_group_id, day_of_week, specific_date, available_at, points_multiplier, start_date, end_date, recurrence_interval, recurrence_start, due_by, expiry_penalty, expiry_penalty_value, created_at
 		 FROM chore_schedules WHERE chore_id = ? ORDER BY id`, choreID)
 	if err != nil {
 		return nil, err
@@ -199,7 +199,7 @@ func (s *Store) ListSchedulesForChore(ctx context.Context, choreID int64) ([]mod
 	var schedules []model.ChoreSchedule
 	for rows.Next() {
 		var cs model.ChoreSchedule
-		if err := rows.Scan(&cs.ID, &cs.ChoreID, &cs.AssignedTo, &cs.AssignmentType, &cs.DayOfWeek, &cs.SpecificDate, &cs.AvailableAt, &cs.PointsMultiplier, &cs.StartDate, &cs.EndDate, &cs.RecurrenceInterval, &cs.RecurrenceStart, &cs.DueBy, &cs.ExpiryPenalty, &cs.ExpiryPenaltyValue, &cs.CreatedAt); err != nil {
+		if err := rows.Scan(&cs.ID, &cs.ChoreID, &cs.AssignedTo, &cs.AssignmentType, &cs.FcfsGroupID, &cs.DayOfWeek, &cs.SpecificDate, &cs.AvailableAt, &cs.PointsMultiplier, &cs.StartDate, &cs.EndDate, &cs.RecurrenceInterval, &cs.RecurrenceStart, &cs.DueBy, &cs.ExpiryPenalty, &cs.ExpiryPenaltyValue, &cs.CreatedAt); err != nil {
 			return nil, err
 		}
 		schedules = append(schedules, cs)
@@ -219,7 +219,16 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			cs.assignment_type, cs.available_at, cs.due_by, cs.expiry_penalty, cs.expiry_penalty_value,
 			cs.day_of_week, cs.specific_date,
 			cc.id, cc.completed_at, cc.photo_url, cc.status, cc.ai_feedback,
-			c.tts_description, c.tts_audio_url
+			c.tts_description, c.tts_audio_url,
+			(SELECT u2.name FROM chore_completions cc2
+			 JOIN chore_schedules cs2 ON cs2.id = cc2.chore_schedule_id
+			 JOIN users u2 ON u2.id = cc2.completed_by
+			 WHERE cs2.fcfs_group_id = cs.fcfs_group_id
+			   AND cs2.fcfs_group_id IS NOT NULL
+			   AND cs2.id != cs.id
+			   AND cc2.completion_date = ?
+			   AND cc2.status != 'ai_rejected'
+			 LIMIT 1) as completed_by_sibling_name
 		FROM chore_schedules cs
 		JOIN chores c ON c.id = cs.chore_id
 		LEFT JOIN chore_completions cc ON cc.chore_schedule_id = cs.id AND cc.completion_date = ?
@@ -244,7 +253,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			return nil, fmt.Errorf("invalid date %s: %w", dateStr, err)
 		}
 		dow := int(t.Weekday())
-		rows, err := s.db.QueryContext(ctx, query, dateStr, userID, dow, dateStr, dateStr, dateStr, dateStr, dateStr)
+		rows, err := s.db.QueryContext(ctx, query, dateStr, dateStr, userID, dow, dateStr, dateStr, dateStr, dateStr, dateStr)
 		if err != nil {
 			return nil, err
 		}
@@ -257,13 +266,14 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			var photoURL sql.NullString
 			var compStatus sql.NullString
 			var aiFeedback sql.NullString
+			var siblingName sql.NullString
 			var reqApp, reqPho int
 			if err := rows.Scan(&sc.ScheduleID, &sc.ChoreID, &sc.Title, &sc.Description, &sc.Category, &sc.Icon,
 				&sc.PointsValue, &sc.MissedPenaltyValue, &sc.EstimatedMinutes, &reqApp, &reqPho, &sc.PhotoSource, &sc.AssignmentType, &sc.AvailableAt, &sc.DueBy,
 				&sc.ExpiryPenalty, &sc.ExpiryPenaltyValue,
 				&dayOfWeek, &specificDate,
 				&compID, &completedAt, &photoURL, &compStatus, &aiFeedback,
-				&sc.TTSDescription, &sc.TTSAudioURL); err != nil {
+				&sc.TTSDescription, &sc.TTSAudioURL, &siblingName); err != nil {
 				rows.Close()
 				return nil, err
 			}
@@ -291,6 +301,10 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			if aiFeedback.Valid && aiFeedback.String != "" {
 				s := aiFeedback.String
 				sc.AIFeedback = &s
+			}
+			if siblingName.Valid && siblingName.String != "" {
+				sc.CompletedByName = siblingName.String
+				sc.CompletedBySibling = true
 			}
 			if sc.AvailableAt != nil && *sc.AvailableAt != "" {
 				sc.Available = currentTime >= *sc.AvailableAt
@@ -339,9 +353,9 @@ func (s *Store) UncompleteChore(ctx context.Context, scheduleID int64, completio
 func (s *Store) GetSchedule(ctx context.Context, id int64) (*model.ChoreSchedule, error) {
 	cs := &model.ChoreSchedule{}
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, chore_id, assigned_to, assignment_type, day_of_week, specific_date, available_at, points_multiplier, start_date, end_date, recurrence_interval, recurrence_start, due_by, expiry_penalty, expiry_penalty_value, created_at
+		`SELECT id, chore_id, assigned_to, assignment_type, fcfs_group_id, day_of_week, specific_date, available_at, points_multiplier, start_date, end_date, recurrence_interval, recurrence_start, due_by, expiry_penalty, expiry_penalty_value, created_at
 		 FROM chore_schedules WHERE id = ?`, id).
-		Scan(&cs.ID, &cs.ChoreID, &cs.AssignedTo, &cs.AssignmentType, &cs.DayOfWeek, &cs.SpecificDate, &cs.AvailableAt, &cs.PointsMultiplier, &cs.StartDate, &cs.EndDate, &cs.RecurrenceInterval, &cs.RecurrenceStart, &cs.DueBy, &cs.ExpiryPenalty, &cs.ExpiryPenaltyValue, &cs.CreatedAt)
+		Scan(&cs.ID, &cs.ChoreID, &cs.AssignedTo, &cs.AssignmentType, &cs.FcfsGroupID, &cs.DayOfWeek, &cs.SpecificDate, &cs.AvailableAt, &cs.PointsMultiplier, &cs.StartDate, &cs.EndDate, &cs.RecurrenceInterval, &cs.RecurrenceStart, &cs.DueBy, &cs.ExpiryPenalty, &cs.ExpiryPenaltyValue, &cs.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -1155,14 +1169,95 @@ func (s *Store) HasMissedChorePenalty(ctx context.Context, scheduleID int64, dat
 	return exists, err
 }
 
+// --- FCFS Helpers ---
+
+// ListNonPausedChildren returns all child users that are not paused.
+func (s *Store) ListNonPausedChildren(ctx context.Context) ([]model.User, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, created_at FROM users WHERE role = 'child' AND paused = 0 ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var users []model.User
+	for rows.Next() {
+		var u model.User
+		var paused int
+		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		u.Paused = paused == 1
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+// FcfsGroupCompletedForDate checks whether any schedule in an FCFS group has been completed for a given date.
+func (s *Store) FcfsGroupCompletedForDate(ctx context.Context, groupID, date string) (bool, error) {
+	var exists bool
+	err := s.db.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM chore_completions cc
+		   JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
+		   WHERE cs.fcfs_group_id = ? AND cc.completion_date = ?
+		   AND cc.status NOT IN ('ai_rejected'))`,
+		groupID, date).Scan(&exists)
+	return exists, err
+}
+
+// CompleteFCFSSiblings creates zero-point shadow completions for all sibling schedules in an FCFS group.
+func (s *Store) CompleteFCFSSiblings(ctx context.Context, groupID string, completedByUserID, excludeScheduleID int64, date string) error {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id FROM chore_schedules WHERE fcfs_group_id = ? AND id != ?`,
+		groupID, excludeScheduleID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var siblingIDs []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		siblingIDs = append(siblingIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, sid := range siblingIDs {
+		_, err := s.db.ExecContext(ctx,
+			`INSERT INTO chore_completions (chore_schedule_id, completed_by, status, completion_date) VALUES (?, ?, 'approved', ?)`,
+			sid, completedByUserID, date)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// UncompleteByFCFSGroup deletes all completions for an FCFS group on a given date.
+func (s *Store) UncompleteByFCFSGroup(ctx context.Context, groupID, date string) error {
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM chore_completions WHERE chore_schedule_id IN (
+		   SELECT id FROM chore_schedules WHERE fcfs_group_id = ?
+		 ) AND completion_date = ?`,
+		groupID, date)
+	return err
+}
+
 // --- Chore Triggers ---
 
 func (s *Store) CreateChoreTrigger(ctx context.Context, t *model.ChoreTrigger) error {
 	enabled := boolToInt(t.Enabled)
+	if t.AssignmentType == "" {
+		t.AssignmentType = model.AssignmentIndividual
+	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO chore_triggers (uuid, chore_id, default_assigned_to, default_due_by, default_available_at, enabled, cooldown_minutes)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		t.UUID, t.ChoreID, t.DefaultAssignedTo, t.DefaultDueBy, t.DefaultAvailableAt, enabled, t.CooldownMinutes)
+		`INSERT INTO chore_triggers (uuid, chore_id, default_assigned_to, default_due_by, default_available_at, enabled, cooldown_minutes, assignment_type)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.UUID, t.ChoreID, t.DefaultAssignedTo, t.DefaultDueBy, t.DefaultAvailableAt, enabled, t.CooldownMinutes, t.AssignmentType)
 	if err != nil {
 		return err
 	}
@@ -1174,9 +1269,9 @@ func (s *Store) GetChoreTriggerByUUID(ctx context.Context, uuid string) (*model.
 	t := &model.ChoreTrigger{}
 	var enabled int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, uuid, chore_id, default_assigned_to, default_due_by, default_available_at, enabled, cooldown_minutes, last_triggered_at, created_at
+		`SELECT id, uuid, chore_id, default_assigned_to, default_due_by, default_available_at, enabled, cooldown_minutes, assignment_type, last_triggered_at, created_at
 		 FROM chore_triggers WHERE uuid = ?`, uuid).
-		Scan(&t.ID, &t.UUID, &t.ChoreID, &t.DefaultAssignedTo, &t.DefaultDueBy, &t.DefaultAvailableAt, &enabled, &t.CooldownMinutes, &t.LastTriggeredAt, &t.CreatedAt)
+		Scan(&t.ID, &t.UUID, &t.ChoreID, &t.DefaultAssignedTo, &t.DefaultDueBy, &t.DefaultAvailableAt, &enabled, &t.CooldownMinutes, &t.AssignmentType, &t.LastTriggeredAt, &t.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -1186,7 +1281,7 @@ func (s *Store) GetChoreTriggerByUUID(ctx context.Context, uuid string) (*model.
 
 func (s *Store) ListChoreTriggersForChore(ctx context.Context, choreID int64) ([]model.ChoreTrigger, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, uuid, chore_id, default_assigned_to, default_due_by, default_available_at, enabled, cooldown_minutes, last_triggered_at, created_at
+		`SELECT id, uuid, chore_id, default_assigned_to, default_due_by, default_available_at, enabled, cooldown_minutes, assignment_type, last_triggered_at, created_at
 		 FROM chore_triggers WHERE chore_id = ? ORDER BY id`, choreID)
 	if err != nil {
 		return nil, err
@@ -1196,7 +1291,7 @@ func (s *Store) ListChoreTriggersForChore(ctx context.Context, choreID int64) ([
 	for rows.Next() {
 		var t model.ChoreTrigger
 		var enabled int
-		if err := rows.Scan(&t.ID, &t.UUID, &t.ChoreID, &t.DefaultAssignedTo, &t.DefaultDueBy, &t.DefaultAvailableAt, &enabled, &t.CooldownMinutes, &t.LastTriggeredAt, &t.CreatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.UUID, &t.ChoreID, &t.DefaultAssignedTo, &t.DefaultDueBy, &t.DefaultAvailableAt, &enabled, &t.CooldownMinutes, &t.AssignmentType, &t.LastTriggeredAt, &t.CreatedAt); err != nil {
 			return nil, err
 		}
 		t.Enabled = enabled == 1
@@ -1207,9 +1302,12 @@ func (s *Store) ListChoreTriggersForChore(ctx context.Context, choreID int64) ([
 
 func (s *Store) UpdateChoreTrigger(ctx context.Context, t *model.ChoreTrigger) error {
 	enabled := boolToInt(t.Enabled)
+	if t.AssignmentType == "" {
+		t.AssignmentType = model.AssignmentIndividual
+	}
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE chore_triggers SET default_assigned_to = ?, default_due_by = ?, default_available_at = ?, enabled = ?, cooldown_minutes = ? WHERE id = ?`,
-		t.DefaultAssignedTo, t.DefaultDueBy, t.DefaultAvailableAt, enabled, t.CooldownMinutes, t.ID)
+		`UPDATE chore_triggers SET default_assigned_to = ?, default_due_by = ?, default_available_at = ?, enabled = ?, cooldown_minutes = ?, assignment_type = ? WHERE id = ?`,
+		t.DefaultAssignedTo, t.DefaultDueBy, t.DefaultAvailableAt, enabled, t.CooldownMinutes, t.AssignmentType, t.ID)
 	return err
 }
 

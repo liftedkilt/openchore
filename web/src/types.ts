@@ -333,6 +333,8 @@ export interface ScheduledChore {
   date: string;
   completion_status?: 'approved' | 'pending' | 'rejected' | 'ai_rejected';
   ai_feedback?: string;
+  completed_by_name?: string;
+  completed_by_sibling?: boolean;
   tts_description?: string;
   tts_audio_url?: string;
 }
@@ -362,6 +364,7 @@ export interface ChoreTrigger {
   default_available_at?: string;
   enabled: boolean;
   cooldown_minutes: number;
+  assignment_type: string;
   last_triggered_at?: string;
   created_at: string;
 }

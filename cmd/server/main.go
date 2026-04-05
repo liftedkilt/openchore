@@ -68,10 +68,10 @@ func main() {
 	decayChecker := webhook.NewDecayChecker(s, dispatcher)
 	go decayChecker.Start(context.Background())
 
-	router, choreHandler := api.NewRouter(s, dispatcher)
+	router, choreHandler, reportsHandler := api.NewRouter(s, dispatcher)
 
 	// Initialize optional AI services in background (waits for sidecars to become ready)
-	go initAIServices(s, choreHandler)
+	go initAIServices(s, choreHandler, reportsHandler)
 
 	log.Printf("starting server on :%s", port)
 	if err := http.ListenAndServe(":"+port, router); err != nil {
@@ -79,7 +79,7 @@ func main() {
 	}
 }
 
-func initAIServices(s *store.Store, choreHandler *api.ChoreHandler) {
+func initAIServices(s *store.Store, choreHandler *api.ChoreHandler, reportsHandler *api.ReportsHandler) {
 	aiEndpoint := os.Getenv("AI_ENDPOINT")
 	if aiEndpoint == "" {
 		aiEndpoint = os.Getenv("OLLAMA_ENDPOINT") // backward compat
@@ -148,7 +148,12 @@ func initAIServices(s *store.Store, choreHandler *api.ChoreHandler) {
 	}
 	ttsGen := ai.NewTTSGenerator(aiClient, aiModel, ttsClient, ttsEndpoint, ttsVoice)
 
+	descGen := ai.NewDescriptionGenerator(aiClient, aiModel)
+	summarizer := ai.NewSummarizer(aiClient, aiModel)
+
 	choreHandler.SetAIServices(reviewer, ttsGen)
+	choreHandler.SetAIExtras(descGen, summarizer)
+	reportsHandler.SetSummarizer(summarizer)
 	log.Printf("AI services initialized (%s at %s, model=%s)", aiClient.ServerType(context.Background()), aiEndpoint, aiModel)
 
 	// Start TTS sync loop — generates audio for all chores, cleans up orphans

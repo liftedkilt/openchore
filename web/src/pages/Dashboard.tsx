@@ -4,7 +4,7 @@ import { useTheme } from '../ThemeContext';
 import { api, APIError } from '../api';
 import type { ScheduledChore, UserStreakData, PointsData, Reward, RedemptionHistory, Theme } from '../types';
 import styles from './Dashboard.module.css';
-import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX, Undo2, Camera, Copy } from 'lucide-react';
+import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX, Undo2, Camera, Copy, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
@@ -535,7 +535,8 @@ export const Dashboard: React.FC = () => {
         <div
           className={clsx(
             styles.choreCard,
-            chore.completed && styles.choreCardCompleted,
+            chore.completed && !chore.completed_by_sibling && styles.choreCardCompleted,
+            chore.completed && chore.completed_by_sibling && styles.choreCardSiblingCompleted,
             isLocked && styles.choreCardLocked,
             isExpired && styles.choreCardExpired,
             isPointsLocked && styles.choreCardPointsLocked,
@@ -591,6 +592,9 @@ export const Dashboard: React.FC = () => {
               </span>
             )}
           </div>
+          {chore.completed_by_sibling && chore.completed_by_name && (
+            <p className={styles.siblingCompletedText}>Completed by {chore.completed_by_name}</p>
+          )}
         </div>
 
         <div className={styles.actionArea}>
@@ -618,10 +622,10 @@ export const Dashboard: React.FC = () => {
               )}
               <button
                 onClick={() => handleToggleComplete(chore)}
-                className={clsx(styles.completeBtn, chore.completed && styles.completeBtnActive)}
+                className={clsx(styles.completeBtn, chore.completed && !chore.completed_by_sibling && styles.completeBtnActive, chore.completed && chore.completed_by_sibling && styles.completeBtnSibling)}
                 aria-label={chore.completed ? "Mark incomplete" : "Mark complete"}
               >
-                {chore.completed ? <CheckCircle size={32} /> : <div className={styles.circle} />}
+                {chore.completed_by_sibling ? <Users size={32} /> : chore.completed ? <CheckCircle size={32} /> : <div className={styles.circle} />}
               </button>
             </>
           )}

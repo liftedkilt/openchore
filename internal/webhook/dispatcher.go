@@ -25,8 +25,9 @@ const (
 	EventRewardRedeemed   = "reward.redeemed"
 	EventDailyComplete    = "daily.complete"
 	EventStreakMilestone   = "streak.milestone"
-	EventPointsDecayed    = "points.decayed"
-	EventChoreMissed      = "chore.missed"
+	EventPointsDecayed       = "points.decayed"
+	EventChoreMissed         = "chore.missed"
+	EventChoreFCFSCompleted  = "chore.fcfs_completed"
 )
 
 type Dispatcher struct {

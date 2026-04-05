@@ -4,7 +4,7 @@ import { api } from '../api';
 import { BarChart } from '../components/charts/BarChart';
 import { LineChart } from '../components/charts/LineChart';
 import styles from './Reports.module.css';
-import { ArrowLeft, ChevronLeft, ChevronRight, Users, TrendingUp, BarChart3, Coins, Calendar, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Users, TrendingUp, BarChart3, Coins, Calendar, AlertTriangle, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 
 type Period = 'week' | 'month' | 'year';
@@ -122,9 +122,24 @@ export const Reports: React.FC = () => {
   const [date, setDate] = useState(todayStr());
   const [data, setData] = useState<ReportsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [aiSummaries, setAiSummaries] = useState<Record<number, string>>({});
+  const [summaryLoading, setSummaryLoading] = useState<Record<number, boolean>>({});
+
+  const handleGenerateSummary = async (userId: number) => {
+    setSummaryLoading(prev => ({ ...prev, [userId]: true }));
+    try {
+      const resp = await api.admin.getAISummary(userId, period, date);
+      setAiSummaries(prev => ({ ...prev, [userId]: resp.summary }));
+    } catch {
+      setAiSummaries(prev => ({ ...prev, [userId]: 'Failed to generate summary. AI services may not be available.' }));
+    } finally {
+      setSummaryLoading(prev => ({ ...prev, [userId]: false }));
+    }
+  };
 
   const fetchReports = useCallback(async () => {
     setLoading(true);
+    setAiSummaries({});
     try {
       const resp = await api.reports.get(period, date);
       setData(resp);
@@ -205,24 +220,43 @@ export const Reports: React.FC = () => {
               <div className={styles.kidGrid}>
                 {data.kids.map(kid => (
                   <div key={kid.user_id} className={styles.kidCard}>
-                    <div className={styles.kidAvatar}>
-                      {kid.avatar_url ? (
-                        <img src={kid.avatar_url} alt={kid.name} />
-                      ) : (
-                        <div className={styles.kidAvatarPlaceholder} />
-                      )}
-                    </div>
-                    <div className={styles.kidInfo}>
-                      <div className={styles.kidName}>{kid.name}</div>
-                      <div className={styles.kidStats}>
-                        <span className={styles.kidStat}>{kid.total_completed}/{kid.total_assigned} done</span>
-                        <span className={styles.kidStat}>{kid.points_earned} pts</span>
-                        <span className={styles.kidStat}>{kid.current_streak}d streak</span>
+                    <div className={styles.kidCardMain}>
+                      <div className={styles.kidAvatar}>
+                        {kid.avatar_url ? (
+                          <img src={kid.avatar_url} alt={kid.name} />
+                        ) : (
+                          <div className={styles.kidAvatarPlaceholder} />
+                        )}
+                      </div>
+                      <div className={styles.kidInfo}>
+                        <div className={styles.kidName}>{kid.name}</div>
+                        <div className={styles.kidStats}>
+                          <span className={styles.kidStat}>{kid.total_completed}/{kid.total_assigned} done</span>
+                          <span className={styles.kidStat}>{kid.points_earned} pts</span>
+                          <span className={styles.kidStat}>{kid.current_streak}d streak</span>
+                        </div>
+                      </div>
+                      <div className={clsx(styles.kidRate, rateColor(kid.completion_rate))}>
+                        {Math.round(kid.completion_rate)}%
                       </div>
                     </div>
-                    <div className={clsx(styles.kidRate, rateColor(kid.completion_rate))}>
-                      {Math.round(kid.completion_rate)}%
-                    </div>
+                    {aiSummaries[kid.user_id] ? (
+                      <div className={styles.aiSummaryCard}>
+                        <div className={styles.aiSummaryText}>{aiSummaries[kid.user_id]}</div>
+                      </div>
+                    ) : (
+                      <button
+                        className={styles.aiSummaryBtn}
+                        onClick={() => handleGenerateSummary(kid.user_id)}
+                        disabled={summaryLoading[kid.user_id]}
+                      >
+                        {summaryLoading[kid.user_id] ? (
+                          <><span className={styles.spinnerSmall} /> Generating...</>
+                        ) : (
+                          <><Sparkles size={12} /> AI Summary</>
+                        )}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

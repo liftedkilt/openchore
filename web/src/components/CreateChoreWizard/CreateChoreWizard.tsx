@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Check, ChevronRight, ChevronLeft } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Check, ChevronRight, ChevronLeft, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
 import Modal from '../Modal/Modal';
 import { api } from '../../api';
@@ -63,6 +63,64 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
+  // AI description generation
+  const [generatingDesc, setGeneratingDesc] = useState(false);
+
+  // AI point suggestion
+  const [aiSuggestion, setAiSuggestion] = useState<{ points: number; estimated_minutes: number; reasoning: string } | null>(null);
+  const [suggestingPoints, setSuggestingPoints] = useState(false);
+  const suggestDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleGenerateDescription = async () => {
+    if (!chore.title.trim()) return;
+    setGeneratingDesc(true);
+    try {
+      const resp = await api.admin.generateDescription(chore.title.trim(), chore.category);
+      setChore(c => ({ ...c, description: resp.description }));
+    } catch {
+      // silently fail — AI is optional
+    } finally {
+      setGeneratingDesc(false);
+    }
+  };
+
+  const fetchPointSuggestion = useCallback(async (title: string, description: string, category: string) => {
+    if (!title.trim()) return;
+    setSuggestingPoints(true);
+    try {
+      const resp = await api.admin.suggestPoints(title.trim(), description.trim(), category);
+      setAiSuggestion(resp);
+    } catch {
+      setAiSuggestion(null);
+    } finally {
+      setSuggestingPoints(false);
+    }
+  }, []);
+
+  // Debounced auto-trigger for point suggestions when title+category are filled
+  useEffect(() => {
+    if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
+    if (!chore.title.trim() || !chore.category) {
+      setAiSuggestion(null);
+      return;
+    }
+    suggestDebounceRef.current = setTimeout(() => {
+      fetchPointSuggestion(chore.title, chore.description, chore.category);
+    }, 1000);
+    return () => {
+      if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
+    };
+  }, [chore.title, chore.description, chore.category, fetchPointSuggestion]);
+
+  const applyAiSuggestion = () => {
+    if (!aiSuggestion) return;
+    setChore(c => ({
+      ...c,
+      points: aiSuggestion.points,
+      estimatedMinutes: aiSuggestion.estimated_minutes,
+    }));
+  };
+
   const reset = () => {
     setStep(0);
     setChore({ ...defaultChoreData });
@@ -70,6 +128,9 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
     setSkipSchedule(false);
     setCreating(false);
     setError('');
+    setAiSuggestion(null);
+    setGeneratingDesc(false);
+    setSuggestingPoints(false);
   };
 
   const handleClose = () => { reset(); onClose(); };
@@ -189,7 +250,21 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
       </div>
 
       <div className={styles.formGroup}>
-        <label className={styles.label}>Description</label>
+        <div className={styles.labelRow}>
+          <label className={styles.label}>Description</label>
+          {chore.title.trim() && (
+            <button
+              type="button"
+              className={styles.aiBtn}
+              onClick={handleGenerateDescription}
+              disabled={generatingDesc}
+              title="Generate with AI"
+            >
+              {generatingDesc ? <span className={styles.spinnerSmall} /> : <Sparkles size={12} />}
+              {generatingDesc ? 'Generating...' : 'AI'}
+            </button>
+          )}
+        </div>
         <input className={styles.input} value={chore.description} onChange={e => setChore(c => ({ ...c, description: e.target.value }))} placeholder="Optional details..." />
       </div>
 
@@ -215,6 +290,21 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
           <input className={styles.input} type="number" min={0} value={chore.estimatedMinutes} onChange={e => setChore(c => ({ ...c, estimatedMinutes: parseInt(e.target.value) || 0 }))} />
         </div>
       </div>
+
+      {(suggestingPoints || aiSuggestion) && (
+        <div className={styles.aiSuggestionRow}>
+          {suggestingPoints ? (
+            <span className={styles.aiSuggestionText}><span className={styles.spinnerSmall} /> Getting AI suggestion...</span>
+          ) : aiSuggestion && (
+            <>
+              <span className={styles.aiSuggestionText}>
+                <Sparkles size={12} /> AI suggests: {aiSuggestion.points} pts, ~{aiSuggestion.estimated_minutes} min
+              </span>
+              <button type="button" className={styles.aiApplyBtn} onClick={applyAiSuggestion}>Apply</button>
+            </>
+          )}
+        </div>
+      )}
 
       <div className={styles.checkRow}>
         <input type="checkbox" checked={chore.requiresApproval} onChange={e => setChore(c => ({ ...c, requiresApproval: e.target.checked }))} />

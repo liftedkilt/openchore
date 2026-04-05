@@ -54,7 +54,7 @@ func setupTest(t *testing.T) *testEnv {
 
 	s := store.New(db)
 	d := webhook.NewDispatcher(s)
-	router, _ := api.NewRouter(s, d)
+	router, _, _ := api.NewRouter(s, d)
 	server := httptest.NewServer(router)
 
 	t.Cleanup(func() {

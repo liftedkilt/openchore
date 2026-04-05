@@ -2,19 +2,27 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/liftedkilt/openchore/internal/ai"
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/store"
 )
 
 type ReportsHandler struct {
-	store *store.Store
+	store      *store.Store
+	summarizer *ai.Summarizer
 }
 
 func NewReportsHandler(s *store.Store) *ReportsHandler {
 	return &ReportsHandler{store: s}
+}
+
+// SetSummarizer sets the optional AI summarizer.
+func (h *ReportsHandler) SetSummarizer(summarizer *ai.Summarizer) {
+	h.summarizer = summarizer
 }
 
 // ReportsResponse is the full payload returned by GET /api/admin/reports.
@@ -261,4 +269,117 @@ func periodRange(period string, ref time.Time) (time.Time, time.Time) {
 	default:
 		return ref, ref
 	}
+}
+
+// GetAISummary generates an AI-powered weekly summary for a specific kid.
+func (h *ReportsHandler) GetAISummary(w http.ResponseWriter, r *http.Request) {
+	if h.summarizer == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI services not available")
+		return
+	}
+
+	userIDStr := r.URL.Query().Get("user_id")
+	if userIDStr == "" {
+		writeError(w, http.StatusBadRequest, "user_id is required")
+		return
+	}
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user_id")
+		return
+	}
+
+	period := r.URL.Query().Get("period")
+	if period == "" {
+		period = "week"
+	}
+	if period != "week" && period != "month" && period != "year" {
+		writeError(w, http.StatusBadRequest, "period must be week, month, or year")
+		return
+	}
+
+	dateStr := r.URL.Query().Get("date")
+	var refDate time.Time
+	if dateStr != "" {
+		refDate, err = time.Parse(model.DateFormat, dateStr)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid date format, use YYYY-MM-DD")
+			return
+		}
+	} else {
+		refDate = time.Now()
+	}
+
+	startDate, endDate := periodRange(period, refDate)
+	startStr := startDate.Format(model.DateFormat)
+	endStr := endDate.Format(model.DateFormat)
+
+	// Get kid summaries and find the requested user
+	kidRows, err := h.store.ReportKidSummaries(r.Context(), startStr, endStr)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get kid summaries")
+		return
+	}
+
+	var kidRow *store.KidSummaryRow
+	for i := range kidRows {
+		if kidRows[i].UserID == userID {
+			kidRow = &kidRows[i]
+			break
+		}
+	}
+	if kidRow == nil {
+		writeError(w, http.StatusNotFound, "no data for this user in the selected period")
+		return
+	}
+
+	// Get most missed chores for context
+	missedRows, err := h.store.ReportMostMissed(r.Context(), startStr, endStr)
+	if err != nil {
+		missedRows = nil
+	}
+
+	missed := kidRow.TotalAssigned - kidRow.TotalCompleted
+	if missed < 0 {
+		missed = 0
+	}
+	rate := 0.0
+	if kidRow.TotalAssigned > 0 {
+		rate = float64(kidRow.TotalCompleted) / float64(kidRow.TotalAssigned) * 100
+	}
+
+	// Build top and missed chore lists from report data
+	var missedChores []string
+	for _, m := range missedRows {
+		// Check if this kid is in the comma-separated kids list
+		kids := strings.Split(m.Kids, ",")
+		for _, k := range kids {
+			if strings.TrimSpace(k) == kidRow.Name {
+				missedChores = append(missedChores, m.ChoreName)
+				break
+			}
+		}
+		if len(missedChores) >= 3 {
+			break
+		}
+	}
+
+	stats := ai.WeeklyStats{
+		KidName:        kidRow.Name,
+		CompletedCount: kidRow.TotalCompleted,
+		MissedCount:    missed,
+		TotalAssigned:  kidRow.TotalAssigned,
+		PointsEarned:   kidRow.PointsEarned,
+		CurrentStreak:  kidRow.CurrentStreak,
+		CompletionRate: rate,
+		MissedChores:   missedChores,
+	}
+
+	summary, err := h.summarizer.WeeklySummary(r.Context(), stats)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "AI summary generation failed: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"summary": summary})
 }

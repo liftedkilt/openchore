@@ -38,6 +38,13 @@ const (
 	PhotoSourceBoth     = "both"
 )
 
+// Assignment types
+const (
+	AssignmentIndividual = "individual"
+	AssignmentFamily     = "family"
+	AssignmentFCFS       = "fcfs"
+)
+
 // Expiry penalty modes
 const (
 	ExpiryBlock    = "block"
@@ -82,6 +89,7 @@ type ChoreSchedule struct {
 	ChoreID          int64    `json:"chore_id"`
 	AssignedTo       int64    `json:"assigned_to"`
 	AssignmentType   string   `json:"assignment_type"`
+	FcfsGroupID      *string  `json:"fcfs_group_id,omitempty"`
 	DayOfWeek        *int     `json:"day_of_week,omitempty"`
 	SpecificDate     *string  `json:"specific_date,omitempty"`
 	AvailableAt      *string  `json:"available_at,omitempty"`
@@ -181,16 +189,17 @@ type UserDecayConfig struct {
 // --- Chore Triggers ---
 
 type ChoreTrigger struct {
-	ID                int64   `json:"id"`
-	UUID              string  `json:"uuid"`
-	ChoreID           int64   `json:"chore_id"`
-	DefaultAssignedTo *int64  `json:"default_assigned_to,omitempty"`
-	DefaultDueBy      *string `json:"default_due_by,omitempty"`
+	ID                 int64   `json:"id"`
+	UUID               string  `json:"uuid"`
+	ChoreID            int64   `json:"chore_id"`
+	DefaultAssignedTo  *int64  `json:"default_assigned_to,omitempty"`
+	DefaultDueBy       *string `json:"default_due_by,omitempty"`
 	DefaultAvailableAt *string `json:"default_available_at,omitempty"`
-	Enabled           bool    `json:"enabled"`
-	CooldownMinutes   int     `json:"cooldown_minutes"`
-	LastTriggeredAt   *string `json:"last_triggered_at,omitempty"`
-	CreatedAt         string  `json:"created_at"`
+	Enabled            bool    `json:"enabled"`
+	CooldownMinutes    int     `json:"cooldown_minutes"`
+	AssignmentType     string  `json:"assignment_type"`
+	LastTriggeredAt    *string `json:"last_triggered_at,omitempty"`
+	CreatedAt          string  `json:"created_at"`
 }
 
 // --- Triggerable Chore (HA integration discovery) ---
@@ -280,6 +289,8 @@ type ScheduledChore struct {
 	PhotoURL           *string    `json:"photo_url,omitempty"`
 	CompletionStatus   *string    `json:"completion_status,omitempty"`
 	AIFeedback         *string    `json:"ai_feedback,omitempty"`
+	CompletedByName    string     `json:"completed_by_name,omitempty"`
+	CompletedBySibling bool       `json:"completed_by_sibling,omitempty"`
 	TTSDescription     string     `json:"tts_description,omitempty"`
 	TTSAudioURL        string     `json:"tts_audio_url,omitempty"`
 	Date               string     `json:"date"`

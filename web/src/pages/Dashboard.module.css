@@ -553,6 +553,23 @@
   text-decoration-color: var(--accent-green);
 }
 
+.choreCardSiblingCompleted {
+  opacity: 0.55;
+  border-left: 3px solid #9f7aea;
+}
+
+.choreCardSiblingCompleted .choreTitle {
+  text-decoration: line-through;
+  text-decoration-color: #9f7aea;
+}
+
+.siblingCompletedText {
+  font-size: 0.75rem;
+  color: #9f7aea;
+  margin: 0.25rem 0 0;
+  font-style: italic;
+}
+
 .choreCardLocked {
   opacity: 0.45;
   border-style: dashed;
@@ -720,6 +737,10 @@
 .completeBtnActive {
   color: var(--accent-green);
   animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.completeBtnSibling {
+  color: #9f7aea;
 }
 
 @keyframes pop {

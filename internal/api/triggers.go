@@ -68,7 +68,107 @@ func (h *TriggerHandler) FireTrigger(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Resolve assigned user
+	// Resolve due_by and available_at (query param overrides default)
+	dueBy := r.URL.Query().Get("due_by")
+	if dueBy == "" && trigger.DefaultDueBy != nil {
+		dueBy = *trigger.DefaultDueBy
+	}
+	availableAt := r.URL.Query().Get("available_at")
+	if availableAt == "" && trigger.DefaultAvailableAt != nil {
+		availableAt = *trigger.DefaultAvailableAt
+	}
+
+	// Get chore title
+	chore, err := h.store.GetChore(ctx, trigger.ChoreID)
+	if err != nil || chore == nil {
+		writeError(w, http.StatusInternalServerError, "chore not found")
+		return
+	}
+
+	today := time.Now().Format(model.DateFormat)
+
+	// FCFS mode: assign to ALL non-paused children with a shared group ID
+	if trigger.AssignmentType == model.AssignmentFCFS {
+		children, err := h.store.ListNonPausedChildren(ctx)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to list children")
+			return
+		}
+		if len(children) == 0 {
+			writeError(w, http.StatusBadRequest, "no active children to assign chore to")
+			return
+		}
+
+		// Dedup check: if any child already has this chore today, reject
+		for _, child := range children {
+			exists, err := h.store.ScheduleExistsForDate(ctx, trigger.ChoreID, child.ID, today)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to check existing schedules")
+				return
+			}
+			if exists {
+				writeJSON(w, http.StatusConflict, map[string]string{
+					"error": fmt.Sprintf("%s is already assigned for today", chore.Title),
+				})
+				return
+			}
+		}
+
+		groupID, err := generateUUID()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to generate group id")
+			return
+		}
+
+		type assignment struct {
+			ScheduleID int64  `json:"schedule_id"`
+			UserID     int64  `json:"user_id"`
+			UserName   string `json:"user_name"`
+		}
+		var assignments []assignment
+
+		for _, child := range children {
+			schedule := &model.ChoreSchedule{
+				ChoreID:          trigger.ChoreID,
+				AssignedTo:       child.ID,
+				AssignmentType:   model.AssignmentFCFS,
+				FcfsGroupID:      &groupID,
+				SpecificDate:     &today,
+				AvailableAt:      strPtrOrNil(availableAt),
+				DueBy:            strPtrOrNil(dueBy),
+				PointsMultiplier: 1.0,
+				ExpiryPenalty:    model.ExpiryBlock,
+			}
+			if err := h.store.CreateSchedule(ctx, schedule); err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to create schedule")
+				return
+			}
+			assignments = append(assignments, assignment{
+				ScheduleID: schedule.ID,
+				UserID:     child.ID,
+				UserName:   child.Name,
+			})
+		}
+
+		// Update last_triggered_at
+		if err := h.store.UpdateTriggerLastFired(ctx, trigger.ID, time.Now()); err != nil {
+			fmt.Printf("WARN: failed to update last_triggered_at for trigger %d: %v\n", trigger.ID, err)
+		}
+
+		writeJSON(w, http.StatusCreated, map[string]any{
+			"message":       "FCFS chore triggered",
+			"chore_id":      chore.ID,
+			"chore":         chore.Title,
+			"fcfs_group_id": groupID,
+			"assignments":   assignments,
+			"date":          today,
+			"available_at":  strPtrOrNil(availableAt),
+			"due_by":        strPtrOrNil(dueBy),
+		})
+		return
+	}
+
+	// Standard (individual) assignment path
 	var assignedUserID int64
 	var assignedUserName string
 
@@ -109,25 +209,7 @@ func (h *TriggerHandler) FireTrigger(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve due_by and available_at (query param overrides default)
-	dueBy := r.URL.Query().Get("due_by")
-	if dueBy == "" && trigger.DefaultDueBy != nil {
-		dueBy = *trigger.DefaultDueBy
-	}
-	availableAt := r.URL.Query().Get("available_at")
-	if availableAt == "" && trigger.DefaultAvailableAt != nil {
-		availableAt = *trigger.DefaultAvailableAt
-	}
-
-	// Get chore title
-	chore, err := h.store.GetChore(ctx, trigger.ChoreID)
-	if err != nil || chore == nil {
-		writeError(w, http.StatusInternalServerError, "chore not found")
-		return
-	}
-
 	// Check for duplicate: same chore + user + today
-	today := time.Now().Format(model.DateFormat)
 	exists, err := h.store.ScheduleExistsForDate(ctx, trigger.ChoreID, assignedUserID, today)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to check existing schedules")
@@ -142,14 +224,14 @@ func (h *TriggerHandler) FireTrigger(w http.ResponseWriter, r *http.Request) {
 
 	// Create one-off schedule for today
 	schedule := &model.ChoreSchedule{
-		ChoreID:        trigger.ChoreID,
-		AssignedTo:     assignedUserID,
-		AssignmentType: "individual",
-		SpecificDate:   &today,
-		AvailableAt:    strPtrOrNil(availableAt),
-		DueBy:          strPtrOrNil(dueBy),
+		ChoreID:          trigger.ChoreID,
+		AssignedTo:       assignedUserID,
+		AssignmentType:   model.AssignmentIndividual,
+		SpecificDate:     &today,
+		AvailableAt:      strPtrOrNil(availableAt),
+		DueBy:            strPtrOrNil(dueBy),
 		PointsMultiplier: 1.0,
-		ExpiryPenalty:  model.ExpiryBlock,
+		ExpiryPenalty:    model.ExpiryBlock,
 	}
 
 	if err := h.store.CreateSchedule(ctx, schedule); err != nil {
@@ -239,6 +321,7 @@ func (h *TriggerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		DefaultAvailableAt *string `json:"default_available_at"`
 		Enabled            *bool   `json:"enabled"`
 		CooldownMinutes    int     `json:"cooldown_minutes"`
+		AssignmentType     string  `json:"assignment_type"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		// Allow empty body — all fields are optional
@@ -248,6 +331,7 @@ func (h *TriggerHandler) Create(w http.ResponseWriter, r *http.Request) {
 			DefaultAvailableAt *string `json:"default_available_at"`
 			Enabled            *bool   `json:"enabled"`
 			CooldownMinutes    int     `json:"cooldown_minutes"`
+			AssignmentType     string  `json:"assignment_type"`
 		}{}
 	}
 
@@ -262,6 +346,11 @@ func (h *TriggerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		enabled = *req.Enabled
 	}
 
+	assignmentType := req.AssignmentType
+	if assignmentType == "" {
+		assignmentType = model.AssignmentIndividual
+	}
+
 	trigger := &model.ChoreTrigger{
 		UUID:               uuid,
 		ChoreID:            choreID,
@@ -270,6 +359,7 @@ func (h *TriggerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		DefaultAvailableAt: req.DefaultAvailableAt,
 		Enabled:            enabled,
 		CooldownMinutes:    req.CooldownMinutes,
+		AssignmentType:     assignmentType,
 	}
 
 	if err := h.store.CreateChoreTrigger(r.Context(), trigger); err != nil {
@@ -293,6 +383,7 @@ func (h *TriggerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		DefaultAvailableAt *string `json:"default_available_at"`
 		Enabled            *bool   `json:"enabled"`
 		CooldownMinutes    *int    `json:"cooldown_minutes"`
+		AssignmentType     string  `json:"assignment_type"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -310,6 +401,11 @@ func (h *TriggerHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.CooldownMinutes != nil {
 		trigger.CooldownMinutes = *req.CooldownMinutes
+	}
+	if req.AssignmentType != "" {
+		trigger.AssignmentType = req.AssignmentType
+	} else {
+		trigger.AssignmentType = model.AssignmentIndividual
 	}
 
 	if err := h.store.UpdateChoreTrigger(r.Context(), trigger); err != nil {

@@ -11,7 +11,7 @@ import (
 	"github.com/liftedkilt/openchore/internal/webhook"
 )
 
-func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *ChoreHandler) {
+func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *ChoreHandler, *ReportsHandler) {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -154,6 +154,11 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 				// AI test endpoints
 				r.Post("/admin/ai/test", chores.TestAIReview)
 				r.Post("/admin/ai/tts", chores.SynthesizeTTS)
+				r.Post("/admin/ai/generate-description", chores.GenerateDescription)
+				r.Post("/admin/ai/suggest-points", chores.SuggestPoints)
+
+				// AI-powered reports
+				r.Get("/admin/reports/ai-summary", reports.GetAISummary)
 
 				// Integration discovery: chores with triggers
 				r.Get("/chores/triggerable", triggers.ListTriggerable)
@@ -161,5 +166,5 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 		})
 	})
 
-	return r, chores
+	return r, chores, reports
 }
