@@ -2427,7 +2427,7 @@ const AIChoreChecker: React.FC = () => {
   const [choreTitle, setChoreTitle] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [testing, setTesting] = useState(false);
+  const [step, setStep] = useState<'idle' | 'uploading' | 'analyzing' | 'generating_audio' | 'done' | 'error'>('idle');
   const [result, setResult] = useState<{
     complete: boolean;
     confidence: number;
@@ -2443,6 +2443,7 @@ const AIChoreChecker: React.FC = () => {
     setPhotoFile(file);
     setResult(null);
     setError(null);
+    setStep('idle');
     const reader = new FileReader();
     reader.onload = () => setPhotoPreview(reader.result as string);
     reader.readAsDataURL(file);
@@ -2452,44 +2453,44 @@ const AIChoreChecker: React.FC = () => {
     e.preventDefault();
     if (!choreTitle || !photoFile) return;
 
-    setTesting(true);
     setResult(null);
     setError(null);
 
     try {
+      setStep('uploading');
       const { url } = await api.chores.upload(photoFile);
+
+      setStep('analyzing');
       const res = await api.admin.testAIReview(choreTitle, url);
       setResult(res);
+
+      if (res.feedback_audio) {
+        setStep('done');
+      } else {
+        setStep('done');
+      }
     } catch (err: any) {
       setError(err.message || 'Test failed');
-    } finally {
-      setTesting(false);
+      setStep('error');
     }
   };
 
   const handlePlayAudio = () => {
-    if (!result) return;
-    if (result.feedback_audio) {
-      setPlayingAudio(true);
-      const audio = new Audio(result.feedback_audio);
-      audio.onended = () => setPlayingAudio(false);
-      audio.onerror = () => {
-        setPlayingAudio(false);
-        if ('speechSynthesis' in window) {
-          const u = new SpeechSynthesisUtterance(result.feedback);
-          u.rate = 0.9;
-          u.pitch = 1.1;
-          window.speechSynthesis.speak(u);
-        }
-      };
-      audio.play().catch(() => setPlayingAudio(false));
-    } else if ('speechSynthesis' in window) {
-      const u = new SpeechSynthesisUtterance(result.feedback);
-      u.rate = 0.9;
-      u.pitch = 1.1;
-      window.speechSynthesis.speak(u);
-    }
+    if (!result?.feedback_audio) return;
+    setPlayingAudio(true);
+    const audio = new Audio(result.feedback_audio);
+    audio.onended = () => setPlayingAudio(false);
+    audio.onerror = () => setPlayingAudio(false);
+    audio.play().catch(() => setPlayingAudio(false));
   };
+
+  const stepLabels = [
+    { key: 'uploading', label: 'Uploading photo' },
+    { key: 'analyzing', label: 'AI analyzing photo' },
+    { key: 'generating_audio', label: 'Generating audio' },
+  ];
+  const activeStepIndex = stepLabels.findIndex(s => s.key === step);
+  const isWorking = step === 'uploading' || step === 'analyzing' || step === 'generating_audio';
 
   return (
     <div className={styles.form}>
@@ -2497,7 +2498,7 @@ const AIChoreChecker: React.FC = () => {
         <h3>AI Chore Checker</h3>
       </div>
       <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-        Test the AI photo review with any chore name and photo. Useful for tuning prompts and checking accuracy.
+        Type a chore name, snap a photo, and see how the AI evaluates it — including Kokoro TTS audio.
       </p>
 
       <form onSubmit={handleTest}>
@@ -2509,6 +2510,7 @@ const AIChoreChecker: React.FC = () => {
               value={choreTitle}
               onChange={e => setChoreTitle(e.target.value)}
               placeholder="e.g. Pick Up Toys, Make Bed, Clean Kitchen"
+              disabled={isWorking}
             />
           </div>
 
@@ -2516,13 +2518,13 @@ const AIChoreChecker: React.FC = () => {
             <label className={styles.label}>Photo</label>
             <label style={{
               display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-              padding: '0.5rem 1rem', borderRadius: '0.5rem', cursor: 'pointer',
+              padding: '0.5rem 1rem', borderRadius: '0.5rem', cursor: isWorking ? 'default' : 'pointer',
               background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
-              fontSize: '0.85rem',
+              fontSize: '0.85rem', opacity: isWorking ? 0.5 : 1,
             }}>
               <Camera size={16} />
               {photoFile ? photoFile.name : 'Choose photo...'}
-              <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} style={{ display: 'none' }} />
+              <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} style={{ display: 'none' }} disabled={isWorking} />
             </label>
           </div>
         </div>
@@ -2534,11 +2536,30 @@ const AIChoreChecker: React.FC = () => {
         )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
-          <button type="submit" className={styles.saveBtn} disabled={!choreTitle || !photoFile || testing}>
-            {testing ? <><Loader2 size={16} className={styles.spinning} /> Reviewing...</> : 'Test Review'}
+          <button type="submit" className={styles.saveBtn} disabled={!choreTitle || !photoFile || isWorking}>
+            {isWorking ? <><Loader2 size={16} className={styles.spinning} /> Working...</> : 'Test Review'}
           </button>
         </div>
       </form>
+
+      {isWorking && (
+        <div style={{ marginTop: '1rem' }}>
+          {stepLabels.map((s, i) => {
+            const isActive = s.key === step;
+            const isDone = i < activeStepIndex || step === 'done';
+            return (
+              <div key={s.key} style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                padding: '0.4rem 0', fontSize: '0.85rem',
+                color: isActive ? 'var(--color-primary, #38bdf8)' : isDone ? 'var(--text-secondary)' : 'var(--text-tertiary, rgba(255,255,255,0.3))',
+              }}>
+                {isActive ? <Loader2 size={14} className={styles.spinning} /> : isDone ? <Check size={14} /> : <div style={{ width: 14, height: 14 }} />}
+                <span>{s.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {error && (
         <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', fontSize: '0.85rem' }}>
@@ -2546,7 +2567,7 @@ const AIChoreChecker: React.FC = () => {
         </div>
       )}
 
-      {result && (
+      {result && step === 'done' && (
         <div style={{
           marginTop: '0.75rem', padding: '0.75rem', borderRadius: '0.5rem',
           background: result.complete ? 'rgba(74,222,128,0.12)' : 'rgba(239,68,68,0.12)',
@@ -2562,18 +2583,22 @@ const AIChoreChecker: React.FC = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ flex: 1 }}>{result.feedback}</span>
-            <button
-              onClick={handlePlayAudio}
-              disabled={playingAudio}
-              style={{
-                flexShrink: 0, background: 'rgba(56,189,248,0.15)', border: 'none',
-                borderRadius: '50%', width: 32, height: 32, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-              aria-label="Listen to feedback"
-            >
-              {playingAudio ? <Loader2 size={16} className={styles.spinning} /> : <Volume2 size={16} />}
-            </button>
+            {result.feedback_audio ? (
+              <button
+                onClick={handlePlayAudio}
+                disabled={playingAudio}
+                style={{
+                  flexShrink: 0, background: 'rgba(56,189,248,0.15)', border: 'none',
+                  borderRadius: '50%', width: 32, height: 32, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+                aria-label="Listen to feedback"
+              >
+                {playingAudio ? <Loader2 size={16} className={styles.spinning} /> : <Volume2 size={16} />}
+              </button>
+            ) : (
+              <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>No audio</span>
+            )}
           </div>
         </div>
       )}
