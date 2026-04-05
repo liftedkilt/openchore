@@ -1738,7 +1738,7 @@ const SettingsTab: React.FC = () => {
           </div>
 
           <label className={styles.checkboxLabel}>
-            <input type="checkbox" checked={aiTtsEnabled} onChange={e => setAiTtsEnabled(e.target.checked)} disabled={!aiEnabled} />
+            <input type="checkbox" checked={aiTtsEnabled} onChange={e => setAiTtsEnabled(e.target.checked)} />
             Generate TTS descriptions for chores
           </label>
         </div>
