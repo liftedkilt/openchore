@@ -29,8 +29,7 @@ echo "==> Pulling latest code..."
 git pull
 
 echo "==> Pulling latest images (before stopping — minimizes downtime)..."
-docker compose $PROFILE pull 2>/dev/null || true
-docker compose $PROFILE build --pull 2>/dev/null || true
+docker compose $PROFILE pull
 
 if [ "$WIPE" = true ]; then
   echo "==> Stopping containers and removing volumes..."
