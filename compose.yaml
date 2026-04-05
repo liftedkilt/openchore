@@ -44,6 +44,7 @@ services:
 
   # Default: LiteRT-LM — Gemma 4 E2B vision + text (~2.3GB RAM, ~5s per review)
   litert:
+    image: ghcr.io/liftedkilt/openchore/litert:latest
     build:
       context: ./litert
       dockerfile: Containerfile
