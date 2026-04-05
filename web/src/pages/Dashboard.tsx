@@ -626,21 +626,28 @@ export const Dashboard: React.FC = () => {
           )}
         </div>
       </div>
-        {(aiFeedback[chore.schedule_id] || (chore.completion_status === 'ai_rejected' && chore.ai_feedback)) && (() => {
+        {(() => {
           const fb = aiFeedback[chore.schedule_id];
-          const feedbackText = fb?.text || chore.ai_feedback;
+          const isRejected = fb || (chore.completion_status === 'ai_rejected' && chore.ai_feedback);
+          const isApprovedByAI = !isRejected && chore.completed && chore.completion_status === 'approved' && chore.ai_feedback;
+          if (!isRejected && !isApprovedByAI) return null;
+          const feedbackText = fb?.text || chore.ai_feedback || '';
           const feedbackAudioUrl = fb?.audioUrl;
           return (
-            <div className={styles.aiFeedback}>
-              <span className={styles.aiFeedbackIcon}>💬</span>
-              <span>{feedbackText}</span>
-              {feedbackAudioUrl && (
-                <button
-                  className={styles.aiFeedbackAudio}
-                  onClick={() => new Audio(feedbackAudioUrl).play()}
-                  aria-label="Listen to feedback"
-                >🔊</button>
-              )}
+            <div className={isRejected ? styles.aiFeedbackRejected : styles.aiFeedbackApproved}>
+              <span className={styles.aiFeedbackIcon}>{isRejected ? '❌' : '✅'}</span>
+              <span className={styles.aiFeedbackText}>{feedbackText}</span>
+              <button
+                className={styles.aiFeedbackAudio}
+                onClick={() => {
+                  if (feedbackAudioUrl) {
+                    new Audio(feedbackAudioUrl).play().catch(() => speak(feedbackText));
+                  } else {
+                    speak(feedbackText);
+                  }
+                }}
+                aria-label="Listen to feedback"
+              >🔊</button>
             </div>
           );
         })()}
