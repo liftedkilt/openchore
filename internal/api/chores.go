@@ -467,7 +467,10 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 				aiFeedback = result.Feedback
 				aiConfidence = result.Confidence
 
-				if !result.Complete || result.Confidence < threshold {
+				// Reject only if the model is confident the chore is NOT done.
+				// If complete=true, always approve. If complete=false but confidence
+				// is below the threshold, give the kid the benefit of the doubt.
+				if !result.Complete && result.Confidence >= threshold {
 					// AI says not complete — save as ai_rejected with feedback
 					user := UserFromContext(r.Context())
 					completedBy := user.ID

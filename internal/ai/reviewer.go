@@ -73,27 +73,28 @@ func buildReviewPrompt(title, description string) string {
 		choreInfo += ": " + description
 	}
 
-	return fmt.Sprintf(`You are reviewing a photo submitted by a child as proof that a household chore has been completed.
+	return fmt.Sprintf(`You are reviewing a photo submitted by a child as proof that a household chore has been completed. The child is showing you the RESULT of their work.
 
 CHORE: %s
 
-Look at the photo and determine if the chore appears to be completed based on what you can see.
+Evaluate whether the area shown in the photo looks like the chore has been done. You are judging the current STATE of things, not looking for the act of cleaning in progress.
 
-Respond ONLY with a JSON object in this exact format:
-{
-  "complete": true or false,
-  "confidence": a number from 0.0 to 1.0,
-  "feedback": "a brief, kind message for the child"
-}
+For example:
+- "Pick Up Toys" is complete if the room/area looks tidy and organized, even if some toys are visible on shelves or in bins — they just shouldn't be scattered on the floor
+- "Make Bed" is complete if the bed looks made with covers pulled up, even if not perfect
+- "Clean Kitchen Table" is complete if the table surface is mostly clear and wiped down
+- "Sweep Floor" is complete if the floor looks clean and free of visible debris
+
+Respond ONLY with a JSON object in this exact format, no markdown, no code fences:
+{"complete": true or false, "confidence": 0.0 to 1.0, "feedback": "brief kind message"}
 
 Guidelines:
 - Be encouraging and age-appropriate — these are kids aged 5-12
-- Be generous: if the task looks mostly done, give credit
-- Focus only on what is visually verifiable in the photo
-- If the photo is blurry, dark, or doesn't clearly show the task area, set confidence low and say so kindly
-- If complete is false, explain specifically what still needs to be done so the child understands
-- If complete is true, briefly acknowledge the good work
-- Examples of helpful feedback when incomplete: "Great start! It looks like there are still a few dishes on the counter — put those away and you're all set!" or "Almost there! The bed looks made but the pillows need to be straightened."
+- Be GENEROUS: if it looks reasonably done, mark it complete. Kids deserve credit for effort
+- Judge the state of the area, not whether you can see the cleaning happening
+- If the photo is blurry or unclear, set confidence low and ask kindly for a clearer photo
+- If complete is true, acknowledge the good work
+- If complete is false, explain specifically and kindly what still needs attention
 - Keep feedback to 1-2 sentences max`, choreInfo)
 }
 
