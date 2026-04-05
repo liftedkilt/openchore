@@ -42,7 +42,7 @@ services:
   # LiteRT is 15x faster and uses 3x less RAM than Ollama for Gemma 4.
   # Ollama is provided as an alternative for users who prefer it.
 
-  # Default: LiteRT-LM — Gemma 4 E2B vision + text (~2.3GB RAM, ~5s per review)
+  # Default: LiteRT-LM — Gemma 4 E4B vision + text (~3.1GB RAM, ~5s per review)
   litert:
     image: ghcr.io/liftedkilt/openchore/litert:latest
     build:

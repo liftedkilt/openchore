@@ -7,9 +7,9 @@ COPY server.py .
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
-ENV MODEL_PATH=/app/model/gemma-4-E2B-it.litertlm
-ENV MODEL_REPO=litert-community/gemma-4-E2B-it-litert-lm
-ENV MODEL_FILE=gemma-4-E2B-it.litertlm
+ENV MODEL_PATH=/app/model/gemma-4-E4B-it.litertlm
+ENV MODEL_REPO=litert-community/gemma-4-E4B-it-litert-lm
+ENV MODEL_FILE=gemma-4-E4B-it.litertlm
 ENV PORT=8080
 
 VOLUME /app/model

@@ -6,7 +6,7 @@ mkdir -p "$MODEL_DIR"
 
 if [ ! -f "$MODEL_PATH" ]; then
     echo "Model not found at $MODEL_PATH — downloading from HuggingFace..."
-    echo "This is a one-time download (~2.6 GB). The model is saved to a persistent volume."
+    echo "This is a one-time download (~3.7 GB). The model is saved to a persistent volume."
     python -c "
 from huggingface_hub import hf_hub_download
 import os
