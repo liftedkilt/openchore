@@ -99,6 +99,7 @@
 - [x] AI photo review — Gemma 4 vision model verifies photo proof matches chore description
 - [x] Kokoro TTS integration — AI-generated text-to-speech via Kokoro-FastAPI container
 - [x] Admin settings UI for AI photo review configuration
+- [ ] Configurable model idle unload — release LiteRT model from RAM after idle timeout, reload on next request
 - [ ] Reference photo comparison — compare submissions against known-good reference photos
 - [ ] Auto-evolving reference photos — approved photos become new references over time
 - [ ] Voice cloning — personalized TTS per kid
