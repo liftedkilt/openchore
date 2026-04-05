@@ -211,7 +211,7 @@ export const api = {
     }),
     getAISettings: () => Promise.all([
       fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_enabled').catch(() => ({ key: 'ai_enabled', value: 'false' })),
-      fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_endpoint').catch(() => ({ key: 'ai_endpoint', value: 'http://ollama:11434' })),
+      fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_endpoint').catch(() => ({ key: 'ai_endpoint', value: 'http://litert:8080' })),
       fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_model').catch(() => ({ key: 'ai_model', value: 'gemma4:e2b' })),
       fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_auto_approve_threshold').catch(() => ({ key: 'ai_auto_approve_threshold', value: '0.85' })),
       fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_tts_enabled').catch(() => ({ key: 'ai_tts_enabled', value: 'false' })),

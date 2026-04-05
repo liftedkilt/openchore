@@ -1420,7 +1420,7 @@ const SettingsTab: React.FC = () => {
 
   // AI settings state
   const [aiEnabled, setAiEnabled] = useState(false);
-  const [aiEndpoint, setAiEndpoint] = useState('http://ollama:11434');
+  const [aiEndpoint, setAiEndpoint] = useState('http://litert:8080');
   const [aiModel, setAiModel] = useState('gemma4:e2b');
   const [aiThreshold, setAiThreshold] = useState('0.85');
   const [aiTtsEnabled, setAiTtsEnabled] = useState(false);
@@ -1482,7 +1482,7 @@ const SettingsTab: React.FC = () => {
     api.admin.getAISettings()
       .then(settings => {
         setAiEnabled(settings.ai_enabled === 'true');
-        setAiEndpoint(settings.ai_endpoint || 'http://ollama:11434');
+        setAiEndpoint(settings.ai_endpoint || 'http://litert:8080');
         setAiModel(settings.ai_model || 'gemma4:e2b');
         setAiThreshold(settings.ai_auto_approve_threshold || '0.85');
         setAiTtsEnabled(settings.ai_tts_enabled === 'true');
@@ -1713,7 +1713,7 @@ const SettingsTab: React.FC = () => {
               className={styles.input}
               value={aiEndpoint}
               onChange={e => setAiEndpoint(e.target.value)}
-              placeholder="http://ollama:11434"
+              placeholder="http://litert:8080"
               disabled={!aiEnabled}
             />
           </div>
