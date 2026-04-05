@@ -198,6 +198,16 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     print("Initializing LiteRT-LM engine...")
-    get_engine()
+    eng = get_engine()
+
+    # Warmup: run a quick text inference to fully initialize the engine
+    print("Running warmup inference...")
+    try:
+        with eng.create_conversation() as conv:
+            conv.send_message({"role": "user", "content": [{"type": "text", "text": "Hi"}]})
+        print("Warmup complete — engine ready.")
+    except Exception as e:
+        print(f"Warmup failed (non-fatal): {e}")
+
     print(f"LiteRT server listening on :{PORT}")
     HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
