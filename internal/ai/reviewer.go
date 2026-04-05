@@ -51,7 +51,7 @@ func (r *Reviewer) ReviewPhoto(ctx context.Context, choreTitle, choreDescription
 		Format: "json",
 		Options: &aibackend.ModelOptions{
 			Temperature: 0.3, // low temperature for consistent evaluation
-			NumPredict:  1024, // needs headroom for model thinking tokens
+			NumPredict:  512,  // JSON response is ~50 tokens; rest is thinking overhead
 		},
 	})
 	if err != nil {

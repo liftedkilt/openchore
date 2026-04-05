@@ -64,11 +64,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._respond_json(400, {"error": "messages required"})
                 return
 
+            options = body.get("options", {})
+            max_tokens = options.get("num_predict", 1024)
+
             eng = get_engine()
             start = time.time()
             tmp_files = []
 
-            with eng.create_conversation() as conv:
+            with eng.create_conversation(max_tokens=max_tokens) as conv:
                 response = None
                 for msg in messages:
                     role = msg.get("role", "user")
@@ -100,6 +103,7 @@ class Handler(BaseHTTPRequestHandler):
 
             resp_text = self._extract_text(response)
             duration = time.time() - start
+            print(f"litert: chat completed in {duration:.1f}s (max_tokens={max_tokens})")
 
             self._respond_json(200, {
                 "model": "gemma4:e4b",
@@ -122,10 +126,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._respond_json(400, {"error": "prompt required"})
                 return
 
+            options = body.get("options", {})
+            max_tokens = options.get("num_predict", 1024)
+
             eng = get_engine()
             start = time.time()
 
-            with eng.create_conversation() as conv:
+            with eng.create_conversation(max_tokens=max_tokens) as conv:
                 response = conv.send_message({
                     "role": "user",
                     "content": [{"type": "text", "text": prompt}],
@@ -133,6 +140,7 @@ class Handler(BaseHTTPRequestHandler):
 
             resp_text = self._extract_text(response)
             duration = time.time() - start
+            print(f"litert: generate completed in {duration:.1f}s (max_tokens={max_tokens})")
 
             self._respond_json(200, {
                 "model": "gemma4:e4b",

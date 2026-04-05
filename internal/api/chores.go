@@ -894,22 +894,26 @@ func (h *ChoreHandler) TestAIReview(w http.ResponseWriter, r *http.Request) {
 		photoPath = "data" + photoPath
 	}
 
+	t0 := time.Now()
 	result, err := h.reviewer.ReviewPhoto(r.Context(), req.ChoreTitle, "", photoPath)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "AI review failed: "+err.Error())
 		return
 	}
+	log.Printf("ai: photo review took %s", time.Since(t0))
 
 	// Synthesize feedback audio if TTS is available
 	var feedbackAudioURL string
 	if h.ttsGen != nil {
 		ttsEnabled, _ := h.store.GetSetting(r.Context(), "ai_tts_enabled")
 		if ttsEnabled == "true" {
+			t1 := time.Now()
 			url, err := h.ttsGen.SynthesizeFeedback(r.Context(), result.Feedback, 0)
 			if err != nil {
-				log.Printf("ai: TTS synthesis failed for chore checker: %v", err)
+				log.Printf("ai: TTS synthesis failed for chore checker (%s): %v", time.Since(t1), err)
 			} else {
 				feedbackAudioURL = url
+				log.Printf("ai: TTS synthesis took %s", time.Since(t1))
 			}
 		} else {
 			log.Printf("ai: TTS disabled in settings (ai_tts_enabled=%q)", ttsEnabled)

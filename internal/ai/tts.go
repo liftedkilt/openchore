@@ -111,7 +111,7 @@ Examples:
 		Prompt: prompt,
 		Options: &aibackend.ModelOptions{
 			Temperature: 0.7,
-			NumPredict:  1024, // needs headroom for model thinking tokens
+			NumPredict:  256, // short phrase; rest is thinking overhead
 		},
 	})
 	if err != nil {
