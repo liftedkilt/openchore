@@ -209,6 +209,11 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ value }),
     }),
+    testAIReview: (choreTitle: string, photoUrl: string) =>
+      fetchWithAuth<{ complete: boolean; confidence: number; feedback: string; feedback_audio: string }>('/admin/ai/test', {
+        method: 'POST',
+        body: JSON.stringify({ chore_title: choreTitle, photo_url: photoUrl }),
+      }),
     getAISettings: () => Promise.all([
       fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_enabled').catch(() => ({ key: 'ai_enabled', value: 'false' })),
       fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_endpoint').catch(() => ({ key: 'ai_endpoint', value: 'http://litert:8080' })),

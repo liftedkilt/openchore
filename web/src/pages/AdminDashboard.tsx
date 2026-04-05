@@ -4,13 +4,13 @@ import { api } from '../api';
 import type { Chore, User, ChoreSchedule, ChoreTrigger, Reward, PointBalance, PointTransaction, StreakRewardItem, Theme, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from '../types';
 import { DAY_NAMES } from '../types';
 import styles from './AdminDashboard.module.css';
-import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, Gift, Coins, Flame, Undo2, Activity, Settings, Check, Pause, Play, Link2, Copy, Key, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, Gift, Coins, Flame, Undo2, Activity, Settings, Check, Pause, Play, Link2, Copy, Key, AlertTriangle, Camera, Volume2, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import CreateChoreWizard from '../components/CreateChoreWizard/CreateChoreWizard';
 import EditChoreModal from '../components/EditChoreModal/EditChoreModal';
 import QuickAssign from '../components/QuickAssign/QuickAssign';
 
-type Tab = 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'settings';
+type Tab = 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'ai' | 'settings';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -98,6 +98,9 @@ export const AdminDashboard: React.FC = () => {
         <button className={clsx(styles.navItem, tab === 'users' && styles.navItemActive)} onClick={() => setTab('users')}>
           <Users size={16} /> People
         </button>
+        <button className={clsx(styles.navItem, tab === 'ai' && styles.navItemActive)} onClick={() => setTab('ai')}>
+          <Camera size={16} /> AI
+        </button>
         <button className={clsx(styles.navItem, tab === 'settings' && styles.navItemActive)} onClick={() => setTab('settings')}>
           <Settings size={16} />
         </button>
@@ -110,6 +113,7 @@ export const AdminDashboard: React.FC = () => {
         {tab === 'rewards' && <RewardsTab />}
         {tab === 'points' && <PointsTab />}
         {tab === 'activity' && <ActivityTab />}
+        {tab === 'ai' && <AIChoreChecker />}
         {tab === 'settings' && <SettingsTab />}
       </main>
 
@@ -2414,5 +2418,165 @@ const UserForm: React.FC<{
         </button>
       </div>
     </form>
+  );
+};
+
+// --- AI Chore Checker (test tool for admins) ---
+
+const AIChoreChecker: React.FC = () => {
+  const [choreTitle, setChoreTitle] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<{
+    complete: boolean;
+    confidence: number;
+    feedback: string;
+    feedback_audio: string;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [playingAudio, setPlayingAudio] = useState(false);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setResult(null);
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = () => setPhotoPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleTest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!choreTitle || !photoFile) return;
+
+    setTesting(true);
+    setResult(null);
+    setError(null);
+
+    try {
+      const { url } = await api.chores.upload(photoFile);
+      const res = await api.admin.testAIReview(choreTitle, url);
+      setResult(res);
+    } catch (err: any) {
+      setError(err.message || 'Test failed');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handlePlayAudio = () => {
+    if (!result) return;
+    if (result.feedback_audio) {
+      setPlayingAudio(true);
+      const audio = new Audio(result.feedback_audio);
+      audio.onended = () => setPlayingAudio(false);
+      audio.onerror = () => {
+        setPlayingAudio(false);
+        if ('speechSynthesis' in window) {
+          const u = new SpeechSynthesisUtterance(result.feedback);
+          u.rate = 0.9;
+          u.pitch = 1.1;
+          window.speechSynthesis.speak(u);
+        }
+      };
+      audio.play().catch(() => setPlayingAudio(false));
+    } else if ('speechSynthesis' in window) {
+      const u = new SpeechSynthesisUtterance(result.feedback);
+      u.rate = 0.9;
+      u.pitch = 1.1;
+      window.speechSynthesis.speak(u);
+    }
+  };
+
+  return (
+    <div className={styles.form}>
+      <div className={styles.formHeader}>
+        <h3>AI Chore Checker</h3>
+      </div>
+      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+        Test the AI photo review with any chore name and photo. Useful for tuning prompts and checking accuracy.
+      </p>
+
+      <form onSubmit={handleTest}>
+        <div className={styles.formGrid}>
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Chore Name</label>
+            <input
+              className={styles.input}
+              value={choreTitle}
+              onChange={e => setChoreTitle(e.target.value)}
+              placeholder="e.g. Pick Up Toys, Make Bed, Clean Kitchen"
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Photo</label>
+            <label style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+              padding: '0.5rem 1rem', borderRadius: '0.5rem', cursor: 'pointer',
+              background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+              fontSize: '0.85rem',
+            }}>
+              <Camera size={16} />
+              {photoFile ? photoFile.name : 'Choose photo...'}
+              <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} style={{ display: 'none' }} />
+            </label>
+          </div>
+        </div>
+
+        {photoPreview && (
+          <div style={{ margin: '0.75rem 0', textAlign: 'center' }}>
+            <img src={photoPreview} alt="Preview" style={{ maxHeight: '200px', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }} />
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
+          <button type="submit" className={styles.saveBtn} disabled={!choreTitle || !photoFile || testing}>
+            {testing ? <><Loader2 size={16} className={styles.spinning} /> Reviewing...</> : 'Test Review'}
+          </button>
+        </div>
+      </form>
+
+      {error && (
+        <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', fontSize: '0.85rem' }}>
+          {error}
+        </div>
+      )}
+
+      {result && (
+        <div style={{
+          marginTop: '0.75rem', padding: '0.75rem', borderRadius: '0.5rem',
+          background: result.complete ? 'rgba(74,222,128,0.12)' : 'rgba(239,68,68,0.12)',
+          border: `1px solid ${result.complete ? 'rgba(74,222,128,0.3)' : 'rgba(239,68,68,0.3)'}`,
+          fontSize: '0.85rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600 }}>
+            <span style={{ fontSize: '1.2rem' }}>{result.complete ? '✅' : '❌'}</span>
+            <span>{result.complete ? 'Approved' : 'Rejected'}</span>
+            <span style={{ marginLeft: 'auto', fontWeight: 400, opacity: 0.7 }}>
+              Confidence: {(result.confidence * 100).toFixed(0)}%
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ flex: 1 }}>{result.feedback}</span>
+            <button
+              onClick={handlePlayAudio}
+              disabled={playingAudio}
+              style={{
+                flexShrink: 0, background: 'rgba(56,189,248,0.15)', border: 'none',
+                borderRadius: '50%', width: 32, height: 32, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+              aria-label="Listen to feedback"
+            >
+              {playingAudio ? <Loader2 size={16} className={styles.spinning} /> : <Volume2 size={16} />}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };

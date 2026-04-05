@@ -864,3 +864,53 @@ func (h *ChoreHandler) AttachPhoto(w http.ResponseWriter, r *http.Request) {
 		"photo_url": req.PhotoURL,
 	})
 }
+
+// TestAIReview lets admins test the AI photo review with a dummy chore name and photo.
+func (h *ChoreHandler) TestAIReview(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ChoreTitle string `json:"chore_title"`
+		PhotoURL   string `json:"photo_url"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.ChoreTitle == "" || req.PhotoURL == "" {
+		writeError(w, http.StatusBadRequest, "chore_title and photo_url are required")
+		return
+	}
+
+	if h.reviewer == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI services not available")
+		return
+	}
+
+	photoPath := req.PhotoURL
+	if len(photoPath) > 0 && photoPath[0] == '/' {
+		photoPath = "data" + photoPath
+	}
+
+	result, err := h.reviewer.ReviewPhoto(r.Context(), req.ChoreTitle, "", photoPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "AI review failed: "+err.Error())
+		return
+	}
+
+	// Synthesize feedback audio if TTS is available
+	var feedbackAudioURL string
+	if h.ttsGen != nil {
+		ttsEnabled, _ := h.store.GetSetting(r.Context(), "ai_tts_enabled")
+		if ttsEnabled == "true" {
+			if url, err := h.ttsGen.SynthesizeFeedback(r.Context(), result.Feedback, 0); err == nil {
+				feedbackAudioURL = url
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"complete":       result.Complete,
+		"confidence":     result.Confidence,
+		"feedback":       result.Feedback,
+		"feedback_audio": feedbackAudioURL,
+	})
+}
