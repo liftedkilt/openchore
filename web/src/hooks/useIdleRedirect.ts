@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 const EVENTS = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
 
-export function useIdleRedirect(targetPath: string) {
+export function useIdleRedirect(targetPath: string, excludePaths: string[] = []) {
   const navigate = useNavigate();
   const location = useLocation();
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -12,6 +12,9 @@ export function useIdleRedirect(targetPath: string) {
   useEffect(() => {
     // Don't set up idle redirect if already on the target page
     if (location.pathname === targetPath) return;
+
+    // Don't set up idle redirect if on an excluded path
+    if (excludePaths.some(p => location.pathname.startsWith(p))) return;
 
     const reset = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -31,5 +34,5 @@ export function useIdleRedirect(targetPath: string) {
         window.removeEventListener(event, reset);
       }
     };
-  }, [navigate, location.pathname, targetPath]);
+  }, [navigate, location.pathname, targetPath, excludePaths]);
 }

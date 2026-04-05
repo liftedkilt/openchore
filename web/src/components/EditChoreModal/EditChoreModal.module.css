@@ -56,7 +56,7 @@
   padding: 0.65rem 0.85rem;
   min-height: 44px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: rgba(0, 0, 0, 0.2);
   color: var(--text-primary, #e2e8f0);
   font-size: 0.85rem;
@@ -102,7 +102,7 @@
   padding: 0.6rem 1.25rem;
   min-height: 44px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--accent-blue, #38bdf8);
   color: var(--bg-primary);
   font-size: 0.85rem;
@@ -121,12 +121,12 @@
 
 /* Status messages */
 .saved {
-  color: #4ade80;
+  color: var(--accent-green);
   font-size: 0.8rem;
   font-weight: 600;
 }
 
 .error {
-  color: #f87171;
+  color: var(--status-required);
   font-size: 0.8rem;
 }

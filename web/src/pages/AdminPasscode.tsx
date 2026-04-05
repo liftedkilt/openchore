@@ -82,13 +82,13 @@ export const AdminPasscode: React.FC = () => {
             if (d === '') return <div key={i} className={styles.keyEmpty} />;
             if (d === 'del') {
               return (
-                <button key={i} className={styles.key} onClick={handleDelete}>
+                <button key={i} className={styles.key} onClick={handleDelete} aria-label="Delete">
                   <Delete size={22} />
                 </button>
               );
             }
             return (
-              <button key={i} className={styles.key} onClick={() => handleDigit(d)}>
+              <button key={i} className={styles.key} onClick={() => handleDigit(d)} aria-label={`Digit ${d}`}>
                 {d}
               </button>
             );

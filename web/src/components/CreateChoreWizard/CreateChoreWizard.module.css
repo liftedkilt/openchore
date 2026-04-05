@@ -95,7 +95,7 @@
   padding: 0.75rem 1rem;
   min-height: 48px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: rgba(0, 0, 0, 0.2);
   color: var(--text-primary, #e2e8f0);
   font-size: 0.9rem;
@@ -259,7 +259,7 @@
   padding: 0.75rem 1.5rem;
   min-height: 48px;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--accent-blue, #38bdf8);
   color: var(--bg-primary);
   font-size: 0.9rem;
@@ -283,7 +283,7 @@
   padding: 0.75rem 1.25rem;
   min-height: 48px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-secondary, #94a3b8);
   font-size: 0.9rem;

@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { useTheme } from '../ThemeContext';
 import type { SoundDef } from '../types';
 
@@ -34,6 +34,13 @@ export function useThemeSound() {
   const playAllDone = useCallback(() => {
     try { playNotes(getCtx(), config.sounds.allDone); } catch { /* no audio support */ }
   }, [config]);
+
+  useEffect(() => {
+    return () => {
+      ctxRef.current?.close();
+      ctxRef.current = null;
+    };
+  }, []);
 
   return { playComplete, playAllDone };
 }

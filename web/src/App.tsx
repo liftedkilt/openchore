@@ -20,7 +20,7 @@ const RequireAdmin: React.FC<{ children: React.ReactElement }> = ({ children }) 
 
 export const App: React.FC = () => {
   const { user, isLoading } = useAuth();
-  useIdleRedirect('/ambient');
+  useIdleRedirect('/ambient', ['/admin', '/setup']);
 
   if (isLoading) return null;
 

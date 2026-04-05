@@ -102,7 +102,7 @@
 
 .card {
   background: var(--bg-secondary);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   padding: 1.25rem;
   border: 1px solid rgba(255, 255, 255, 0.04);
 }
@@ -154,7 +154,7 @@
 .kidAvatarPlaceholder {
   width: 100%;
   height: 100%;
-  background: #334155;
+  background: var(--border-subtle);
 }
 
 .kidInfo {
@@ -265,9 +265,9 @@
   min-width: 70px;
 }
 
-.categoryRequired { color: #ef4444; }
+.categoryRequired { color: var(--status-required); }
 .categoryCore { color: var(--status-core); }
-.categoryBonus { color: #f59e0b; }
+.categoryBonus { color: var(--status-bonus); }
 
 .categoryBar {
   flex: 1;

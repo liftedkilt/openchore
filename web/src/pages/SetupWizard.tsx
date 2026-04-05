@@ -28,6 +28,7 @@ export const SetupWizard: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [selectedPresets, setSelectedPresets] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
   const addChild = () => {
@@ -48,6 +49,7 @@ export const SetupWizard: React.FC = () => {
 
   const handleFinish = async () => {
     setLoading(true);
+    setError('');
     try {
       const result = await api.setup({
         children: children.map(c => ({ name: c.name, theme: c.theme })),
@@ -68,7 +70,7 @@ export const SetupWizard: React.FC = () => {
       setStep('finish');
     } catch (err) {
       console.error(err);
-      alert('Failed to complete setup. Please try again.');
+      setError('Failed to complete setup. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -191,6 +193,8 @@ export const SetupWizard: React.FC = () => {
                 </button>
               ))}
             </div>
+
+            {error && <p style={{ color: '#ef4444', fontSize: '0.9rem', marginTop: '0.5rem' }}>{error}</p>}
 
             <div className={styles.navBtns}>
               <button className={styles.secondaryBtn} onClick={() => setStep('themes')}>Back</button>

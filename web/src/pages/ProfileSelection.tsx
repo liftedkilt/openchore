@@ -47,7 +47,7 @@ export const ProfileSelection: React.FC = () => {
 
       <div className={styles.grid}>
         {kids.map(u => (
-          <button key={u.id} className={styles.card} onClick={() => handleSelect(u)}>
+          <button key={u.id} className={styles.card} onClick={() => handleSelect(u)} role="button" aria-label={`Select profile for ${u.name}`}>
             <div className={styles.avatarWrapper}>
               {u.avatar_url ? (
                 <img src={u.avatar_url} alt={u.name} className={styles.avatar} />
@@ -64,7 +64,7 @@ export const ProfileSelection: React.FC = () => {
         <div className={styles.adminSection}>
           <div className={styles.adminRow}>
             {admins.map(u => (
-              <button key={u.id} className={styles.adminCard} onClick={() => handleSelect(u)}>
+              <button key={u.id} className={styles.adminCard} onClick={() => handleSelect(u)} role="button" aria-label={`Select profile for ${u.name}`}>
                 <div className={styles.adminAvatar}>
                   {u.avatar_url ? <img src={u.avatar_url} alt={u.name} /> : <UserCircle size={32} />}
                 </div>

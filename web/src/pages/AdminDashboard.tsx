@@ -205,10 +205,10 @@ const ChoresTab: React.FC = () => {
                 </div>
               </div>
               <div className={styles.listItemActions}>
-                <button className={styles.iconBtn} title="Edit" onClick={(e) => { e.stopPropagation(); handleEdit(chore); }}>
+                <button className={styles.iconBtn} title="Edit" aria-label="Edit chore" onClick={(e) => { e.stopPropagation(); handleEdit(chore); }}>
                   <Edit2 size={16} />
                 </button>
-                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} title="Delete" onClick={(e) => { e.stopPropagation(); handleDelete(chore.id); }}>
+                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} title="Delete" aria-label="Delete chore" onClick={(e) => { e.stopPropagation(); handleDelete(chore.id); }}>
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -587,7 +587,7 @@ const ScheduleManager: React.FC<{
                   {g.expiryPenalty === 'no_points' ? '(0 pts if late)' : `(-${g.expiryPenaltyValue} pts if late)`}
                 </span>
               )}
-              <button className={clsx(styles.iconBtn, styles.iconBtnDanger, styles.iconBtnSm)} onClick={() => handleDeleteGroup(g.scheduleIds)}>
+              <button className={clsx(styles.iconBtn, styles.iconBtnDanger, styles.iconBtnSm)} aria-label="Delete schedule" onClick={() => handleDeleteGroup(g.scheduleIds)}>
                 <Trash2 size={14} />
               </button>
             </div>
@@ -763,6 +763,7 @@ const TriggerManager: React.FC<{
                   <button
                     className={styles.iconBtn}
                     title="Copy URL"
+                    aria-label="Copy trigger URL"
                     onClick={() => copyUrl(trigger.uuid, trigger.id)}
                   >
                     {copied === trigger.id ? <Check size={14} /> : <Copy size={14} />}
@@ -770,14 +771,15 @@ const TriggerManager: React.FC<{
                   <button
                     className={styles.iconBtn}
                     title={trigger.enabled ? 'Disable' : 'Enable'}
+                    aria-label={trigger.enabled ? 'Disable trigger' : 'Enable trigger'}
                     onClick={() => handleToggle(trigger)}
                   >
                     {trigger.enabled ? <Pause size={14} /> : <Play size={14} />}
                   </button>
-                  <button className={styles.iconBtn} title="Edit" onClick={() => startEdit(trigger)}>
+                  <button className={styles.iconBtn} title="Edit" aria-label="Edit trigger" onClick={() => startEdit(trigger)}>
                     <Edit2 size={14} />
                   </button>
-                  <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} title="Delete" onClick={() => handleDelete(trigger.id)}>
+                  <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} title="Delete" aria-label="Delete trigger" onClick={() => handleDelete(trigger.id)}>
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -868,10 +870,10 @@ const RewardsTab: React.FC = () => {
                 </button>
               </div>
               <div className={styles.listItemActions}>
-                <button className={styles.iconBtn} onClick={() => { setEditingReward(r); setShowForm(true); }}>
+                <button className={styles.iconBtn} aria-label="Edit reward" onClick={() => { setEditingReward(r); setShowForm(true); }}>
                   <Edit2 size={16} />
                 </button>
-                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} onClick={() => handleDeleteReward(r.id)}>
+                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} aria-label="Delete reward" onClick={() => handleDeleteReward(r.id)}>
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -910,7 +912,7 @@ const RewardsTab: React.FC = () => {
                 </div>
               </div>
               <div className={styles.listItemActions}>
-                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} onClick={() => handleDeleteStreakReward(sr.id)}>
+                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} aria-label="Delete streak reward" onClick={() => handleDeleteStreakReward(sr.id)}>
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -1334,6 +1336,7 @@ const ActivityTab: React.FC = () => {
             <button
               className={clsx(styles.iconBtn, styles.iconBtnSm)}
               title="Undo this event"
+              aria-label="Undo this event"
               onClick={() => handleUndo(txn)}
             >
               <Undo2 size={14} />
@@ -1390,12 +1393,12 @@ const ExportConfigSection: React.FC = () => {
       <div className={styles.formHeader}>
         <h3>Export Configuration</h3>
       </div>
-      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+      <p className={styles.sectionDesc}>
         Download a <code>config.yaml</code> reflecting the current database state. Use this to bootstrap a fresh instance.
       </p>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+      <div className={styles.chipRow} style={{ marginBottom: '1rem' }}>
         {EXPORT_SECTIONS.map(s => (
-          <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+          <label key={s.id} className={styles.chipLabel}>
             <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} />
             {s.label}
           </label>
@@ -1476,12 +1479,10 @@ const SettingsTab: React.FC = () => {
     // We don't have a bulk settings API, so we fetch what we need
     // For now, let's just assume we can fetch specific settings if needed
     // or add a new endpoint. Since we're here, let's add a quick fetch for base_url.
-    fetch('/api/admin/settings/base_url')
-      .then(r => r.json())
+    api.admin.getSetting('base_url')
       .then(data => setBaseUrl(data.value || ''))
       .catch(() => {});
-    fetch('/api/admin/settings/discord_webhook_url')
-      .then(r => r.json())
+    api.admin.getSetting('discord_webhook_url')
       .then(data => setDiscordUrl(data.value || ''))
       .catch(() => {});
     api.admin.getAISettings()
@@ -1499,11 +1500,7 @@ const SettingsTab: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      await fetch('/api/admin/settings/base_url', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: baseUrl })
-      });
+      await api.admin.setSetting('base_url', baseUrl);
       setMessage({ type: 'success', text: 'Base URL updated' });
     } catch {
       setMessage({ type: 'error', text: 'Failed to update Base URL' });
@@ -1516,11 +1513,7 @@ const SettingsTab: React.FC = () => {
     setDiscordSaving(true);
     setDiscordMessage(null);
     try {
-      await fetch('/api/admin/settings/discord_webhook_url', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'X-User-ID': JSON.parse(localStorage.getItem('openchore_user') || '{}').id?.toString() || '' },
-        body: JSON.stringify({ value: discordUrl })
-      });
+      await api.admin.setSetting('discord_webhook_url', discordUrl);
       setDiscordMessage({ type: 'success', text: discordUrl ? 'Discord webhook URL saved' : 'Discord notifications disabled' });
     } catch {
       setDiscordMessage({ type: 'error', text: 'Failed to save Discord webhook URL' });
@@ -1648,7 +1641,7 @@ const SettingsTab: React.FC = () => {
         <div className={styles.formHeader}>
           <h3>System Base URL</h3>
         </div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+        <p className={styles.sectionDesc}>
           The public URL of this server (e.g. <code>https://chores.example.com</code>). Used for QR codes and notifications.
         </p>
         <div className={styles.formGroup}>
@@ -1670,7 +1663,7 @@ const SettingsTab: React.FC = () => {
         <div className={styles.formHeader}>
           <h3>Discord Notifications</h3>
         </div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+        <p className={styles.sectionDesc}>
           Get notified in Discord when chores are completed, approved, or rejected. Paste a Discord webhook URL below.
         </p>
         <div className={styles.formGroup}>
@@ -1682,7 +1675,7 @@ const SettingsTab: React.FC = () => {
           />
         </div>
         {discordMessage && (
-          <p style={{ fontSize: '0.85rem', fontWeight: 600, color: discordMessage.type === 'success' ? '#22c55e' : '#ef4444', marginTop: '0.25rem', marginBottom: '0.25rem' }}>
+          <p className={clsx(styles.feedbackMsg, discordMessage.type === 'success' ? styles.feedbackMsgSuccess : styles.feedbackMsgError)} style={{ marginTop: '0.25rem', marginBottom: '0.25rem' }}>
             {discordMessage.text}
           </p>
         )}
@@ -1702,7 +1695,7 @@ const SettingsTab: React.FC = () => {
         <div className={styles.formHeader}>
           <h3>AI Photo Review</h3>
         </div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+        <p className={styles.sectionDesc}>
           Use AI to automatically verify chore completion photos. When enabled, uploaded photos are analyzed before marking a chore complete.
         </p>
 
@@ -1736,7 +1729,7 @@ const SettingsTab: React.FC = () => {
 
           <div className={styles.formGroup}>
             <label className={styles.label}>Auto-Approve Threshold (0 &ndash; 1)</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div className={styles.flexRow} style={{ gap: '0.75rem' }}>
               <input
                 type="range"
                 min="0"
@@ -1749,9 +1742,9 @@ const SettingsTab: React.FC = () => {
               />
               <span style={{ fontSize: '0.9rem', fontWeight: 700, minWidth: '3ch', textAlign: 'right' }}>{aiThreshold}</span>
             </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+            <span className={styles.helpText}>
               Photos with confidence above this threshold are auto-approved. Lower values are more lenient.
-            </p>
+            </span>
           </div>
 
           <label className={styles.checkboxLabel}>
@@ -1761,7 +1754,7 @@ const SettingsTab: React.FC = () => {
         </div>
 
         {aiMessage && (
-          <p style={{ fontSize: '0.85rem', fontWeight: 600, color: aiMessage.type === 'success' ? '#22c55e' : '#ef4444', marginTop: '0.5rem' }}>
+          <p className={clsx(styles.feedbackMsg, aiMessage.type === 'success' ? styles.feedbackMsgSuccess : styles.feedbackMsgError)}>
             {aiMessage.text}
           </p>
         )}
@@ -1823,7 +1816,7 @@ const SettingsTab: React.FC = () => {
         </div>
 
         {message && (
-          <p style={{ fontSize: '0.85rem', fontWeight: 600, color: message.type === 'success' ? '#22c55e' : '#ef4444', marginTop: '0.5rem' }}>
+          <p className={clsx(styles.feedbackMsg, message.type === 'success' ? styles.feedbackMsgSuccess : styles.feedbackMsgError)}>
             {message.text}
           </p>
         )}
@@ -1846,7 +1839,7 @@ const SettingsTab: React.FC = () => {
             <Plus size={14} /> Add
           </button>
         </div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+        <p className={styles.sectionDesc}>
           Send events to external services (Home Assistant, Discord, etc.)
         </p>
 
@@ -1863,7 +1856,7 @@ const SettingsTab: React.FC = () => {
               </div>
               <div className={styles.formGroup}>
                 <label className={styles.label}>Events {allEventsSelected && <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>(all)</span>}</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.3rem' }}>
+                <div className={styles.chipRow} style={{ gap: '0.4rem', marginTop: '0.3rem' }}>
                   {WEBHOOK_EVENTS.map(ev => {
                     const selected = webhookSelectedEvents.has(ev.id) || allEventsSelected;
                     return (
@@ -1871,15 +1864,7 @@ const SettingsTab: React.FC = () => {
                         key={ev.id}
                         type="button"
                         onClick={() => toggleEvent(ev.id)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '0.3rem',
-                          padding: '0.35rem 0.65rem', borderRadius: '100px',
-                          fontSize: '0.75rem', fontWeight: 600,
-                          border: `2px solid ${selected ? 'var(--accent-blue)' : 'rgba(255,255,255,0.08)'}`,
-                          background: selected ? 'rgba(56,189,248,0.12)' : 'rgba(255,255,255,0.03)',
-                          color: selected ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                          cursor: 'pointer', transition: 'all 0.15s ease',
-                        }}
+                        className={clsx(styles.webhookEventChip, selected && styles.webhookEventChipActive)}
                       >
                         <span>{ev.icon}</span> {ev.label}
                       </button>
@@ -1896,62 +1881,51 @@ const SettingsTab: React.FC = () => {
         )}
 
         {webhooks.length === 0 && !showWebhookForm && (
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No webhooks configured</p>
+          <p className={styles.emptyTextItalic}>No webhooks configured</p>
         )}
 
         {webhooks.map(wh => (
           <div key={wh.id} className={styles.listItem} style={{ marginBottom: '0.5rem' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{
-                  width: 8, height: 8, borderRadius: '50%',
-                  background: wh.active ? '#22c55e' : '#6b7280',
-                  flexShrink: 0
-                }} />
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div className={styles.flexRow}>
+                <span className={clsx(styles.statusDot, wh.active ? styles.statusDotActive : styles.statusDotInactive)} />
+                <span className={styles.webhookUrlText}>
                   {wh.url}
                 </span>
               </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem', display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div className={styles.webhookMeta}>
                 {wh.events === '*' ? (
                   <span>All events</span>
                 ) : (
                   wh.events.split(',').map(e => {
                     const ev = WEBHOOK_EVENTS.find(we => we.id === e.trim());
-                    return <span key={e} style={{ background: 'rgba(255,255,255,0.06)', padding: '0.1rem 0.4rem', borderRadius: '100px' }}>{ev ? `${ev.icon} ${ev.label}` : e.trim()}</span>;
+                    return <span key={e} className={styles.webhookEventTag}>{ev ? `${ev.icon} ${ev.label}` : e.trim()}</span>;
                   })
                 )}
                 {wh.secret && <span>• Signed</span>}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+            <div className={styles.btnGroup}>
               <button className={styles.btnSmall} onClick={() => handleExpandWebhook(wh.id)}>
                 {expandedWebhook === wh.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </button>
               <button className={styles.btnSmall} onClick={() => handleToggleWebhook(wh)}>
                 {wh.active ? 'Disable' : 'Enable'}
               </button>
-              <button className={clsx(styles.btnSmall, styles.btnDanger)} onClick={() => handleDeleteWebhook(wh.id)}>
+              <button className={clsx(styles.btnSmall, styles.btnDanger)} aria-label="Delete webhook" onClick={() => handleDeleteWebhook(wh.id)}>
                 <Trash2 size={14} />
               </button>
             </div>
             {expandedWebhook === wh.id && (
               <div style={{ width: '100%', marginTop: '0.5rem' }}>
-                <h4 style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>Recent Deliveries</h4>
+                <h4 className={styles.deliveryHeader}>Recent Deliveries</h4>
                 {deliveries.length === 0 ? (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No deliveries yet</p>
+                  <p className={styles.emptyTextItalic} style={{ fontSize: '0.8rem' }}>No deliveries yet</p>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', maxHeight: '200px', overflowY: 'auto' }}>
+                  <div className={styles.deliveryList}>
                     {deliveries.map(d => (
-                      <div key={d.id} style={{
-                        fontSize: '0.75rem', padding: '0.4rem 0.5rem',
-                        background: 'rgba(255,255,255,0.03)', borderRadius: '4px',
-                        display: 'flex', gap: '0.5rem', alignItems: 'center'
-                      }}>
-                        <span style={{
-                          width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                          background: d.status_code && d.status_code >= 200 && d.status_code < 300 ? '#22c55e' : '#ef4444'
-                        }} />
+                      <div key={d.id} className={styles.deliveryItem}>
+                        <span className={clsx(styles.statusDot, d.status_code && d.status_code >= 200 && d.status_code < 300 ? styles.statusDotActive : styles.statusDotError)} />
                         <span style={{ fontWeight: 600 }}>{d.event}</span>
                         <span style={{ color: 'var(--text-secondary)' }}>{d.status_code || 'err'}</span>
                         <span style={{ color: 'var(--text-secondary)', marginLeft: 'auto' }}>
@@ -2043,20 +2017,14 @@ const APITokensSection: React.FC = () => {
           <Plus size={14} /> Add
         </button>
       </div>
-      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+      <p className={styles.sectionDesc}>
         Generate tokens for external integrations (Home Assistant, scripts, etc.) to authenticate with the API.
       </p>
 
       {/* New token reveal banner */}
       {newToken && (
-        <div style={{
-          background: 'rgba(34, 197, 94, 0.08)',
-          border: '1px solid rgba(34, 197, 94, 0.25)',
-          borderRadius: '12px',
-          padding: '1rem',
-          marginBottom: '1rem',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <div className={styles.tokenRevealBox}>
+          <div className={styles.flexRow} style={{ marginBottom: '0.5rem' }}>
             <AlertTriangle size={16} style={{ color: '#f59e0b' }} />
             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b' }}>
               Copy this token now — it will not be shown again
@@ -2065,16 +2033,8 @@ const APITokensSection: React.FC = () => {
           <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
             Token for <strong>{newToken.name}</strong>:
           </p>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '0.5rem',
-          }}>
-            <code style={{
-              flex: 1, background: 'rgba(255, 255, 255, 0.08)',
-              padding: '0.5rem 0.75rem', borderRadius: '8px',
-              fontSize: '0.75rem', fontFamily: "'SF Mono', 'Menlo', 'Monaco', monospace",
-              color: 'var(--text-primary)', wordBreak: 'break-all',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-            }}>
+          <div className={styles.flexRow}>
+            <code className={styles.tokenCode}>
               {newToken.token}
             </code>
             <button
@@ -2085,14 +2045,7 @@ const APITokensSection: React.FC = () => {
               {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
             </button>
           </div>
-          <button
-            onClick={() => setNewToken(null)}
-            style={{
-              marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)',
-              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-              textDecoration: 'underline',
-            }}
-          >
+          <button onClick={() => setNewToken(null)} className={styles.dismissBtn}>
             Dismiss
           </button>
         </div>
@@ -2125,16 +2078,16 @@ const APITokensSection: React.FC = () => {
 
       {/* Token list */}
       {activeTokens.length === 0 && revokedTokens.length === 0 && !showForm && (
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No API tokens created</p>
+        <p className={styles.emptyTextItalic}>No API tokens created</p>
       )}
 
       {activeTokens.map(t => (
         <div key={t.id} className={styles.listItem} style={{ marginBottom: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', width: '100%' }}>
+          <div className={styles.listItemContentRow}>
             <Key size={16} style={{ color: 'var(--accent-blue)', flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{t.name}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '0.75rem', marginTop: '0.15rem', flexWrap: 'wrap' }}>
+              <div className={styles.tokenName}>{t.name}</div>
+              <div className={styles.tokenMeta}>
                 <span>Created {new Date(t.created_at).toLocaleDateString()}</span>
                 {t.last_used_at && <span>Last used {new Date(t.last_used_at).toLocaleDateString()}</span>}
                 {!t.last_used_at && <span style={{ fontStyle: 'italic' }}>Never used</span>}
@@ -2149,16 +2102,16 @@ const APITokensSection: React.FC = () => {
 
       {revokedTokens.length > 0 && (
         <>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.04em', marginTop: '1rem', marginBottom: '0.5rem' }}>
+          <div className={styles.revokedLabel}>
             Revoked
           </div>
           {revokedTokens.map(t => (
             <div key={t.id} className={styles.listItem} style={{ marginBottom: '0.5rem', opacity: 0.5 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', width: '100%' }}>
+              <div className={styles.listItemContentRow}>
                 <Key size={16} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 600, textDecoration: 'line-through' }}>{t.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '0.75rem', marginTop: '0.15rem' }}>
+                  <div className={styles.tokenName} style={{ textDecoration: 'line-through' }}>{t.name}</div>
+                  <div className={styles.tokenMeta}>
                     <span>Created {new Date(t.created_at).toLocaleDateString()}</span>
                     <span style={{ color: '#ef4444', fontWeight: 600 }}>Revoked</span>
                   </div>
@@ -2249,19 +2202,20 @@ const UsersTab: React.FC = () => {
                     className={clsx(styles.iconBtn, u.paused && styles.iconBtnActive)}
                     onClick={() => handleTogglePause(u)}
                     title={u.paused ? 'Unpause (resume chores)' : 'Pause (vacation/sick mode)'}
+                    aria-label={u.paused ? 'Unpause user' : 'Pause user'}
                   >
                     {u.paused ? <Play size={16} /> : <Pause size={16} />}
                   </button>
                 )}
                 {u.role === 'child' && (
-                  <button className={styles.iconBtn} onClick={() => setExpandedDecay(expandedDecay === u.id ? null : u.id)} title="Points decay settings">
+                  <button className={styles.iconBtn} onClick={() => setExpandedDecay(expandedDecay === u.id ? null : u.id)} title="Points decay settings" aria-label="Points decay settings">
                     <Clock size={16} />
                   </button>
                 )}
-                <button className={styles.iconBtn} onClick={() => { setEditingUser(u); setShowForm(true); }}>
+                <button className={styles.iconBtn} aria-label="Edit user" onClick={() => { setEditingUser(u); setShowForm(true); }}>
                   <Edit2 size={16} />
                 </button>
-                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} onClick={() => handleDelete(u.id)}>
+                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} aria-label="Delete user" onClick={() => handleDelete(u.id)}>
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -2316,7 +2270,7 @@ const DecayConfigEditor: React.FC<{ userId: number }> = ({ userId }) => {
       </div>
       <div className={styles.scheduleForm}>
         <div className={styles.formGroup}>
-          <label className={styles.label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <label className={clsx(styles.label, styles.flexRow)}>
             <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} />
             Enable points decay
           </label>
@@ -2500,7 +2454,7 @@ const AIChoreChecker: React.FC = () => {
       <div className={styles.formHeader}>
         <h3>AI Chore Checker</h3>
       </div>
-      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+      <p className={styles.sectionDesc}>
         Type a chore name, snap a photo, and see how the AI evaluates it — including Kokoro TTS audio.
       </p>
 
@@ -2519,12 +2473,7 @@ const AIChoreChecker: React.FC = () => {
 
           <div className={styles.formGroup}>
             <label className={styles.label}>Photo</label>
-            <label style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-              padding: '0.5rem 1rem', borderRadius: '0.5rem', cursor: isWorking ? 'default' : 'pointer',
-              background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
-              fontSize: '0.85rem', opacity: isWorking ? 0.5 : 1,
-            }}>
+            <label className={styles.photoUploadLabel} style={{ cursor: isWorking ? 'default' : 'pointer', opacity: isWorking ? 0.5 : 1 }}>
               <Camera size={16} />
               {photoFile ? photoFile.name : 'Choose photo...'}
               <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} style={{ display: 'none' }} disabled={isWorking} />
@@ -2533,12 +2482,12 @@ const AIChoreChecker: React.FC = () => {
         </div>
 
         {photoPreview && (
-          <div style={{ margin: '0.75rem 0', textAlign: 'center' }}>
-            <img src={photoPreview} alt="Preview" style={{ maxHeight: '200px', borderRadius: '0.5rem', border: '1px solid var(--border-color)' }} />
+          <div className={styles.photoPreview}>
+            <img src={photoPreview} alt="Preview" />
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
+        <div className={styles.formActions}>
           <button type="submit" className={styles.saveBtn} disabled={!choreTitle || !photoFile || isWorking}>
             {isWorking ? <><Loader2 size={16} className={styles.spinning} /> Working...</> : 'Test Review'}
           </button>
@@ -2551,9 +2500,7 @@ const AIChoreChecker: React.FC = () => {
             const isActive = s.key === step;
             const isDone = i < activeStepIndex || step === 'done';
             return (
-              <div key={s.key} style={{
-                display: 'flex', alignItems: 'center', gap: '0.5rem',
-                padding: '0.4rem 0', fontSize: '0.85rem',
+              <div key={s.key} className={styles.stepItem} style={{
                 color: isActive ? 'var(--color-primary, #38bdf8)' : isDone ? 'var(--text-secondary)' : 'var(--text-tertiary, rgba(255,255,255,0.3))',
               }}>
                 {isActive ? <Loader2 size={14} className={styles.spinning} /> : isDone ? <Check size={14} /> : <div style={{ width: 14, height: 14 }} />}
@@ -2565,36 +2512,27 @@ const AIChoreChecker: React.FC = () => {
       )}
 
       {error && (
-        <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', fontSize: '0.85rem' }}>
+        <div className={clsx(styles.statusBox, styles.statusBoxError)}>
           {error}
         </div>
       )}
 
       {result && step === 'done' && (
-        <div style={{
-          marginTop: '0.75rem', padding: '0.75rem', borderRadius: '0.5rem',
-          background: result.complete ? 'rgba(74,222,128,0.12)' : 'rgba(239,68,68,0.12)',
-          border: `1px solid ${result.complete ? 'rgba(74,222,128,0.3)' : 'rgba(239,68,68,0.3)'}`,
-          fontSize: '0.85rem',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600 }}>
+        <div className={clsx(styles.statusBox, result.complete ? styles.statusBoxSuccess : styles.statusBoxReject)}>
+          <div className={styles.flexRow} style={{ marginBottom: '0.5rem', fontWeight: 600 }}>
             <span style={{ fontSize: '1.2rem' }}>{result.complete ? '✅' : '❌'}</span>
             <span>{result.complete ? 'Approved' : 'Rejected'}</span>
             <span style={{ marginLeft: 'auto', fontWeight: 400, opacity: 0.7 }}>
               Confidence: {(result.confidence * 100).toFixed(0)}%
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className={styles.flexRow}>
             <span style={{ flex: 1 }}>{result.feedback}</span>
             {result.feedback_audio ? (
               <button
                 onClick={handlePlayAudio}
                 disabled={playingAudio}
-                style={{
-                  flexShrink: 0, background: 'rgba(56,189,248,0.15)', border: 'none',
-                  borderRadius: '50%', width: 32, height: 32, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
+                className={styles.audioPlayBtn}
                 aria-label="Listen to feedback"
               >
                 {playingAudio ? <Loader2 size={16} className={styles.spinning} /> : <Volume2 size={16} />}
