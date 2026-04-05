@@ -88,7 +88,7 @@ export const AdminPasscode: React.FC = () => {
               );
             }
             return (
-              <button key={i} className={styles.key} onClick={() => handleDigit(d)} aria-label={`Digit ${d}`}>
+              <button key={i} className={styles.key} onClick={() => handleDigit(d)}>
                 {d}
               </button>
             );
