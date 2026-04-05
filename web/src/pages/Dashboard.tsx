@@ -538,7 +538,8 @@ export const Dashboard: React.FC = () => {
             chore.completed && styles.choreCardCompleted,
             isLocked && styles.choreCardLocked,
             isExpired && styles.choreCardExpired,
-            isPointsLocked && styles.choreCardPointsLocked
+            isPointsLocked && styles.choreCardPointsLocked,
+            (aiFeedback[chore.schedule_id] || (chore.completion_status === 'ai_rejected' && chore.ai_feedback) || (chore.completed && chore.completion_status === 'approved' && chore.ai_feedback)) && styles.choreCardHasFeedback
           )}
           onTouchStart={canSwipe ? (e) => handleTouchStart(e, choreKey) : undefined}
           onTouchMove={canSwipe ? (e) => handleTouchMove(e, chore) : undefined}
@@ -635,7 +636,6 @@ export const Dashboard: React.FC = () => {
           const feedbackAudioUrl = fb?.audioUrl;
           return (
             <div className={isRejected ? styles.aiFeedbackRejected : styles.aiFeedbackApproved}>
-              <span className={styles.aiFeedbackIcon}>{isRejected ? '❌' : '✅'}</span>
               <span className={styles.aiFeedbackText}>{feedbackText}</span>
               <button
                 className={styles.ttsBtn}

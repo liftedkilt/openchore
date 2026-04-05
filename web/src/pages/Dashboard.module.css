@@ -600,36 +600,39 @@
   line-height: 1.4;
 }
 
+.choreCardHasFeedback {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
 .aiFeedbackRejected,
 .aiFeedbackApproved {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem;
-  margin-top: 0.5rem;
-  border-radius: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0 0 0.75rem 0.75rem;
   font-size: 0.85rem;
   color: var(--color-text);
   line-height: 1.4;
 }
 
 .aiFeedbackRejected {
-  background: rgba(239, 68, 68, 0.12);
+  background: rgba(239, 68, 68, 0.15);
   border: 1px solid rgba(239, 68, 68, 0.3);
+  border-top: none;
 }
 
 .aiFeedbackApproved {
-  background: rgba(74, 222, 128, 0.12);
+  background: rgba(74, 222, 128, 0.15);
   border: 1px solid rgba(74, 222, 128, 0.3);
-}
-
-.aiFeedbackIcon {
-  flex-shrink: 0;
-  font-size: 1.1rem;
+  border-top: none;
 }
 
 .aiFeedbackText {
   flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
 }
 
 
