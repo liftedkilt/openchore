@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { User } from './types';
 
 interface AuthContextType {
@@ -25,14 +25,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
   }, []);
 
-  const handleSetUser = (u: User | null) => {
+  const handleSetUser = useCallback((u: User | null) => {
     setUser(u);
     if (u) {
       localStorage.setItem('openchore_user', JSON.stringify(u));
     } else {
       localStorage.removeItem('openchore_user');
     }
-  };
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, setUser: handleSetUser, isLoading }}>
