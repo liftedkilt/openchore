@@ -1,0 +1,8 @@
+# Override for local development — publishes AI service ports to the host.
+services:
+  litert:
+    ports:
+      - "11434:8080"
+  kokoro:
+    ports:
+      - "8880:8880"

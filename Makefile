@@ -1,4 +1,4 @@
-.PHONY: all api ui dev install build test test-e2e test-e2e-install test-all clean help
+.PHONY: all api ui dev dev-ai ai-up ai-down install build test test-e2e test-e2e-install test-all clean help
 
 # Default target
 all: help
@@ -17,6 +17,20 @@ dev:
 	@test -f config/config.yaml || (cp config/config.example.yaml config/config.yaml && echo "Created config/config.yaml from example")
 	rm -f openchore.db openchore.db-shm openchore.db-wal
 	make -j 2 api ui
+
+# Run both API and UI with AI sidecars (LiteRT + Kokoro)
+dev-ai: ai-up
+	@test -f config/config.yaml || (cp config/config.example.yaml config/config.yaml && echo "Created config/config.yaml from example")
+	rm -f openchore.db openchore.db-shm openchore.db-wal
+	OLLAMA_ENDPOINT=http://localhost:11434 TTS_ENDPOINT=http://localhost:8880 make -j 2 api ui
+
+# Start AI sidecars (LiteRT + Kokoro) with ports published for local dev
+ai-up:
+	docker compose -f compose.yaml -f compose.dev-ai.yaml --profile ai up -d litert kokoro
+
+# Stop AI sidecars
+ai-down:
+	docker compose -f compose.yaml -f compose.dev-ai.yaml --profile ai down
 
 # Install dependencies for both
 install:
@@ -54,6 +68,9 @@ help:
 	@echo "  api     - Run the API server (Go)"
 	@echo "  ui      - Run the UI (Vite)"
 	@echo "  dev     - Run both API and UI concurrently (fresh DB, auto-seeded from config)"
+	@echo "  dev-ai  - Same as dev but with AI sidecars (LiteRT + Kokoro)"
+	@echo "  ai-up   - Start AI sidecars in Docker"
+	@echo "  ai-down - Stop AI sidecars"
 	@echo "  install - Install dependencies for both API and UI"
 	@echo "  build   - Build both API and UI"
 	@echo "  test              - Run Go tests"
