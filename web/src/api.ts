@@ -2,6 +2,41 @@ import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalan
 
 const API_BASE = '/api';
 
+// Resize images client-side before uploading to avoid Nginx body size limits
+// and reduce upload time on mobile. Returns a JPEG file ≤ maxDim on longest side.
+function resizeImage(file: File, maxDim: number): Promise<File> {
+  return new Promise((resolve) => {
+    // Skip if already small enough (< 500KB)
+    if (file.size < 500_000) {
+      resolve(file);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      const { width, height } = img;
+      if (width <= maxDim && height <= maxDim) {
+        resolve(file);
+        return;
+      }
+      const scale = maxDim / Math.max(width, height);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(width * scale);
+      canvas.height = Math.round(height * scale);
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => {
+          resolve(new File([blob!], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }));
+        },
+        'image/jpeg',
+        0.85,
+      );
+    };
+    img.onerror = () => resolve(file); // fallback to original on error
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export class APIError extends Error {
   status: number;
   data: any;
@@ -114,10 +149,10 @@ export const api = {
       fetchWithAuth(`/schedules/${scheduleId}/complete?date=${date}`, {
         method: 'DELETE',
       }),
-    upload: (file: File) => {
+    upload: async (file: File) => {
+      const resized = await resizeImage(file, 1280);
       const formData = new FormData();
-      formData.append('photo', file);
-      // skipContentType: let fetch set Content-Type with the correct multipart boundary
+      formData.append('photo', resized);
       return fetchWithAuth<{ url: string }>('/upload', {
         method: 'POST',
         body: formData,
