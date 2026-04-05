@@ -1698,7 +1698,7 @@ const SettingsTab: React.FC = () => {
           <h3>AI Photo Review</h3>
         </div>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-          Use AI (Ollama) to automatically verify chore completion photos. When enabled, uploaded photos are analyzed before marking a chore complete.
+          Use AI to automatically verify chore completion photos. When enabled, uploaded photos are analyzed before marking a chore complete.
         </p>
 
         <div className={styles.formGrid}>
@@ -1708,7 +1708,7 @@ const SettingsTab: React.FC = () => {
           </label>
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>Ollama Endpoint</label>
+            <label className={styles.label}>AI Endpoint</label>
             <input
               className={styles.input}
               value={aiEndpoint}
