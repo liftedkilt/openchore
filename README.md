@@ -14,7 +14,7 @@ A family chore management system designed for a wall-mounted iPad. Gamifies hous
 - **Multi-step creation wizard**: guided chore + schedule setup in one flow
 - **Photo proof**: chores can require photo evidence via QR code scan from a second device
 - **Chore triggers**: per-chore webhook URLs for external systems (Home Assistant, etc.) with cooldown and default assignee
-- **AI photo review**: optional LLM-powered verification of photo proof submissions (Gemma 4 via Ollama)
+- **AI photo review**: optional LLM-powered verification of photo proof submissions (Gemma 4 via LiteRT)
 - **Text-to-speech**: AI-generated audio descriptions of chores via Kokoro TTS
 
 ### Approval Workflow
@@ -71,22 +71,18 @@ A family chore management system designed for a wall-mounted iPad. Gamifies hous
 - Apple mobile web app meta tags for iOS Safari
 
 ### AI Features (Optional)
-- **AI photo review**: submitted photo proofs are automatically verified by a local LLM (Gemma 4 via Ollama) — checks whether the photo matches the chore description before approval
+- **AI photo review**: submitted photo proofs are automatically verified by a local LLM (Gemma 4 E4B via LiteRT) — checks whether the photo matches the chore description before approval
 - **Text-to-speech**: AI-generated chore descriptions read aloud via Kokoro-FastAPI, replacing browser SpeechSynthesis for higher-quality audio
+- **AI Chore Checker**: admin tool to test photo review and TTS synthesis with any chore name and photo
 
-AI services run as optional containers:
+AI services (LiteRT + Kokoro TTS) start by default:
 ```bash
-docker compose --profile ai up        # Start with AI services
+docker compose up -d
 ```
 
-First-time setup — pull the vision model:
-```bash
-docker exec openchore-ollama ollama pull gemma4:e2b
-```
+**Resource requirements:** LiteRT (gemma4:e4b) needs ~3.1 GB RAM; Kokoro TTS adds ~2 GB. Total AI stack is ~5 GB additional.
 
-**Resource requirements:** Ollama (gemma4:e2b) needs ~7.3 GB RAM; Kokoro TTS adds ~2 GB. Total AI stack is ~10 GB additional. A VM with 12-14 GB total RAM is recommended when running the full AI stack alongside the OS and OpenChore.
-
-Configure from **Admin --> Settings --> AI Photo Review**.
+Configure from **Admin --> Settings --> AI Settings**. AI model and endpoint are configured via environment variables in `compose.yaml`, not the UI.
 
 ### Accessibility
 - **Text-to-speech**: speaker button on chore cards reads title and description aloud. When Kokoro TTS is enabled, uses AI-generated audio; otherwise falls back to browser SpeechSynthesis API. Defaults on for kids age 7 and under; any user can toggle via header button. Preference persisted per-user.
@@ -110,8 +106,8 @@ Configure from **Admin --> Settings --> AI Photo Review**.
 ## Getting Started
 
 ### Prerequisites
-- Go 1.25+ with `gcc` (for CGO/sqlite3)
-- Node.js 18+ and npm
+- Go 1.25+
+- Node.js 22+ and npm
 
 ### Install Dependencies
 ```bash
@@ -140,6 +136,8 @@ There is no separate seed command. The server auto-applies `config/config.yaml` 
 | `DB_PATH` | `openchore.db` | SQLite database file path |
 | `CONFIG_PATH` | `config/config.yaml` | Path to seed/config YAML file |
 | `TZ` | system | Timezone (important for deadline/time-lock accuracy) |
+| `AI_ENDPOINT` | `http://litert:8080` | AI backend URL (LiteRT or Ollama) |
+| `TTS_ENDPOINT` | `http://kokoro:8880` | Kokoro TTS service URL |
 
 ### Running Tests
 ```bash
@@ -182,14 +180,14 @@ The compose setup runs:
 │   ├── discord/              # Discord webhook notifications
 │   │   └── notifier.go       # Sends approval requests, chore events to Discord
 │   ├── model/model.go        # Data types (User, Chore, Schedule, Trigger, etc.)
-│   ├── ollama/               # Ollama API client (Gemma 4 vision model)
+│   ├── aibackend/            # AI backend client (LiteRT/Ollama, Gemma 4 vision model)
 │   ├── store/store.go        # SQLite data access layer
 │   ├── tts/                  # Kokoro TTS client (text-to-speech via Kokoro-FastAPI)
 │   └── webhook/              # Async webhook dispatcher + background checkers
 │       ├── dispatcher.go     # Event firing, HMAC signing, delivery logging
 │       ├── expiry.go         # Background expiry checker (1-min interval)
 │       └── decay.go          # Background decay checker (15-min interval)
-├── migrations/               # Embedded SQL migrations (001–004)
+├── migrations/               # Embedded SQL migrations (001–007)
 ├── web/                      # React frontend
 │   └── src/
 │       ├── api.ts            # Typed API client
@@ -274,6 +272,8 @@ The compose setup runs:
 | GET/POST/DELETE | `/api/admin/streak-rewards[/{id}]` | Streak milestone CRUD |
 | GET | `/api/admin/reports` | Analytics/reports data |
 | GET | `/api/admin/export-config` | Export config as YAML |
+| POST | `/api/admin/ai/test` | Test AI photo review |
+| POST | `/api/admin/ai/tts` | Synthesize TTS audio for text |
 | GET/POST/PUT/DELETE | `/api/admin/webhooks[/{id}]` | Webhook CRUD |
 | GET | `/api/admin/webhooks/{id}/deliveries` | Webhook delivery log |
 

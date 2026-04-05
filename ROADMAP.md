@@ -71,8 +71,18 @@
 - [x] FireTrigger: return 403 for disabled triggers instead of 404
 - [x] FireTrigger: return richer response with schedule details
 
+## Code Quality (Completed)
+- [x] String constants for categories, statuses, point reasons, photo sources, expiry modes
+- [x] Renamed internal/ollama to internal/aibackend — supports both LiteRT and Ollama
+- [x] Renamed OLLAMA_ENDPOINT to AI_ENDPOINT with backward compatibility
+- [x] Removed AI infrastructure settings (model, endpoint) from Admin UI — env-var-only
+- [x] Settings key allowlist — rejects unknown keys in admin settings API
+- [x] Thread-safe TTS client with mutex and lazy reconnection
+- [x] Logged point credit/debit errors instead of silent discard
+- [x] Fixed goroutine context leak (r.Context() → context.Background())
+
 ## Testing
-267 integration tests across API, store, config, discord, triggers, and webhook layers.
+357 integration tests across API, store, config, discord, triggers, AI, TTS, and webhook layers.
 - [ ] Add `data-testid` attributes to key admin interactive elements (edit/delete buttons on cards, schedule group delete, pause/unpause toggle, reward/user/point form inputs)
 - [ ] Edit Chore Modal: open, modify fields, save — currently verified via API PUT only
 - [ ] Inline schedule deletion via trash icon in the edit modal
@@ -95,10 +105,13 @@
 - [ ] Chore templates (age-appropriate packs parents can import)
 
 ## Phase 8: AI (Partially Complete)
-- [x] Ollama integration — local LLM inference via Docker sidecar
+- [x] LiteRT integration — local LLM inference via LiteRT Docker sidecar (15x faster than Ollama, 3x less RAM)
 - [x] AI photo review — Gemma 4 vision model verifies photo proof matches chore description
 - [x] Kokoro TTS integration — AI-generated text-to-speech via Kokoro-FastAPI container
 - [x] Admin settings UI for AI photo review configuration
+- [x] AI Chore Checker — admin tool to test photo review and TTS with any photo
+- [x] Lazy TTS reconnection — Kokoro auto-discovered if it starts after the API server
+- [x] TTS retry endpoint — retry audio synthesis without re-analyzing photos
 - [ ] Configurable model idle unload — release LiteRT model from RAM after idle timeout, reload on next request
 - [ ] Reference photo comparison — compare submissions against known-good reference photos
 - [ ] Auto-evolving reference photos — approved photos become new references over time
