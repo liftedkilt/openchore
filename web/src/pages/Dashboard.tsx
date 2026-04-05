@@ -21,7 +21,8 @@ const QRCodeModal: React.FC<{
   baseUrl?: string;
   onClose: () => void;
   onComplete: () => void;
-}> = ({ chore, userId, baseUrl, onClose, onComplete }) => {
+  onAIReject?: (scheduleId: number, feedback: string, audioUrl?: string) => void;
+}> = ({ chore, userId, baseUrl, onClose, onComplete, onAIReject }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -64,7 +65,13 @@ const QRCodeModal: React.FC<{
       onComplete();
     } catch (err: any) {
       if (err instanceof APIError && err.status === 422 && err.data?.ai_review) {
-        setUploadError(err.data.ai_review.feedback);
+        // Close the modal and show feedback on the chore card
+        if (onAIReject) {
+          onAIReject(chore.schedule_id, err.data.ai_review.feedback, err.data.ai_review.feedback_audio);
+          onClose();
+        } else {
+          setUploadError(err.data.ai_review.feedback);
+        }
       } else {
         setUploadError(err.message || 'Upload failed');
       }
@@ -1000,6 +1007,11 @@ export const Dashboard: React.FC = () => {
             setQrChore(null);
             await loadChores();
           } : onChoreFinished}
+          onAIReject={(scheduleId, feedback, audioUrl) => {
+            setAiFeedback(prev => ({ ...prev, [scheduleId]: { text: feedback, audioUrl } }));
+            setQrChore(null);
+            loadChores();
+          }}
         />
       )}
 
