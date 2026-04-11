@@ -701,6 +701,40 @@ func TestDecayChecker_PenalizeMissedRequiredChore(t *testing.T) {
 	}
 }
 
+func TestDecayChecker_PenalizeMissedCoreChore(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	parentID := createParentUser(t, env, "Parent")
+	childID := createChildUser(t, env, "Child")
+
+	// Seed a positive balance so we can observe the debit.
+	if err := env.store.AdminAdjustPoints(ctx, childID, 50, ""); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	// A core chore scheduled for yesterday with a 7-point missed penalty.
+	yesterday := time.Now().AddDate(0, 0, -1)
+	dow := int(yesterday.Weekday())
+	_, scheduleID := createChoreWithSchedule(t, env, parentID, childID, "core", dow, nil, 7)
+
+	dc := NewDecayChecker(env.store, env.dispatcher)
+	dc.check(ctx)
+
+	hasPenalty, err := env.store.HasMissedChorePenalty(ctx, scheduleID, yesterday.Format(model.DateFormat))
+	if err != nil {
+		t.Fatalf("HasMissedChorePenalty error: %v", err)
+	}
+	if !hasPenalty {
+		t.Error("expected missed core chore with penalty to be debited")
+	}
+
+	balance, _ := env.store.GetPointBalance(ctx, childID)
+	if balance != 43 {
+		t.Errorf("expected balance=43 after 7-point penalty on missed core chore, got %d", balance)
+	}
+}
+
 func TestDecayChecker_NoPenaltyForBonusChore(t *testing.T) {
 	env := setupTest(t)
 
