@@ -18,6 +18,15 @@ import (
 
 func setupStore(t *testing.T) *store.Store {
 	t.Helper()
+	s, _ := setupStoreWithDB(t)
+	return s
+}
+
+// setupStoreWithDB returns both the Store and the underlying *sql.DB so tests
+// can perform direct SQL manipulation (e.g. backdating timestamps) that isn't
+// exposed through the Store API.
+func setupStoreWithDB(t *testing.T) (*store.Store, *sql.DB) {
+	t.Helper()
 
 	db, err := sql.Open("sqlite", ":memory:?_foreign_keys=on&_busy_timeout=5000")
 	if err != nil {
@@ -42,7 +51,7 @@ func setupStore(t *testing.T) *store.Store {
 	}
 
 	t.Cleanup(func() { db.Close() })
-	return store.New(db)
+	return store.New(db), db
 }
 
 func createTestUser(t *testing.T, s *store.Store, name, role string) *model.User {
@@ -1464,6 +1473,68 @@ func TestLogAndListWebhookDeliveries(t *testing.T) {
 	}
 	if deliveries[0].Event != "chore.complete" {
 		t.Errorf("unexpected event: %q", deliveries[0].Event)
+	}
+}
+
+func TestDeleteOldWebhookDeliveries(t *testing.T) {
+	s, db := setupStoreWithDB(t)
+	ctx := context.Background()
+
+	w := &model.Webhook{URL: "https://hook.example.com", Events: "*", Active: true}
+	if err := s.CreateWebhook(ctx, w); err != nil {
+		t.Fatalf("CreateWebhook: %v", err)
+	}
+
+	// Insert three rows: two "old" (will be backdated), one "fresh" at now.
+	sc := 200
+	d := func(event string) *model.WebhookDelivery {
+		return &model.WebhookDelivery{
+			WebhookID:    w.ID,
+			Event:        event,
+			Payload:      `{}`,
+			StatusCode:   &sc,
+			ResponseBody: "OK",
+		}
+	}
+	for _, e := range []string{"old1", "old2", "fresh"} {
+		if err := s.LogWebhookDelivery(ctx, d(e)); err != nil {
+			t.Fatalf("LogWebhookDelivery %q: %v", e, err)
+		}
+	}
+
+	// Backdate two rows to 60 days ago via direct SQL (test-only).
+	backdated := time.Now().Add(-60 * 24 * time.Hour).UTC().Format("2006-01-02 15:04:05")
+	if _, err := db.ExecContext(ctx,
+		`UPDATE webhook_deliveries SET created_at = ? WHERE event IN ('old1','old2')`,
+		backdated); err != nil {
+		t.Fatalf("backdate: %v", err)
+	}
+
+	// Purge rows older than 30 days: should remove both backdated rows.
+	cutoff := time.Now().Add(-30 * 24 * time.Hour)
+	n, err := s.DeleteOldWebhookDeliveries(ctx, cutoff)
+	if err != nil {
+		t.Fatalf("DeleteOldWebhookDeliveries: %v", err)
+	}
+	if n != 2 {
+		t.Errorf("expected 2 rows deleted, got %d", n)
+	}
+
+	remaining, err := s.ListWebhookDeliveries(ctx, w.ID, 10)
+	if err != nil {
+		t.Fatalf("ListWebhookDeliveries: %v", err)
+	}
+	if len(remaining) != 1 || remaining[0].Event != "fresh" {
+		t.Errorf("expected only 'fresh' to remain, got %+v", remaining)
+	}
+
+	// Second call with same cutoff should delete nothing.
+	n, err = s.DeleteOldWebhookDeliveries(ctx, cutoff)
+	if err != nil {
+		t.Fatalf("DeleteOldWebhookDeliveries (second): %v", err)
+	}
+	if n != 0 {
+		t.Errorf("expected 0 rows deleted on second call, got %d", n)
 	}
 }
 

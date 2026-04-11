@@ -2,12 +2,50 @@ package config
 
 // Config represents the top-level YAML configuration file.
 type Config struct {
-	Users        []UserConfig         `yaml:"users,omitempty"`
-	Chores       []ChoreConfig        `yaml:"chores,omitempty"`
-	Rewards      []RewardConfig       `yaml:"rewards,omitempty"`
+	Users         []UserConfig         `yaml:"users,omitempty"`
+	Chores        []ChoreConfig        `yaml:"chores,omitempty"`
+	Rewards       []RewardConfig       `yaml:"rewards,omitempty"`
 	StreakRewards []StreakRewardConfig `yaml:"streak_rewards,omitempty"`
-	Settings     map[string]string    `yaml:"settings,omitempty"`
-	AI           *AIConfig            `yaml:"ai,omitempty"`
+	Settings      map[string]string    `yaml:"settings,omitempty"`
+	AI            *AIConfig            `yaml:"ai,omitempty"`
+	Webhooks      *WebhooksConfig      `yaml:"webhooks,omitempty"`
+}
+
+// WebhooksConfig holds runtime tunables for the webhook subsystem.
+// Currently only governs retention/cleanup of webhook_deliveries rows.
+type WebhooksConfig struct {
+	// DeliveryRetentionDays is the number of days of webhook delivery history to keep.
+	// Rows with created_at older than now - retention are purged. Default: 30.
+	// A value <= 0 disables cleanup (retain forever).
+	DeliveryRetentionDays int `yaml:"delivery_retention_days,omitempty"`
+
+	// DeliveryCleanupIntervalHours is how often the cleanup goroutine runs.
+	// Default: 24 (once per day). Must be > 0 to schedule cleanup.
+	DeliveryCleanupIntervalHours int `yaml:"delivery_cleanup_interval_hours,omitempty"`
+}
+
+// Retention defaults for webhook_deliveries cleanup.
+const (
+	DefaultWebhookDeliveryRetentionDays        = 30
+	DefaultWebhookDeliveryCleanupIntervalHours = 24
+)
+
+// WebhookRetention returns the effective retention duration in days for
+// webhook_deliveries rows, falling back to the default when unset.
+func (c *Config) WebhookRetentionDays() int {
+	if c == nil || c.Webhooks == nil || c.Webhooks.DeliveryRetentionDays == 0 {
+		return DefaultWebhookDeliveryRetentionDays
+	}
+	return c.Webhooks.DeliveryRetentionDays
+}
+
+// WebhookCleanupIntervalHours returns the effective interval between cleanup
+// runs in hours, falling back to the default when unset.
+func (c *Config) WebhookCleanupIntervalHours() int {
+	if c == nil || c.Webhooks == nil || c.Webhooks.DeliveryCleanupIntervalHours <= 0 {
+		return DefaultWebhookDeliveryCleanupIntervalHours
+	}
+	return c.Webhooks.DeliveryCleanupIntervalHours
 }
 
 // AIConfig holds settings for AI-powered features (LiteRT or Ollama + Kokoro TTS).
