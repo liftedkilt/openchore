@@ -71,7 +71,11 @@ class Handler(BaseHTTPRequestHandler):
             start = time.time()
             tmp_files = []
 
-            with eng.create_conversation(max_tokens=max_tokens) as conv:
+            # Note: newer litert_lm.Engine.create_conversation() no longer
+            # accepts max_tokens as a kwarg — the supported parameters are
+            # messages, tools, tool_event_handler, extra_context. We still
+            # log the client's requested max_tokens for observability.
+            with eng.create_conversation() as conv:
                 response = None
                 for msg in messages:
                     role = msg.get("role", "user")
@@ -132,7 +136,9 @@ class Handler(BaseHTTPRequestHandler):
             eng = get_engine()
             start = time.time()
 
-            with eng.create_conversation(max_tokens=max_tokens) as conv:
+            # See note in _handle_chat: create_conversation() no longer
+            # accepts max_tokens in the current litert_lm API.
+            with eng.create_conversation() as conv:
                 response = conv.send_message({
                     "role": "user",
                     "content": [{"type": "text", "text": prompt}],
