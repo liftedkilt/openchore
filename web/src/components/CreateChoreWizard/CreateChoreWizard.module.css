@@ -63,49 +63,30 @@
   color: var(--text-primary, #e2e8f0);
 }
 
-/* Form fields */
+/* Form fields — shared base rules come from styles/forms.module.css via composes */
 .formGrid {
-  display: flex;
-  flex-direction: column;
+  composes: formGrid from '../../styles/forms.module.css';
   gap: 0.875rem;
 }
 
 .formRow {
-  display: flex;
-  gap: 0.75rem;
+  composes: formRow from '../../styles/forms.module.css';
 }
 
 .formGroup {
-  display: flex;
-  flex-direction: column;
+  composes: formGroup from '../../styles/forms.module.css';
   gap: 0.4rem;
-  flex: 1;
 }
 
 .label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-secondary, #94a3b8);
+  composes: label from '../../styles/forms.module.css';
 }
 
 .input {
-  width: 100%;
+  composes: input from '../../styles/forms.module.css';
   padding: 0.75rem 1rem;
   min-height: 48px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
-  background: rgba(0, 0, 0, 0.2);
-  color: var(--text-primary, #e2e8f0);
   font-size: 0.9rem;
-  box-sizing: border-box;
-}
-
-.input:focus {
-  outline: none;
-  border-color: var(--accent-blue, #38bdf8);
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
 }
 
 .helpText {
@@ -115,8 +96,7 @@
 
 /* Checkbox row */
 .checkRow {
-  display: flex;
-  align-items: center;
+  composes: checkRow from '../../styles/forms.module.css';
   gap: 0.75rem;
   min-height: 44px;
   padding: 0.5rem 0;
@@ -125,12 +105,11 @@
 .checkRow input[type="checkbox"] {
   width: 22px;
   height: 22px;
-  accent-color: var(--accent-blue, #38bdf8);
 }
 
 .checkLabel {
+  composes: checkLabel from '../../styles/forms.module.css';
   font-size: 0.9rem;
-  color: var(--text-primary, #e2e8f0);
 }
 
 /* User picker pills */
@@ -253,27 +232,10 @@
 }
 
 .btnPrimary {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
+  composes: btnPrimary from '../../styles/forms.module.css';
   padding: 0.75rem 1.5rem;
   min-height: 48px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: var(--accent-blue, #38bdf8);
-  color: var(--bg-primary);
   font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.btnPrimary:hover {
-  opacity: 0.9;
-}
-
-.btnPrimary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 .btnSecondary {
