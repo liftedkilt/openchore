@@ -130,8 +130,9 @@ export const Reports: React.FC = () => {
     try {
       const resp = await api.admin.getAISummary(userId, period, date);
       setAiSummaries(prev => ({ ...prev, [userId]: resp.summary }));
-    } catch {
-      setAiSummaries(prev => ({ ...prev, [userId]: 'Failed to generate summary. AI services may not be available.' }));
+    } catch (e) {
+      const msg = e instanceof Error && e.message ? e.message : 'Failed to generate summary.';
+      setAiSummaries(prev => ({ ...prev, [userId]: msg }));
     } finally {
       setSummaryLoading(prev => ({ ...prev, [userId]: false }));
     }

@@ -82,6 +82,8 @@ const UserForm: React.FC<{
   const [userTheme, setUserTheme] = useState<Theme>(user?.theme || 'default');
   const [saving, setSaving] = useState(false);
 
+  const isChild = role === 'child';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -90,7 +92,7 @@ const UserForm: React.FC<{
         name,
         role: role as 'admin' | 'child',
         age: age ? parseInt(age) : undefined,
-        theme: userTheme,
+        theme: isChild ? userTheme : 'default',
         avatar_url: `https://api.dicebear.com/9.x/avataaars-neutral/svg?seed=${encodeURIComponent(name)}`,
       };
       if (user) {
@@ -130,15 +132,17 @@ const UserForm: React.FC<{
             <input className={styles.input} type="number" min="1" max="99" value={age} onChange={e => setAge(e.target.value)} placeholder="Optional" />
           </div>
         </div>
-        <div className={styles.formGroup}>
-          <label className={styles.label}>Theme</label>
-          <select className={styles.input} value={userTheme} onChange={e => setUserTheme(e.target.value as Theme)}>
-            <option value="default">🌊 Classic</option>
-            <option value="quest">⚔️ Quest</option>
-            <option value="galaxy">🚀 Galaxy</option>
-            <option value="forest">🌲 Forest</option>
-          </select>
-        </div>
+        {isChild && (
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Theme</label>
+            <select className={styles.input} value={userTheme} onChange={e => setUserTheme(e.target.value as Theme)}>
+              <option value="default">🌊 Classic</option>
+              <option value="quest">⚔️ Quest</option>
+              <option value="galaxy">🚀 Galaxy</option>
+              <option value="forest">🌲 Forest</option>
+            </select>
+          </div>
+        )}
       </div>
 
       <div className={styles.formActions}>
