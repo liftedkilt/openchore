@@ -2186,3 +2186,193 @@ func TestCompleteChoreWithEmptyAIFields(t *testing.T) {
 		t.Errorf("expected zero AI confidence, got %f", got.AIConfidence)
 	}
 }
+
+// ===== Missed-chore penalty idempotency (issue #17) =====
+
+// TestDebitMissedChoreIsIdempotent asserts that applying a missed-chore
+// penalty twice for the same (user, schedule, date) inserts exactly one
+// point_transactions row and deducts points exactly once. The check lives
+// in a UNIQUE partial index on idempotency_key; the second call is expected
+// to succeed as a no-op rather than return an error.
+func TestDebitMissedChoreIsIdempotent(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Laundry", 5, u.ID)
+	cs := createTestSchedule(t, s, c.ID, u.ID, 1)
+
+	const date = "2026-04-10"
+	const penalty = 3
+
+	if err := s.DebitMissedChore(ctx, u.ID, cs.ID, penalty, date); err != nil {
+		t.Fatalf("first DebitMissedChore: %v", err)
+	}
+	if err := s.DebitMissedChore(ctx, u.ID, cs.ID, penalty, date); err != nil {
+		t.Fatalf("second DebitMissedChore (should be no-op, not error): %v", err)
+	}
+
+	// Exactly one penalty row should exist for this schedule+date.
+	txs, err := s.ListPointTransactions(ctx, u.ID, 10)
+	if err != nil {
+		t.Fatalf("ListPointTransactions: %v", err)
+	}
+	var penaltyCount int
+	for _, tx := range txs {
+		if tx.Reason == "missed_chore" && tx.ReferenceID != nil && *tx.ReferenceID == cs.ID {
+			penaltyCount++
+			if tx.IdempotencyKey == nil {
+				t.Errorf("penalty row has NULL idempotency_key")
+			} else if want := "missed_chore_penalty:"; !strings.HasPrefix(*tx.IdempotencyKey, want) {
+				t.Errorf("idempotency key = %q, want prefix %q", *tx.IdempotencyKey, want)
+			}
+		}
+	}
+	if penaltyCount != 1 {
+		t.Errorf("expected 1 penalty transaction, got %d", penaltyCount)
+	}
+
+	// Balance should reflect exactly one -3 debit, not -6.
+	bal, err := s.GetPointBalance(ctx, u.ID)
+	if err != nil {
+		t.Fatalf("GetPointBalance: %v", err)
+	}
+	if bal != -penalty {
+		t.Errorf("balance = %d, want %d (debited once)", bal, -penalty)
+	}
+}
+
+// TestHasMissedChorePenaltyExactMatch verifies HasMissedChorePenalty returns
+// true only for the exact (schedule, date) pair that was penalized — i.e.
+// the lookup is an exact key match, not a substring search that could
+// accidentally match an adjacent date or schedule.
+func TestHasMissedChorePenaltyExactMatch(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Dishes", 5, u.ID)
+	cs1 := createTestSchedule(t, s, c.ID, u.ID, 1)
+	cs2 := createTestSchedule(t, s, c.ID, u.ID, 2)
+
+	// Before any penalty, nothing is flagged.
+	for _, cs := range []*model.ChoreSchedule{cs1, cs2} {
+		got, err := s.HasMissedChorePenalty(ctx, cs.ID, "2026-04-10")
+		if err != nil {
+			t.Fatalf("HasMissedChorePenalty: %v", err)
+		}
+		if got {
+			t.Errorf("schedule %d: unexpected penalty reported before any debit", cs.ID)
+		}
+	}
+
+	// Apply a penalty for (cs1, 2026-04-10) only.
+	if err := s.DebitMissedChore(ctx, u.ID, cs1.ID, 2, "2026-04-10"); err != nil {
+		t.Fatalf("DebitMissedChore: %v", err)
+	}
+
+	cases := []struct {
+		name       string
+		scheduleID int64
+		date       string
+		want       bool
+	}{
+		{"exact match", cs1.ID, "2026-04-10", true},
+		{"same schedule, different date", cs1.ID, "2026-04-11", false},
+		{"different schedule, same date", cs2.ID, "2026-04-10", false},
+		{"unknown schedule", 99999, "2026-04-10", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := s.HasMissedChorePenalty(ctx, tc.scheduleID, tc.date)
+			if err != nil {
+				t.Fatalf("HasMissedChorePenalty: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestDebitMissedChoreDistinctKeysCoexist proves the UNIQUE index scopes
+// idempotency to the exact (user, schedule, date) tuple — penalties for
+// different dates or different schedules are NOT blocked.
+func TestDebitMissedChoreDistinctKeysCoexist(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Sweep", 10, u.ID)
+	cs1 := createTestSchedule(t, s, c.ID, u.ID, 1)
+	cs2 := createTestSchedule(t, s, c.ID, u.ID, 2)
+
+	calls := []struct {
+		scheduleID int64
+		date       string
+	}{
+		{cs1.ID, "2026-04-10"},
+		{cs1.ID, "2026-04-11"}, // same schedule, different date
+		{cs2.ID, "2026-04-10"}, // different schedule, same date
+	}
+	for _, call := range calls {
+		if err := s.DebitMissedChore(ctx, u.ID, call.scheduleID, 2, call.date); err != nil {
+			t.Fatalf("DebitMissedChore(%d, %s): %v", call.scheduleID, call.date, err)
+		}
+	}
+
+	bal, err := s.GetPointBalance(ctx, u.ID)
+	if err != nil {
+		t.Fatalf("GetPointBalance: %v", err)
+	}
+	if want := -6; bal != want {
+		t.Errorf("balance = %d, want %d (three distinct penalties)", bal, want)
+	}
+}
+
+// TestNullIdempotencyKeysAreNotUnique asserts that non-idempotent
+// transactions (e.g. chore credits) with NULL idempotency_key do not
+// collide with each other under the partial UNIQUE index. Without the
+// `WHERE idempotency_key IS NOT NULL` predicate, the index would treat
+// all NULLs as identical and reject the second insert.
+func TestNullIdempotencyKeysAreNotUnique(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Trash", 5, u.ID)
+	cs := createTestSchedule(t, s, c.ID, u.ID, 3)
+
+	// Two chore completions → two credit rows, both with NULL idempotency_key.
+	cc1 := &model.ChoreCompletion{ChoreScheduleID: cs.ID, CompletedBy: u.ID, CompletionDate: "2026-04-10", Status: "approved"}
+	cc2 := &model.ChoreCompletion{ChoreScheduleID: cs.ID, CompletedBy: u.ID, CompletionDate: "2026-04-11", Status: "approved"}
+	if err := s.CompleteChore(ctx, cc1); err != nil {
+		t.Fatalf("CompleteChore 1: %v", err)
+	}
+	if err := s.CompleteChore(ctx, cc2); err != nil {
+		t.Fatalf("CompleteChore 2: %v", err)
+	}
+	if err := s.CreditChorePoints(ctx, u.ID, cc1.ID, 5); err != nil {
+		t.Fatalf("CreditChorePoints 1 (NULL key): %v", err)
+	}
+	if err := s.CreditChorePoints(ctx, u.ID, cc2.ID, 5); err != nil {
+		t.Fatalf("CreditChorePoints 2 (NULL key): %v", err)
+	}
+
+	txs, err := s.ListPointTransactions(ctx, u.ID, 10)
+	if err != nil {
+		t.Fatalf("ListPointTransactions: %v", err)
+	}
+	var creditCount int
+	for _, tx := range txs {
+		if tx.Reason == model.ReasonChoreComplete {
+			creditCount++
+			if tx.IdempotencyKey != nil {
+				t.Errorf("chore credit unexpectedly has idempotency_key = %q", *tx.IdempotencyKey)
+			}
+		}
+	}
+	if creditCount != 2 {
+		t.Errorf("expected 2 chore-credit rows with NULL keys, got %d", creditCount)
+	}
+}

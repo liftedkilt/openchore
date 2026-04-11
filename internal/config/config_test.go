@@ -431,3 +431,57 @@ func TestMarshal(t *testing.T) {
 		t.Error("expected non-empty YAML output")
 	}
 }
+
+// ===== Webhook retention helpers (issue #18) =====
+
+// TestWebhookRetentionDays covers the fallback ladder: nil Config, nil
+// Webhooks section, zero value, and explicit override. This guards against
+// a regression where unset config causes cleanup to misbehave (e.g. purge
+// everything because retention read as 0, or panic on nil).
+func TestWebhookRetentionDays(t *testing.T) {
+	cases := []struct {
+		name string
+		cfg  *Config
+		want int
+	}{
+		{"nil config", nil, DefaultWebhookDeliveryRetentionDays},
+		{"nil webhooks section", &Config{}, DefaultWebhookDeliveryRetentionDays},
+		{"zero value falls through to default", &Config{Webhooks: &WebhooksConfig{}}, DefaultWebhookDeliveryRetentionDays},
+		{"explicit override", &Config{Webhooks: &WebhooksConfig{DeliveryRetentionDays: 7}}, 7},
+		{"negative value passes through (disables cleanup)", &Config{Webhooks: &WebhooksConfig{DeliveryRetentionDays: -1}}, -1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.cfg.WebhookRetentionDays()
+			if got != tc.want {
+				t.Errorf("WebhookRetentionDays() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestWebhookCleanupIntervalHours mirrors WebhookRetentionDays, but note
+// the interval helper clamps non-positive values to the default because
+// a zero or negative tick interval would break the cleanup goroutine's
+// ticker.
+func TestWebhookCleanupIntervalHours(t *testing.T) {
+	cases := []struct {
+		name string
+		cfg  *Config
+		want int
+	}{
+		{"nil config", nil, DefaultWebhookDeliveryCleanupIntervalHours},
+		{"nil webhooks section", &Config{}, DefaultWebhookDeliveryCleanupIntervalHours},
+		{"zero value falls through", &Config{Webhooks: &WebhooksConfig{}}, DefaultWebhookDeliveryCleanupIntervalHours},
+		{"negative value clamped to default", &Config{Webhooks: &WebhooksConfig{DeliveryCleanupIntervalHours: -5}}, DefaultWebhookDeliveryCleanupIntervalHours},
+		{"explicit override", &Config{Webhooks: &WebhooksConfig{DeliveryCleanupIntervalHours: 6}}, 6},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.cfg.WebhookCleanupIntervalHours()
+			if got != tc.want {
+				t.Errorf("WebhookCleanupIntervalHours() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
