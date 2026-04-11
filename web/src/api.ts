@@ -122,6 +122,21 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ line_color }),
       }),
+    verifyPin: (id: number, pin: string) =>
+      fetchPublic<{ valid: boolean }>(`/users/${id}/verify-pin`, {
+        method: 'POST',
+        body: JSON.stringify({ pin }),
+      }),
+    setPin: (id: number, newPin: string, currentPin?: string) =>
+      fetchWithAuth<{ has_pin: boolean }>(`/users/${id}/pin`, {
+        method: 'PUT',
+        body: JSON.stringify({ new_pin: newPin, current_pin: currentPin ?? '' }),
+      }),
+    clearPin: (id: number, currentPin?: string) =>
+      fetchWithAuth<{ has_pin: boolean }>(`/users/${id}/pin`, {
+        method: 'DELETE',
+        body: JSON.stringify({ current_pin: currentPin ?? '' }),
+      }),
     pause: (id: number) =>
       fetchWithAuth<User>(`/users/${id}/pause`, { method: 'PUT' }),
     unpause: (id: number) =>

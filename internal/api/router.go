@@ -43,6 +43,9 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 		r.Get("/users", users.List)
 		r.Get("/users/{id}", users.Get)
 
+		// Public: verify a profile PIN from the login screen (no session yet)
+		r.Post("/users/{id}/verify-pin", users.VerifyPin)
+
 		// Public: chore trigger webhook (UUID is the auth)
 		r.Post("/hooks/trigger/{uuid}", triggers.FireTrigger)
 
@@ -66,6 +69,8 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 			r.Put("/users/{id}/theme", users.UpdateTheme)
 			r.Put("/users/{id}/avatar", users.UpdateAvatar)
 			r.Put("/users/{id}/line-color", users.UpdateLineColor)
+			r.Put("/users/{id}/pin", users.SetPin)
+			r.Delete("/users/{id}/pin", users.ClearPin)
 
 			// Any user can complete/uncomplete chores
 			r.Post("/schedules/{scheduleID}/complete", chores.Complete)

@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/store"
 )
@@ -337,6 +339,182 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// --- Profile PIN ---
+
+// pinFormatValid checks that a PIN is 4-8 numeric digits.
+func pinFormatValid(pin string) bool {
+	if len(pin) < 4 || len(pin) > 8 {
+		return false
+	}
+	for _, c := range pin {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+type verifyPinRequest struct {
+	Pin string `json:"pin"`
+}
+
+// VerifyPin checks a PIN attempt against the stored hash for the given user.
+// This is a public endpoint: it is how a kid unlocks their own profile at the
+// login screen, before any session identity exists.
+func (h *UserHandler) VerifyPin(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+	var req verifyPinRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	hash, err := h.store.GetUserPinHash(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to check pin")
+		return
+	}
+	if hash == "" {
+		// No PIN set — nothing to verify.
+		writeError(w, http.StatusBadRequest, "profile has no pin")
+		return
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Pin)); err != nil {
+		writeError(w, http.StatusUnauthorized, "incorrect pin")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"valid": true})
+}
+
+type setPinRequest struct {
+	CurrentPin string `json:"current_pin"`
+	NewPin     string `json:"new_pin"`
+}
+
+// SetPin sets or updates a user's profile PIN. A user may only change their
+// own PIN, and must supply the current PIN if one is already set. Admins can
+// set/reset any user's PIN without the current value.
+func (h *UserHandler) SetPin(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+
+	caller := UserFromContext(r.Context())
+	if caller == nil {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	isAdmin := caller.Role == "admin"
+	if !isAdmin && caller.ID != id {
+		writeError(w, http.StatusForbidden, "can only change your own pin")
+		return
+	}
+
+	var req setPinRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if !pinFormatValid(req.NewPin) {
+		writeError(w, http.StatusBadRequest, "pin must be 4-8 digits")
+		return
+	}
+
+	existingHash, err := h.store.GetUserPinHash(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to check pin")
+		return
+	}
+	if existingHash == "" {
+		// No PIN set yet — ensure the target user actually exists.
+		u, err := h.store.GetUser(r.Context(), id)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to get user")
+			return
+		}
+		if u == nil {
+			writeError(w, http.StatusNotFound, "user not found")
+			return
+		}
+	} else if !isAdmin {
+		// Non-admin changing their own PIN must supply the current value.
+		if err := bcrypt.CompareHashAndPassword([]byte(existingHash), []byte(req.CurrentPin)); err != nil {
+			writeError(w, http.StatusUnauthorized, "incorrect current pin")
+			return
+		}
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPin), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to hash pin")
+		return
+	}
+	if err := h.store.SetUserPin(r.Context(), id, string(newHash)); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save pin")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"has_pin": true})
+}
+
+type clearPinRequest struct {
+	CurrentPin string `json:"current_pin"`
+}
+
+// ClearPin removes the PIN from a user's profile. Non-admin callers must
+// supply the current PIN; admins can clear any user's PIN without it.
+func (h *UserHandler) ClearPin(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+
+	caller := UserFromContext(r.Context())
+	if caller == nil {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	isAdmin := caller.Role == "admin"
+	if !isAdmin && caller.ID != id {
+		writeError(w, http.StatusForbidden, "can only change your own pin")
+		return
+	}
+
+	existingHash, err := h.store.GetUserPinHash(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to check pin")
+		return
+	}
+	if existingHash == "" {
+		// Already clear — idempotent success.
+		writeJSON(w, http.StatusOK, map[string]bool{"has_pin": false})
+		return
+	}
+
+	if !isAdmin {
+		var req clearPinRequest
+		if err := decodeJSON(r, &req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(existingHash), []byte(req.CurrentPin)); err != nil {
+			writeError(w, http.StatusUnauthorized, "incorrect current pin")
+			return
+		}
+	}
+
+	if err := h.store.SetUserPin(r.Context(), id, ""); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to clear pin")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"has_pin": false})
 }
 
 func (h *UserHandler) GetChores(w http.ResponseWriter, r *http.Request) {

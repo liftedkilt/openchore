@@ -3215,3 +3215,103 @@ func TestChoreGetIncludesTTSDescription(t *testing.T) {
 		t.Errorf("expected tts_description on get, got %v", chore["tts_description"])
 	}
 }
+
+// ===== Profile PIN =====
+
+func TestProfilePinSetVerifyAndClear(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Initially: listing users reports has_pin=false.
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d", kidID), nil, nil, http.StatusOK)
+	var u map[string]any
+	decodeBody(t, resp, &u)
+	if hp, _ := u["has_pin"].(bool); hp {
+		t.Fatalf("expected has_pin=false, got true")
+	}
+
+	// Verify against an unset PIN is rejected.
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID),
+		map[string]any{"pin": "1234"}, nil, http.StatusBadRequest)
+
+	// Kid sets their own PIN (no current_pin required on first set).
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidID),
+		map[string]any{"new_pin": "1234"}, childHeaders(kidID), http.StatusOK)
+
+	// has_pin now true.
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d", kidID), nil, nil, http.StatusOK)
+	decodeBody(t, resp, &u)
+	if hp, _ := u["has_pin"].(bool); !hp {
+		t.Fatalf("expected has_pin=true after set")
+	}
+
+	// Wrong PIN is rejected on the public verify endpoint.
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID),
+		map[string]any{"pin": "9999"}, nil, http.StatusUnauthorized)
+
+	// Correct PIN succeeds.
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID),
+		map[string]any{"pin": "1234"}, nil, http.StatusOK)
+
+	// Kid cannot change to a new PIN without supplying the current one.
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidID),
+		map[string]any{"new_pin": "5678"}, childHeaders(kidID), http.StatusUnauthorized)
+
+	// With current_pin, the change succeeds.
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidID),
+		map[string]any{"current_pin": "1234", "new_pin": "5678"}, childHeaders(kidID), http.StatusOK)
+
+	// Old PIN no longer verifies; new one does.
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID),
+		map[string]any{"pin": "1234"}, nil, http.StatusUnauthorized)
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID),
+		map[string]any{"pin": "5678"}, nil, http.StatusOK)
+
+	// Admin can clear a kid's PIN without supplying it (reset flow).
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/users/%d/pin", kidID),
+		nil, adminHeaders(), http.StatusOK)
+
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d", kidID), nil, nil, http.StatusOK)
+	decodeBody(t, resp, &u)
+	if hp, _ := u["has_pin"].(bool); hp {
+		t.Fatalf("expected has_pin=false after admin clear")
+	}
+}
+
+func TestProfilePinRejectsNonNumericAndShort(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Too short.
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidID),
+		map[string]any{"new_pin": "12"}, childHeaders(kidID), http.StatusBadRequest)
+
+	// Non-numeric.
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidID),
+		map[string]any{"new_pin": "abcd"}, childHeaders(kidID), http.StatusBadRequest)
+
+	// Too long.
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidID),
+		map[string]any{"new_pin": "123456789"}, childHeaders(kidID), http.StatusBadRequest)
+}
+
+func TestProfilePinCannotBeChangedByOtherChild(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidA := env.createChild(t, "KidA")
+	kidB := env.createChild(t, "KidB")
+
+	// KidA sets a PIN.
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidA),
+		map[string]any{"new_pin": "1234"}, childHeaders(kidA), http.StatusOK)
+
+	// KidB attempts to change KidA's PIN → forbidden.
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidA),
+		map[string]any{"new_pin": "9999"}, childHeaders(kidB), http.StatusForbidden)
+
+	// KidB attempts to clear KidA's PIN → forbidden.
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/users/%d/pin", kidA),
+		nil, childHeaders(kidB), http.StatusForbidden)
+}

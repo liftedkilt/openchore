@@ -6,7 +6,7 @@ import type { Chore, User, ChoreSchedule, ChoreTrigger, Reward, PointBalance, Po
 import { DAY_NAMES } from '../types';
 import { toggleInArray } from '../utils';
 import styles from './AdminDashboard.module.css';
-import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, Gift, Coins, Flame, Undo2, Activity, Settings, Check, Pause, Play, Link2, Copy, Key, AlertTriangle, Camera, Volume2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, X, Save, Users, ListChecks, Clock, Star, ChevronDown, ChevronUp, Gift, Coins, Flame, Undo2, Activity, Settings, Check, Pause, Play, Link2, Copy, Key, KeyRound, AlertTriangle, Camera, Volume2, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import CreateChoreWizard from '../components/CreateChoreWizard/CreateChoreWizard';
 import EditChoreModal from '../components/EditChoreModal/EditChoreModal';
@@ -2151,6 +2151,16 @@ const UsersTab: React.FC = () => {
     }
   };
 
+  const handleClearPin = async (user: User) => {
+    if (!confirm(`Reset ${user.name}'s profile PIN? They will be able to log in without a PIN until they set a new one.`)) return;
+    try {
+      await api.users.clearPin(user.id);
+      load();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleSaved = () => {
     setShowForm(false);
     setEditingUser(null);
@@ -2186,10 +2196,21 @@ const UsersTab: React.FC = () => {
                 <div className={styles.listItemMeta}>
                   <span className={clsx(styles.badge, u.role === 'admin' ? styles.badge_admin : styles.badge_child)}>{u.role}</span>
                   {u.paused && <span className={clsx(styles.badge, styles.badge_paused)}>Paused</span>}
+                  {u.has_pin && <span className={clsx(styles.badge, styles.badge_child)}>PIN</span>}
                   {u.age && <span>Age {u.age}</span>}
                 </div>
               </div>
               <div className={styles.listItemActions}>
+                {u.has_pin && (
+                  <button
+                    className={styles.iconBtn}
+                    onClick={() => handleClearPin(u)}
+                    title="Reset profile PIN"
+                    aria-label="Reset profile PIN"
+                  >
+                    <KeyRound size={16} />
+                  </button>
+                )}
                 {u.role === 'child' && (
                   <button
                     className={clsx(styles.iconBtn, u.paused && styles.iconBtnActive)}

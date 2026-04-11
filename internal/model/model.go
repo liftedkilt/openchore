@@ -61,6 +61,8 @@ type User struct {
 	Theme     string    `json:"theme,omitempty"`
 	LineColor string    `json:"line_color,omitempty"`
 	Paused    bool      `json:"paused"`
+	HasPin    bool      `json:"has_pin"`
+	PinHash   string    `json:"-"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
