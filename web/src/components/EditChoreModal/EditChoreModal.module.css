@@ -92,3 +92,73 @@
   color: var(--status-required);
   font-size: 0.8rem;
 }
+
+/* Secondary button for TTS section */
+.btnSecondary {
+  composes: btnPrimary from '../../styles/forms.module.css';
+  padding: 0.6rem 1rem;
+  min-height: 44px;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary, #e2e8f0);
+}
+
+.btnSecondary:hover {
+  background: rgba(255, 255, 255, 0.14);
+  opacity: 1;
+}
+
+/* Textarea used for the TTS spoken description */
+.textarea {
+  composes: input from '../../styles/forms.module.css';
+  padding: 0.65rem 0.85rem;
+  font-size: 0.85rem;
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+/* TTS audio player row */
+.ttsPlayerRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.ttsPlayBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-blue, #38bdf8);
+  color: var(--bg-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ttsPlayBtn:hover {
+  opacity: 0.9;
+}
+
+.ttsHint {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #94a3b8);
+}
+
+/* Spinner animation for the regenerate button */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}

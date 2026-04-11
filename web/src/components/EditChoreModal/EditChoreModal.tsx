@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Save, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Save, Check, Play, Pause, RefreshCw, Sparkles } from 'lucide-react';
 import Modal from '../Modal/Modal';
-import { api } from '../../api';
+import { api, APIError } from '../../api';
 import type { Chore, User } from '../../types';
 import styles from './EditChoreModal.module.css';
 
@@ -31,6 +31,79 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+
+  // TTS editing state
+  const [ttsDescription, setTtsDescription] = useState(chore.tts_description || '');
+  const [ttsAudioURL, setTtsAudioURL] = useState(chore.tts_audio_url || '');
+  const [ttsCacheBust, setTtsCacheBust] = useState(() => Date.now());
+  const [ttsRegenerating, setTtsRegenerating] = useState(false);
+  const [ttsGenerating, setTtsGenerating] = useState(false);
+  const [ttsSaved, setTtsSaved] = useState(false);
+  const [ttsError, setTtsError] = useState('');
+  const [ttsPlaying, setTtsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const handleEnded = () => setTtsPlaying(false);
+    const handlePause = () => setTtsPlaying(false);
+    const handlePlay = () => setTtsPlaying(true);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('play', handlePlay);
+    return () => {
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('play', handlePlay);
+    };
+  }, [ttsAudioURL]);
+
+  const audioSrc = ttsAudioURL ? `${ttsAudioURL}?v=${ttsCacheBust}` : '';
+
+  const handlePlayPause = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      audio.play().catch(() => {
+        setTtsError('Unable to play audio');
+      });
+    } else {
+      audio.pause();
+    }
+  };
+
+  const handleRegenerateTTS = async () => {
+    setTtsRegenerating(true);
+    setTtsError('');
+    setTtsSaved(false);
+    try {
+      const resp = await api.chores.regenerateTTS(chore.id, ttsDescription.trim());
+      setTtsDescription(resp.tts_description);
+      setTtsAudioURL(resp.tts_audio_url);
+      setTtsCacheBust(Date.now());
+      setTtsSaved(true);
+      onSaved();
+      setTimeout(() => setTtsSaved(false), 2000);
+    } catch (e) {
+      const msg = e instanceof APIError ? (e.data?.error || e.message) : (e instanceof Error ? e.message : 'Failed to regenerate TTS');
+      setTtsError(msg);
+    }
+    setTtsRegenerating(false);
+  };
+
+  const handleGenerateTTSDescription = async () => {
+    setTtsGenerating(true);
+    setTtsError('');
+    try {
+      const resp = await api.chores.generateTTSDescription(chore.id);
+      setTtsDescription(resp.description);
+    } catch (e) {
+      const msg = e instanceof APIError ? (e.data?.error || e.message) : (e instanceof Error ? e.message : 'Failed to generate description');
+      setTtsError(msg);
+    }
+    setTtsGenerating(false);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -129,6 +202,71 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
             {error && <span className={styles.error}>{error}</span>}
             <button className={styles.btnPrimary} onClick={handleSave} disabled={saving || !title.trim()}>
               <Save size={14} /> {saving ? 'Saving...' : 'Save Details'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <hr className={styles.divider} />
+
+      {/* --- TTS Audio --- */}
+      <div className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <span className={styles.sectionTitle}>Kokoro TTS</span>
+        </div>
+        <div className={styles.formGrid}>
+          {ttsAudioURL ? (
+            <div className={styles.ttsPlayerRow}>
+              <button
+                type="button"
+                className={styles.ttsPlayBtn}
+                onClick={handlePlayPause}
+                aria-label={ttsPlaying ? 'Pause TTS audio' : 'Play TTS audio'}
+                title={ttsPlaying ? 'Pause' : 'Play'}
+              >
+                {ttsPlaying ? <Pause size={18} /> : <Play size={18} />}
+              </button>
+              <audio ref={audioRef} src={audioSrc} preload="none" />
+              <span className={styles.ttsHint}>
+                {ttsPlaying ? 'Playing…' : 'Click to preview generated audio'}
+              </span>
+            </div>
+          ) : (
+            <div className={styles.ttsHint}>No TTS audio has been generated for this chore yet.</div>
+          )}
+
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Spoken description (TTS prompt)</label>
+            <textarea
+              className={styles.textarea}
+              value={ttsDescription}
+              onChange={e => setTtsDescription(e.target.value)}
+              placeholder="What should the TTS voice say for this chore?"
+              rows={3}
+            />
+          </div>
+
+          <div className={styles.saveRow}>
+            {ttsSaved && <span className={styles.saved}><Check size={14} /> Regenerated</span>}
+            {ttsError && <span className={styles.error}>{ttsError}</span>}
+            <button
+              type="button"
+              className={styles.btnSecondary}
+              onClick={handleGenerateTTSDescription}
+              disabled={ttsGenerating || ttsRegenerating}
+              title="Generate a new spoken description with AI"
+            >
+              <Sparkles size={14} /> {ttsGenerating ? 'Generating…' : 'Suggest Text'}
+            </button>
+            <button
+              type="button"
+              className={styles.btnPrimary}
+              onClick={handleRegenerateTTS}
+              disabled={ttsRegenerating || ttsGenerating || !ttsDescription.trim()}
+            >
+              <RefreshCw size={14} className={ttsRegenerating ? styles.spin : ''} />
+              {' '}
+              {ttsRegenerating ? 'Regenerating…' : 'Save & Regenerate Audio'}
             </button>
           </div>
         </div>
