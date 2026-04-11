@@ -61,8 +61,10 @@ func (pc *DecayChecker) check(ctx context.Context) {
 		}
 
 		for _, c := range chores {
-			// Only penalize required chores that weren't completed and have a penalty value
-			if c.Category == model.CategoryRequired && !c.Completed && c.MissedPenaltyValue > 0 {
+			// Penalize any non-bonus chore (required or core) that wasn't
+			// completed and has a configured missed-penalty value. Bonus
+			// chores are optional and never incur a missed-chore penalty.
+			if c.Category != model.CategoryBonus && !c.Completed && c.MissedPenaltyValue > 0 {
 				// Check if already penalized to avoid double-dipping
 				alreadyPenalized, err := pc.store.HasMissedChorePenalty(ctx, c.ScheduleID, yesterday)
 				if err != nil {
