@@ -798,3 +798,274 @@ func TestDecayChecker_OnlyPenalizesChildren(t *testing.T) {
 		t.Error("parents should not be penalized for missed chores")
 	}
 }
+
+// --- PointsDecayChecker Tests ---
+
+func TestNewPointsDecayChecker(t *testing.T) {
+	env := setupTest(t)
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+	if pdc == nil {
+		t.Fatal("NewPointsDecayChecker returned nil")
+	}
+	if pdc.interval != 15*time.Minute {
+		t.Errorf("expected interval 15m, got %v", pdc.interval)
+	}
+}
+
+func TestPointsDecayChecker_StartAndCancel(t *testing.T) {
+	env := setupTest(t)
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+	pdc.interval = 50 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	done := make(chan struct{})
+	go func() {
+		pdc.Start(ctx)
+		close(done)
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+		// Success
+	case <-time.After(2 * time.Second):
+		t.Fatal("PointsDecayChecker.Start did not return after context cancel")
+	}
+}
+
+func TestPointsDecayChecker_DecaysWhenRequiredChoreMissed(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	var mu sync.Mutex
+	var firedEvents []string
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		firedEvents = append(firedEvents, r.Header.Get("X-OpenChore-Event"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+	createWebhook(t, env, ts.URL, "", "*", true)
+
+	parentID := createParentUser(t, env, "Parent")
+	childID := createChildUser(t, env, "Child")
+
+	// Seed a balance so we can observe the debit.
+	if err := env.store.AdminAdjustPoints(ctx, childID, 100, ""); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	// A required chore that was scheduled yesterday and NOT completed.
+	yesterday := time.Now().AddDate(0, 0, -1)
+	createChoreWithSchedule(t, env, parentID, childID, "required", int(yesterday.Weekday()), nil, 0)
+
+	// Enable decay for this child at 7 points/day.
+	if err := env.store.SetUserDecayConfig(ctx, &model.UserDecayConfig{
+		UserID: childID, Enabled: true, DecayRate: 7, DecayIntervalHours: 24,
+	}); err != nil {
+		t.Fatalf("SetUserDecayConfig: %v", err)
+	}
+
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+	pdc.check(ctx)
+
+	balance, err := env.store.GetPointBalance(ctx, childID)
+	if err != nil {
+		t.Fatalf("GetPointBalance: %v", err)
+	}
+	if balance != 93 {
+		t.Errorf("expected balance 93 after decay, got %d", balance)
+	}
+
+	// last_decay_at should be set so we don't re-decay on the next tick.
+	cfg, _ := env.store.GetUserDecayConfig(ctx, childID)
+	if cfg.LastDecayAt == nil {
+		t.Error("expected last_decay_at to be set after decay")
+	}
+
+	// Running again immediately must not decay again (interval respected).
+	pdc.check(ctx)
+	balance2, _ := env.store.GetPointBalance(ctx, childID)
+	if balance2 != 93 {
+		t.Errorf("expected balance to remain 93 on second check, got %d", balance2)
+	}
+
+	// Webhook for points.decayed should have fired exactly once.
+	time.Sleep(300 * time.Millisecond)
+	mu.Lock()
+	defer mu.Unlock()
+	decayedCount := 0
+	for _, e := range firedEvents {
+		if e == EventPointsDecayed {
+			decayedCount++
+		}
+	}
+	if decayedCount != 1 {
+		t.Errorf("expected 1 %q webhook event, got %d (events=%v)", EventPointsDecayed, decayedCount, firedEvents)
+	}
+}
+
+func TestPointsDecayChecker_NoDecayWhenAllChoresComplete(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	parentID := createParentUser(t, env, "Parent")
+	childID := createChildUser(t, env, "Child")
+	if err := env.store.AdminAdjustPoints(ctx, childID, 100, ""); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	yesterday := time.Now().AddDate(0, 0, -1)
+	_, scheduleID := createChoreWithSchedule(t, env, parentID, childID, "core", int(yesterday.Weekday()), nil, 0)
+
+	// Mark yesterday's chore as completed.
+	if err := env.store.CompleteChore(ctx, &model.ChoreCompletion{
+		ChoreScheduleID: scheduleID,
+		CompletedBy:     childID,
+		Status:          model.StatusApproved,
+		CompletionDate:  yesterday.Format(model.DateFormat),
+	}); err != nil {
+		t.Fatalf("CompleteChore: %v", err)
+	}
+
+	if err := env.store.SetUserDecayConfig(ctx, &model.UserDecayConfig{
+		UserID: childID, Enabled: true, DecayRate: 5, DecayIntervalHours: 24,
+	}); err != nil {
+		t.Fatalf("SetUserDecayConfig: %v", err)
+	}
+
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+	pdc.check(ctx)
+
+	balance, _ := env.store.GetPointBalance(ctx, childID)
+	if balance != 100 {
+		t.Errorf("expected balance to stay at 100, got %d", balance)
+	}
+}
+
+func TestPointsDecayChecker_IgnoresBonusChores(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	parentID := createParentUser(t, env, "Parent")
+	childID := createChildUser(t, env, "Child")
+	if err := env.store.AdminAdjustPoints(ctx, childID, 50, ""); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	// Only a bonus chore scheduled for yesterday, incomplete.
+	yesterday := time.Now().AddDate(0, 0, -1)
+	createChoreWithSchedule(t, env, parentID, childID, "bonus", int(yesterday.Weekday()), nil, 0)
+
+	if err := env.store.SetUserDecayConfig(ctx, &model.UserDecayConfig{
+		UserID: childID, Enabled: true, DecayRate: 5, DecayIntervalHours: 24,
+	}); err != nil {
+		t.Fatalf("SetUserDecayConfig: %v", err)
+	}
+
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+	pdc.check(ctx)
+
+	balance, _ := env.store.GetPointBalance(ctx, childID)
+	if balance != 50 {
+		t.Errorf("bonus-only misses must not trigger decay; balance=%d want 50", balance)
+	}
+}
+
+func TestPointsDecayChecker_RespectsIntervalHours(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	parentID := createParentUser(t, env, "Parent")
+	childID := createChildUser(t, env, "Child")
+	if err := env.store.AdminAdjustPoints(ctx, childID, 100, ""); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	yesterday := time.Now().AddDate(0, 0, -1)
+	createChoreWithSchedule(t, env, parentID, childID, "required", int(yesterday.Weekday()), nil, 0)
+
+	if err := env.store.SetUserDecayConfig(ctx, &model.UserDecayConfig{
+		UserID: childID, Enabled: true, DecayRate: 5, DecayIntervalHours: 24,
+	}); err != nil {
+		t.Fatalf("SetUserDecayConfig: %v", err)
+	}
+
+	// Simulate a decay that already ran 1 hour ago.
+	recent := time.Now().Add(-1 * time.Hour)
+	if err := env.store.UpdateLastDecayAt(ctx, childID, recent); err != nil {
+		t.Fatalf("UpdateLastDecayAt: %v", err)
+	}
+
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+	pdc.check(ctx)
+
+	balance, _ := env.store.GetPointBalance(ctx, childID)
+	if balance != 100 {
+		t.Errorf("expected balance to stay at 100 (interval not elapsed), got %d", balance)
+	}
+}
+
+func TestPointsDecayChecker_SkipsDisabledUsers(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	parentID := createParentUser(t, env, "Parent")
+	childID := createChildUser(t, env, "Child")
+	if err := env.store.AdminAdjustPoints(ctx, childID, 100, ""); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	yesterday := time.Now().AddDate(0, 0, -1)
+	createChoreWithSchedule(t, env, parentID, childID, "required", int(yesterday.Weekday()), nil, 0)
+
+	// Explicitly disabled.
+	if err := env.store.SetUserDecayConfig(ctx, &model.UserDecayConfig{
+		UserID: childID, Enabled: false, DecayRate: 5, DecayIntervalHours: 24,
+	}); err != nil {
+		t.Fatalf("SetUserDecayConfig: %v", err)
+	}
+
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+	pdc.check(ctx)
+
+	balance, _ := env.store.GetPointBalance(ctx, childID)
+	if balance != 100 {
+		t.Errorf("disabled user should not be decayed; balance=%d want 100", balance)
+	}
+}
+
+func TestPointsDecayChecker_ClampsToNonNegativeBalance(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	parentID := createParentUser(t, env, "Parent")
+	childID := createChildUser(t, env, "Child")
+
+	// Only 3 points in the bank; decay rate is 10.
+	if err := env.store.AdminAdjustPoints(ctx, childID, 3, ""); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	yesterday := time.Now().AddDate(0, 0, -1)
+	createChoreWithSchedule(t, env, parentID, childID, "required", int(yesterday.Weekday()), nil, 0)
+
+	if err := env.store.SetUserDecayConfig(ctx, &model.UserDecayConfig{
+		UserID: childID, Enabled: true, DecayRate: 10, DecayIntervalHours: 24,
+	}); err != nil {
+		t.Fatalf("SetUserDecayConfig: %v", err)
+	}
+
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+	pdc.check(ctx)
+
+	balance, _ := env.store.GetPointBalance(ctx, childID)
+	if balance != 0 {
+		t.Errorf("expected balance clamped to 0, got %d", balance)
+	}
+}
