@@ -258,6 +258,59 @@ func TestChoreCRUD(t *testing.T) {
 	}
 }
 
+// TestChoreUpdatePointsAndPenaltyZeroing verifies that points_value and
+// missed_penalty_value can be explicitly set to 0 via a PUT, and that a
+// partial update that omits those fields leaves them untouched.
+func TestChoreUpdatePointsAndPenaltyZeroing(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	// Create a chore with non-zero points and penalty.
+	resp := env.request(t, "POST", "/api/chores", map[string]any{
+		"title":                "Take out trash",
+		"category":             "core",
+		"points_value":         10,
+		"missed_penalty_value": 5,
+	}, adminHeaders())
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.StatusCode)
+	}
+	var chore map[string]any
+	decodeBody(t, resp, &chore)
+	choreID := int(chore["id"].(float64))
+
+	// Partial update: title only. Points and penalty should be preserved.
+	resp = env.request(t, "PUT", fmt.Sprintf("/api/chores/%d", choreID), map[string]any{
+		"title": "Take out trash (evening)",
+	}, adminHeaders())
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("partial update: expected 200, got %d", resp.StatusCode)
+	}
+	decodeBody(t, resp, &chore)
+	if chore["points_value"].(float64) != 10 {
+		t.Errorf("partial update clobbered points_value: got %v, want 10", chore["points_value"])
+	}
+	if chore["missed_penalty_value"].(float64) != 5 {
+		t.Errorf("partial update clobbered missed_penalty_value: got %v, want 5", chore["missed_penalty_value"])
+	}
+
+	// Explicit zero: both fields should be cleared.
+	resp = env.request(t, "PUT", fmt.Sprintf("/api/chores/%d", choreID), map[string]any{
+		"points_value":         0,
+		"missed_penalty_value": 0,
+	}, adminHeaders())
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("zero update: expected 200, got %d", resp.StatusCode)
+	}
+	decodeBody(t, resp, &chore)
+	if chore["points_value"].(float64) != 0 {
+		t.Errorf("explicit zero was ignored for points_value: got %v, want 0", chore["points_value"])
+	}
+	if chore["missed_penalty_value"].(float64) != 0 {
+		t.Errorf("explicit zero was ignored for missed_penalty_value: got %v, want 0", chore["missed_penalty_value"])
+	}
+}
+
 func TestScheduleAndComplete(t *testing.T) {
 	env := setupTest(t)
 	env.createAdmin(t)
