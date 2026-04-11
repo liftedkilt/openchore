@@ -70,6 +70,14 @@ func main() {
 	pointsDecayChecker := webhook.NewPointsDecayChecker(s, dispatcher)
 	go pointsDecayChecker.Start(context.Background())
 
+	// Webhook delivery log cleanup (issue #18): bounded retention for webhook_deliveries.
+	deliveryCleaner := webhook.NewDeliveryCleaner(
+		s,
+		cfg.WebhookRetentionDays(),
+		cfg.WebhookCleanupIntervalHours(),
+	)
+	go deliveryCleaner.Start(context.Background())
+
 	router, choreHandler, reportsHandler := api.NewRouter(s, dispatcher)
 
 	// Initialize optional AI services in background (waits for sidecars to become ready)

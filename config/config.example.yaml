@@ -305,3 +305,15 @@ ai:
   tts_enabled: false
   tts_endpoint: "http://kokoro:8880"  # Kokoro-FastAPI (OpenAI-compatible TTS)
   tts_voice: "af_heart"               # Warm, kid-friendly voice
+
+# Webhook subsystem tunables.
+# These apply at server startup — changes require a restart.
+webhooks:
+  # How many days of webhook_deliveries (delivery attempt log) to keep before
+  # a background goroutine purges older rows. The table grows with every
+  # outbound webhook delivery, so unbounded retention wastes disk and slows
+  # queries. Set to 0 to disable cleanup and retain forever. Default: 30.
+  delivery_retention_days: 30
+  # How often (in hours) the cleanup goroutine wakes up to purge old rows.
+  # Default: 24 (once per day).
+  delivery_cleanup_interval_hours: 24

@@ -1587,6 +1587,23 @@ func (s *Store) ListWebhookDeliveries(ctx context.Context, webhookID int64, limi
 	return deliveries, rows.Err()
 }
 
+// DeleteOldWebhookDeliveries removes webhook_deliveries rows with created_at strictly
+// older than the given cutoff. Returns the number of rows deleted. The table has an
+// index on created_at (see migration 001), so this is cheap.
+func (s *Store) DeleteOldWebhookDeliveries(ctx context.Context, before time.Time) (int64, error) {
+	res, err := s.db.ExecContext(ctx,
+		`DELETE FROM webhook_deliveries WHERE created_at < ?`,
+		before.UTC().Format("2006-01-02 15:04:05"))
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 // GetExpiredChores returns chores that are past their due_by time and not completed for today.
 func (s *Store) GetExpiredChores(ctx context.Context, date string, currentTime string) ([]struct {
 	ScheduleID int64
