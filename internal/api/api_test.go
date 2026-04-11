@@ -23,8 +23,10 @@ import (
 )
 
 type testEnv struct {
-	server *httptest.Server
-	db     *sql.DB
+	server  *httptest.Server
+	db      *sql.DB
+	store   *store.Store
+	chores  *api.ChoreHandler
 }
 
 func setupTest(t *testing.T) *testEnv {
@@ -54,7 +56,7 @@ func setupTest(t *testing.T) *testEnv {
 
 	s := store.New(db)
 	d := webhook.NewDispatcher(s)
-	router, _, _ := api.NewRouter(s, d)
+	router, chores, _ := api.NewRouter(s, d)
 	server := httptest.NewServer(router)
 
 	t.Cleanup(func() {
@@ -62,7 +64,7 @@ func setupTest(t *testing.T) *testEnv {
 		db.Close()
 	})
 
-	return &testEnv{server: server, db: db}
+	return &testEnv{server: server, db: db, store: s, chores: chores}
 }
 
 func (e *testEnv) request(t *testing.T, method, path string, body any, headers map[string]string) *http.Response {
