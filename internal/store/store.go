@@ -567,7 +567,7 @@ func (s *Store) GetAllPointBalances(ctx context.Context) ([]PointBalanceRow, err
 
 func (s *Store) ListPointTransactions(ctx context.Context, userID int64, limit int) ([]model.PointTransaction, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, user_id, amount, reason, reference_id, note, created_at
+		`SELECT id, user_id, amount, reason, reference_id, note, idempotency_key, created_at
 		 FROM point_transactions WHERE user_id = ? ORDER BY id DESC LIMIT ?`, userID, limit)
 	if err != nil {
 		return nil, err
@@ -576,8 +576,13 @@ func (s *Store) ListPointTransactions(ctx context.Context, userID int64, limit i
 	var txs []model.PointTransaction
 	for rows.Next() {
 		var t model.PointTransaction
-		if err := rows.Scan(&t.ID, &t.UserID, &t.Amount, &t.Reason, &t.ReferenceID, &t.Note, &t.CreatedAt); err != nil {
+		var idempotencyKey sql.NullString
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Amount, &t.Reason, &t.ReferenceID, &t.Note, &idempotencyKey, &t.CreatedAt); err != nil {
 			return nil, err
+		}
+		if idempotencyKey.Valid {
+			k := idempotencyKey.String
+			t.IdempotencyKey = &k
 		}
 		txs = append(txs, t)
 	}
@@ -1156,20 +1161,62 @@ func (s *Store) DebitDecay(ctx context.Context, userID int64, amount int) error 
 	return err
 }
 
+// missedChorePenaltyKey returns the structured idempotency key used to
+// guarantee at-most-once application of a missed-chore penalty for a
+// given (user, schedule, date) tuple.
+func missedChorePenaltyKey(userID, scheduleID int64, date string) string {
+	return fmt.Sprintf("missed_chore_penalty:%d:%d:%s", userID, scheduleID, date)
+}
+
 func (s *Store) DebitMissedChore(ctx context.Context, userID int64, scheduleID int64, amount int, date string) error {
+	key := missedChorePenaltyKey(userID, scheduleID, date)
+	// The partial UNIQUE index on idempotency_key ensures that concurrent
+	// or retried invocations for the same (user, schedule, date) cannot
+	// insert duplicate penalty rows. Treat a UNIQUE violation as a
+	// successful no-op so callers don't have to distinguish the race.
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
-		 VALUES (?, ?, 'missed_chore', ?, ?)`,
-		userID, -amount, scheduleID, "Penalty for missed chore on "+date)
-	return err
+		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note, idempotency_key)
+		 VALUES (?, ?, 'missed_chore', ?, ?, ?)`,
+		userID, -amount, scheduleID, "Penalty for missed chore on "+date, key)
+	if err != nil {
+		if isUniqueConstraintErr(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *Store) HasMissedChorePenalty(ctx context.Context, scheduleID int64, date string) (bool, error) {
-	var exists bool
+	// Look up the penalty by exact idempotency-key match. The schedule's
+	// assigned user identifies the user portion of the key; resolving it
+	// here keeps the public API stable while allowing the key format to
+	// carry richer information.
+	var userID int64
 	err := s.db.QueryRowContext(ctx,
-		`SELECT EXISTS(SELECT 1 FROM point_transactions WHERE reason = 'missed_chore' AND reference_id = ? AND note LIKE ?)`,
-		scheduleID, "%"+date+"%").Scan(&exists)
+		`SELECT assigned_to FROM chore_schedules WHERE id = ?`, scheduleID).Scan(&userID)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	key := missedChorePenaltyKey(userID, scheduleID, date)
+	var exists bool
+	err = s.db.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM point_transactions WHERE idempotency_key = ?)`,
+		key).Scan(&exists)
 	return exists, err
+}
+
+// isUniqueConstraintErr reports whether err is a SQLite UNIQUE-constraint
+// violation. modernc.org/sqlite surfaces these through error messages that
+// contain "UNIQUE constraint failed".
+func isUniqueConstraintErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
 // --- FCFS Helpers ---
