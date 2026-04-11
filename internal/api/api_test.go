@@ -3317,3 +3317,38 @@ func TestProfilePinCannotBeChangedByOtherChild(t *testing.T) {
 	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/users/%d/pin", kidA),
 		nil, childHeaders(kidB), http.StatusForbidden)
 }
+
+// Admin changing their *own* PIN must still supply the current value — the
+// admin override only exists for resetting another user's forgotten PIN.
+func TestProfilePinAdminMustVerifyOwnCurrentPin(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	// Admin sets their own initial PIN. No current_pin required because none exists yet.
+	env.expectStatus(t, "PUT", "/api/users/1/pin",
+		map[string]any{"new_pin": "1234"}, adminHeaders(), http.StatusOK)
+
+	// Wrong current_pin must be rejected even though caller is admin.
+	env.expectStatus(t, "PUT", "/api/users/1/pin",
+		map[string]any{"current_pin": "9999", "new_pin": "5678"}, adminHeaders(), http.StatusUnauthorized)
+
+	// Empty current_pin must also be rejected.
+	env.expectStatus(t, "PUT", "/api/users/1/pin",
+		map[string]any{"new_pin": "5678"}, adminHeaders(), http.StatusUnauthorized)
+
+	// Correct current_pin succeeds.
+	env.expectStatus(t, "PUT", "/api/users/1/pin",
+		map[string]any{"current_pin": "1234", "new_pin": "5678"}, adminHeaders(), http.StatusOK)
+
+	// Old PIN no longer verifies.
+	env.expectStatus(t, "POST", "/api/users/1/verify-pin",
+		map[string]any{"pin": "1234"}, nil, http.StatusUnauthorized)
+
+	// Clearing own PIN with the wrong current value is rejected.
+	env.expectStatus(t, "DELETE", "/api/users/1/pin",
+		map[string]any{"current_pin": "0000"}, adminHeaders(), http.StatusUnauthorized)
+
+	// Clearing with the right current value succeeds.
+	env.expectStatus(t, "DELETE", "/api/users/1/pin",
+		map[string]any{"current_pin": "5678"}, adminHeaders(), http.StatusOK)
+}
