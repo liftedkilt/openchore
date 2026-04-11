@@ -4,7 +4,7 @@ import { useTheme } from '../ThemeContext';
 import { api, APIError } from '../api';
 import type { ScheduledChore, UserStreakData, PointsData, Reward, RedemptionHistory, Theme } from '../types';
 import styles from './Dashboard.module.css';
-import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX, Undo2, Camera, Copy, Users } from 'lucide-react';
+import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, KeyRound, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX, Undo2, Camera, Copy, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
@@ -14,6 +14,7 @@ import type { TimePeriod } from '../timeGrouping';
 import { QRCodeSVG } from 'qrcode.react';
 import { useThemeSound } from '../hooks/useThemeSound';
 import { useTextToSpeech } from '../hooks/useTextToSpeech';
+import PinSettingsModal from '../components/PinPad/PinSettingsModal';
 
 const QRCodeModal: React.FC<{
   chore: ScheduledChore;
@@ -181,6 +182,7 @@ export const Dashboard: React.FC = () => {
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showPinSettings, setShowPinSettings] = useState(false);
   const [qrChore, setQrChore] = useState<ScheduledChore | null>(null);
   const [aiFeedback, setAiFeedback] = useState<Record<number, { text: string; audioUrl?: string }>>({});
   const [systemBaseUrl, setSystemBaseUrl] = useState<string>('');
@@ -965,6 +967,14 @@ export const Dashboard: React.FC = () => {
           <button onClick={() => { setShowThemePicker(!showThemePicker); setShowAvatarPicker(false); setShowColorPicker(false); }} className={styles.themeBtn} aria-label="Change theme">
             <Palette size={20} />
           </button>
+          <button
+            onClick={() => setShowPinSettings(true)}
+            className={styles.themeBtn}
+            aria-label={user?.has_pin ? 'Change PIN' : 'Set PIN'}
+            title={user?.has_pin ? 'Change PIN' : 'Set PIN'}
+          >
+            <KeyRound size={20} />
+          </button>
           <button onClick={logout} className={styles.logoutBtn} aria-label="Logout">
             <LogOut size={20} />
           </button>
@@ -1007,6 +1017,15 @@ export const Dashboard: React.FC = () => {
             setShowAvatarPicker(false);
           }}
           onClose={() => setShowAvatarPicker(false)}
+        />
+      )}
+
+      {showPinSettings && user && (
+        <PinSettingsModal
+          userId={user.id}
+          hasPin={user.has_pin}
+          onClose={() => setShowPinSettings(false)}
+          onChanged={(hasPin) => setUser({ ...user, has_pin: hasPin })}
         />
       )}
 

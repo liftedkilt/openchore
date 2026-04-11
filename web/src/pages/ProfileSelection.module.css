@@ -50,6 +50,7 @@
 }
 
 .avatarWrapper {
+  position: relative;
   width: 100px;
   height: 100px;
   border-radius: 50%;
@@ -58,8 +59,35 @@
   align-items: center;
   justify-content: center;
   margin-bottom: 1rem;
-  overflow: hidden;
+  overflow: visible;
   border: 4px solid var(--border-subtle);
+}
+
+.avatarWrapper > img,
+.avatarWrapper > .placeholder {
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.lockBadge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-secondary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.adminLock {
+  color: var(--accent-blue);
+  margin-left: 0.25rem;
 }
 
 .avatar {
@@ -136,6 +164,63 @@
 }
 
 /* --- Bottom Buttons --- */
+.pinPrompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 360px;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.pinAvatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  background: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid var(--border-subtle);
+}
+
+.pinAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pinName {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.backBtn {
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.backBtn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
 .bottomBtns {
   display: flex;
   gap: 0.75rem;

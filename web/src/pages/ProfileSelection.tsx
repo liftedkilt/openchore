@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { api, APIError } from '../api';
 import { useAuth } from '../AuthContext';
 import type { User } from '../types';
 import styles from './ProfileSelection.module.css';
-import { UserCircle, Settings, Monitor } from 'lucide-react';
+import { UserCircle, Settings, Monitor, Lock, ArrowLeft } from 'lucide-react';
+import PinPad from '../components/PinPad/PinPad';
 
 export const ProfileSelection: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [pendingUser, setPendingUser] = useState<User | null>(null);
+  const [pinError, setPinError] = useState('');
   const { setUser } = useAuth();
   const navigate = useNavigate();
 
@@ -24,12 +27,61 @@ export const ProfileSelection: React.FC = () => {
     }).catch(console.error);
   }, [navigate]);
 
-  const handleSelect = (user: User) => {
+  const finalizeLogin = (user: User) => {
     setUser(user);
     navigate('/');
   };
 
+  const handleSelect = (user: User) => {
+    if (user.has_pin) {
+      setPinError('');
+      setPendingUser(user);
+      return;
+    }
+    finalizeLogin(user);
+  };
+
+  const handlePinSubmit = async (pin: string) => {
+    if (!pendingUser) return;
+    try {
+      await api.users.verifyPin(pendingUser.id, pin);
+      finalizeLogin(pendingUser);
+    } catch (e) {
+      if (e instanceof APIError && e.status === 401) {
+        setPinError('Incorrect PIN');
+      } else {
+        setPinError('Could not verify PIN');
+      }
+    }
+  };
+
   if (users.length === 0) return null; // Let the redirect handle it
+
+  if (pendingUser) {
+    return (
+      <div className={styles.container}>
+        <button
+          className={styles.backBtn}
+          onClick={() => { setPendingUser(null); setPinError(''); }}
+        >
+          <ArrowLeft size={20} /> Back
+        </button>
+        <div className={styles.pinPrompt}>
+          <div className={styles.pinAvatar}>
+            {pendingUser.avatar_url
+              ? <img src={pendingUser.avatar_url} alt={pendingUser.name} />
+              : <UserCircle size={80} className={styles.placeholder} />}
+          </div>
+          <h1 className={styles.pinName}>{pendingUser.name}</h1>
+          <PinPad
+            prompt="Enter your PIN"
+            error={pinError}
+            onSubmit={handlePinSubmit}
+          />
+        </div>
+      </div>
+    );
+  }
 
   // Show kids first, then admins
   const sorted = [...users].sort((a, b) => {
@@ -54,6 +106,11 @@ export const ProfileSelection: React.FC = () => {
               ) : (
                 <UserCircle size={80} className={styles.placeholder} />
               )}
+              {u.has_pin && (
+                <div className={styles.lockBadge} aria-label="PIN protected">
+                  <Lock size={14} />
+                </div>
+              )}
             </div>
             <span className={styles.name}>{u.name}</span>
           </button>
@@ -69,6 +126,7 @@ export const ProfileSelection: React.FC = () => {
                   {u.avatar_url ? <img src={u.avatar_url} alt={u.name} /> : <UserCircle size={32} />}
                 </div>
                 <span className={styles.adminName}>{u.name}</span>
+                {u.has_pin && <Lock size={12} className={styles.adminLock} />}
               </button>
             ))}
           </div>

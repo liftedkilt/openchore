@@ -198,6 +198,7 @@ export interface User {
   theme: Theme;
   line_color?: string;
   paused: boolean;
+  has_pin: boolean;
   created_at: string;
 }
 

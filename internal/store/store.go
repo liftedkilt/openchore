@@ -30,12 +30,13 @@ func New(db *sql.DB) *Store {
 func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
 	paused := boolToInt(u.Paused)
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO users (name, avatar_url, role, age, theme, line_color, paused) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.LineColor, paused)
+		`INSERT INTO users (name, avatar_url, role, age, theme, line_color, paused, pin_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.LineColor, paused, u.PinHash)
 	if err != nil {
 		return err
 	}
 	u.ID, _ = res.LastInsertId()
+	u.HasPin = u.PinHash != ""
 	return nil
 }
 
@@ -43,18 +44,19 @@ func (s *Store) GetUser(ctx context.Context, id int64) (*model.User, error) {
 	u := &model.User{}
 	var paused int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, created_at FROM users WHERE id = ?`, id).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.CreatedAt)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, pin_hash, created_at FROM users WHERE id = ?`, id).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.PinHash, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	u.Paused = paused == 1
+	u.HasPin = u.PinHash != ""
 	return u, err
 }
 
 func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, created_at FROM users ORDER BY name`)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, pin_hash, created_at FROM users ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -63,10 +65,11 @@ func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 	for rows.Next() {
 		var u model.User
 		var paused int
-		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.PinHash, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		u.Paused = paused == 1
+		u.HasPin = u.PinHash != ""
 		users = append(users, u)
 	}
 	return users, rows.Err()
@@ -1326,13 +1329,32 @@ func (s *Store) GetUserByName(ctx context.Context, name string) (*model.User, er
 	u := &model.User{}
 	var paused int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, created_at FROM users WHERE LOWER(name) = LOWER(?)`, name).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.CreatedAt)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, pin_hash, created_at FROM users WHERE LOWER(name) = LOWER(?)`, name).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.PinHash, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	u.Paused = paused == 1
+	u.HasPin = u.PinHash != ""
 	return u, err
+}
+
+// SetUserPin stores a bcrypt-hashed PIN for the user. Pass an empty string to clear the PIN.
+func (s *Store) SetUserPin(ctx context.Context, userID int64, pinHash string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET pin_hash = ? WHERE id = ?`, pinHash, userID)
+	return err
+}
+
+// GetUserPinHash returns the stored bcrypt hash for a user's PIN, or empty string if none is set.
+func (s *Store) GetUserPinHash(ctx context.Context, userID int64) (string, error) {
+	var hash string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT pin_hash FROM users WHERE id = ?`, userID).Scan(&hash)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return hash, err
 }
 
 // --- API Tokens ---
