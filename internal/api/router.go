@@ -163,6 +163,10 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 				r.Post("/admin/ai/generate-description", chores.GenerateDescription)
 				r.Post("/admin/ai/suggest-points", chores.SuggestPoints)
 
+				// Per-chore TTS regeneration (admin)
+				r.Post("/chores/{id}/tts/regenerate", chores.RegenerateChoreTTS)
+				r.Post("/chores/{id}/tts/generate-description", chores.GenerateChoreTTSDescription)
+
 				// AI-powered reports
 				r.Get("/admin/reports/ai-summary", reports.GetAISummary)
 

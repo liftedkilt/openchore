@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/liftedkilt/openchore/internal/ai"
@@ -1024,6 +1025,111 @@ func (h *ChoreHandler) TriggerTTSSync(w http.ResponseWriter, r *http.Request) {
 	}
 	h.ttsSyncer.Trigger()
 	writeJSON(w, http.StatusOK, map[string]any{"status": "sync triggered"})
+}
+
+// RegenerateChoreTTS re-synthesizes the TTS audio for a specific chore. The
+// admin can supply a custom spoken description; if empty, the chore's current
+// tts_description is used. The new description (if any) is persisted and the
+// chore_{id}.mp3 file is overwritten.
+func (h *ChoreHandler) RegenerateChoreTTS(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid chore id")
+		return
+	}
+
+	var req struct {
+		Description string `json:"description"`
+	}
+	// Body is optional; tolerate missing/empty bodies.
+	_ = decodeJSON(r, &req)
+
+	chore, err := h.store.GetChore(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get chore")
+		return
+	}
+	if chore == nil {
+		writeError(w, http.StatusNotFound, "chore not found")
+		return
+	}
+
+	if h.ttsGen == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI services not available")
+		return
+	}
+	if !h.ttsGen.TTSAvailable() {
+		writeError(w, http.StatusServiceUnavailable, "TTS service not available")
+		return
+	}
+
+	desc := strings.TrimSpace(req.Description)
+	if desc == "" {
+		desc = chore.TTSDescription
+	}
+	if desc == "" {
+		writeError(w, http.StatusBadRequest, "no description provided and chore has no existing tts_description")
+		return
+	}
+
+	audioURL, err := h.ttsGen.SynthesizeAudio(r.Context(), desc, chore.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to synthesize audio: "+err.Error())
+		return
+	}
+	if audioURL == "" {
+		writeError(w, http.StatusServiceUnavailable, "TTS audio synthesis unavailable")
+		return
+	}
+
+	if err := h.store.UpdateChoreTTSDescription(r.Context(), chore.ID, desc); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save description")
+		return
+	}
+	if err := h.store.UpdateChoreTTSAudioURL(r.Context(), chore.ID, audioURL); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save audio URL")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"tts_description": desc,
+		"tts_audio_url":   audioURL,
+	})
+}
+
+// GenerateChoreTTSDescription uses the configured LLM to produce a fresh
+// kid-friendly spoken description for a chore. The generated text is
+// returned but NOT persisted; the admin can review and edit before saving
+// via RegenerateChoreTTS.
+func (h *ChoreHandler) GenerateChoreTTSDescription(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid chore id")
+		return
+	}
+
+	chore, err := h.store.GetChore(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get chore")
+		return
+	}
+	if chore == nil {
+		writeError(w, http.StatusNotFound, "chore not found")
+		return
+	}
+
+	if h.ttsGen == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI services not available")
+		return
+	}
+
+	desc, err := h.ttsGen.GenerateDescription(r.Context(), chore.Title, chore.Description)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to generate description: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"description": desc})
 }
 
 // GenerateDescription lets admins generate a chore description using AI.

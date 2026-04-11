@@ -191,6 +191,18 @@ export const api = {
       }),
     deleteSchedule: (choreId: number, scheduleId: number) =>
       fetchWithAuth(`/chores/${choreId}/schedules/${scheduleId}`, { method: 'DELETE' }),
+    regenerateTTS: (choreId: number, description?: string) =>
+      fetchWithAuth<{ tts_description: string; tts_audio_url: string }>(
+        `/chores/${choreId}/tts/regenerate`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ description: description ?? '' }),
+        },
+      ),
+    generateTTSDescription: (choreId: number) =>
+      fetchWithAuth<{ description: string }>(`/chores/${choreId}/tts/generate-description`, {
+        method: 'POST',
+      }),
   },
   points: {
     getForUser: (userId: number) => fetchWithAuth<PointsData>(`/users/${userId}/points`),
