@@ -67,6 +67,8 @@ func main() {
 	go expiryChecker.Start(context.Background())
 	decayChecker := webhook.NewDecayChecker(s, dispatcher)
 	go decayChecker.Start(context.Background())
+	pointsDecayChecker := webhook.NewPointsDecayChecker(s, dispatcher)
+	go pointsDecayChecker.Start(context.Background())
 
 	router, choreHandler, reportsHandler := api.NewRouter(s, dispatcher)
 
