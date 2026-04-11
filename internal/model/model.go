@@ -123,13 +123,14 @@ type ChoreCompletion struct {
 // --- Points & Rewards ---
 
 type PointTransaction struct {
-	ID          int64     `json:"id"`
-	UserID      int64     `json:"user_id"`
-	Amount      int       `json:"amount"`
-	Reason      string    `json:"reason"`
-	ReferenceID *int64    `json:"reference_id,omitempty"`
-	Note        string    `json:"note,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID             int64     `json:"id"`
+	UserID         int64     `json:"user_id"`
+	Amount         int       `json:"amount"`
+	Reason         string    `json:"reason"`
+	ReferenceID    *int64    `json:"reference_id,omitempty"`
+	Note           string    `json:"note,omitempty"`
+	IdempotencyKey *string   `json:"idempotency_key,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type Reward struct {
