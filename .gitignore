@@ -26,6 +26,10 @@ config/config.yaml
 # OS
 .DS_Store
 
+# Python build artifacts
+__pycache__/
+*.pyc
+
 # Runtime data (uploads, TTS audio, profiling)
 data/
 default.profraw
