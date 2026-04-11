@@ -74,12 +74,17 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	theme := req.Theme
+	if req.Role == "admin" {
+		// Admin users never have a theme — the admin UI always uses the default.
+		theme = ""
+	}
 	user := &model.User{
 		Name:      req.Name,
 		AvatarURL: req.AvatarURL,
 		Role:      req.Role,
 		Age:       req.Age,
-		Theme:     req.Theme,
+		Theme:     theme,
 	}
 	if err := h.store.CreateUser(r.Context(), user); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create user")
@@ -125,8 +130,12 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.Age != nil {
 		existing.Age = req.Age
 	}
-	if req.Theme != "" {
+	if req.Theme != "" && existing.Role != "admin" {
 		existing.Theme = req.Theme
+	}
+	if existing.Role == "admin" {
+		// Admin users never have a theme — clear any stale value.
+		existing.Theme = ""
 	}
 
 	if err := h.store.UpdateUser(r.Context(), existing); err != nil {
@@ -147,6 +156,12 @@ func (h *UserHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	caller := UserFromContext(r.Context())
 	if caller.ID != id {
 		writeError(w, http.StatusForbidden, "can only update your own theme")
+		return
+	}
+
+	// Admin users do not have themes — the admin UI always uses the default.
+	if caller.Role == "admin" {
+		writeError(w, http.StatusForbidden, "admin users do not have themes")
 		return
 	}
 

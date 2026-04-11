@@ -105,15 +105,19 @@ func initAIServices(s *store.Store, choreHandler *api.ChoreHandler, reportsHandl
 
 	aiClient := aibackend.NewClient(aiEndpoint)
 
-	// Wait for the AI endpoint to become available (retry every 5s for up to 2 minutes)
+	// Wait for the AI endpoint to become available. Retry forever so that a
+	// slow-to-start sidecar (or one started after the server) still wires up
+	// AI features — previously this gave up after 2 minutes and left the
+	// summarizer/reviewer permanently nil, which surfaced in the UI as
+	// "AI services may not be available" with no way to recover short of a
+	// server restart.
 	log.Printf("Waiting for AI endpoint at %s...", aiEndpoint)
-	for attempt := 1; attempt <= 24; attempt++ {
+	for attempt := 1; ; attempt++ {
 		if aiClient.Healthy(context.Background()) {
 			break
 		}
-		if attempt == 24 {
-			log.Printf("AI endpoint not available at %s after 2 minutes — AI features disabled", aiEndpoint)
-			return
+		if attempt%12 == 0 {
+			log.Printf("Still waiting for AI endpoint at %s (attempt %d)", aiEndpoint, attempt)
 		}
 		time.Sleep(5 * time.Second)
 	}
@@ -123,14 +127,20 @@ func initAIServices(s *store.Store, choreHandler *api.ChoreHandler, reportsHandl
 		aiModel = "gemma4:e4b"
 	}
 
-	// Auto-pull model if not present
-	if !aiClient.HasModel(context.Background(), aiModel) {
+	// Auto-pull model if not present. Retry transient failures so a flaky
+	// pull doesn't permanently disable AI features.
+	for attempt := 1; ; attempt++ {
+		if aiClient.HasModel(context.Background(), aiModel) {
+			break
+		}
 		log.Printf("Model %s not found — pulling (this may take a few minutes on first run)...", aiModel)
 		if err := aiClient.Pull(context.Background(), aiModel); err != nil {
-			log.Printf("WARNING: failed to pull model %s: %v — AI features disabled", aiModel, err)
-			return
+			log.Printf("WARNING: failed to pull model %s (attempt %d): %v — retrying in 30s", aiModel, attempt, err)
+			time.Sleep(30 * time.Second)
+			continue
 		}
 		log.Printf("Model %s pulled successfully", aiModel)
+		break
 	}
 
 	reviewer := ai.NewReviewer(aiClient, aiModel)

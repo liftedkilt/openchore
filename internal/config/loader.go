@@ -48,10 +48,15 @@ func Apply(ctx context.Context, s *store.Store, cfg *Config) error {
 	// 1. Create users, build name→ID map
 	nameToID := make(map[string]int64, len(cfg.Users))
 	for _, u := range cfg.Users {
+		theme := u.Theme
+		if u.Role == "admin" {
+			// Admin users never have a theme — the admin UI always uses the default.
+			theme = ""
+		}
 		user := &model.User{
 			Name:      u.Name,
 			Role:      u.Role,
-			Theme:     u.Theme,
+			Theme:     theme,
 			AvatarURL: u.Avatar,
 		}
 		if u.Age > 0 {
