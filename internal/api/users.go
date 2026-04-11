@@ -411,9 +411,10 @@ type setPinRequest struct {
 	NewPin     string `json:"new_pin"`
 }
 
-// SetPin sets or updates a user's profile PIN. A user may only change their
-// own PIN, and must supply the current PIN if one is already set. Admins can
-// set/reset any user's PIN without the current value.
+// SetPin sets or updates a user's profile PIN. A user changing their own PIN
+// (whether admin or child) must supply the current PIN if one is already set.
+// Admins can reset another user's PIN without supplying the current value
+// (used for forgotten-PIN recovery from the admin dashboard).
 func (h *UserHandler) SetPin(w http.ResponseWriter, r *http.Request) {
 	id, err := urlParamInt64(r, "id")
 	if err != nil {
@@ -427,10 +428,14 @@ func (h *UserHandler) SetPin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	isAdmin := caller.Role == "admin"
-	if !isAdmin && caller.ID != id {
+	targetIsSelf := caller.ID == id
+	if !isAdmin && !targetIsSelf {
 		writeError(w, http.StatusForbidden, "can only change your own pin")
 		return
 	}
+	// Only an admin acting on a *different* user may bypass the current-PIN
+	// check. An admin changing their own PIN must still prove they know it.
+	adminOverride := isAdmin && !targetIsSelf
 
 	var req setPinRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -458,8 +463,8 @@ func (h *UserHandler) SetPin(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "user not found")
 			return
 		}
-	} else if !isAdmin {
-		// Non-admin changing their own PIN must supply the current value.
+	} else if !adminOverride {
+		// Caller is changing their own PIN — must supply the current value.
 		if err := bcrypt.CompareHashAndPassword([]byte(existingHash), []byte(req.CurrentPin)); err != nil {
 			writeError(w, http.StatusUnauthorized, "incorrect current pin")
 			return
@@ -482,8 +487,10 @@ type clearPinRequest struct {
 	CurrentPin string `json:"current_pin"`
 }
 
-// ClearPin removes the PIN from a user's profile. Non-admin callers must
-// supply the current PIN; admins can clear any user's PIN without it.
+// ClearPin removes the PIN from a user's profile. A user clearing their own
+// PIN (whether admin or child) must supply the current value. Admins clearing
+// another user's PIN can do so without it (used to reset a forgotten kid PIN
+// from the admin dashboard).
 func (h *UserHandler) ClearPin(w http.ResponseWriter, r *http.Request) {
 	id, err := urlParamInt64(r, "id")
 	if err != nil {
@@ -497,10 +504,12 @@ func (h *UserHandler) ClearPin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	isAdmin := caller.Role == "admin"
-	if !isAdmin && caller.ID != id {
+	targetIsSelf := caller.ID == id
+	if !isAdmin && !targetIsSelf {
 		writeError(w, http.StatusForbidden, "can only change your own pin")
 		return
 	}
+	adminOverride := isAdmin && !targetIsSelf
 
 	existingHash, err := h.store.GetUserPinHash(r.Context(), id)
 	if err != nil {
@@ -513,7 +522,7 @@ func (h *UserHandler) ClearPin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isAdmin {
+	if !adminOverride {
 		var req clearPinRequest
 		if err := decodeJSON(r, &req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid request body")
