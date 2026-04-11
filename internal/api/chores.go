@@ -73,12 +73,15 @@ func (h *ChoreHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 type createChoreRequest struct {
-	Title              string `json:"title"`
-	Description        string `json:"description"`
-	Category           string `json:"category"`
-	Icon               string `json:"icon"`
-	PointsValue        int    `json:"points_value"`
-	MissedPenaltyValue int    `json:"missed_penalty_value"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+	Icon        string `json:"icon"`
+	// PointsValue and MissedPenaltyValue are pointers so we can distinguish
+	// "field omitted" (nil) from "field explicitly set to 0". Without this,
+	// admins can't clear a penalty or zero out a point value via the UI.
+	PointsValue        *int   `json:"points_value"`
+	MissedPenaltyValue *int   `json:"missed_penalty_value"`
 	EstimatedMinutes   *int   `json:"estimated_minutes"`
 	RequiresApproval   bool   `json:"requires_approval"`
 	RequiresPhoto      bool   `json:"requires_photo"`
@@ -118,8 +121,8 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Description:        req.Description,
 		Category:           req.Category,
 		Icon:               req.Icon,
-		PointsValue:        req.PointsValue,
-		MissedPenaltyValue: req.MissedPenaltyValue,
+		PointsValue:        intPtrOrZero(req.PointsValue),
+		MissedPenaltyValue: intPtrOrZero(req.MissedPenaltyValue),
 		EstimatedMinutes:   req.EstimatedMinutes,
 		RequiresApproval:   req.RequiresApproval,
 		RequiresPhoto:      req.RequiresPhoto,
@@ -193,11 +196,14 @@ func (h *ChoreHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.Icon != "" {
 		existing.Icon = req.Icon
 	}
-	if req.PointsValue != 0 {
-		existing.PointsValue = req.PointsValue
+	// Honor an explicit 0 (nil == field omitted, non-nil == set to that
+	// value). This lets admins clear a penalty or reset points to zero via
+	// the UI rather than having the update silently dropped.
+	if req.PointsValue != nil {
+		existing.PointsValue = *req.PointsValue
 	}
-	if req.MissedPenaltyValue != 0 {
-		existing.MissedPenaltyValue = req.MissedPenaltyValue
+	if req.MissedPenaltyValue != nil {
+		existing.MissedPenaltyValue = *req.MissedPenaltyValue
 	}
 	if req.EstimatedMinutes != nil {
 		existing.EstimatedMinutes = req.EstimatedMinutes
@@ -523,10 +529,10 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 					writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
 						"error": result.Feedback,
 						"ai_review": map[string]any{
-							"complete":        result.Complete,
-							"confidence":      result.Confidence,
-							"feedback":        result.Feedback,
-							"feedback_audio":  feedbackAudioURL,
+							"complete":       result.Complete,
+							"confidence":     result.Confidence,
+							"feedback":       result.Feedback,
+							"feedback_audio": feedbackAudioURL,
 						},
 					})
 					return

@@ -30,3 +30,12 @@ func decodeJSON(r *http.Request, v any) error {
 	defer r.Body.Close()
 	return json.NewDecoder(r.Body).Decode(v)
 }
+
+// intPtrOrZero returns *p if p is non-nil, otherwise 0. Used for request
+// fields that are *int so we can tell "omitted" (nil) from "explicitly 0".
+func intPtrOrZero(p *int) int {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
