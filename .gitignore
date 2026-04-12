@@ -6,6 +6,7 @@
 
 # Binaries
 /openchore
+/server
 /cmd/server/server
 
 # Frontend
