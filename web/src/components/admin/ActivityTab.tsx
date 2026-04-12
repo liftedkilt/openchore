@@ -61,6 +61,7 @@ export const ActivityTab: React.FC = () => {
       case 'admin_adjust': return 'Admin adjustment';
       case 'expiry_penalty': return 'Late penalty';
       case 'points_decay': return 'Points decay';
+      case 'missed_chore': return 'Missed chore penalty';
       default: return reason;
     }
   };

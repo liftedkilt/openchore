@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -86,20 +87,20 @@ func (pdc *PointsDecayChecker) check(ctx context.Context) {
 		}
 
 		nonBonusCount := 0
-		missedAny := false
+		var missedTitles []string
 		for _, c := range chores {
 			if c.Category == model.CategoryBonus {
 				continue
 			}
 			nonBonusCount++
 			if !c.Completed {
-				missedAny = true
+				missedTitles = append(missedTitles, c.Title)
 			}
 		}
 
 		// No non-bonus chores scheduled or everything was completed: no
 		// decay, but still advance the timer so we don't keep re-checking.
-		if nonBonusCount == 0 || !missedAny {
+		if nonBonusCount == 0 || len(missedTitles) == 0 {
 			if err := pdc.store.UpdateLastDecayAt(ctx, cfg.UserID, now); err != nil {
 				log.Printf("points-decay: failed to update last_decay_at for user %d: %v", cfg.UserID, err)
 			}
@@ -118,7 +119,8 @@ func (pdc *PointsDecayChecker) check(ctx context.Context) {
 		}
 
 		if debit > 0 {
-			if err := pdc.store.DebitDecay(ctx, cfg.UserID, debit, yesterday); err != nil {
+			note := fmt.Sprintf("Points decay for %s — missed: %s", yesterday, strings.Join(missedTitles, ", "))
+			if err := pdc.store.DebitDecay(ctx, cfg.UserID, debit, yesterday, note); err != nil {
 				// If the idempotency key rejects the insert, this date was
 				// already debited — fall through to update last_decay_at so
 				// we don't keep retrying.
@@ -129,13 +131,15 @@ func (pdc *PointsDecayChecker) check(ctx context.Context) {
 					continue
 				}
 			} else {
-				log.Printf("points-decay: debited %d points from user %d (%s) for missed chores on %s", debit, user.ID, user.Name, yesterday)
+				log.Printf("points-decay: debited %d points from user %d (%s) for missed chores on %s (missed: %s)",
+					debit, user.ID, user.Name, yesterday, strings.Join(missedTitles, ", "))
 
 				pdc.dispatcher.Fire(EventPointsDecayed, map[string]any{
-					"user_id":   user.ID,
-					"user_name": user.Name,
-					"amount":    debit,
-					"date":      yesterday,
+					"user_id":    user.ID,
+					"user_name":  user.Name,
+					"amount":     debit,
+					"date":       yesterday,
+					"missed":     missedTitles,
 				})
 			}
 		}

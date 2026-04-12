@@ -245,7 +245,7 @@ export interface PointTransaction {
   id: number;
   user_id: number;
   amount: number;
-  reason: 'chore_complete' | 'chore_uncomplete' | 'reward_redeem' | 'streak_bonus' | 'admin_adjust' | 'expiry_penalty' | 'points_decay';
+  reason: 'chore_complete' | 'chore_uncomplete' | 'reward_redeem' | 'streak_bonus' | 'admin_adjust' | 'expiry_penalty' | 'points_decay' | 'missed_chore';
   reference_id?: number;
   note?: string;
   created_at: string;
