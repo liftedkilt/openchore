@@ -1163,12 +1163,12 @@ func (s *Store) DebitExpiryPenalty(ctx context.Context, userID, completionID int
 	return err
 }
 
-func (s *Store) DebitDecay(ctx context.Context, userID int64, amount int, date string) error {
+func (s *Store) DebitDecay(ctx context.Context, userID int64, amount int, date, note string) error {
 	key := fmt.Sprintf("points_decay:%d:%s", userID, date)
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO point_transactions (user_id, amount, reason, note, idempotency_key)
-		 VALUES (?, ?, ?, 'Daily points decay', ?)`,
-		userID, -amount, model.ReasonPointsDecay, key)
+		 VALUES (?, ?, ?, ?, ?)`,
+		userID, -amount, model.ReasonPointsDecay, note, key)
 	return err
 }
 
