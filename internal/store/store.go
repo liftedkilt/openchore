@@ -234,7 +234,17 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			 LIMIT 1) as completed_by_sibling_name
 		FROM chore_schedules cs
 		JOIN chores c ON c.id = cs.chore_id
-		LEFT JOIN chore_completions cc ON cc.chore_schedule_id = cs.id AND cc.completion_date = ?
+		LEFT JOIN chore_completions cc ON cc.id = (
+				SELECT cc3.id FROM chore_completions cc3
+				WHERE cc3.chore_schedule_id = cs.id AND cc3.completion_date = ?
+				ORDER BY CASE cc3.status
+					WHEN 'approved' THEN 1
+					WHEN 'pending'  THEN 2
+					WHEN 'rejected' THEN 3
+					WHEN 'ai_rejected' THEN 4
+				END
+				LIMIT 1
+			)
 		WHERE cs.assigned_to = ?
 		  AND (
 			(cs.day_of_week = ? AND cs.specific_date IS NULL AND cs.recurrence_interval IS NULL)
@@ -1153,11 +1163,12 @@ func (s *Store) DebitExpiryPenalty(ctx context.Context, userID, completionID int
 	return err
 }
 
-func (s *Store) DebitDecay(ctx context.Context, userID int64, amount int) error {
+func (s *Store) DebitDecay(ctx context.Context, userID int64, amount int, date string) error {
+	key := fmt.Sprintf("points_decay:%d:%s", userID, date)
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO point_transactions (user_id, amount, reason, note)
-		 VALUES (?, ?, ?, 'Daily points decay')`,
-		userID, -amount, model.ReasonPointsDecay)
+		`INSERT INTO point_transactions (user_id, amount, reason, note, idempotency_key)
+		 VALUES (?, ?, ?, 'Daily points decay', ?)`,
+		userID, -amount, model.ReasonPointsDecay, key)
 	return err
 }
 
@@ -1664,7 +1675,12 @@ func (s *Store) GetExpiredChores(ctx context.Context, date string, currentTime s
 		FROM chore_schedules cs
 		JOIN chores c ON c.id = cs.chore_id
 		JOIN users u ON u.id = cs.assigned_to
-		LEFT JOIN chore_completions cc ON cc.chore_schedule_id = cs.id AND cc.completion_date = ?
+		LEFT JOIN chore_completions cc ON cc.id = (
+				SELECT cc3.id FROM chore_completions cc3
+				WHERE cc3.chore_schedule_id = cs.id AND cc3.completion_date = ?
+				  AND cc3.status != 'ai_rejected'
+				LIMIT 1
+			)
 		WHERE u.paused = 0
 		  AND cs.due_by IS NOT NULL
 		  AND cs.due_by != ''
