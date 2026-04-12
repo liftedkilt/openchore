@@ -51,7 +51,7 @@ export const ApprovalsTab: React.FC<{ onCountChange: (count: number) => void }> 
             <div className={styles.approvalInfo}>
               <div className={styles.approvalHeader}>
                 <span className={styles.approvalUser}>{p.child_name}</span>
-                <span className={styles.approvalDate}>{p.completion_date}</span>
+                <span className={styles.approvalDate}>{new Date(p.completion_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
               </div>
               <h3 className={styles.approvalTitle}>{p.chore_title}</h3>
               {p.photo_url && (

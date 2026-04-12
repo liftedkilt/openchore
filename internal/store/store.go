@@ -14,6 +14,15 @@ type Store struct {
 	db *sql.DB
 }
 
+// normalizeDate strips the time component that modernc.org/sqlite appends
+// when scanning DATE columns (e.g. "2026-04-11T00:00:00Z" → "2026-04-11").
+func normalizeDate(s string) string {
+	if len(s) > 10 && (s[10] == 'T' || s[10] == ' ') {
+		return s[:10]
+	}
+	return s
+}
+
 func boolToInt(b bool) int {
 	if b {
 		return 1
@@ -385,6 +394,7 @@ func (s *Store) GetCompletionForScheduleDate(ctx context.Context, scheduleID int
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
+	cc.CompletionDate = normalizeDate(cc.CompletionDate)
 	return cc, err
 }
 
@@ -397,6 +407,7 @@ func (s *Store) GetCompletion(ctx context.Context, id int64) (*model.ChoreComple
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
+	cc.CompletionDate = normalizeDate(cc.CompletionDate)
 	return cc, err
 }
 
@@ -429,6 +440,7 @@ func (s *Store) ListPendingCompletions(ctx context.Context) ([]PendingCompletion
 		if err := rows.Scan(&p.ID, &p.ChoreTitle, &p.ChildName, &p.PhotoURL, &p.CompletionDate, &p.CompletedAt); err != nil {
 			return nil, err
 		}
+		p.CompletionDate = normalizeDate(p.CompletionDate)
 		pending = append(pending, p)
 	}
 	return pending, rows.Err()
@@ -1866,6 +1878,7 @@ func (s *Store) ReportCompletionTrend(ctx context.Context, startDate, endDate st
 		if err := rows.Scan(&r.Date, &r.Completed, &r.Assigned); err != nil {
 			return nil, err
 		}
+		r.Date = normalizeDate(r.Date)
 		results = append(results, r)
 	}
 	return results, rows.Err()
