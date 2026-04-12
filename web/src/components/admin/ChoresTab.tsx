@@ -23,7 +23,8 @@ export const ChoresTab: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: number, name: string) => {
+    if (!confirm(`Delete chore "${name}"? This action cannot be undone.`)) return;
     await api.chores.delete(id);
     load();
   };
@@ -85,7 +86,7 @@ export const ChoresTab: React.FC = () => {
                 <button className={styles.iconBtn} title="Edit" aria-label="Edit chore" onClick={(e) => { e.stopPropagation(); handleEdit(chore); }}>
                   <Edit2 size={16} />
                 </button>
-                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} title="Delete" aria-label="Delete chore" onClick={(e) => { e.stopPropagation(); handleDelete(chore.id); }}>
+                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} title="Delete" aria-label="Delete chore" onClick={(e) => { e.stopPropagation(); handleDelete(chore.id, chore.name); }}>
                   <Trash2 size={16} />
                 </button>
               </div>
