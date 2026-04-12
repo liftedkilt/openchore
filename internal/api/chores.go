@@ -440,8 +440,13 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	}
 	if existing != nil {
 		if existing.Status == model.StatusAIRejected {
-			// Allow retry — delete the rejected attempt
-			_ = h.store.UncompleteChore(r.Context(), scheduleID, req.CompletionDate)
+			// Allow retry — delete the rejected attempt so we don't end up
+			// with duplicate rows (one ai_rejected + one approved) which
+			// confuses the points-decay checker.
+			if err := h.store.UncompleteChore(r.Context(), scheduleID, req.CompletionDate); err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to clear previous attempt")
+				return
+			}
 		} else {
 			writeError(w, http.StatusConflict, "chore already completed for this date")
 			return

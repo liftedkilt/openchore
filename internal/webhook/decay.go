@@ -3,6 +3,7 @@ package webhook
 import (
 	"context"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/liftedkilt/openchore/internal/model"
@@ -117,18 +118,26 @@ func (pdc *PointsDecayChecker) check(ctx context.Context) {
 		}
 
 		if debit > 0 {
-			if err := pdc.store.DebitDecay(ctx, cfg.UserID, debit); err != nil {
-				log.Printf("points-decay: failed to debit user %d: %v", cfg.UserID, err)
-				continue
-			}
-			log.Printf("points-decay: debited %d points from user %d (%s) for missed chores on %s", debit, user.ID, user.Name, yesterday)
+			if err := pdc.store.DebitDecay(ctx, cfg.UserID, debit, yesterday); err != nil {
+				// If the idempotency key rejects the insert, this date was
+				// already debited — fall through to update last_decay_at so
+				// we don't keep retrying.
+				if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+					log.Printf("points-decay: already debited user %d for %s (idempotency), advancing timer", cfg.UserID, yesterday)
+				} else {
+					log.Printf("points-decay: failed to debit user %d: %v", cfg.UserID, err)
+					continue
+				}
+			} else {
+				log.Printf("points-decay: debited %d points from user %d (%s) for missed chores on %s", debit, user.ID, user.Name, yesterday)
 
-			pdc.dispatcher.Fire(EventPointsDecayed, map[string]any{
-				"user_id":   user.ID,
-				"user_name": user.Name,
-				"amount":    debit,
-				"date":      yesterday,
-			})
+				pdc.dispatcher.Fire(EventPointsDecayed, map[string]any{
+					"user_id":   user.ID,
+					"user_name": user.Name,
+					"amount":    debit,
+					"date":      yesterday,
+				})
+			}
 		}
 
 		if err := pdc.store.UpdateLastDecayAt(ctx, cfg.UserID, now); err != nil {

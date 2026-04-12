@@ -1293,7 +1293,7 @@ func TestDebitDecay(t *testing.T) {
 	u := createTestUser(t, s, "Child", "child")
 	s.AdminAdjustPoints(ctx, u.ID, 100, "")
 
-	err := s.DebitDecay(ctx, u.ID, 5)
+	err := s.DebitDecay(ctx, u.ID, 5, "2026-04-11")
 	if err != nil {
 		t.Fatalf("DebitDecay: %v", err)
 	}

@@ -1103,3 +1103,154 @@ func TestPointsDecayChecker_ClampsToNonNegativeBalance(t *testing.T) {
 		t.Errorf("expected balance clamped to 0, got %d", balance)
 	}
 }
+
+// TestPointsDecayChecker_NoDecayWithDuplicateCompletions verifies that decay
+// is NOT applied when a chore has both an ai_rejected and an approved
+// completion record (duplicate rows). This can happen when the
+// UncompleteChore call during an AI-rejection retry fails silently.
+func TestPointsDecayChecker_NoDecayWithDuplicateCompletions(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	parentID := createParentUser(t, env, "Parent")
+	childID := createChildUser(t, env, "Child")
+
+	if err := env.store.AdminAdjustPoints(ctx, childID, 100, ""); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	yesterday := time.Now().AddDate(0, 0, -1)
+	_, scheduleID := createChoreWithSchedule(t, env, parentID, childID, "required", int(yesterday.Weekday()), nil, 0)
+
+	// Simulate the duplicate-completion scenario: an ai_rejected record
+	// that was not cleaned up, plus a subsequent approved record.
+	if err := env.store.CompleteChore(ctx, &model.ChoreCompletion{
+		ChoreScheduleID: scheduleID,
+		CompletedBy:     childID,
+		Status:          model.StatusAIRejected,
+		CompletionDate:  yesterday.Format(model.DateFormat),
+		AIFeedback:      "Doesn't look complete",
+		AIConfidence:    0.9,
+	}); err != nil {
+		t.Fatalf("CompleteChore (ai_rejected): %v", err)
+	}
+	if err := env.store.CompleteChore(ctx, &model.ChoreCompletion{
+		ChoreScheduleID: scheduleID,
+		CompletedBy:     childID,
+		Status:          model.StatusApproved,
+		CompletionDate:  yesterday.Format(model.DateFormat),
+	}); err != nil {
+		t.Fatalf("CompleteChore (approved): %v", err)
+	}
+
+	if err := env.store.SetUserDecayConfig(ctx, &model.UserDecayConfig{
+		UserID: childID, Enabled: true, DecayRate: 10, DecayIntervalHours: 24,
+	}); err != nil {
+		t.Fatalf("SetUserDecayConfig: %v", err)
+	}
+
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+	pdc.check(ctx)
+
+	balance, _ := env.store.GetPointBalance(ctx, childID)
+	if balance != 100 {
+		t.Errorf("expected balance to stay 100 (no decay with duplicate completions), got %d", balance)
+	}
+}
+
+// TestPointsDecayChecker_MultipleKidsAllComplete verifies that when multiple
+// kids each have several non-bonus chores all completed, no decay is applied
+// to any of them.
+func TestPointsDecayChecker_MultipleKidsAllComplete(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	parentID := createParentUser(t, env, "Parent")
+	kids := make([]int64, 3)
+	for i := range kids {
+		kids[i] = createChildUser(t, env, fmt.Sprintf("Kid%d", i))
+	}
+
+	yesterday := time.Now().AddDate(0, 0, -1)
+	dow := int(yesterday.Weekday())
+	dateStr := yesterday.Format(model.DateFormat)
+
+	// Each kid gets 3 non-bonus chores (required + core) and 1 bonus.
+	for _, kidID := range kids {
+		if err := env.store.AdminAdjustPoints(ctx, kidID, 100, ""); err != nil {
+			t.Fatalf("AdminAdjustPoints: %v", err)
+		}
+
+		for _, cat := range []string{"required", "required", "core", "bonus"} {
+			_, schedID := createChoreWithSchedule(t, env, parentID, kidID, cat, dow, nil, 0)
+			// Complete all chores including the bonus one.
+			if err := env.store.CompleteChore(ctx, &model.ChoreCompletion{
+				ChoreScheduleID: schedID,
+				CompletedBy:     kidID,
+				Status:          model.StatusApproved,
+				CompletionDate:  dateStr,
+			}); err != nil {
+				t.Fatalf("CompleteChore: %v", err)
+			}
+		}
+
+		if err := env.store.SetUserDecayConfig(ctx, &model.UserDecayConfig{
+			UserID: kidID, Enabled: true, DecayRate: 10, DecayIntervalHours: 24,
+		}); err != nil {
+			t.Fatalf("SetUserDecayConfig: %v", err)
+		}
+	}
+
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+	pdc.check(ctx)
+
+	for i, kidID := range kids {
+		balance, _ := env.store.GetPointBalance(ctx, kidID)
+		if balance != 100 {
+			t.Errorf("Kid%d: expected balance 100 (no decay), got %d", i, balance)
+		}
+	}
+}
+
+// TestPointsDecayChecker_IdempotentDebit verifies that running the decay
+// checker twice for the same date does not double-debit, thanks to the
+// idempotency key on point_transactions.
+func TestPointsDecayChecker_IdempotentDebit(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	parentID := createParentUser(t, env, "Parent")
+	childID := createChildUser(t, env, "Child")
+
+	if err := env.store.AdminAdjustPoints(ctx, childID, 100, ""); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	yesterday := time.Now().AddDate(0, 0, -1)
+	createChoreWithSchedule(t, env, parentID, childID, "required", int(yesterday.Weekday()), nil, 0)
+
+	if err := env.store.SetUserDecayConfig(ctx, &model.UserDecayConfig{
+		UserID: childID, Enabled: true, DecayRate: 10, DecayIntervalHours: 24,
+	}); err != nil {
+		t.Fatalf("SetUserDecayConfig: %v", err)
+	}
+
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+	pdc.check(ctx)
+
+	balance, _ := env.store.GetPointBalance(ctx, childID)
+	if balance != 90 {
+		t.Fatalf("expected balance 90 after first decay, got %d", balance)
+	}
+
+	// Manually reset last_decay_at to simulate UpdateLastDecayAt failing
+	// after the debit succeeded, so the checker would try again.
+	env.db.ExecContext(ctx, `UPDATE user_decay_config SET last_decay_at = NULL WHERE user_id = ?`, childID)
+
+	pdc.check(ctx)
+
+	balance, _ = env.store.GetPointBalance(ctx, childID)
+	if balance != 90 {
+		t.Errorf("expected balance to remain 90 (idempotent), got %d", balance)
+	}
+}
