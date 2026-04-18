@@ -391,6 +391,21 @@ func (s *Store) UncompleteChore(ctx context.Context, scheduleID int64, completio
 	if updated > 0 {
 		return nil
 	}
+	// Belt-and-suspenders: if an already-soft-deleted approved/pending row
+	// exists for this schedule+date, treat the operation as a no-op instead
+	// of falling through to the unconditional DELETE below. Without this
+	// guard, a double-uncheck would destroy the preserved row + metadata.
+	var softDeleted int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM chore_completions
+		 WHERE chore_schedule_id = ?
+		   AND completion_date = ?
+		   AND uncompleted_at IS NOT NULL
+		   AND status IN (?, ?)`,
+		scheduleID, completionDate, model.StatusApproved, model.StatusPending,
+	).Scan(&softDeleted); err == nil && softDeleted > 0 {
+		return nil
+	}
 	// No approved/pending row found — fall back to the old hard-delete so
 	// ai_rejected / rejected rows are cleared and can be retried fresh.
 	_, err = s.db.ExecContext(ctx,

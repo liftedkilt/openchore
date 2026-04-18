@@ -755,6 +755,15 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 
 	// Get completion before deleting so we can reverse points
 	existing, _ := h.store.GetCompletionForScheduleDate(r.Context(), scheduleID, dateStr)
+	// If the completion is already soft-deleted, short-circuit: don't debit
+	// again (GetNetPointsForCompletion ignores chore_uncomplete rows, so the
+	// already-debited amount would be re-debited), and don't call the store's
+	// UncompleteChore (its fallback DELETE would destroy the preserved row).
+	// The endpoint is idempotent.
+	if existing != nil && existing.UncompletedAt != nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	var completedBy int64
 	if existing != nil {
 		completedBy = existing.CompletedBy
