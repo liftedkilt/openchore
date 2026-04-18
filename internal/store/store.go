@@ -415,6 +415,10 @@ type PendingCompletionRow struct {
 	ID             int64     `json:"id"`
 	ChoreTitle     string    `json:"chore_title"`
 	ChildName      string    `json:"child_name"`
+	// AssignedUserID is the user_id the underlying schedule is assigned to
+	// (i.e. the kid the chore "belongs to"), which may differ from the user
+	// who clicked "complete" (see ChildName) in sibling/FCFS scenarios.
+	AssignedUserID int64     `json:"assigned_user_id"`
 	PhotoURL       string    `json:"photo_url"`
 	CompletionDate string    `json:"completion_date"`
 	CompletedAt    time.Time `json:"completed_at"`
@@ -422,7 +426,7 @@ type PendingCompletionRow struct {
 
 func (s *Store) ListPendingCompletions(ctx context.Context) ([]PendingCompletionRow, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT cc.id, c.title, u.name, cc.photo_url, cc.completion_date, cc.completed_at
+		SELECT cc.id, c.title, u.name, cs.assigned_to, cc.photo_url, cc.completion_date, cc.completed_at
 		FROM chore_completions cc
 		JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
 		JOIN chores c ON c.id = cs.chore_id
@@ -437,7 +441,7 @@ func (s *Store) ListPendingCompletions(ctx context.Context) ([]PendingCompletion
 	var pending []PendingCompletionRow
 	for rows.Next() {
 		var p PendingCompletionRow
-		if err := rows.Scan(&p.ID, &p.ChoreTitle, &p.ChildName, &p.PhotoURL, &p.CompletionDate, &p.CompletedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.ChoreTitle, &p.ChildName, &p.AssignedUserID, &p.PhotoURL, &p.CompletionDate, &p.CompletedAt); err != nil {
 			return nil, err
 		}
 		p.CompletionDate = normalizeDate(p.CompletionDate)
