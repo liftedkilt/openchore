@@ -118,6 +118,11 @@ type ChoreCompletion struct {
 	CompletionDate  string     `json:"completion_date"`
 	AIFeedback      string     `json:"ai_feedback,omitempty"`
 	AIConfidence    float64    `json:"ai_confidence,omitempty"`
+	// UncompletedAt, when non-nil, marks a soft-deleted completion. The row
+	// is preserved (photo + AI metadata + approval) so a kid can un-check and
+	// re-check a chore without losing the approved state. Reader queries
+	// exposing "is this done?" must treat non-nil UncompletedAt as not done.
+	UncompletedAt *time.Time `json:"uncompleted_at,omitempty"`
 }
 
 // --- Points & Rewards ---
