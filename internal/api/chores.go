@@ -460,11 +460,36 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 					if _, err := h.store.ReverseUncompleteDebits(r.Context(), existing.ID); err != nil {
 						log.Printf("error reversing uncomplete debits for completion %d: %v", existing.ID, err)
 					}
+					// Bonus chores that were originally credited 0 points (because
+					// required/core weren't done yet) can now qualify if the kid has
+					// since finished the rest of the day. Re-run the gate and credit
+					// the difference via a fresh chore_complete transaction (all
+					// point changes must go through point_transactions per
+					// CLAUDE.md). We only ever credit the delta, so stacking
+					// unchecks/rechecks can't multi-credit the bonus.
+					reviveChore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
+					if reviveChore != nil && reviveChore.Category == model.CategoryBonus {
+						if h.shouldAwardBonusPoints(r.Context(), existing.CompletedBy, req.CompletionDate) {
+							fullPts, _ := h.store.GetChorePointsForSchedule(r.Context(), scheduleID)
+							alreadyCredited, _ := h.store.GetNetPointsForCompletion(r.Context(), existing.ID)
+							delta := fullPts - alreadyCredited
+							if delta > 0 {
+								if err := h.store.CreditChorePoints(r.Context(), existing.CompletedBy, existing.ID, delta); err != nil {
+									log.Printf("error crediting bonus delta on revive for completion %d: %v", existing.ID, err)
+								}
+							}
+						}
+					}
 					// Recalculate streak after revival
 					if err := h.store.RecalculateStreak(r.Context(), existing.CompletedBy, req.CompletionDate); err != nil {
 						log.Printf("error recalculating streak for user %d: %v", existing.CompletedBy, err)
 					}
 				}
+				// Note: we intentionally do NOT fire EventChoreCompleted on
+				// revive. A revive isn't a fresh completion — it's reversing an
+				// accidental uncheck — and firing would spam downstream webhook
+				// consumers (Home Assistant scripts, push notifications) with
+				// duplicate events. Revisit if product needs differ.
 				// Clear uncompleted_at on the returned payload too
 				existing.UncompletedAt = nil
 				writeJSON(w, http.StatusCreated, existing)
