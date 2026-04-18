@@ -265,9 +265,30 @@ export const Dashboard: React.FC = () => {
         await api.chores.uncomplete(chore.schedule_id, chore.date);
       } else {
         const photoSource = chore.photo_source || 'child';
-        if (chore.requires_photo && photoSource === 'child') {
-          setQrChore(chore);
-          return;
+        const needsPhoto = chore.requires_photo && photoSource === 'child';
+        if (needsPhoto) {
+          // Try to complete without a photo first — the backend will revive
+          // a prior soft-deleted approved completion (kept around so an
+          // accidental uncheck + recheck doesn't wipe the photo/AI feedback
+          // for today). If there's no prior completion, the backend returns
+          // 400 "photo required" and we fall through to the QR modal.
+          try {
+            await api.chores.complete(chore.schedule_id, chore.date);
+            setAiFeedback(prev => {
+              const next = { ...prev };
+              delete next[chore.schedule_id];
+              return next;
+            });
+            onChoreFinished();
+            return;
+          } catch (e) {
+            if (e instanceof APIError && e.status === 400) {
+              // No prior completion to revive — show the photo capture modal.
+              setQrChore(chore);
+              return;
+            }
+            throw e;
+          }
         }
         await api.chores.complete(chore.schedule_id, chore.date);
         // Clear any previous AI feedback for this chore on success

@@ -1964,6 +1964,98 @@ func TestUncompleteNormalPointsReversed(t *testing.T) {
 	}
 }
 
+func TestRecheckPreservesApprovedPhotoAndPoints(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Chore that requires a photo.
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title": "Clean Room", "category": "core", "points_value": 10,
+		"requires_photo": true, "photo_source": "child",
+	}, adminHeaders())
+
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	today := time.Now().Format(model.DateFormat)
+
+	// Complete with a photo URL — we don't have an AI reviewer in tests so
+	// this ends up as a normal approved completion with the photo stored.
+	resp := env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+		"photo_url":       "/uploads/room.jpg",
+	}, adminHeaders(), http.StatusCreated)
+	var firstCC map[string]any
+	decodeBody(t, resp, &firstCC)
+	firstID := int64(firstCC["id"].(float64))
+	if firstCC["photo_url"] != "/uploads/room.jpg" {
+		t.Fatalf("expected photo stored, got %+v", firstCC)
+	}
+
+	// Balance should be 10.
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 10 {
+		t.Fatalf("expected 10 after complete, got %v", pts["balance"])
+	}
+
+	// Uncheck.
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/1/complete?date=%s", today), nil, adminHeaders(), http.StatusNoContent)
+
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected 0 after uncheck, got %v", pts["balance"])
+	}
+
+	// Re-check WITHOUT providing a photo. The backend should find the
+	// soft-deleted approved completion and revive it — not demand a new photo.
+	resp = env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	var revivedCC map[string]any
+	decodeBody(t, resp, &revivedCC)
+	if int64(revivedCC["id"].(float64)) != firstID {
+		t.Fatalf("expected same completion id %d, got %v", firstID, revivedCC["id"])
+	}
+	if revivedCC["photo_url"] != "/uploads/room.jpg" {
+		t.Fatalf("expected photo preserved on revival, got %+v", revivedCC)
+	}
+	if revivedCC["status"] != "approved" {
+		t.Fatalf("expected status=approved on revival, got %v", revivedCC["status"])
+	}
+
+	// Balance should be back to 10.
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 10 {
+		t.Fatalf("expected 10 after revival, got %v", pts["balance"])
+	}
+
+	// Uncheck + recheck a second time should still work correctly.
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/1/complete?date=%s", today), nil, adminHeaders(), http.StatusNoContent)
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected 0 after second uncheck, got %v", pts["balance"])
+	}
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 10 {
+		t.Fatalf("expected 10 after second revival, got %v", pts["balance"])
+	}
+}
+
 // =================== BCRYPT PASSCODE TESTS ===================
 
 func TestBcryptPasscodeRoundTrip(t *testing.T) {
