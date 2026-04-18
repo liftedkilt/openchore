@@ -14,6 +14,7 @@ test.describe('Admin Chore CRUD', () => {
 
     // Verify in admin UI
     await loginAsAdmin(page);
+    await page.getByRole('button', { name: /^Chores$/i }).click();
     await expect(page.getByText('10 pts').first()).toBeVisible({ timeout: 5_000 });
   });
 
@@ -39,6 +40,7 @@ test.describe('Admin Chore CRUD', () => {
 
   test('admin can create chore with interval schedule', async ({ page }) => {
     await loginAsAdmin(page);
+    await page.getByRole('button', { name: /^Chores$/i }).click();
 
     await page.getByRole('button', { name: /Add Chore/i }).click();
     await page.getByPlaceholder('e.g. Empty the dishwasher').fill('E2E Interval Chore');
@@ -69,6 +71,7 @@ test.describe('Admin Chore CRUD', () => {
 
   test('chore list shows all seeded chores', async ({ page }) => {
     await loginAsAdmin(page);
+    await page.getByRole('button', { name: /^Chores$/i }).click();
 
     const expectedChores = ['Feed Cats (Morning)', 'Feed Cats (Evening)', 'Make Bed',
       'Brush Teeth (Morning)', 'Brush Teeth (Evening)', 'Empty Dishwasher',

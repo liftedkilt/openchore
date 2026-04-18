@@ -5,6 +5,7 @@ test.describe('Chore Creation', () => {
   test.describe.serial(() => {
     test('create chore with Every Day schedule assigns all 7 days', async ({ page }) => {
       await loginAsAdmin(page);
+      await page.getByRole('button', { name: /^Chores$/i }).click();
 
       // Open create wizard
       await page.getByRole('button', { name: /Add Chore/i }).click();
@@ -38,6 +39,7 @@ test.describe('Chore Creation', () => {
 
     test('photo_source persists through create and update', async ({ page }) => {
       await loginAsAdmin(page);
+      await page.getByRole('button', { name: /^Chores$/i }).click();
 
       // Create a chore with photo required + external source via the wizard
       await page.getByRole('button', { name: /Add Chore/i }).click();
