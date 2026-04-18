@@ -1,4 +1,4 @@
-import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, Reward, RewardAssignment, RewardRedemption, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from './types';
+import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardAssignment, RewardRedemption, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from './types';
 
 const API_BASE = '/api';
 
@@ -179,7 +179,7 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ photo_url: photoUrl }),
       }),
-    listPending: () => fetchWithAuth<any[]>('/completions/pending'),
+    listPending: () => fetchWithAuth<PendingCompletion[]>('/completions/pending'),
     approve: (completionId: number) => fetchWithAuth(`/completions/${completionId}/approve`, { method: 'POST' }),
     reject: (completionId: number) => fetchWithAuth(`/completions/${completionId}/reject`, { method: 'POST' }),
     listSchedules: (choreId: number) =>

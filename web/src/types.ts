@@ -340,6 +340,19 @@ export interface ScheduledChore {
   tts_audio_url?: string;
 }
 
+// Shape of rows returned by GET /api/completions/pending. Exposed as a typed
+// surface (the admin UI cares about assigned_user_id to attribute pending
+// approvals to the kid the chore belongs to, not just whoever clicked it).
+export interface PendingCompletion {
+  id: number;
+  chore_title: string;
+  child_name: string;
+  assigned_user_id: number;
+  photo_url: string;
+  completion_date: string;
+  completed_at: string;
+}
+
 export interface UserDecayConfig {
   user_id: number;
   enabled: boolean;
