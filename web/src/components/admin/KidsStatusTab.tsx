@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../../api';
-import type { User, ScheduledChore, UserStreakData, PointBalance } from '../../types';
+import type { User, ScheduledChore, UserStreakData, PointBalance, PendingCompletion } from '../../types';
 import adminStyles from '../../pages/AdminDashboard.module.css';
 import styles from './KidsStatusTab.module.css';
 import {
@@ -16,10 +16,6 @@ import {
 import clsx from 'clsx';
 import { localDateStr } from '../../utils';
 
-interface PendingCompletionLite {
-  child_name: string;
-}
-
 interface KidStatus {
   user: User;
   chores: ScheduledChore[];
@@ -30,15 +26,21 @@ interface KidStatus {
 }
 
 interface Breakdown {
+  requiredCompleted: number;
+  requiredTotal: number;
   coreCompleted: number;
   coreTotal: number;
   bonusCompleted: number;
   bonusTotal: number;
+  // overdue is restricted to required+core (bonus is never "overdue" for the
+  // purpose of alerts — it's opt-in and doesn't block the bonus gate).
   overdue: number;
   pendingOnToday: number;
 }
 
 function breakdownFor(chores: ScheduledChore[]): Breakdown {
+  let requiredCompleted = 0;
+  let requiredTotal = 0;
   let coreCompleted = 0;
   let coreTotal = 0;
   let bonusCompleted = 0;
@@ -46,18 +48,29 @@ function breakdownFor(chores: ScheduledChore[]): Breakdown {
   let overdue = 0;
   let pendingOnToday = 0;
   for (const c of chores) {
-    const isBonus = c.category === 'bonus';
-    if (isBonus) {
-      bonusTotal += 1;
-      if (c.completed) bonusCompleted += 1;
-    } else {
+    if (c.category === 'required') {
+      requiredTotal += 1;
+      if (c.completed) requiredCompleted += 1;
+    } else if (c.category === 'core') {
       coreTotal += 1;
       if (c.completed) coreCompleted += 1;
+    } else {
+      bonusTotal += 1;
+      if (c.completed) bonusCompleted += 1;
     }
     if (!c.completed && c.expired && c.category !== 'bonus') overdue += 1;
     if (c.completion_status === 'pending') pendingOnToday += 1;
   }
-  return { coreCompleted, coreTotal, bonusCompleted, bonusTotal, overdue, pendingOnToday };
+  return {
+    requiredCompleted,
+    requiredTotal,
+    coreCompleted,
+    coreTotal,
+    bonusCompleted,
+    bonusTotal,
+    overdue,
+    pendingOnToday,
+  };
 }
 
 function initialsFor(name: string): string {
@@ -83,17 +96,19 @@ export const KidsStatusTab: React.FC = () => {
       const [users, balances, pending] = await Promise.all([
         api.users.list(),
         api.points.getAllBalances().catch(() => [] as PointBalance[]),
-        api.chores.listPending().catch(() => [] as PendingCompletionLite[]),
+        api.chores.listPending().catch(() => [] as PendingCompletion[]),
       ]);
 
       const children = users
         .filter((u: User) => u.role === 'child')
         .sort((a, b) => a.name.localeCompare(b.name));
 
-      // Count pending approvals per child name (pending API returns child_name only).
-      const pendingByName = new Map<string, number>();
-      for (const p of pending as PendingCompletionLite[]) {
-        pendingByName.set(p.child_name, (pendingByName.get(p.child_name) || 0) + 1);
+      // Attribute pending approvals to the assignee (the kid the chore
+      // belongs to), not the completer. Matching by name would collapse
+      // duplicate names and would miss the sibling-completing case.
+      const pendingByAssignee = new Map<number, number>();
+      for (const p of pending) {
+        pendingByAssignee.set(p.assigned_user_id, (pendingByAssignee.get(p.assigned_user_id) || 0) + 1);
       }
 
       const results = await Promise.all(
@@ -113,7 +128,7 @@ export const KidsStatusTab: React.FC = () => {
               chores,
               balance: bal,
               streak: streakData.current_streak,
-              pendingApprovals: pendingByName.get(kid.name) || 0,
+              pendingApprovals: pendingByAssignee.get(kid.id) || 0,
               loadError: false,
             };
           } catch (e) {
@@ -123,7 +138,7 @@ export const KidsStatusTab: React.FC = () => {
               chores: [],
               balance: balances.find(b => b.user_id === kid.id)?.balance ?? 0,
               streak: 0,
-              pendingApprovals: pendingByName.get(kid.name) || 0,
+              pendingApprovals: pendingByAssignee.get(kid.id) || 0,
               loadError: true,
             };
           }
@@ -182,15 +197,20 @@ export const KidsStatusTab: React.FC = () => {
       <div className={styles.grid}>
         {kids.map(kid => {
           const b = breakdownFor(kid.chores);
-          const corePct = b.coreTotal > 0 ? (b.coreCompleted / b.coreTotal) * 100 : 0;
-          const bonusWidthOfRemaining = b.coreTotal > 0
-            ? (1 - b.coreCompleted / b.coreTotal) * (b.bonusTotal > 0 ? (b.bonusCompleted / b.bonusTotal) : 0) * 100
-            : b.bonusTotal > 0 ? (b.bonusCompleted / b.bonusTotal) * 100 : 0;
-          const allCoreDone = b.coreTotal > 0 && b.coreCompleted === b.coreTotal;
+          // Progress bar shows required+core progress only. Bonus is
+          // rendered as a separate secondary bar ONLY when required+core are
+          // complete — per CLAUDE.md bonus points are gated on that, so
+          // showing bonus progress before it's unlocked is misleading.
+          const gatedTotal = b.requiredTotal + b.coreTotal;
+          const gatedCompleted = b.requiredCompleted + b.coreCompleted;
+          const gatedPct = gatedTotal > 0 ? (gatedCompleted / gatedTotal) * 100 : 0;
+          const bonusPct = b.bonusTotal > 0 ? (b.bonusCompleted / b.bonusTotal) * 100 : 0;
+          const allRequiredAndCoreDone = gatedTotal > 0 && gatedCompleted === gatedTotal;
+          const bonusUnlocked = allRequiredAndCoreDone && b.bonusTotal > 0;
           const hasAlert = b.overdue > 0;
           const isExpanded = expanded.has(kid.user.id);
-          const totalCompleted = b.coreCompleted + b.bonusCompleted;
-          const totalChores = b.coreTotal + b.bonusTotal;
+          const totalChores = gatedTotal + b.bonusTotal;
+          const detailsId = `kid-${kid.user.id}-details`;
 
           return (
             <div
@@ -199,20 +219,15 @@ export const KidsStatusTab: React.FC = () => {
                 styles.card,
                 kid.user.paused && styles.cardPaused,
                 hasAlert && styles.cardAlert,
-                !hasAlert && allCoreDone && styles.cardDone,
+                !hasAlert && allRequiredAndCoreDone && styles.cardDone,
               )}
             >
-              <div
+              <button
+                type="button"
                 className={styles.header}
                 onClick={() => toggleExpand(kid.user.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    toggleExpand(kid.user.id);
-                  }
-                }}
+                aria-expanded={isExpanded}
+                aria-controls={detailsId}
               >
                 <div className={styles.avatar}>
                   {kid.user.avatar_url
@@ -229,7 +244,7 @@ export const KidsStatusTab: React.FC = () => {
                         <AlertTriangle size={11} /> {b.overdue} overdue
                       </span>
                     )}
-                    {!hasAlert && allCoreDone && (
+                    {!hasAlert && allRequiredAndCoreDone && (
                       <span className={styles.doneTag}>
                         <Check size={11} /> All done
                       </span>
@@ -241,34 +256,58 @@ export const KidsStatusTab: React.FC = () => {
                       <span className={styles.progressTextMuted}>No chores scheduled today</span>
                     ) : (
                       <>
-                        <span>
-                          <strong>{b.coreCompleted}</strong>
-                          <span className={styles.progressTextMuted}>/{b.coreTotal}</span> core
-                        </span>
+                        {b.requiredTotal > 0 && (
+                          <span>
+                            <strong>{b.requiredCompleted}</strong>
+                            <span className={styles.progressTextMuted}>/{b.requiredTotal}</span> required
+                          </span>
+                        )}
+                        {b.coreTotal > 0 && (
+                          <span className={b.requiredTotal > 0 ? styles.progressTextMuted : undefined}>
+                            {b.requiredTotal > 0 && '· '}
+                            <strong style={b.requiredTotal > 0 ? { color: 'var(--text-primary)' } : undefined}>
+                              {b.coreCompleted}
+                            </strong>
+                            <span className={styles.progressTextMuted}>/{b.coreTotal}</span> core
+                          </span>
+                        )}
                         {b.bonusTotal > 0 && (
                           <span className={styles.progressTextMuted}>
                             · <strong style={{ color: 'var(--text-primary)' }}>{b.bonusCompleted}</strong>/{b.bonusTotal} bonus
                           </span>
                         )}
-                        <span className={styles.progressTextMuted}>· {totalCompleted}/{totalChores} total</span>
                       </>
                     )}
                   </div>
 
+                  {/*
+                    Main bar fills with required+core completion. Bonus gets
+                    its own secondary bar, only shown once the gate is
+                    cleared (bonus points aren't awarded until then — see
+                    CLAUDE.md — so showing bonus progress earlier would
+                    imply it "counts" when it doesn't).
+                  */}
                   <div className={styles.progressBar}>
-                    {b.coreTotal > 0 && (
+                    {gatedTotal > 0 && (
                       <div
-                        className={allCoreDone ? styles.progressFillDone : styles.progressFillCore}
-                        style={{ width: `${corePct}%` }}
-                      />
-                    )}
-                    {b.bonusTotal > 0 && (
-                      <div
-                        className={styles.progressFillBonus}
-                        style={{ width: `${bonusWidthOfRemaining}%` }}
+                        className={allRequiredAndCoreDone ? styles.progressFillDone : styles.progressFillCore}
+                        style={{ width: `${gatedPct}%` }}
                       />
                     )}
                   </div>
+                  {b.bonusTotal > 0 && bonusUnlocked && (
+                    <div className={clsx(styles.progressBar, styles.progressBarBonus)}>
+                      <div
+                        className={styles.progressFillBonus}
+                        style={{ width: `${bonusPct}%` }}
+                      />
+                    </div>
+                  )}
+                  {b.bonusTotal > 0 && !bonusUnlocked && (
+                    <div className={styles.bonusHint}>
+                      Bonus unlocks when required + core are done
+                    </div>
+                  )}
 
                   <div className={styles.statsRow}>
                     <span className={clsx(styles.stat, styles.statStreak)}>
@@ -294,10 +333,10 @@ export const KidsStatusTab: React.FC = () => {
                   size={20}
                   className={clsx(styles.caret, isExpanded && styles.caretOpen)}
                 />
-              </div>
+              </button>
 
               {isExpanded && (
-                <div className={styles.details}>
+                <div id={detailsId} className={styles.details}>
                   {kid.loadError && (
                     <div className={styles.error}>Couldn't load this child's chores.</div>
                   )}
