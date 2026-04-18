@@ -508,9 +508,51 @@ func TestUncompleteChore(t *testing.T) {
 		t.Fatalf("UncompleteChore: %v", err)
 	}
 
+	// Approved completions are SOFT-deleted (preserves photo/AI metadata
+	// so the kid can re-check without losing the approval for the day).
+	// The row should still be present with uncompleted_at set.
+	got, _ := s.GetCompletionForScheduleDate(ctx, cs.ID, "2026-03-28")
+	if got == nil {
+		t.Fatalf("expected row to survive as soft-deleted, got nil")
+	}
+	if got.UncompletedAt == nil {
+		t.Errorf("expected uncompleted_at to be set after uncomplete, got nil")
+	}
+
+	// Revive: completion should come back with uncompleted_at cleared.
+	if err := s.ReviveCompletion(ctx, got.ID); err != nil {
+		t.Fatalf("ReviveCompletion: %v", err)
+	}
+	revived, _ := s.GetCompletionForScheduleDate(ctx, cs.ID, "2026-03-28")
+	if revived == nil || revived.UncompletedAt != nil {
+		t.Errorf("expected row revived with uncompleted_at=nil, got %+v", revived)
+	}
+}
+
+func TestUncompleteChore_AIRejectedHardDeletes(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Trash", 5, u.ID)
+	cs := createTestSchedule(t, s, c.ID, u.ID, 3)
+
+	cc := &model.ChoreCompletion{
+		ChoreScheduleID: cs.ID,
+		CompletedBy:     u.ID,
+		Status:          model.StatusAIRejected,
+		CompletionDate:  "2026-03-28",
+	}
+	s.CompleteChore(ctx, cc)
+
+	if err := s.UncompleteChore(ctx, cs.ID, "2026-03-28"); err != nil {
+		t.Fatalf("UncompleteChore: %v", err)
+	}
+
+	// ai_rejected rows should be hard-deleted so the retry flow works.
 	got, _ := s.GetCompletionForScheduleDate(ctx, cs.ID, "2026-03-28")
 	if got != nil {
-		t.Errorf("expected nil after uncomplete, got %+v", got)
+		t.Errorf("expected ai_rejected row to be hard-deleted, got %+v", got)
 	}
 }
 
