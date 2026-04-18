@@ -2056,6 +2056,98 @@ func TestRecheckPreservesApprovedPhotoAndPoints(t *testing.T) {
 	}
 }
 
+// TestDoubleUncheckIsIdempotent verifies that unchecking an already-unchecked
+// (soft-deleted) completion does not double-debit the child's balance and does
+// not hard-delete the preserved row. The second DELETE must be a no-op so a
+// subsequent recheck still revives the original completion with its photo +
+// approval metadata intact.
+func TestDoubleUncheckIsIdempotent(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title": "Clean Room", "category": "core", "points_value": 10,
+		"requires_photo": true, "photo_source": "child",
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	today := time.Now().Format(model.DateFormat)
+
+	// Approve via photo URL.
+	resp := env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+		"photo_url":       "/uploads/room.jpg",
+	}, adminHeaders(), http.StatusCreated)
+	var firstCC map[string]any
+	decodeBody(t, resp, &firstCC)
+	firstID := int64(firstCC["id"].(float64))
+
+	// Balance 10.
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 10 {
+		t.Fatalf("expected 10 after complete, got %v", pts["balance"])
+	}
+
+	// First uncheck — should debit once (balance 0) and soft-delete the row.
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/1/complete?date=%s", today), nil, adminHeaders(), http.StatusNoContent)
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected 0 after first uncheck, got %v", pts["balance"])
+	}
+
+	// Second uncheck on an already-soft-deleted row must NOT debit again and
+	// must NOT hard-delete the preserved row.
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/1/complete?date=%s", today), nil, adminHeaders(), http.StatusNoContent)
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected balance to remain 0 after double uncheck, got %v", pts["balance"])
+	}
+
+	// The soft-deleted row must still exist with uncompleted_at set.
+	var rowCount int
+	var uncompletedAtNull bool
+	if err := env.db.QueryRow(
+		`SELECT COUNT(*), MIN(CASE WHEN uncompleted_at IS NULL THEN 1 ELSE 0 END)
+		 FROM chore_completions WHERE id = ?`, firstID).Scan(&rowCount, &uncompletedAtNull); err != nil {
+		t.Fatalf("failed to query completion row: %v", err)
+	}
+	if rowCount != 1 {
+		t.Fatalf("expected soft-deleted row to be preserved after double uncheck, got %d rows", rowCount)
+	}
+	if uncompletedAtNull {
+		t.Fatal("expected uncompleted_at to still be set after double uncheck")
+	}
+
+	// Recheck — must revive original completion with photo preserved and
+	// balance restored to 10 exactly once.
+	resp = env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	var revived map[string]any
+	decodeBody(t, resp, &revived)
+	if int64(revived["id"].(float64)) != firstID {
+		t.Fatalf("expected same completion id %d on revive, got %v", firstID, revived["id"])
+	}
+	if revived["photo_url"] != "/uploads/room.jpg" {
+		t.Fatalf("expected photo preserved after double-uncheck + recheck, got %+v", revived)
+	}
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 10 {
+		t.Fatalf("expected balance 10 after revive, got %v", pts["balance"])
+	}
+}
+
 // =================== BCRYPT PASSCODE TESTS ===================
 
 func TestBcryptPasscodeRoundTrip(t *testing.T) {
