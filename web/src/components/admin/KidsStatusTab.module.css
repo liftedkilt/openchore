@@ -1,0 +1,336 @@
+/* --- Kids Status Tab --- */
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.card {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+.cardAlert {
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.cardDone {
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.cardPaused {
+  opacity: 0.55;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  cursor: pointer;
+  min-height: 64px;
+}
+
+.header:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-primary);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarPlaceholder {
+  width: 100%;
+  height: 100%;
+  background: var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.name {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.pausedTag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  background: var(--badge-paused-bg);
+  color: var(--badge-paused-text);
+  letter-spacing: 0.04em;
+}
+
+.alertTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--status-required);
+  letter-spacing: 0.04em;
+}
+
+.doneTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--accent-green);
+  letter-spacing: 0.04em;
+}
+
+.progressText {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.progressTextMuted {
+  opacity: 0.6;
+}
+
+.progressBar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+}
+
+.progressFillCore {
+  background: var(--accent-blue);
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.progressFillBonus {
+  background: var(--accent-green);
+  height: 100%;
+  opacity: 0.7;
+  transition: width 0.4s ease;
+}
+
+.progressFillDone {
+  background: var(--accent-green);
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.statsRow {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 600;
+}
+
+.statStreak {
+  color: var(--status-bonus);
+}
+
+.statPoints {
+  color: var(--accent-blue);
+}
+
+.statPending {
+  color: var(--status-bonus);
+}
+
+.caret {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+}
+
+.caretOpen {
+  transform: rotate(180deg);
+}
+
+.details {
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 0.75rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.categorySection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.categoryLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.choreList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.choreItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  font-size: 0.85rem;
+}
+
+.choreTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.choreTitleDone {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.choreStatus {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.15rem 0.4rem;
+  border-radius: 5px;
+  letter-spacing: 0.04em;
+}
+
+.statusDone {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--accent-green);
+}
+
+.statusPending {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--status-bonus);
+}
+
+.statusOverdue {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--status-required);
+}
+
+.statusIdle {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+}
+
+.choreIcon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.choreIconDone {
+  color: var(--accent-green);
+}
+
+.choreIconOverdue {
+  color: var(--status-required);
+}
+
+.emptyChore {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  padding: 0.35rem 0;
+  font-style: italic;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.error {
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: var(--status-required);
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+.refreshBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 0.5rem;
+}
+
+.refreshHint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}

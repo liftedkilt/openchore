@@ -4,7 +4,7 @@ import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import type { User } from '../types';
 import styles from './AdminDashboard.module.css';
-import { ArrowLeft, Plus, Users, ListChecks, Gift, Coins, Activity, Settings, Undo2, Camera } from 'lucide-react';
+import { ArrowLeft, Plus, Users, ListChecks, Gift, Coins, Activity, Settings, Undo2, Camera, Home } from 'lucide-react';
 import clsx from 'clsx';
 import QuickAssign from '../components/QuickAssign/QuickAssign';
 import { ChoresTab } from '../components/admin/ChoresTab';
@@ -15,13 +15,14 @@ import { PointsTab } from '../components/admin/PointsTab';
 import { ActivityTab } from '../components/admin/ActivityTab';
 import { AIChoreChecker } from '../components/admin/AIChoreChecker';
 import { SettingsTab } from '../components/admin/SettingsTab';
+import { KidsStatusTab } from '../components/admin/KidsStatusTab';
 
-type Tab = 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'ai' | 'settings';
+type Tab = 'kids-status' | 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'ai' | 'settings';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { setUser } = useAuth();
-  const [tab, setTab] = useState<Tab>('chores');
+  const [tab, setTab] = useState<Tab>('kids-status');
   const [ready, setReady] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [quickAssignOpen, setQuickAssignOpen] = useState(false);
@@ -85,6 +86,9 @@ export const AdminDashboard: React.FC = () => {
       </header>
 
       <nav className={styles.nav}>
+        <button className={clsx(styles.navItem, tab === 'kids-status' && styles.navItemActive)} onClick={() => setTab('kids-status')}>
+          <Home size={16} /> Kids
+        </button>
         <button className={clsx(styles.navItem, tab === 'chores' && styles.navItemActive)} onClick={() => setTab('chores')}>
           <ListChecks size={16} /> Chores
         </button>
@@ -114,6 +118,7 @@ export const AdminDashboard: React.FC = () => {
       </nav>
 
       <main className={styles.content}>
+        {tab === 'kids-status' && <KidsStatusTab />}
         {tab === 'chores' && <ChoresTab />}
         {tab === 'approvals' && <ApprovalsTab onCountChange={setPendingCount} />}
         {tab === 'users' && <UsersTab />}
