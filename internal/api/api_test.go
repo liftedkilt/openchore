@@ -2148,6 +2148,86 @@ func TestDoubleUncheckIsIdempotent(t *testing.T) {
 	}
 }
 
+// TestReviveBonusReevaluatesGate verifies that a bonus chore initially
+// credited 0 points (because required/core weren't done yet) correctly
+// earns its full points on revive if the kid has since qualified. All
+// point changes must still flow through point_transactions.
+func TestReviveBonusReevaluatesGate(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Required core chore (gates bonus points).
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title": "Make Bed", "category": "core", "points_value": 5,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	// Bonus chore.
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title": "Extra Vacuum", "category": "bonus", "points_value": 10,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/2/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	today := time.Now().Format(model.DateFormat)
+
+	// Complete the bonus first — core is still pending, so bonus credits 0.
+	env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected 0 (bonus gated), got %v", pts["balance"])
+	}
+
+	// Uncheck the bonus (soft-delete).
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/2/complete?date=%s", today), nil, adminHeaders(), http.StatusNoContent)
+
+	// Now finish the core chore — bonus gate now passes.
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 5 {
+		t.Fatalf("expected 5 after core complete, got %v", pts["balance"])
+	}
+
+	// Recheck the bonus — revive should re-evaluate the gate and credit
+	// the full 10 points (not leave it at the stale 0).
+	env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 15 {
+		t.Fatalf("expected 15 (5 core + 10 revived bonus), got %v", pts["balance"])
+	}
+
+	// Uncheck + recheck a second time — should NOT double-credit the bonus.
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/2/complete?date=%s", today), nil, adminHeaders(), http.StatusNoContent)
+	env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 15 {
+		t.Fatalf("expected balance stable at 15 on second revive (no double-credit), got %v", pts["balance"])
+	}
+}
+
 // =================== BCRYPT PASSCODE TESTS ===================
 
 func TestBcryptPasscodeRoundTrip(t *testing.T) {

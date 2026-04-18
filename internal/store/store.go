@@ -415,10 +415,17 @@ func (s *Store) UncompleteChore(ctx context.Context, scheduleID int64, completio
 }
 
 // ReviveCompletion clears uncompleted_at on a soft-deleted completion so the
-// row is once again treated as live/completed.
+// row is once again treated as live/completed. completed_at is refreshed to
+// "now" so downstream consumers (activity feeds, streak calculators, "recent
+// completions" queries) see the revival as a recent action. Approval
+// metadata (approved_by / approved_at / photo_url / ai_feedback /
+// ai_confidence / status) is preserved as-is.
 func (s *Store) ReviveCompletion(ctx context.Context, id int64) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE chore_completions SET uncompleted_at = NULL WHERE id = ?`, id)
+		`UPDATE chore_completions
+		   SET uncompleted_at = NULL,
+		       completed_at   = CURRENT_TIMESTAMP
+		 WHERE id = ?`, id)
 	return err
 }
 
