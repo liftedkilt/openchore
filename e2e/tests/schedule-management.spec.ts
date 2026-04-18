@@ -4,6 +4,7 @@ import { loginAsAdmin, apiGet } from './helpers/setup';
 test.describe('Schedule Management', () => {
   test('deleting a multi-day schedule group removes all days', async ({ page }) => {
     await loginAsAdmin(page);
+    await page.getByRole('button', { name: /^Chores$/i }).click();
 
     // First, create a chore with a multi-day schedule via the wizard
     await page.getByRole('button', { name: /Add Chore/i }).click();

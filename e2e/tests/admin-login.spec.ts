@@ -30,7 +30,8 @@ test.describe('Admin Login', () => {
       await page.getByRole('button', { name: digit, exact: true }).click();
     }
     await expect(page).toHaveURL('/admin/dashboard');
-    // Should show seeded chores
+    // Kids is the default tab; switch to Chores to verify seeded data renders.
+    await page.getByRole('button', { name: /^Chores$/i }).click();
     await expect(page.getByText('Make Bed')).toBeVisible();
   });
 });

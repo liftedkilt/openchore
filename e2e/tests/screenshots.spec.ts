@@ -46,6 +46,7 @@ test.describe('Screenshots', () => {
   test('05 - Admin Dashboard (Chores)', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await loginAsAdmin(page);
+    await page.getByRole('button', { name: /^Chores$/i }).click();
     await expect(page.getByText('Make Bed')).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: `${dir}/05-admin-chores.png`, fullPage: false });
   });
@@ -93,6 +94,7 @@ test.describe('Screenshots', () => {
   test('11 - Quick Assign Modal', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await loginAsAdmin(page);
+    await page.getByRole('button', { name: /^Chores$/i }).click();
     await expect(page.getByText('Make Bed')).toBeVisible({ timeout: 10_000 });
     // Click the FAB
     await page.locator('button[title="Quick Assign"]').click();
@@ -103,6 +105,7 @@ test.describe('Screenshots', () => {
   test('12 - Chore Creation Wizard', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await loginAsAdmin(page);
+    await page.getByRole('button', { name: /^Chores$/i }).click();
     await expect(page.getByText('Make Bed')).toBeVisible({ timeout: 10_000 });
     // Click the Add Chore button
     await page.getByRole('button', { name: /Add Chore/i }).click();
