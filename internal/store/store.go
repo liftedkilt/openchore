@@ -240,12 +240,14 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			   AND cs2.id != cs.id
 			   AND cc2.completion_date = ?
 			   AND cc2.status != 'ai_rejected'
+			   AND cc2.uncompleted_at IS NULL
 			 LIMIT 1) as completed_by_sibling_name
 		FROM chore_schedules cs
 		JOIN chores c ON c.id = cs.chore_id
 		LEFT JOIN chore_completions cc ON cc.id = (
 				SELECT cc3.id FROM chore_completions cc3
 				WHERE cc3.chore_schedule_id = cs.id AND cc3.completion_date = ?
+				  AND cc3.uncompleted_at IS NULL
 				ORDER BY CASE cc3.status
 					WHEN 'approved' THEN 1
 					WHEN 'pending'  THEN 2
@@ -365,11 +367,72 @@ func (s *Store) CompleteChore(ctx context.Context, cc *model.ChoreCompletion) er
 	return nil
 }
 
+// UncompleteChore removes (or soft-deletes) the completion for a schedule +
+// date. approved and pending completions are soft-deleted (uncompleted_at
+// set) so the kid can re-check without losing the photo + AI approval
+// metadata for the same day. ai_rejected and rejected completions are hard
+// deleted so the retry flow (a fresh photo + AI call) continues to work as
+// before.
 func (s *Store) UncompleteChore(ctx context.Context, scheduleID int64, completionDate string) error {
-	_, err := s.db.ExecContext(ctx,
+	// Only soft-delete live (non-uncompleted) approved/pending rows. Already
+	// soft-deleted rows are left alone — double-uncomplete is a no-op.
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE chore_completions
+		   SET uncompleted_at = CURRENT_TIMESTAMP
+		 WHERE chore_schedule_id = ?
+		   AND completion_date = ?
+		   AND uncompleted_at IS NULL
+		   AND status IN (?, ?)`,
+		scheduleID, completionDate, model.StatusApproved, model.StatusPending)
+	if err != nil {
+		return err
+	}
+	updated, _ := res.RowsAffected()
+	if updated > 0 {
+		return nil
+	}
+	// No approved/pending row found — fall back to the old hard-delete so
+	// ai_rejected / rejected rows are cleared and can be retried fresh.
+	_, err = s.db.ExecContext(ctx,
 		`DELETE FROM chore_completions WHERE chore_schedule_id = ? AND completion_date = ?`,
 		scheduleID, completionDate)
 	return err
+}
+
+// ReviveCompletion clears uncompleted_at on a soft-deleted completion so the
+// row is once again treated as live/completed.
+func (s *Store) ReviveCompletion(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE chore_completions SET uncompleted_at = NULL WHERE id = ?`, id)
+	return err
+}
+
+// ReverseUncompleteDebits deletes any chore_uncomplete transactions that were
+// recorded against the given completion ID. Used when reviving a soft-deleted
+// completion so the child's balance is restored to its pre-uncheck state
+// without double-counting credits (we can't simply re-credit because future
+// unchecks would then debit too much). Returns the absolute amount of debits
+// that were reversed (>= 0).
+func (s *Store) ReverseUncompleteDebits(ctx context.Context, completionID int64) (int, error) {
+	var reversed int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(amount), 0) FROM point_transactions
+		 WHERE reference_id = ? AND reason = ?`,
+		completionID, model.ReasonChoreUncomplete).Scan(&reversed)
+	if err != nil {
+		return 0, err
+	}
+	if _, err := s.db.ExecContext(ctx,
+		`DELETE FROM point_transactions WHERE reference_id = ? AND reason = ?`,
+		completionID, model.ReasonChoreUncomplete); err != nil {
+		return 0, err
+	}
+	// reversed is the sum of the debits, which are negative, so the absolute
+	// value represents points restored to the balance.
+	if reversed < 0 {
+		reversed = -reversed
+	}
+	return reversed, nil
 }
 
 func (s *Store) GetSchedule(ctx context.Context, id int64) (*model.ChoreSchedule, error) {
@@ -384,13 +447,16 @@ func (s *Store) GetSchedule(ctx context.Context, id int64) (*model.ChoreSchedule
 	return cs, err
 }
 
+// GetCompletionForScheduleDate returns the completion row for a schedule+date,
+// INCLUDING soft-deleted (uncompleted_at != NULL) rows so the complete-flow
+// can find a prior approved row and revive it without re-running AI.
 func (s *Store) GetCompletionForScheduleDate(ctx context.Context, scheduleID int64, completionDate string) (*model.ChoreCompletion, error) {
 	cc := &model.ChoreCompletion{}
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, chore_schedule_id, completed_by, status, photo_url, approved_by, approved_at, completed_at, completion_date, ai_feedback, ai_confidence
+		`SELECT id, chore_schedule_id, completed_by, status, photo_url, approved_by, approved_at, completed_at, completion_date, ai_feedback, ai_confidence, uncompleted_at
 		 FROM chore_completions WHERE chore_schedule_id = ? AND completion_date = ?`,
 		scheduleID, completionDate).
-		Scan(&cc.ID, &cc.ChoreScheduleID, &cc.CompletedBy, &cc.Status, &cc.PhotoURL, &cc.ApprovedBy, &cc.ApprovedAt, &cc.CompletedAt, &cc.CompletionDate, &cc.AIFeedback, &cc.AIConfidence)
+		Scan(&cc.ID, &cc.ChoreScheduleID, &cc.CompletedBy, &cc.Status, &cc.PhotoURL, &cc.ApprovedBy, &cc.ApprovedAt, &cc.CompletedAt, &cc.CompletionDate, &cc.AIFeedback, &cc.AIConfidence, &cc.UncompletedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -401,9 +467,9 @@ func (s *Store) GetCompletionForScheduleDate(ctx context.Context, scheduleID int
 func (s *Store) GetCompletion(ctx context.Context, id int64) (*model.ChoreCompletion, error) {
 	cc := &model.ChoreCompletion{}
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, chore_schedule_id, completed_by, status, photo_url, approved_by, approved_at, completed_at, completion_date, ai_feedback, ai_confidence
+		`SELECT id, chore_schedule_id, completed_by, status, photo_url, approved_by, approved_at, completed_at, completion_date, ai_feedback, ai_confidence, uncompleted_at
 		 FROM chore_completions WHERE id = ?`, id).
-		Scan(&cc.ID, &cc.ChoreScheduleID, &cc.CompletedBy, &cc.Status, &cc.PhotoURL, &cc.ApprovedBy, &cc.ApprovedAt, &cc.CompletedAt, &cc.CompletionDate, &cc.AIFeedback, &cc.AIConfidence)
+		Scan(&cc.ID, &cc.ChoreScheduleID, &cc.CompletedBy, &cc.Status, &cc.PhotoURL, &cc.ApprovedBy, &cc.ApprovedAt, &cc.CompletedAt, &cc.CompletionDate, &cc.AIFeedback, &cc.AIConfidence, &cc.UncompletedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -428,6 +494,7 @@ func (s *Store) ListPendingCompletions(ctx context.Context) ([]PendingCompletion
 		JOIN chores c ON c.id = cs.chore_id
 		JOIN users u ON u.id = cc.completed_by
 		WHERE cc.status = ?
+		  AND cc.uncompleted_at IS NULL
 		ORDER BY cc.completed_at DESC
 	`, model.StatusPending)
 	if err != nil {
@@ -1272,7 +1339,8 @@ func (s *Store) FcfsGroupCompletedForDate(ctx context.Context, groupID, date str
 		`SELECT EXISTS(SELECT 1 FROM chore_completions cc
 		   JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
 		   WHERE cs.fcfs_group_id = ? AND cc.completion_date = ?
-		   AND cc.status NOT IN ('ai_rejected'))`,
+		   AND cc.status NOT IN ('ai_rejected')
+		   AND cc.uncompleted_at IS NULL)`,
 		groupID, date).Scan(&exists)
 	return exists, err
 }
@@ -1691,6 +1759,7 @@ func (s *Store) GetExpiredChores(ctx context.Context, date string, currentTime s
 				SELECT cc3.id FROM chore_completions cc3
 				WHERE cc3.chore_schedule_id = cs.id AND cc3.completion_date = ?
 				  AND cc3.status != 'ai_rejected'
+				  AND cc3.uncompleted_at IS NULL
 				LIMIT 1
 			)
 		WHERE u.paused = 0
@@ -1766,6 +1835,7 @@ func (s *Store) ReportKidSummaries(ctx context.Context, startDate, endDate strin
 			FROM chore_completions cc
 			WHERE cc.completion_date >= ? AND cc.completion_date <= ?
 			AND cc.status = 'approved'
+			AND cc.uncompleted_at IS NULL
 			GROUP BY cc.completed_by
 		) completed ON completed.completed_by = u.id
 		LEFT JOIN (
@@ -1773,6 +1843,7 @@ func (s *Store) ReportKidSummaries(ctx context.Context, startDate, endDate strin
 			FROM chore_completions cc
 			WHERE cc.completion_date >= ? AND cc.completion_date <= ?
 			AND cc.status = 'rejected'
+			AND cc.uncompleted_at IS NULL
 			GROUP BY cc.completed_by
 		) missed ON missed.completed_by = u.id
 		LEFT JOIN (
@@ -1826,6 +1897,7 @@ func (s *Store) ReportMostMissed(ctx context.Context, startDate, endDate string)
 		JOIN chores c ON c.id = cs.chore_id
 		JOIN users u ON u.id = cc.completed_by
 		WHERE cc.status = 'rejected'
+		AND cc.uncompleted_at IS NULL
 		AND cc.completion_date >= ? AND cc.completion_date <= ?
 		GROUP BY c.id, c.title
 		ORDER BY miss_count DESC
@@ -1863,6 +1935,7 @@ func (s *Store) ReportCompletionTrend(ctx context.Context, startDate, endDate st
 			COUNT(*) AS assigned
 		FROM chore_completions cc
 		WHERE cc.completion_date >= ? AND cc.completion_date <= ?
+		  AND cc.uncompleted_at IS NULL
 		GROUP BY cc.completion_date
 		ORDER BY cc.completion_date`
 
@@ -1901,6 +1974,7 @@ func (s *Store) ReportCategoryBreakdown(ctx context.Context, startDate, endDate 
 		JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
 		JOIN chores c ON c.id = cs.chore_id
 		WHERE cc.completion_date >= ? AND cc.completion_date <= ?
+		  AND cc.uncompleted_at IS NULL
 		GROUP BY c.category
 		ORDER BY c.category`
 
@@ -1979,6 +2053,7 @@ func (s *Store) ReportDayOfWeek(ctx context.Context, startDate, endDate string) 
 			SUM(CASE WHEN cc.status = 'approved' THEN 1 ELSE 0 END) AS total_completed
 		FROM chore_completions cc
 		WHERE cc.completion_date >= ? AND cc.completion_date <= ?
+		  AND cc.uncompleted_at IS NULL
 		GROUP BY dow
 		ORDER BY dow`
 
