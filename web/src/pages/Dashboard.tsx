@@ -179,6 +179,10 @@ export const Dashboard: React.FC = () => {
   const [redeemingId, setRedeemingId] = useState<number | null>(null);
   const [redeemedId, setRedeemedId] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Per-schedule-id "request in flight" flag. Prevents double-POSTs when a
+  // kid double-taps a chore tile (common on touchscreens), and lets us grey
+  // out the tile while the backend round-trip is in progress.
+  const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -260,6 +264,14 @@ export const Dashboard: React.FC = () => {
 
   const handleToggleComplete = async (chore: ScheduledChore) => {
     if (chore.date !== todayStr) return;
+    // Double-tap / double-POST guard. If a request is already in flight for
+    // this schedule, drop subsequent clicks until it resolves.
+    if (togglingIds.has(chore.schedule_id)) return;
+    setTogglingIds(prev => {
+      const next = new Set(prev);
+      next.add(chore.schedule_id);
+      return next;
+    });
     try {
       if (chore.completed) {
         await api.chores.uncomplete(chore.schedule_id, chore.date);
@@ -306,9 +318,27 @@ export const Dashboard: React.FC = () => {
       if (err instanceof APIError && err.status === 422 && err.data?.ai_review) {
         setAiFeedback(prev => ({ ...prev, [chore.schedule_id]: { text: err.data.ai_review.feedback, audioUrl: err.data.ai_review.feedback_audio } }));
         await loadChores();
-      } else {
+      } else if (err instanceof APIError && (err.status === 400 || err.status === 422)) {
+        // Client-level validation errors are surfaced via more specific paths
+        // (photo modal, AI feedback). Log for diagnostics but don't toast.
         console.error(err);
+      } else {
+        // 500s, network failures, etc. — surface to the user rather than
+        // leaving the tile silently stuck.
+        console.error(err);
+        const message = err instanceof APIError && err.data?.error
+          ? String(err.data.error)
+          : "Couldn't save — try again";
+        setToast(message);
+        setTimeout(() => setToast(null), 3000);
       }
+    } finally {
+      setTogglingIds(prev => {
+        if (!prev.has(chore.schedule_id)) return prev;
+        const next = new Set(prev);
+        next.delete(chore.schedule_id);
+        return next;
+      });
     }
   };
 
@@ -509,6 +539,7 @@ export const Dashboard: React.FC = () => {
     const isLocked = !chore.available && !chore.completed;
     const isExpired = chore.expired && !chore.completed;
     const isPointsLocked = isToday && chore.completed && chore.category === 'core' && !allRequiredDone;
+    const isToggling = togglingIds.has(chore.schedule_id);
 
     if (isWeekly) {
       return (
@@ -519,9 +550,10 @@ export const Dashboard: React.FC = () => {
             chore.completed && styles.calendarChoreCompleted,
             !isToday && styles.calendarChorePast,
             isLocked && styles.calendarChoreLocked,
-            isPointsLocked && styles.calendarChorePointsLocked
+            isPointsLocked && styles.calendarChorePointsLocked,
+            isToggling && styles.choreCardToggling
           )}
-          onClick={() => isToday && !isLocked && handleToggleComplete(chore)}
+          onClick={() => !isToggling && isToday && !isLocked && handleToggleComplete(chore)}
         >
           <div className={clsx(styles.calendarStatus, chore.completed && styles.calendarStatusCompleted)}>
             {chore.completed ? <CheckCircle size={14} /> : (isLocked ? <Lock size={10} /> : null)}
@@ -563,11 +595,12 @@ export const Dashboard: React.FC = () => {
             isLocked && styles.choreCardLocked,
             isExpired && styles.choreCardExpired,
             isPointsLocked && styles.choreCardPointsLocked,
+            isToggling && styles.choreCardToggling,
             (aiFeedback[chore.schedule_id] || (chore.completion_status === 'ai_rejected' && chore.ai_feedback) || (chore.completed && chore.completion_status === 'approved' && chore.ai_feedback)) && styles.choreCardHasFeedback
           )}
-          onTouchStart={canSwipe ? (e) => handleTouchStart(e, choreKey) : undefined}
-          onTouchMove={canSwipe ? (e) => handleTouchMove(e, chore) : undefined}
-          onTouchEnd={canSwipe ? (e) => handleSwipeEnd(e, chore) : undefined}
+          onTouchStart={canSwipe && !isToggling ? (e) => handleTouchStart(e, choreKey) : undefined}
+          onTouchMove={canSwipe && !isToggling ? (e) => handleTouchMove(e, chore) : undefined}
+          onTouchEnd={canSwipe && !isToggling ? (e) => handleSwipeEnd(e, chore) : undefined}
         >
         <div className={styles.choreInfo}>
           <h3 className={styles.choreTitle}>
@@ -645,6 +678,7 @@ export const Dashboard: React.FC = () => {
               )}
               <button
                 onClick={() => handleToggleComplete(chore)}
+                disabled={isToggling}
                 className={clsx(styles.completeBtn, chore.completed && !chore.completed_by_sibling && styles.completeBtnActive, chore.completed && chore.completed_by_sibling && styles.completeBtnSibling)}
                 aria-label={chore.completed ? "Mark incomplete" : "Mark complete"}
               >

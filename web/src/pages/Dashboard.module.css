@@ -576,6 +576,14 @@
   border-color: rgba(255, 255, 255, 0.08);
 }
 
+/* Applied while a complete/uncomplete request is in flight. Visually dims
+ * the tile and blocks further input so a kid double-tapping doesn't fire
+ * two POSTs. */
+.choreCardToggling {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 .choreCardExpired {
   opacity: 0.5;
   border-left: 3px solid var(--status-required);
