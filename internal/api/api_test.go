@@ -2499,6 +2499,14 @@ func TestListPendingCompletions(t *testing.T) {
 	if len(pending) != 1 {
 		t.Fatalf("expected 1 pending completion, got %d", len(pending))
 	}
+	// Verify assigned_user_id is exposed so the admin UI can attribute pending
+	// approvals to the assignee (not just the completer).
+	if pending[0]["assigned_user_id"] == nil {
+		t.Fatalf("expected assigned_user_id field on pending response, got %+v", pending[0])
+	}
+	if int(pending[0]["assigned_user_id"].(float64)) != kidID {
+		t.Errorf("expected assigned_user_id=%d, got %v", kidID, pending[0]["assigned_user_id"])
+	}
 }
 
 func TestApproveCompletion(t *testing.T) {

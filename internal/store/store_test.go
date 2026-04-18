@@ -1482,6 +1482,46 @@ func TestListPendingCompletions(t *testing.T) {
 	if pending[0].ChoreTitle != "Clean Room" || pending[0].ChildName != "Child" {
 		t.Errorf("unexpected pending: %+v", pending[0])
 	}
+	if pending[0].AssignedUserID != child.ID {
+		t.Errorf("expected AssignedUserID=%d, got %d", child.ID, pending[0].AssignedUserID)
+	}
+}
+
+// TestListPendingCompletions_SiblingCompleter verifies that when a sibling
+// clicks "complete" on another kid's chore, AssignedUserID is the chore's
+// owner (the assignee) while ChildName is the sibling who did the click.
+func TestListPendingCompletions_SiblingCompleter(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	alex := createTestUser(t, s, "Alex", "child")
+	sam := createTestUser(t, s, "Sam", "child")
+	c := createTestChore(t, s, "Clean Room", 10, parent.ID)
+	cs := createTestSchedule(t, s, c.ID, alex.ID, 6)
+
+	// Sam completes a chore assigned to Alex.
+	cc := &model.ChoreCompletion{
+		ChoreScheduleID: cs.ID,
+		CompletedBy:     sam.ID,
+		Status:          "pending",
+		CompletionDate:  "2026-03-28",
+	}
+	s.CompleteChore(ctx, cc)
+
+	pending, err := s.ListPendingCompletions(ctx)
+	if err != nil {
+		t.Fatalf("ListPendingCompletions: %v", err)
+	}
+	if len(pending) != 1 {
+		t.Fatalf("expected 1 pending completion, got %d", len(pending))
+	}
+	if pending[0].ChildName != "Sam" {
+		t.Errorf("expected ChildName=Sam (completer), got %q", pending[0].ChildName)
+	}
+	if pending[0].AssignedUserID != alex.ID {
+		t.Errorf("expected AssignedUserID=%d (Alex), got %d", alex.ID, pending[0].AssignedUserID)
+	}
 }
 
 // ===== Webhook Deliveries =====
