@@ -439,7 +439,44 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if existing != nil {
-		if existing.Status == model.StatusAIRejected {
+		if existing.UncompletedAt != nil {
+			// Soft-deleted prior completion exists. Approved + pending rows
+			// are revived in place so the kid keeps the photo / AI feedback /
+			// approval metadata and doesn't have to retake a photo after an
+			// accidental uncheck. ai_rejected and rejected rows should not
+			// be revivable — treat them as fresh retry targets by hard-deleting
+			// and falling through to the normal complete flow.
+			if existing.Status == model.StatusApproved || existing.Status == model.StatusPending {
+				if err := h.store.ReviveCompletion(r.Context(), existing.ID); err != nil {
+					writeError(w, http.StatusInternalServerError, "failed to revive completion")
+					return
+				}
+				// Restore the child's balance by deleting the chore_uncomplete
+				// debit rows that were inserted when they unchecked. Crediting
+				// a new chore_complete row would double-count on subsequent
+				// unchecks (since GetNetPointsForCompletion would return a
+				// higher number), so we surgically remove the debit instead.
+				if existing.Status == model.StatusApproved {
+					if _, err := h.store.ReverseUncompleteDebits(r.Context(), existing.ID); err != nil {
+						log.Printf("error reversing uncomplete debits for completion %d: %v", existing.ID, err)
+					}
+					// Recalculate streak after revival
+					if err := h.store.RecalculateStreak(r.Context(), existing.CompletedBy, req.CompletionDate); err != nil {
+						log.Printf("error recalculating streak for user %d: %v", existing.CompletedBy, err)
+					}
+				}
+				// Clear uncompleted_at on the returned payload too
+				existing.UncompletedAt = nil
+				writeJSON(w, http.StatusCreated, existing)
+				return
+			}
+			// ai_rejected / rejected soft-deleted: hard-delete the row so the
+			// retry flow that follows can create a fresh completion.
+			if err := h.store.UncompleteChore(r.Context(), scheduleID, req.CompletionDate); err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to clear previous attempt")
+				return
+			}
+		} else if existing.Status == model.StatusAIRejected {
 			// Allow retry — delete the rejected attempt so we don't end up
 			// with duplicate rows (one ai_rejected + one approved) which
 			// confuses the points-decay checker.
