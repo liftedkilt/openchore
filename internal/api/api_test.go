@@ -2228,6 +2228,79 @@ func TestReviveBonusReevaluatesGate(t *testing.T) {
 	}
 }
 
+// TestRequiredCompletionOpensBonusGate verifies that completing a required/core
+// chore retroactively credits any already-approved bonus completions that
+// were capped at 0 points because the gate was closed at the time. Previously
+// the retroactive credit only fired on revive, so the kid had to uncheck and
+// recheck the bonus to "see" the points they had earned.
+func TestRequiredCompletionOpensBonusGate(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Required chore worth 5 points.
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title": "Make Bed", "category": "required", "points_value": 5,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	// Bonus chore worth 20 points.
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title": "Extra Vacuum", "category": "bonus", "points_value": 20,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/2/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	today := time.Now().Format(model.DateFormat)
+
+	// Complete the bonus first — required is still pending, so bonus credits 0.
+	env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected 0 (bonus gated), got %v", pts["balance"])
+	}
+
+	// Now complete the required chore — this should both credit the required
+	// chore's 5 points AND retroactively credit the bonus chore's 20 points.
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 25 {
+		t.Fatalf("expected 25 (5 required + 20 retro bonus), got %v", pts["balance"])
+	}
+
+	// Uncheck + recheck the bonus should leave the balance stable — no
+	// double-credit from the retroactive path stacking with revive.
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/2/complete?date=%s", today), nil, adminHeaders(), http.StatusNoContent)
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 5 {
+		t.Fatalf("expected 5 after uncheck bonus, got %v", pts["balance"])
+	}
+	env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 25 {
+		t.Fatalf("expected 25 after recheck, got %v", pts["balance"])
+	}
+}
+
 // =================== BCRYPT PASSCODE TESTS ===================
 
 func TestBcryptPasscodeRoundTrip(t *testing.T) {

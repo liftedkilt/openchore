@@ -664,6 +664,13 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Completing a required/core chore can be the event that opens the
+		// bonus gate. Retroactively credit any approved bonus completions for
+		// this user/date that were originally capped at 0.
+		if chore != nil && (chore.Category == model.CategoryRequired || chore.Category == model.CategoryCore) {
+			h.creditPendingBonusPoints(r.Context(), completedBy, req.CompletionDate)
+		}
+
 		// Recalculate streak
 		if err := h.store.RecalculateStreak(r.Context(), completedBy, req.CompletionDate); err != nil {
 			log.Printf("error recalculating streak for user %d: %v", completedBy, err)
@@ -901,6 +908,13 @@ func (h *ChoreHandler) Approve(w http.ResponseWriter, r *http.Request) {
 			if err := h.store.CreditChorePoints(r.Context(), completion.CompletedBy, completion.ID, pts); err != nil {
 				log.Printf("error crediting chore points for user %d completion %d: %v", completion.CompletedBy, completion.ID, err)
 			}
+		}
+
+		// Approving a required/core completion can be the event that opens
+		// the bonus gate. Retroactively credit any approved bonus completions
+		// for this user/date that were originally capped at 0.
+		if chore != nil && (chore.Category == model.CategoryRequired || chore.Category == model.CategoryCore) {
+			h.creditPendingBonusPoints(r.Context(), completion.CompletedBy, completion.CompletionDate)
 		}
 	}
 
@@ -1284,4 +1298,48 @@ func (h *ChoreHandler) shouldAwardBonusPoints(ctx context.Context, userID int64,
 		}
 	}
 	return true
+}
+
+// creditPendingBonusPoints retroactively credits approved bonus completions
+// for the given user/date that were capped at 0 points because the
+// required/core gate was closed at the time of their approval. Call after an
+// event that can open the gate (a required or core chore transitioning to
+// approved). No-op if the gate is still closed. Only the delta between the
+// chore's full value and what's already on the completion is credited, so
+// repeated calls can't multi-credit the same completion.
+func (h *ChoreHandler) creditPendingBonusPoints(ctx context.Context, userID int64, date string) {
+	if !h.shouldAwardBonusPoints(ctx, userID, date) {
+		return
+	}
+	scheduled, err := h.store.GetScheduledChoresForUser(ctx, userID, []string{date}, time.Now())
+	if err != nil {
+		log.Printf("error fetching scheduled chores for bonus reevaluation user %d date %s: %v", userID, date, err)
+		return
+	}
+	for _, sc := range scheduled {
+		if sc.Category != model.CategoryBonus || sc.CompletionID == nil {
+			continue
+		}
+		// Only approved completions get points; pending bonus completions
+		// are credited when the admin approves them.
+		if sc.CompletionStatus == nil || *sc.CompletionStatus != model.StatusApproved {
+			continue
+		}
+		fullPts, err := h.store.GetChorePointsForSchedule(ctx, sc.ScheduleID)
+		if err != nil {
+			log.Printf("error fetching points for schedule %d: %v", sc.ScheduleID, err)
+			continue
+		}
+		alreadyCredited, err := h.store.GetNetPointsForCompletion(ctx, *sc.CompletionID)
+		if err != nil {
+			log.Printf("error fetching net points for completion %d: %v", *sc.CompletionID, err)
+			continue
+		}
+		delta := fullPts - alreadyCredited
+		if delta > 0 {
+			if err := h.store.CreditChorePoints(ctx, userID, *sc.CompletionID, delta); err != nil {
+				log.Printf("error crediting retroactive bonus points for user %d completion %d: %v", userID, *sc.CompletionID, err)
+			}
+		}
+	}
 }
