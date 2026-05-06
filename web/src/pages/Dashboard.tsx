@@ -179,9 +179,11 @@ export const Dashboard: React.FC = () => {
   const [redeemingId, setRedeemingId] = useState<number | null>(null);
   const [redeemedId, setRedeemedId] = useState<number | null>(null);
   const [savingTowardId, setSavingTowardId] = useState<number | null>(null);
-  const [contributeAmount, setContributeAmount] = useState<string>('');
-  const [contributing, setContributing] = useState(false);
-  const [breakingGoal, setBreakingGoal] = useState(false);
+  // Per-commitment input + in-flight state, keyed by commitment id, so
+  // multiple goal cards (personal + N shared) each have their own UI.
+  const [contributeAmounts, setContributeAmounts] = useState<Record<number, string>>({});
+  const [contributingIds, setContributingIds] = useState<Set<number>>(new Set());
+  const [breakingIds, setBreakingIds] = useState<Set<number>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   // Per-schedule-id "request in flight" flag. Prevents double-POSTs when a
   // kid double-taps a chore tile (common on touchscreens), and lets us grey
@@ -351,12 +353,22 @@ export const Dashboard: React.FC = () => {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // Look up the kid's active commitment for a given reward (personal or
+  // shared share — at most one of either kind).
+  const findCommitmentForReward = (rewardId: number) =>
+    pointsData?.active_commitments.find(c => c.reward_id === rewardId) ?? null;
+
   const handleRedeem = async (reward: Reward) => {
     if (!pointsData) return;
-    const commitment = pointsData.active_commitment;
-    const isCommittedReward = commitment && commitment.reward_id === reward.id;
-    if (!isCommittedReward && pointsData.balance < reward.effective_cost) return;
-    if (isCommittedReward && commitment.amount_saved < commitment.target_cost) return;
+    const commitment = findCommitmentForReward(reward.id);
+    const isCommitted = !!commitment;
+    const fullyFunded = commitment?.pool
+      ? commitment.pool.amount_saved >= commitment.pool.target_cost
+      : commitment
+        ? commitment.amount_saved >= commitment.target_cost
+        : false;
+    if (!isCommitted && pointsData.balance < reward.effective_cost) return;
+    if (isCommitted && !fullyFunded) return;
     setRedeemingId(reward.id);
     try {
       await api.rewards.redeem(reward.id);
@@ -376,20 +388,24 @@ export const Dashboard: React.FC = () => {
     } catch (e) {
       console.error('Redeem error:', e);
       setRedeemingId(null);
-      showToast('Redemption failed — try again');
+      const msg = e instanceof APIError ? e.message : 'Redemption failed — try again';
+      showToast(msg);
     }
   };
 
   const handleSaveToward = async (reward: Reward) => {
     if (!pointsData) return;
-    if (pointsData.active_commitment) {
-      showToast('You already have an active goal — finish or change it first');
+    // Personal goals occupy a single slot; shared rewards stack freely.
+    if (!reward.shareable && pointsData.active_commitments.some(c => !c.shared_pool_id)) {
+      showToast('You already have a personal goal — finish or change it first');
       return;
     }
     setSavingTowardId(reward.id);
     try {
       await api.commitments.commit(reward.id, 0);
-      showToast(`Saving toward ${reward.icon || '🎁'} ${reward.name}!`);
+      showToast(reward.shareable
+        ? `Joined family goal: ${reward.icon || '🎁'} ${reward.name}!`
+        : `Saving toward ${reward.icon || '🎁'} ${reward.name}!`);
       await loadExtras();
     } catch (e) {
       console.error('Save toward error:', e);
@@ -400,9 +416,10 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const handleContribute = async () => {
-    if (!pointsData?.active_commitment) return;
-    const amount = parseInt(contributeAmount, 10);
+  const handleContribute = async (commitmentId: number) => {
+    if (!pointsData) return;
+    const raw = contributeAmounts[commitmentId] ?? '';
+    const amount = parseInt(raw, 10);
     if (!Number.isFinite(amount) || amount <= 0) {
       showToast('Enter a number of points to add');
       return;
@@ -411,10 +428,10 @@ export const Dashboard: React.FC = () => {
       showToast(`You only have ${pointsData.balance} spendable`);
       return;
     }
-    setContributing(true);
+    setContributingIds(prev => new Set(prev).add(commitmentId));
     try {
-      await api.commitments.contribute(pointsData.active_commitment.id, amount);
-      setContributeAmount('');
+      await api.commitments.contribute(commitmentId, amount);
+      setContributeAmounts(prev => ({ ...prev, [commitmentId]: '' }));
       await loadExtras();
       showToast(`Saved ${amount} more!`);
     } catch (e) {
@@ -422,37 +439,52 @@ export const Dashboard: React.FC = () => {
       const msg = e instanceof APIError ? e.message : 'Could not save — try again';
       showToast(msg);
     } finally {
-      setContributing(false);
+      setContributingIds(prev => {
+        const next = new Set(prev);
+        next.delete(commitmentId);
+        return next;
+      });
     }
   };
 
-  const handleSetAutoContribute = async (percent: number) => {
-    if (!pointsData?.active_commitment) return;
+  const handleSetAutoContribute = async (commitmentId: number, percent: number) => {
     // Optimistic so the slider feels responsive.
-    setPointsData(prev => prev && prev.active_commitment
-      ? { ...prev, active_commitment: { ...prev.active_commitment, auto_contribute_percent: percent } }
-      : prev);
+    setPointsData(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        active_commitments: prev.active_commitments.map(c =>
+          c.id === commitmentId ? { ...c, auto_contribute_percent: percent } : c
+        ),
+      };
+    });
     try {
-      await api.commitments.setAutoContribute(pointsData.active_commitment.id, percent);
+      await api.commitments.setAutoContribute(commitmentId, percent);
     } catch (e) {
       console.error('Auto-contribute error:', e);
       await loadExtras();
     }
   };
 
-  const handleBreakCommitment = async () => {
-    if (!pointsData?.active_commitment) return;
-    if (!window.confirm('Stop saving? Your saved points will go back to your spendable balance.')) return;
-    setBreakingGoal(true);
+  const handleBreakCommitment = async (commitmentId: number, isShared: boolean) => {
+    const msg = isShared
+      ? 'Leave this family goal? Your contribution will come back to your spendable balance.'
+      : 'Stop saving? Your saved points will go back to your spendable balance.';
+    if (!window.confirm(msg)) return;
+    setBreakingIds(prev => new Set(prev).add(commitmentId));
     try {
-      await api.commitments.break(pointsData.active_commitment.id);
+      await api.commitments.break(commitmentId);
       await loadExtras();
-      showToast('Goal cancelled — points are back in your balance');
+      showToast(isShared ? 'Left family goal — your share is back' : 'Goal cancelled — points are back in your balance');
     } catch (e) {
       console.error('Break commitment error:', e);
       showToast('Could not cancel goal — try again');
     } finally {
-      setBreakingGoal(false);
+      setBreakingIds(prev => {
+        const next = new Set(prev);
+        next.delete(commitmentId);
+        return next;
+      });
     }
   };
 
@@ -903,25 +935,35 @@ export const Dashboard: React.FC = () => {
     );
   };
 
-  const renderGoalCard = () => {
-    const commitment = pointsData?.active_commitment;
-    if (!commitment) return null;
-    const pct = Math.min(100, Math.round((commitment.amount_saved / commitment.target_cost) * 100));
-    const fullyFunded = commitment.amount_saved >= commitment.target_cost;
-    const remaining = Math.max(0, commitment.target_cost - commitment.amount_saved);
+  // Render one commitment card. Personal and shared use the same shape; for
+  // shared, progress and "remaining" come from the pool (so the bar reflects
+  // siblings' contributions too) and a contributor leaderboard sits at the
+  // bottom.
+  const renderGoalCard = (commitment: import('../types').RewardCommitment) => {
+    const isShared = !!commitment.pool;
+    const target = isShared ? commitment.pool!.target_cost : commitment.target_cost;
+    const totalSaved = isShared ? commitment.pool!.amount_saved : commitment.amount_saved;
+    const myShare = commitment.amount_saved;
+    const pct = target > 0 ? Math.min(100, Math.round((totalSaved / target) * 100)) : 0;
+    const fullyFunded = totalSaved >= target;
+    const remaining = Math.max(0, target - totalSaved);
+    const contributing = contributingIds.has(commitment.id);
+    const breaking = breakingIds.has(commitment.id);
+    const contributeAmount = contributeAmounts[commitment.id] ?? '';
+
     return (
-      <div className={styles.goalCard}>
+      <div key={commitment.id} className={clsx(styles.goalCard, isShared && styles.goalCardShared)}>
         <div className={styles.goalHeader}>
-          <div className={styles.goalIcon}>{commitment.reward_icon || '🎯'}</div>
+          <div className={styles.goalIcon}>{commitment.reward_icon || (isShared ? '👨‍👩‍👧' : '🎯')}</div>
           <div className={styles.goalTitleBlock}>
-            <div className={styles.goalLabel}>Saving toward</div>
+            <div className={styles.goalLabel}>{isShared ? 'Family goal' : 'Saving toward'}</div>
             <div className={styles.goalName}>{commitment.reward_name}</div>
           </div>
           {fullyFunded && <span className={styles.goalBadge}>Ready!</span>}
         </div>
         <div className={styles.goalAmounts}>
-          <span><strong>{commitment.amount_saved}</strong> / {commitment.target_cost} pts</span>
-          <span>{fullyFunded ? 'Fully funded 🎉' : `${remaining} to go`}</span>
+          <span><strong>{totalSaved}</strong> / {target} pts</span>
+          <span>{fullyFunded ? (isShared ? 'Tap redeem 🎉' : 'Fully funded 🎉') : `${remaining} to go`}</span>
         </div>
         <div className={styles.goalProgressTrack}>
           <div
@@ -929,6 +971,19 @@ export const Dashboard: React.FC = () => {
             style={{ width: `${pct}%` }}
           />
         </div>
+
+        {isShared && commitment.pool?.contributors && commitment.pool.contributors.length > 0 && (
+          <div className={styles.contributorList}>
+            {commitment.pool.contributors.map(c => (
+              <span
+                key={c.user_id}
+                className={clsx(styles.contributorChip, c.user_id === user?.id && styles.contributorChipMe)}
+              >
+                {c.user_id === user?.id ? 'You' : c.user_name}: <strong>{c.amount_saved}</strong>
+              </span>
+            ))}
+          </div>
+        )}
 
         <div className={styles.goalAuto}>
           <PiggyBank size={14} />
@@ -939,7 +994,7 @@ export const Dashboard: React.FC = () => {
             max={100}
             step={5}
             value={commitment.auto_contribute_percent}
-            onChange={e => handleSetAutoContribute(parseInt(e.target.value, 10))}
+            onChange={e => handleSetAutoContribute(commitment.id, parseInt(e.target.value, 10))}
             className={styles.goalAutoSlider}
           />
           <span className={styles.goalAutoValue}>{commitment.auto_contribute_percent}%</span>
@@ -953,12 +1008,12 @@ export const Dashboard: React.FC = () => {
               max={pointsData?.balance ?? 0}
               placeholder={`Add points (max ${pointsData?.balance ?? 0})`}
               value={contributeAmount}
-              onChange={e => setContributeAmount(e.target.value)}
+              onChange={e => setContributeAmounts(prev => ({ ...prev, [commitment.id]: e.target.value }))}
               className={styles.goalContributeInput}
             />
             <button
               className={clsx(styles.goalBtn, styles.goalBtnPrimary)}
-              onClick={handleContribute}
+              onClick={() => handleContribute(commitment.id)}
               disabled={contributing || !contributeAmount}
               style={{ flex: '0 0 auto', minWidth: 90 }}
             >
@@ -982,20 +1037,26 @@ export const Dashboard: React.FC = () => {
           )}
           <button
             className={clsx(styles.goalBtn, styles.goalBtnDanger)}
-            onClick={handleBreakCommitment}
-            disabled={breakingGoal}
+            onClick={() => handleBreakCommitment(commitment.id, isShared)}
+            disabled={breaking}
           >
-            <X size={14} /> Stop saving
+            <X size={14} /> {isShared ? 'Leave goal' : 'Stop saving'}
           </button>
         </div>
       </div>
     );
   };
 
+  const renderGoalCards = () => {
+    const list = pointsData?.active_commitments ?? [];
+    if (list.length === 0) return null;
+    return <>{list.map(c => renderGoalCard(c))}</>;
+  };
+
   const renderRewardsView = () => {
     const balance = pointsData?.balance ?? 0;
     const committed = pointsData?.committed ?? 0;
-    const commitment = pointsData?.active_commitment;
+    const hasPersonalGoal = (pointsData?.active_commitments ?? []).some(c => !c.shared_pool_id);
 
     return (
       <div className={styles.rewardsView}>
@@ -1007,7 +1068,7 @@ export const Dashboard: React.FC = () => {
           </span>
         </div>
 
-        {renderGoalCard()}
+        {renderGoalCards()}
 
         {rewards.length === 0 ? (
           <div className={styles.empty}>
@@ -1018,21 +1079,36 @@ export const Dashboard: React.FC = () => {
         ) : (
           <div className={styles.rewardsGrid}>
             {rewards.map(reward => {
-              const isCommittedReward = !!(commitment && commitment.reward_id === reward.id);
-              const canAfford = balance >= reward.effective_cost;
-              const fullyFunded = isCommittedReward && commitment!.amount_saved >= commitment!.target_cost;
+              const commitment = findCommitmentForReward(reward.id);
+              const isCommittedReward = !!commitment;
+              const isShared = reward.shareable;
+              const target = commitment?.pool ? commitment.pool.target_cost : (commitment?.target_cost ?? reward.effective_cost);
+              const totalSaved = commitment?.pool ? commitment.pool.amount_saved : (commitment?.amount_saved ?? 0);
+              const fullyFunded = isCommittedReward && totalSaved >= target;
+              const canAfford = !isShared && balance >= reward.effective_cost;
               const outOfStock = reward.stock !== null && reward.stock !== undefined && reward.stock <= 0;
               const isRedeeming = redeemingId === reward.id;
-              const isSaving = savingTowardId === reward.id;
-              const showSaveToward = !commitment && reward.effective_cost > balance;
+              const isSavingToward = savingTowardId === reward.id;
+              // Personal: show "Save toward" only if not affordable and the kid
+              // has no personal goal yet. Shared: show "Join family goal" if
+              // the kid hasn't joined this pool yet — independent of personal.
+              const showSaveToward = isShared
+                ? !isCommittedReward && !outOfStock
+                : !isCommittedReward && !hasPersonalGoal && reward.effective_cost > balance && !outOfStock;
+              const redeemEnabled = isShared
+                ? fullyFunded
+                : isCommittedReward
+                  ? fullyFunded
+                  : canAfford;
 
               return (
-                <div key={reward.id} className={clsx(styles.rewardCard, !canAfford && !isCommittedReward && styles.rewardCardLocked)}>
+                <div key={reward.id} className={clsx(styles.rewardCard, !redeemEnabled && !isCommittedReward && styles.rewardCardLocked)}>
                   {reward.icon && <div className={styles.rewardIcon}>{reward.icon}</div>}
                   <div className={styles.rewardInfo}>
                     <h3 className={styles.rewardName}>
                       {reward.name}
-                      {isCommittedReward && <> <span className={styles.goalBadge}><Target size={10} /> goal</span></>}
+                      {isShared && <> <span className={styles.goalBadge}><Users size={10} /> family</span></>}
+                      {isCommittedReward && !isShared && <> <span className={styles.goalBadge}><Target size={10} /> goal</span></>}
                     </h3>
                     {reward.description && (
                       <p className={styles.rewardDesc}>{reward.description}</p>
@@ -1052,10 +1128,10 @@ export const Dashboard: React.FC = () => {
                     <button
                       className={clsx(
                         styles.redeemBtn,
-                        ((isCommittedReward && fullyFunded) || (!isCommittedReward && canAfford)) && !outOfStock && styles.redeemBtnActive,
+                        redeemEnabled && !outOfStock && styles.redeemBtnActive,
                         redeemedId === reward.id && styles.redeemBtnSuccess
                       )}
-                      disabled={(isCommittedReward ? !fullyFunded : !canAfford) || outOfStock || isRedeeming || redeemedId === reward.id}
+                      disabled={!redeemEnabled || outOfStock || isRedeeming || redeemedId === reward.id}
                       onClick={() => handleRedeem(reward)}
                     >
                       {redeemedId === reward.id
@@ -1065,18 +1141,24 @@ export const Dashboard: React.FC = () => {
                           : outOfStock
                             ? 'Gone'
                             : isCommittedReward
-                              ? (fullyFunded ? 'Redeem' : `${commitment!.amount_saved}/${commitment!.target_cost}`)
+                              ? (fullyFunded ? 'Redeem' : `${totalSaved}/${target}`)
                               : canAfford
                                 ? 'Redeem'
-                                : `Need ${reward.effective_cost - balance}`}
+                                : isShared
+                                  ? 'Family goal'
+                                  : `Need ${reward.effective_cost - balance}`}
                     </button>
-                    {showSaveToward && !outOfStock && (
+                    {showSaveToward && (
                       <button
                         className={styles.saveTowardBtn}
                         onClick={() => handleSaveToward(reward)}
-                        disabled={isSaving}
+                        disabled={isSavingToward}
                       >
-                        {isSaving ? '...' : <><Target size={12} /> Save toward</>}
+                        {isSavingToward
+                          ? '...'
+                          : isShared
+                            ? <><Users size={12} /> Join goal</>
+                            : <><Target size={12} /> Save toward</>}
                       </button>
                     )}
                   </div>
@@ -1176,35 +1258,44 @@ export const Dashboard: React.FC = () => {
     </div>
   );
 
-  // Lightweight banner that nudges the kid toward their goal from the daily
-  // view. Tap it to jump to the rewards tab where they can save more or
-  // redeem when fully funded.
+  // Lightweight banner that nudges the kid toward each of their goals from
+  // the daily view. One row per active commitment (personal first, shared
+  // shares after). Tap to jump to the rewards tab.
   const renderGoalBanner = () => {
-    const c = pointsData?.active_commitment;
-    if (!c) return null;
-    const pct = Math.min(100, Math.round((c.amount_saved / c.target_cost) * 100));
-    const fullyFunded = c.amount_saved >= c.target_cost;
+    const list = pointsData?.active_commitments ?? [];
+    if (list.length === 0) return null;
     return (
-      <div className={styles.goalCard} onClick={() => setView('rewards')} role="button" tabIndex={0}>
-        <div className={styles.goalHeader}>
-          <div className={styles.goalIcon}>{c.reward_icon || '🎯'}</div>
-          <div className={styles.goalTitleBlock}>
-            <div className={styles.goalLabel}>Saving toward</div>
-            <div className={styles.goalName}>{c.reward_name}</div>
-          </div>
-          {fullyFunded && <span className={styles.goalBadge}>Ready!</span>}
-        </div>
-        <div className={styles.goalAmounts}>
-          <span><strong>{c.amount_saved}</strong> / {c.target_cost} pts</span>
-          <span>{fullyFunded ? 'Tap to redeem 🎉' : `${c.target_cost - c.amount_saved} to go`}</span>
-        </div>
-        <div className={styles.goalProgressTrack}>
-          <div
-            className={clsx(styles.goalProgressFill, fullyFunded && styles.goalProgressFillDone)}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      </div>
+      <>
+        {list.map(c => {
+          const isShared = !!c.pool;
+          const target = isShared ? c.pool!.target_cost : c.target_cost;
+          const totalSaved = isShared ? c.pool!.amount_saved : c.amount_saved;
+          const pct = target > 0 ? Math.min(100, Math.round((totalSaved / target) * 100)) : 0;
+          const fullyFunded = totalSaved >= target;
+          return (
+            <div key={c.id} className={clsx(styles.goalCard, isShared && styles.goalCardShared)} onClick={() => setView('rewards')} role="button" tabIndex={0}>
+              <div className={styles.goalHeader}>
+                <div className={styles.goalIcon}>{c.reward_icon || (isShared ? '👨‍👩‍👧' : '🎯')}</div>
+                <div className={styles.goalTitleBlock}>
+                  <div className={styles.goalLabel}>{isShared ? 'Family goal' : 'Saving toward'}</div>
+                  <div className={styles.goalName}>{c.reward_name}</div>
+                </div>
+                {fullyFunded && <span className={styles.goalBadge}>Ready!</span>}
+              </div>
+              <div className={styles.goalAmounts}>
+                <span><strong>{totalSaved}</strong> / {target} pts{isShared && c.amount_saved !== totalSaved ? ` · you: ${c.amount_saved}` : ''}</span>
+                <span>{fullyFunded ? 'Tap to redeem 🎉' : `${target - totalSaved} to go`}</span>
+              </div>
+              <div className={styles.goalProgressTrack}>
+                <div
+                  className={clsx(styles.goalProgressFill, fullyFunded && styles.goalProgressFillDone)}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </>
     );
   };
 

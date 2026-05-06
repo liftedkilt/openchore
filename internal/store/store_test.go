@@ -2705,3 +2705,261 @@ func TestCommitmentSnapshotsTargetCost(t *testing.T) {
 		t.Errorf("expected target_cost still 100 (snapshotted), got %d", got.TargetCost)
 	}
 }
+
+// ===== Shared / Family Goals =====
+
+func TestSharedPoolJoinAndContribute(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	alice := createTestUser(t, s, "Alice", "child")
+	bob := createTestUser(t, s, "Bob", "child")
+
+	reward := &model.Reward{Name: "Minecraft", Cost: 600, Active: true, Shareable: true, CreatedBy: parent.ID}
+	if err := s.CreateReward(ctx, reward); err != nil {
+		t.Fatalf("CreateReward: %v", err)
+	}
+	s.AdminAdjustPoints(ctx, alice.ID, 500, "seed")
+	s.AdminAdjustPoints(ctx, bob.ID, 300, "seed")
+
+	// Alice joins first — creates the pool.
+	a, err := s.CreateCommitment(ctx, alice.ID, reward.ID, 0)
+	if err != nil {
+		t.Fatalf("Alice CreateCommitment: %v", err)
+	}
+	if a.SharedPoolID == nil {
+		t.Fatalf("expected SharedPoolID populated for shareable reward")
+	}
+	if a.Pool == nil || a.Pool.TargetCost != 600 {
+		t.Fatalf("expected pool target=600, got %+v", a.Pool)
+	}
+
+	// Bob joins same pool — should reuse not create a new one.
+	b, err := s.CreateCommitment(ctx, bob.ID, reward.ID, 0)
+	if err != nil {
+		t.Fatalf("Bob CreateCommitment: %v", err)
+	}
+	if b.SharedPoolID == nil || *a.SharedPoolID != *b.SharedPoolID {
+		t.Errorf("expected Bob to join same pool as Alice (alice=%v bob=%v)", a.SharedPoolID, b.SharedPoolID)
+	}
+
+	// Each kid contributes their share. Pool total should sum across kids.
+	if err := s.ContributeToCommitment(ctx, alice.ID, a.ID, 400); err != nil {
+		t.Fatalf("Alice contribute: %v", err)
+	}
+	if err := s.ContributeToCommitment(ctx, bob.ID, b.ID, 200); err != nil {
+		t.Fatalf("Bob contribute: %v", err)
+	}
+
+	pool, _ := s.GetSharedPool(ctx, *a.SharedPoolID)
+	if pool.AmountSaved != 600 {
+		t.Errorf("expected pool saved=600, got %d", pool.AmountSaved)
+	}
+	if len(pool.Contributors) != 2 {
+		t.Errorf("expected 2 contributors, got %d", len(pool.Contributors))
+	}
+
+	// Personal commitment should be unaffected by shared participation.
+	if existing, _ := s.GetActiveCommitmentForUser(ctx, alice.ID); existing != nil {
+		t.Errorf("expected no active personal commitment for alice, got %+v", existing)
+	}
+	// Alice should still be able to start a personal goal.
+	cheap := &model.Reward{Name: "LEGO", Cost: 50, Active: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, cheap)
+	if _, err := s.CreateCommitment(ctx, alice.ID, cheap.ID, 0); err != nil {
+		t.Errorf("expected personal commitment alongside shared share, got error: %v", err)
+	}
+}
+
+func TestSharedPoolContributeCapsAtPoolRemaining(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	alice := createTestUser(t, s, "Alice", "child")
+	bob := createTestUser(t, s, "Bob", "child")
+
+	reward := &model.Reward{Name: "Family Trip", Cost: 100, Active: true, Shareable: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, reward)
+	s.AdminAdjustPoints(ctx, alice.ID, 200, "seed")
+	s.AdminAdjustPoints(ctx, bob.ID, 200, "seed")
+
+	a, _ := s.CreateCommitment(ctx, alice.ID, reward.ID, 0)
+	b, _ := s.CreateCommitment(ctx, bob.ID, reward.ID, 0)
+
+	// Alice fills 90 of the pool first.
+	if err := s.ContributeToCommitment(ctx, alice.ID, a.ID, 90); err != nil {
+		t.Fatalf("Alice contribute: %v", err)
+	}
+	// Bob asks for 50 — should be capped at 10 (pool has 10 left).
+	if err := s.ContributeToCommitment(ctx, bob.ID, b.ID, 50); err != nil {
+		t.Fatalf("Bob contribute: %v", err)
+	}
+	pool, _ := s.GetSharedPool(ctx, *a.SharedPoolID)
+	if pool.AmountSaved != 100 {
+		t.Errorf("expected pool capped at 100, got %d", pool.AmountSaved)
+	}
+	bobBal, _ := s.GetPointBalance(ctx, bob.ID)
+	if bobBal != 190 {
+		t.Errorf("expected bob spendable 190 (only 10 contributed), got %d", bobBal)
+	}
+}
+
+func TestSharedPoolRedemptionDebitsEachContributor(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	alice := createTestUser(t, s, "Alice", "child")
+	bob := createTestUser(t, s, "Bob", "child")
+
+	reward := &model.Reward{Name: "Minecraft", Cost: 300, Active: true, Shareable: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, reward)
+	s.AdminAdjustPoints(ctx, alice.ID, 250, "seed")
+	s.AdminAdjustPoints(ctx, bob.ID, 250, "seed")
+
+	a, _ := s.CreateCommitment(ctx, alice.ID, reward.ID, 0)
+	b, _ := s.CreateCommitment(ctx, bob.ID, reward.ID, 0)
+	s.ContributeToCommitment(ctx, alice.ID, a.ID, 200)
+	s.ContributeToCommitment(ctx, bob.ID, b.ID, 100)
+
+	// Bob hits redeem (any contributor can).
+	if _, err := s.RedeemReward(ctx, bob.ID, reward.ID); err != nil {
+		t.Fatalf("RedeemReward: %v", err)
+	}
+
+	// Each kid loses exactly their contribution from total balance, spendable
+	// unchanged net (saved → spent in one tx).
+	if bal, _ := s.GetPointBalance(ctx, alice.ID); bal != 50 {
+		t.Errorf("expected alice spendable 50 (250 seed - 200 contributed), got %d", bal)
+	}
+	if bal, _ := s.GetPointBalance(ctx, bob.ID); bal != 150 {
+		t.Errorf("expected bob spendable 150 (250 seed - 100 contributed), got %d", bal)
+	}
+
+	pool, _ := s.GetSharedPool(ctx, *a.SharedPoolID)
+	if pool.Status != model.CommitmentRedeemed {
+		t.Errorf("expected pool redeemed, got %s", pool.Status)
+	}
+
+	// Both kids should have a redemption history entry sized to their share.
+	aliceHist, _ := s.ListRedemptionsForUser(ctx, alice.ID, 10)
+	if len(aliceHist) != 1 || aliceHist[0].PointsSpent != 200 {
+		t.Errorf("expected alice redemption=200, got %+v", aliceHist)
+	}
+	bobHist, _ := s.ListRedemptionsForUser(ctx, bob.ID, 10)
+	if len(bobHist) != 1 || bobHist[0].PointsSpent != 100 {
+		t.Errorf("expected bob redemption=100, got %+v", bobHist)
+	}
+}
+
+func TestSharedPoolRedeemFailsWhenNotFunded(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	alice := createTestUser(t, s, "Alice", "child")
+	reward := &model.Reward{Name: "Big thing", Cost: 1000, Active: true, Shareable: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, reward)
+	s.AdminAdjustPoints(ctx, alice.ID, 500, "seed")
+
+	a, _ := s.CreateCommitment(ctx, alice.ID, reward.ID, 0)
+	s.ContributeToCommitment(ctx, alice.ID, a.ID, 200)
+
+	if _, err := s.RedeemReward(ctx, alice.ID, reward.ID); err == nil {
+		t.Errorf("expected redemption to fail when pool isn't fully funded")
+	}
+}
+
+func TestSharedPoolBreakRefundsOnlyOwnContribution(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	alice := createTestUser(t, s, "Alice", "child")
+	bob := createTestUser(t, s, "Bob", "child")
+	reward := &model.Reward{Name: "Game", Cost: 200, Active: true, Shareable: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, reward)
+	s.AdminAdjustPoints(ctx, alice.ID, 100, "seed")
+	s.AdminAdjustPoints(ctx, bob.ID, 100, "seed")
+
+	a, _ := s.CreateCommitment(ctx, alice.ID, reward.ID, 0)
+	b, _ := s.CreateCommitment(ctx, bob.ID, reward.ID, 0)
+	s.ContributeToCommitment(ctx, alice.ID, a.ID, 60)
+	s.ContributeToCommitment(ctx, bob.ID, b.ID, 40)
+
+	if err := s.BreakCommitment(ctx, alice.ID, a.ID); err != nil {
+		t.Fatalf("Alice break: %v", err)
+	}
+	if bal, _ := s.GetPointBalance(ctx, alice.ID); bal != 100 {
+		t.Errorf("expected alice refunded to 100, got %d", bal)
+	}
+	if bal, _ := s.GetPointBalance(ctx, bob.ID); bal != 60 {
+		t.Errorf("expected bob still committed 40 (spendable 60), got %d", bal)
+	}
+	// Pool should still be active so Bob (and others) can keep saving.
+	pool, _ := s.GetSharedPool(ctx, *a.SharedPoolID)
+	if pool.Status != model.CommitmentActive {
+		t.Errorf("expected pool to remain active after one kid leaves, got %s", pool.Status)
+	}
+	if pool.AmountSaved != 40 {
+		t.Errorf("expected pool to retain bob's 40, got %d", pool.AmountSaved)
+	}
+}
+
+func TestSharedPoolAutoContributeStacksWithPersonal(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	kid := createTestUser(t, s, "Kid", "child")
+
+	personal := &model.Reward{Name: "LEGO", Cost: 200, Active: true, CreatedBy: parent.ID}
+	family := &model.Reward{Name: "Minecraft", Cost: 600, Active: true, Shareable: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, personal)
+	s.CreateReward(ctx, family)
+
+	if _, err := s.CreateCommitment(ctx, kid.ID, personal.ID, 50); err != nil {
+		t.Fatalf("personal commitment: %v", err)
+	}
+	if _, err := s.CreateCommitment(ctx, kid.ID, family.ID, 25); err != nil {
+		t.Fatalf("shared commitment: %v", err)
+	}
+
+	chore := createTestChore(t, s, "Big chore", 100, parent.ID)
+	cs := createTestSchedule(t, s, chore.ID, kid.ID, 1)
+	cc := &model.ChoreCompletion{ChoreScheduleID: cs.ID, CompletedBy: kid.ID, Status: model.StatusApproved, CompletionDate: "2026-05-06"}
+	s.CompleteChore(ctx, cc)
+	if err := s.CreditChorePoints(ctx, kid.ID, cc.ID, 100); err != nil {
+		t.Fatalf("CreditChorePoints: %v", err)
+	}
+
+	// Expect 50 to personal, 25 to shared, 25 left spendable.
+	bal, _ := s.GetPointBalance(ctx, kid.ID)
+	if bal != 25 {
+		t.Errorf("expected spendable 25 (100 credit - 50 personal - 25 shared), got %d", bal)
+	}
+
+	commitments, err := s.ListActiveCommitmentsForUser(ctx, kid.ID)
+	if err != nil {
+		t.Fatalf("ListActiveCommitmentsForUser: %v", err)
+	}
+	if len(commitments) != 2 {
+		t.Fatalf("expected 2 active commitments, got %d", len(commitments))
+	}
+	var personalSaved, sharedSaved int
+	for _, c := range commitments {
+		if c.SharedPoolID == nil {
+			personalSaved = c.AmountSaved
+		} else {
+			sharedSaved = c.AmountSaved
+		}
+	}
+	if personalSaved != 50 {
+		t.Errorf("expected personal saved=50, got %d", personalSaved)
+	}
+	if sharedSaved != 25 {
+		t.Errorf("expected shared saved=25, got %d", sharedSaved)
+	}
+}

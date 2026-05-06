@@ -261,6 +261,8 @@ export interface RewardCommitment {
   amount_saved: number;
   auto_contribute_percent: number;
   status: 'active' | 'redeemed' | 'cancelled';
+  shared_pool_id?: number;
+  pool?: SharedCommitmentPool;
   created_at: string;
   redeemed_at?: string;
   cancelled_at?: string;
@@ -269,7 +271,7 @@ export interface RewardCommitment {
 export interface PointsData {
   balance: number;
   committed: number;
-  active_commitment: RewardCommitment | null;
+  active_commitments: RewardCommitment[];
   transactions: PointTransaction[];
 }
 
@@ -294,9 +296,30 @@ export interface Reward {
   effective_cost: number;
   stock?: number;
   active: boolean;
+  shareable: boolean;
   created_by: number;
   created_at: string;
   assignments?: RewardAssignment[];
+}
+
+export interface PoolContributor {
+  user_id: number;
+  user_name: string;
+  avatar_url?: string;
+  amount_saved: number;
+}
+
+export interface SharedCommitmentPool {
+  id: number;
+  reward_id: number;
+  reward_name?: string;
+  reward_icon?: string;
+  target_cost: number;
+  amount_saved: number;
+  status: 'active' | 'redeemed' | 'cancelled';
+  contributors?: PoolContributor[];
+  created_at: string;
+  redeemed_at?: string;
 }
 
 export interface RewardRedemption {

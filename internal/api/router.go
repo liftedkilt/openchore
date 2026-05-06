@@ -89,6 +89,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 			r.Post("/commitments/{id}/contribute", rewards.Contribute)
 			r.Put("/commitments/{id}/auto-contribute", rewards.SetAutoContribute)
 			r.Delete("/commitments/{id}", rewards.BreakCommitment)
+			r.Get("/pools/{id}", rewards.GetSharedPool)
 
 			// Admin-only routes
 			r.Group(func(r chi.Router) {

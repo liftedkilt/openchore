@@ -23,23 +23,25 @@ func (h *PointsHandler) GetUserPoints(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// SUM(point_transactions.amount) is naturally the spendable balance:
-	// commit_to_goal entries already debit it. Surface "balance" as the
-	// spendable number the kid can spend on cheaper rewards, plus a separate
-	// "committed" total + the active commitment (if any) so the UI can show
-	// progress toward the saved goal.
+	// commit_to_goal entries already debit it. The kid can have one personal
+	// goal AND any number of shared family pools open at once — return them
+	// all so the UI can render a stack of goal cards.
 	balance, err := h.store.GetPointBalance(r.Context(), userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to get balance")
 		return
 	}
-	commitment, err := h.store.GetActiveCommitmentForUser(r.Context(), userID)
+	commitments, err := h.store.ListActiveCommitmentsForUser(r.Context(), userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get commitment")
+		writeError(w, http.StatusInternalServerError, "failed to get commitments")
 		return
 	}
+	if commitments == nil {
+		commitments = []model.RewardCommitment{}
+	}
 	committed := 0
-	if commitment != nil {
-		committed = commitment.AmountSaved
+	for _, c := range commitments {
+		committed += c.AmountSaved
 	}
 	txs, err := h.store.ListPointTransactions(r.Context(), userID, 50)
 	if err != nil {
@@ -50,10 +52,10 @@ func (h *PointsHandler) GetUserPoints(w http.ResponseWriter, r *http.Request) {
 		txs = []model.PointTransaction{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"balance":           balance,
-		"committed":         committed,
-		"active_commitment": commitment,
-		"transactions":      txs,
+		"balance":            balance,
+		"committed":          committed,
+		"active_commitments": commitments,
+		"transactions":       txs,
 	})
 }
 

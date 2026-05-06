@@ -98,6 +98,7 @@ const RewardForm: React.FC<{
   const [icon, setIcon] = useState(reward?.icon || '');
   const [cost, setCost] = useState(reward?.cost?.toString() || '50');
   const [stock, setStock] = useState(reward?.stock?.toString() || '');
+  const [shareable, setShareable] = useState(reward?.shareable ?? false);
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -111,6 +112,7 @@ const RewardForm: React.FC<{
         cost: parseInt(cost) || 0,
         stock: stock ? parseInt(stock) : undefined,
         active: true,
+        shareable,
       };
       if (reward) {
         await api.rewards.update(reward.id, data);
@@ -157,6 +159,18 @@ const RewardForm: React.FC<{
             <label className={styles.label} title="Limit how many times this reward can be redeemed. Leave blank for unlimited.">Stock (blank = unlimited)</label>
             <input className={styles.input} type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} placeholder="∞" />
           </div>
+        </div>
+
+        <div className={styles.formGroup}>
+          <label className={styles.label} title="Shareable rewards become a family pool: multiple kids can save together and the cost is split based on each kid's contribution.">
+            <input
+              type="checkbox"
+              checked={shareable}
+              onChange={e => setShareable(e.target.checked)}
+              style={{ marginRight: '0.5rem' }}
+            />
+            Shareable / family goal — multiple kids can pool points together
+          </label>
         </div>
       </div>
 

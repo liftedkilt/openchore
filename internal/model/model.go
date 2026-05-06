@@ -156,6 +156,7 @@ type Reward struct {
 	EffectiveCost int                `json:"effective_cost"` // per-user cost (may differ from base cost)
 	Stock         *int               `json:"stock,omitempty"`
 	Active        bool               `json:"active"`
+	Shareable     bool               `json:"shareable"`
 	CreatedBy     int64              `json:"created_by"`
 	CreatedAt     time.Time          `json:"created_at"`
 	Assignments   []RewardAssignment `json:"assignments,omitempty"`
@@ -179,19 +180,47 @@ type RewardRedemption struct {
 // RewardCommitment represents a kid earmarking points toward a chosen reward.
 // AmountSaved is derived from point_transactions referencing this commitment
 // and is populated by the store layer (not stored on the row itself).
+// SharedPoolID, when non-nil, marks this row as a kid's share of a pooled
+// family goal — Pool is populated for caller convenience.
 type RewardCommitment struct {
-	ID                    int64      `json:"id"`
-	UserID                int64      `json:"user_id"`
-	RewardID              int64      `json:"reward_id"`
-	RewardName            string     `json:"reward_name,omitempty"`
-	RewardIcon            string     `json:"reward_icon,omitempty"`
-	TargetCost            int        `json:"target_cost"`
-	AmountSaved           int        `json:"amount_saved"`
-	AutoContributePercent int        `json:"auto_contribute_percent"`
-	Status                string     `json:"status"`
-	CreatedAt             time.Time  `json:"created_at"`
-	RedeemedAt            *time.Time `json:"redeemed_at,omitempty"`
-	CancelledAt           *time.Time `json:"cancelled_at,omitempty"`
+	ID                    int64                 `json:"id"`
+	UserID                int64                 `json:"user_id"`
+	RewardID              int64                 `json:"reward_id"`
+	RewardName            string                `json:"reward_name,omitempty"`
+	RewardIcon            string                `json:"reward_icon,omitempty"`
+	TargetCost            int                   `json:"target_cost"`
+	AmountSaved           int                   `json:"amount_saved"`
+	AutoContributePercent int                   `json:"auto_contribute_percent"`
+	Status                string                `json:"status"`
+	SharedPoolID          *int64                `json:"shared_pool_id,omitempty"`
+	Pool                  *SharedCommitmentPool `json:"pool,omitempty"`
+	CreatedAt             time.Time             `json:"created_at"`
+	RedeemedAt            *time.Time            `json:"redeemed_at,omitempty"`
+	CancelledAt           *time.Time            `json:"cancelled_at,omitempty"`
+}
+
+// SharedCommitmentPool is the pooled save target multiple kids are
+// contributing to. AmountSaved is the sum across active contributors.
+type SharedCommitmentPool struct {
+	ID           int64             `json:"id"`
+	RewardID     int64             `json:"reward_id"`
+	RewardName   string            `json:"reward_name,omitempty"`
+	RewardIcon   string            `json:"reward_icon,omitempty"`
+	TargetCost   int               `json:"target_cost"`
+	AmountSaved  int               `json:"amount_saved"`
+	Status       string            `json:"status"`
+	Contributors []PoolContributor `json:"contributors,omitempty"`
+	CreatedAt    time.Time         `json:"created_at"`
+	RedeemedAt   *time.Time        `json:"redeemed_at,omitempty"`
+}
+
+// PoolContributor is one kid's slice of a shared pool — populated for the UI
+// leaderboard ("You: 75, Alice: 120, Bob: 50").
+type PoolContributor struct {
+	UserID      int64  `json:"user_id"`
+	UserName    string `json:"user_name"`
+	AvatarURL   string `json:"avatar_url,omitempty"`
+	AmountSaved int    `json:"amount_saved"`
 }
 
 // --- Streaks ---

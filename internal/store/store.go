@@ -735,9 +735,9 @@ func (s *Store) AdminAdjustPoints(ctx context.Context, userID int64, amount int,
 
 func (s *Store) CreateReward(ctx context.Context, r *model.Reward) error {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO rewards (name, description, icon, cost, stock, active, created_by)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		r.Name, r.Description, r.Icon, r.Cost, r.Stock, r.Active, r.CreatedBy)
+		`INSERT INTO rewards (name, description, icon, cost, stock, active, shareable, created_by)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.Name, r.Description, r.Icon, r.Cost, r.Stock, r.Active, boolToInt(r.Shareable), r.CreatedBy)
 	if err != nil {
 		return err
 	}
@@ -747,20 +747,21 @@ func (s *Store) CreateReward(ctx context.Context, r *model.Reward) error {
 
 func (s *Store) GetReward(ctx context.Context, id int64) (*model.Reward, error) {
 	r := &model.Reward{}
-	var active int
+	var active, shareable int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, description, icon, cost, stock, active, created_by, created_at
+		`SELECT id, name, description, icon, cost, stock, active, shareable, created_by, created_at
 		 FROM rewards WHERE id = ?`, id).
-		Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &active, &r.CreatedBy, &r.CreatedAt)
+		Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &active, &shareable, &r.CreatedBy, &r.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	r.Active = active == 1
+	r.Shareable = shareable == 1
 	return r, err
 }
 
 func (s *Store) ListRewards(ctx context.Context, activeOnly bool) ([]model.Reward, error) {
-	q := `SELECT id, name, description, icon, cost, stock, active, created_by, created_at FROM rewards`
+	q := `SELECT id, name, description, icon, cost, stock, active, shareable, created_by, created_at FROM rewards`
 	if activeOnly {
 		q += ` WHERE active = 1`
 	}
@@ -773,11 +774,12 @@ func (s *Store) ListRewards(ctx context.Context, activeOnly bool) ([]model.Rewar
 	var rewards []model.Reward
 	for rows.Next() {
 		var r model.Reward
-		var active int
-		if err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &active, &r.CreatedBy, &r.CreatedAt); err != nil {
+		var active, shareable int
+		if err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &active, &shareable, &r.CreatedBy, &r.CreatedAt); err != nil {
 			return nil, err
 		}
 		r.Active = active == 1
+		r.Shareable = shareable == 1
 		r.EffectiveCost = r.Cost
 		rewards = append(rewards, r)
 	}
@@ -789,7 +791,7 @@ func (s *Store) ListRewards(ctx context.Context, activeOnly bool) ([]model.Rewar
 // If it has assignments, only assigned users see it, with per-user cost.
 func (s *Store) ListRewardsForUser(ctx context.Context, userID int64) ([]model.Reward, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT r.id, r.name, r.description, r.icon, r.cost, r.stock, r.created_by, r.created_at,
+		SELECT r.id, r.name, r.description, r.icon, r.cost, r.stock, r.shareable, r.created_by, r.created_at,
 			ra.custom_cost
 		FROM rewards r
 		LEFT JOIN reward_assignments ra ON ra.reward_id = r.id AND ra.user_id = ?
@@ -808,11 +810,13 @@ func (s *Store) ListRewardsForUser(ctx context.Context, userID int64) ([]model.R
 	var rewards []model.Reward
 	for rows.Next() {
 		var r model.Reward
+		var shareable int
 		var customCost sql.NullInt64
-		if err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &r.CreatedBy, &r.CreatedAt, &customCost); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &shareable, &r.CreatedBy, &r.CreatedAt, &customCost); err != nil {
 			return nil, err
 		}
 		r.Active = true
+		r.Shareable = shareable == 1
 		if customCost.Valid {
 			r.EffectiveCost = int(customCost.Int64)
 		} else {
@@ -884,10 +888,9 @@ func (s *Store) SetRewardAssignments(ctx context.Context, rewardID int64, assign
 }
 
 func (s *Store) UpdateReward(ctx context.Context, r *model.Reward) error {
-	active := boolToInt(r.Active)
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE rewards SET name=?, description=?, icon=?, cost=?, stock=?, active=? WHERE id=?`,
-		r.Name, r.Description, r.Icon, r.Cost, r.Stock, active, r.ID)
+		`UPDATE rewards SET name=?, description=?, icon=?, cost=?, stock=?, active=?, shareable=? WHERE id=?`,
+		r.Name, r.Description, r.Icon, r.Cost, r.Stock, boolToInt(r.Active), boolToInt(r.Shareable), r.ID)
 	return err
 }
 
@@ -906,10 +909,10 @@ func (s *Store) RedeemReward(ctx context.Context, userID, rewardID int64) (*mode
 	// Get reward
 	var baseCost int
 	var stock sql.NullInt64
-	var active int
+	var active, shareable int
 	err = tx.QueryRowContext(ctx,
-		`SELECT cost, stock, active FROM rewards WHERE id = ?`, rewardID).
-		Scan(&baseCost, &stock, &active)
+		`SELECT cost, stock, active, shareable FROM rewards WHERE id = ?`, rewardID).
+		Scan(&baseCost, &stock, &active, &shareable)
 	if err != nil {
 		return nil, fmt.Errorf("reward not found")
 	}
@@ -941,7 +944,22 @@ func (s *Store) RedeemReward(ctx context.Context, userID, rewardID int64) (*mode
 		}
 	}
 
-	// Determine effective cost (per-user override or base)
+	// Shareable rewards must be redeemed through their pool: anyone in the
+	// pool can hit redeem once it's fully funded, and each kid is debited
+	// only their contribution. This enforces the social contract — no kid
+	// alone shoulders the cost on a family goal.
+	if shareable == 1 {
+		out, err := s.redeemSharedPoolTx(ctx, tx, userID, rewardID, stock)
+		if err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		return out, nil
+	}
+
+	// Determine effective cost (per-user override or base) for personal flow.
 	cost := baseCost
 	var customCost sql.NullInt64
 	tx.QueryRowContext(ctx,
@@ -951,28 +969,26 @@ func (s *Store) RedeemReward(ctx context.Context, userID, rewardID int64) (*mode
 		cost = int(customCost.Int64)
 	}
 
-	// Look for an active commitment toward this reward. If one exists, the kid
-	// must have saved at least the snapshotted target before they can redeem;
-	// the saved points are still in the ledger as commit_to_goal debits, so we
-	// emit a goal_break to return them to spendable just before the normal
-	// reward_redeem debit. Net effect on the ledger is -target_cost, which is
-	// the same as a standard redemption — but the commitment row gets marked
-	// redeemed and any difference between target_cost and current cost flows
-	// to the kid (we redeem at the snapshotted target, not the current price).
+	// Look for an active personal commitment toward this reward. If one
+	// exists, the kid must have saved at least the snapshotted target before
+	// they can redeem; the saved points are still in the ledger as
+	// commit_to_goal debits, so we emit a goal_break to return them to
+	// spendable just before the normal reward_redeem debit. Net effect on the
+	// ledger is -target_cost, the same as a standard redemption — but the
+	// commitment row gets marked redeemed and the kid pays the snapshotted
+	// target, not the current price.
 	var commitmentID int64
 	var commitmentTarget int
 	commitmentRow := tx.QueryRowContext(ctx,
 		`SELECT id, target_cost FROM reward_commitments
-		 WHERE user_id = ? AND reward_id = ? AND status = ?`,
+		 WHERE user_id = ? AND reward_id = ? AND status = ? AND shared_pool_id IS NULL`,
 		userID, rewardID, model.CommitmentActive)
 	if err := commitmentRow.Scan(&commitmentID, &commitmentTarget); err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
 
 	if commitmentID != 0 {
-		// Honour the snapshotted target so price changes don't burn the saver.
 		cost = commitmentTarget
-
 		var saved int
 		err = tx.QueryRowContext(ctx,
 			`SELECT COALESCE(-SUM(amount), 0) FROM point_transactions
@@ -995,14 +1011,10 @@ func (s *Store) RedeemReward(ctx context.Context, userID, rewardID int64) (*mode
 	if err != nil {
 		return nil, err
 	}
-	// When redeeming via a fully-funded commitment, the goal_break we're about
-	// to emit will return the saved points first, so spendable+saved must
-	// cover cost — saved >= cost is already verified above, so this passes.
 	if commitmentID == 0 && balance < cost {
 		return nil, fmt.Errorf("insufficient points (have %d, need %d)", balance, cost)
 	}
 
-	// Insert redemption
 	res, err := tx.ExecContext(ctx,
 		`INSERT INTO reward_redemptions (reward_id, user_id, points_spent) VALUES (?, ?, ?)`,
 		rewardID, userID, cost)
@@ -1025,19 +1037,15 @@ func (s *Store) RedeemReward(ctx context.Context, userID, rewardID int64) (*mode
 		}
 	}
 
-	// Debit points for the redemption
-	_, err = tx.ExecContext(ctx,
+	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
 		 VALUES (?, ?, ?, ?, '')`,
-		userID, -cost, model.ReasonRewardRedeem, redemptionID)
-	if err != nil {
+		userID, -cost, model.ReasonRewardRedeem, redemptionID); err != nil {
 		return nil, err
 	}
 
-	// Decrement stock if limited
 	if stock.Valid {
-		_, err = tx.ExecContext(ctx, `UPDATE rewards SET stock = stock - 1 WHERE id = ?`, rewardID)
-		if err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE rewards SET stock = stock - 1 WHERE id = ?`, rewardID); err != nil {
 			return nil, err
 		}
 	}
@@ -1054,13 +1062,160 @@ func (s *Store) RedeemReward(ctx context.Context, userID, rewardID int64) (*mode
 	}, nil
 }
 
+// redeemSharedPoolTx settles a fully-funded shared pool: every active
+// contributor is debited their saved amount, the pool is marked redeemed,
+// stock decrements once. The caller must be a contributor with a non-zero
+// saved share. Returns the calling user's RewardRedemption row.
+func (s *Store) redeemSharedPoolTx(ctx context.Context, tx *sql.Tx, userID, rewardID int64, stock sql.NullInt64) (*model.RewardRedemption, error) {
+	// Find the active pool for this reward.
+	var poolID int64
+	var poolTarget int
+	err := tx.QueryRowContext(ctx,
+		`SELECT id, target_cost FROM shared_commitment_pools
+		 WHERE reward_id = ? AND status = ?`,
+		rewardID, model.CommitmentActive).Scan(&poolID, &poolTarget)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("no active family goal for this reward — join one first")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// The caller must be a contributor.
+	var callerCommitmentID int64
+	if err := tx.QueryRowContext(ctx,
+		`SELECT id FROM reward_commitments
+		 WHERE user_id = ? AND shared_pool_id = ? AND status = ?`,
+		userID, poolID, model.CommitmentActive).Scan(&callerCommitmentID); err == sql.ErrNoRows {
+		return nil, fmt.Errorf("you haven't joined this family goal")
+	} else if err != nil {
+		return nil, err
+	}
+
+	// Pool must be fully funded.
+	var poolSaved int
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COALESCE(-SUM(pt.amount), 0)
+		 FROM point_transactions pt
+		 JOIN reward_commitments rc ON rc.id = pt.reference_id
+		 WHERE rc.shared_pool_id = ? AND rc.status = ?
+		   AND pt.reason IN (?, ?)`,
+		poolID, model.CommitmentActive, model.ReasonCommitToGoal, model.ReasonGoalBreak).Scan(&poolSaved); err != nil {
+		return nil, err
+	}
+	if poolSaved < poolTarget {
+		return nil, fmt.Errorf("family goal not fully funded yet (have %d, need %d)", poolSaved, poolTarget)
+	}
+
+	// For each active contributor: emit goal_break + reward_redeem +
+	// reward_redemption row sized to that contributor's saved share. Caller's
+	// row is returned to the API layer.
+	contributorRows, err := tx.QueryContext(ctx,
+		`SELECT rc.id, rc.user_id, COALESCE(-SUM(pt.amount), 0) AS saved
+		 FROM reward_commitments rc
+		 LEFT JOIN point_transactions pt
+		   ON pt.reference_id = rc.id AND pt.reason IN (?, ?)
+		 WHERE rc.shared_pool_id = ? AND rc.status = ?
+		 GROUP BY rc.id, rc.user_id`,
+		model.ReasonCommitToGoal, model.ReasonGoalBreak, poolID, model.CommitmentActive)
+	if err != nil {
+		return nil, err
+	}
+	type contrib struct {
+		commitmentID int64
+		userID       int64
+		saved        int
+	}
+	var contribs []contrib
+	for contributorRows.Next() {
+		var c contrib
+		if err := contributorRows.Scan(&c.commitmentID, &c.userID, &c.saved); err != nil {
+			contributorRows.Close()
+			return nil, err
+		}
+		contribs = append(contribs, c)
+	}
+	contributorRows.Close()
+
+	var callerRedemption *model.RewardRedemption
+	for _, c := range contribs {
+		if c.saved <= 0 {
+			// A contributor with 0 saved (joined but never funded). Mark them
+			// redeemed but skip the ledger churn.
+			if _, err := tx.ExecContext(ctx,
+				`UPDATE reward_commitments SET status = ?, redeemed_at = CURRENT_TIMESTAMP WHERE id = ?`,
+				model.CommitmentRedeemed, c.commitmentID); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		res, err := tx.ExecContext(ctx,
+			`INSERT INTO reward_redemptions (reward_id, user_id, points_spent) VALUES (?, ?, ?)`,
+			rewardID, c.userID, c.saved)
+		if err != nil {
+			return nil, err
+		}
+		redemptionID, _ := res.LastInsertId()
+
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+			 VALUES (?, ?, ?, ?, 'redeemed via family goal')`,
+			c.userID, c.saved, model.ReasonGoalBreak, c.commitmentID); err != nil {
+			return nil, err
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+			 VALUES (?, ?, ?, ?, '')`,
+			c.userID, -c.saved, model.ReasonRewardRedeem, redemptionID); err != nil {
+			return nil, err
+		}
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE reward_commitments SET status = ?, redeemed_at = CURRENT_TIMESTAMP WHERE id = ?`,
+			model.CommitmentRedeemed, c.commitmentID); err != nil {
+			return nil, err
+		}
+
+		if c.userID == userID {
+			callerRedemption = &model.RewardRedemption{
+				ID:          redemptionID,
+				RewardID:    rewardID,
+				UserID:      userID,
+				PointsSpent: c.saved,
+			}
+		}
+	}
+
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE shared_commitment_pools SET status = ?, redeemed_at = CURRENT_TIMESTAMP, redeemed_by_user_id = ? WHERE id = ?`,
+		model.CommitmentRedeemed, userID, poolID); err != nil {
+		return nil, err
+	}
+
+	if stock.Valid {
+		if _, err := tx.ExecContext(ctx, `UPDATE rewards SET stock = stock - 1 WHERE id = ?`, rewardID); err != nil {
+			return nil, err
+		}
+	}
+
+	if callerRedemption == nil {
+		// Caller had 0 saved — surface a synthetic record so the response
+		// shape is consistent. The caller is recorded as the redeemer of the
+		// pool itself via shared_commitment_pools.redeemed_by_user_id.
+		callerRedemption = &model.RewardRedemption{
+			RewardID:    rewardID,
+			UserID:      userID,
+			PointsSpent: 0,
+		}
+	}
+	return callerRedemption, nil
+}
+
 // --- Reward Commitments ---
 
 // ErrActiveCommitmentExists indicates the user already has an active commitment.
 var ErrActiveCommitmentExists = fmt.Errorf("user already has an active commitment")
 
-// scanCommitment fills a RewardCommitment from a row scan and computes the
-// derived AmountSaved from the ledger.
+// hydrateCommitmentSaved derives AmountSaved for a commitment from the ledger.
 func (s *Store) hydrateCommitmentSaved(ctx context.Context, q interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }, c *model.RewardCommitment) error {
@@ -1070,8 +1225,9 @@ func (s *Store) hydrateCommitmentSaved(ctx context.Context, q interface {
 		c.ID, model.ReasonCommitToGoal, model.ReasonGoalBreak).Scan(&c.AmountSaved)
 }
 
-// GetActiveCommitmentForUser returns the user's active commitment with reward
-// metadata and a derived AmountSaved, or nil if there isn't one.
+// GetActiveCommitmentForUser returns the user's active personal commitment
+// (shared shares are excluded — see ListActiveCommitmentsForUser for the
+// full picture).
 func (s *Store) GetActiveCommitmentForUser(ctx context.Context, userID int64) (*model.RewardCommitment, error) {
 	c := &model.RewardCommitment{}
 	var redeemedAt, cancelledAt sql.NullTime
@@ -1081,7 +1237,7 @@ func (s *Store) GetActiveCommitmentForUser(ctx context.Context, userID int64) (*
 		        rc.redeemed_at, rc.cancelled_at
 		 FROM reward_commitments rc
 		 JOIN rewards r ON r.id = rc.reward_id
-		 WHERE rc.user_id = ? AND rc.status = ?`,
+		 WHERE rc.user_id = ? AND rc.status = ? AND rc.shared_pool_id IS NULL`,
 		userID, model.CommitmentActive).
 		Scan(&c.ID, &c.UserID, &c.RewardID, &c.RewardName, &c.RewardIcon, &c.TargetCost,
 			&c.AutoContributePercent, &c.Status, &c.CreatedAt, &redeemedAt, &cancelledAt)
@@ -1103,13 +1259,123 @@ func (s *Store) GetActiveCommitmentForUser(ctx context.Context, userID int64) (*
 	return c, nil
 }
 
+// ListActiveCommitmentsForUser returns all active commitments — both the
+// kid's personal goal (if any) and every shared family pool they've joined.
+// Shared rows have Pool populated for UI rendering.
+func (s *Store) ListActiveCommitmentsForUser(ctx context.Context, userID int64) ([]model.RewardCommitment, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT rc.id, rc.user_id, rc.reward_id, r.name, r.icon, rc.target_cost,
+		        rc.auto_contribute_percent, rc.status, rc.created_at,
+		        rc.redeemed_at, rc.cancelled_at, rc.shared_pool_id
+		 FROM reward_commitments rc
+		 JOIN rewards r ON r.id = rc.reward_id
+		 WHERE rc.user_id = ? AND rc.status = ?
+		 ORDER BY rc.shared_pool_id IS NULL DESC, rc.created_at DESC`,
+		userID, model.CommitmentActive)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.RewardCommitment
+	for rows.Next() {
+		var c model.RewardCommitment
+		var redeemedAt, cancelledAt sql.NullTime
+		var poolID sql.NullInt64
+		if err := rows.Scan(&c.ID, &c.UserID, &c.RewardID, &c.RewardName, &c.RewardIcon,
+			&c.TargetCost, &c.AutoContributePercent, &c.Status, &c.CreatedAt,
+			&redeemedAt, &cancelledAt, &poolID); err != nil {
+			return nil, err
+		}
+		if redeemedAt.Valid {
+			c.RedeemedAt = &redeemedAt.Time
+		}
+		if cancelledAt.Valid {
+			c.CancelledAt = &cancelledAt.Time
+		}
+		if poolID.Valid {
+			id := poolID.Int64
+			c.SharedPoolID = &id
+		}
+		out = append(out, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range out {
+		if err := s.hydrateCommitmentSaved(ctx, s.db, &out[i]); err != nil {
+			return nil, err
+		}
+		if out[i].SharedPoolID != nil {
+			pool, err := s.GetSharedPool(ctx, *out[i].SharedPoolID)
+			if err != nil {
+				return nil, err
+			}
+			out[i].Pool = pool
+		}
+	}
+	return out, nil
+}
+
+// GetSharedPool returns a shared commitment pool with derived AmountSaved
+// (sum across active contributors) and the contributor leaderboard.
+func (s *Store) GetSharedPool(ctx context.Context, poolID int64) (*model.SharedCommitmentPool, error) {
+	p := &model.SharedCommitmentPool{}
+	var redeemedAt sql.NullTime
+	err := s.db.QueryRowContext(ctx,
+		`SELECT scp.id, scp.reward_id, r.name, r.icon, scp.target_cost, scp.status,
+		        scp.created_at, scp.redeemed_at
+		 FROM shared_commitment_pools scp
+		 JOIN rewards r ON r.id = scp.reward_id
+		 WHERE scp.id = ?`, poolID).
+		Scan(&p.ID, &p.RewardID, &p.RewardName, &p.RewardIcon, &p.TargetCost, &p.Status,
+			&p.CreatedAt, &redeemedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if redeemedAt.Valid {
+		p.RedeemedAt = &redeemedAt.Time
+	}
+
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT u.id, u.name, u.avatar_url, COALESCE(-SUM(pt.amount), 0) AS saved
+		 FROM reward_commitments rc
+		 JOIN users u ON u.id = rc.user_id
+		 LEFT JOIN point_transactions pt
+		   ON pt.reference_id = rc.id AND pt.reason IN (?, ?)
+		 WHERE rc.shared_pool_id = ? AND rc.status = ?
+		 GROUP BY u.id, u.name, u.avatar_url
+		 ORDER BY saved DESC, u.name ASC`,
+		model.ReasonCommitToGoal, model.ReasonGoalBreak, poolID, model.CommitmentActive)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var total int
+	for rows.Next() {
+		var c model.PoolContributor
+		if err := rows.Scan(&c.UserID, &c.UserName, &c.AvatarURL, &c.AmountSaved); err != nil {
+			return nil, err
+		}
+		total += c.AmountSaved
+		p.Contributors = append(p.Contributors, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	p.AmountSaved = total
+	return p, nil
+}
+
 // ListCommitmentsForUser returns the user's commitments (active + history),
 // most recent first.
 func (s *Store) ListCommitmentsForUser(ctx context.Context, userID int64) ([]model.RewardCommitment, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT rc.id, rc.user_id, rc.reward_id, r.name, r.icon, rc.target_cost,
 		        rc.auto_contribute_percent, rc.status, rc.created_at,
-		        rc.redeemed_at, rc.cancelled_at
+		        rc.redeemed_at, rc.cancelled_at, rc.shared_pool_id
 		 FROM reward_commitments rc
 		 JOIN rewards r ON r.id = rc.reward_id
 		 WHERE rc.user_id = ?
@@ -1122,9 +1388,10 @@ func (s *Store) ListCommitmentsForUser(ctx context.Context, userID int64) ([]mod
 	for rows.Next() {
 		var c model.RewardCommitment
 		var redeemedAt, cancelledAt sql.NullTime
+		var poolID sql.NullInt64
 		if err := rows.Scan(&c.ID, &c.UserID, &c.RewardID, &c.RewardName, &c.RewardIcon,
 			&c.TargetCost, &c.AutoContributePercent, &c.Status, &c.CreatedAt,
-			&redeemedAt, &cancelledAt); err != nil {
+			&redeemedAt, &cancelledAt, &poolID); err != nil {
 			return nil, err
 		}
 		if redeemedAt.Valid {
@@ -1132,6 +1399,10 @@ func (s *Store) ListCommitmentsForUser(ctx context.Context, userID int64) ([]mod
 		}
 		if cancelledAt.Valid {
 			c.CancelledAt = &cancelledAt.Time
+		}
+		if poolID.Valid {
+			id := poolID.Int64
+			c.SharedPoolID = &id
 		}
 		out = append(out, c)
 	}
@@ -1146,10 +1417,12 @@ func (s *Store) ListCommitmentsForUser(ctx context.Context, userID int64) ([]mod
 	return out, nil
 }
 
-// CreateCommitment opens a new active commitment for the user, snapshotting
-// the reward's effective cost as the target. The kid keeps that price even if
-// admins later raise the reward's cost. Returns ErrActiveCommitmentExists if
-// the user already has an active commitment.
+// CreateCommitment opens a new active commitment for the user. For personal
+// (non-shareable) rewards it snapshots the per-user effective cost as the
+// target and refuses if the kid already has a personal goal. For shareable
+// rewards it creates the shared pool on demand (snapshotting the base cost
+// once for everyone) and joins the kid in — with no impact on their personal
+// goal slot.
 func (s *Store) CreateCommitment(ctx context.Context, userID, rewardID int64, autoPercent int) (*model.RewardCommitment, error) {
 	if autoPercent < 0 || autoPercent > 100 {
 		return nil, fmt.Errorf("auto_contribute_percent must be between 0 and 100")
@@ -1161,28 +1434,19 @@ func (s *Store) CreateCommitment(ctx context.Context, userID, rewardID int64, au
 	}
 	defer tx.Rollback()
 
-	// Refuse if user has an active commitment.
-	var existing int64
-	if err := tx.QueryRowContext(ctx,
-		`SELECT id FROM reward_commitments WHERE user_id = ? AND status = ?`,
-		userID, model.CommitmentActive).Scan(&existing); err == nil {
-		return nil, ErrActiveCommitmentExists
-	} else if err != sql.ErrNoRows {
-		return nil, err
-	}
-
-	// Snapshot the cost the kid sees (per-user override or base cost).
 	var baseCost int
-	var active int
+	var active, shareable int
 	if err := tx.QueryRowContext(ctx,
-		`SELECT cost, active FROM rewards WHERE id = ?`, rewardID).Scan(&baseCost, &active); err != nil {
+		`SELECT cost, active, shareable FROM rewards WHERE id = ?`, rewardID).
+		Scan(&baseCost, &active, &shareable); err != nil {
 		return nil, fmt.Errorf("reward not found")
 	}
 	if active != 1 {
 		return nil, fmt.Errorf("reward is not active")
 	}
 
-	// Honour assignments + per-user pricing.
+	// Honour assignments — applies to both shareable and personal rewards so
+	// admins can scope a family goal to a subset of kids if they want.
 	var hasAssignments bool
 	if err := tx.QueryRowContext(ctx,
 		`SELECT EXISTS(SELECT 1 FROM reward_assignments WHERE reward_id = ?)`, rewardID).
@@ -1200,32 +1464,139 @@ func (s *Store) CreateCommitment(ctx context.Context, userID, rewardID int64, au
 			return nil, fmt.Errorf("reward is not available to you")
 		}
 	}
-	target := baseCost
-	var customCost sql.NullInt64
-	tx.QueryRowContext(ctx,
-		`SELECT custom_cost FROM reward_assignments WHERE reward_id = ? AND user_id = ?`,
-		rewardID, userID).Scan(&customCost)
-	if customCost.Valid {
-		target = int(customCost.Int64)
-	}
 
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO reward_commitments (user_id, reward_id, target_cost, auto_contribute_percent)
-		 VALUES (?, ?, ?, ?)`,
-		userID, rewardID, target, autoPercent); err != nil {
-		return nil, err
+	var commitmentID int64
+
+	if shareable == 1 {
+		// Find or create the active shared pool for this reward.
+		var poolID int64
+		var poolTarget int
+		err := tx.QueryRowContext(ctx,
+			`SELECT id, target_cost FROM shared_commitment_pools
+			 WHERE reward_id = ? AND status = ?`,
+			rewardID, model.CommitmentActive).Scan(&poolID, &poolTarget)
+		if err == sql.ErrNoRows {
+			// First contributor opens the pool. Snapshot the base cost so
+			// admins changing the price mid-pool can't punish the savers.
+			// Per-user pricing (custom_cost) is intentionally NOT applied to
+			// shared pools — one cost for the shared goal.
+			res, err := tx.ExecContext(ctx,
+				`INSERT INTO shared_commitment_pools (reward_id, target_cost) VALUES (?, ?)`,
+				rewardID, baseCost)
+			if err != nil {
+				return nil, err
+			}
+			poolID, _ = res.LastInsertId()
+			poolTarget = baseCost
+		} else if err != nil {
+			return nil, err
+		}
+
+		// Block double-join (and the partial unique index would too).
+		var existing int64
+		if err := tx.QueryRowContext(ctx,
+			`SELECT id FROM reward_commitments
+			 WHERE user_id = ? AND shared_pool_id = ? AND status = ?`,
+			userID, poolID, model.CommitmentActive).Scan(&existing); err == nil {
+			return nil, fmt.Errorf("you've already joined this family goal")
+		} else if err != sql.ErrNoRows {
+			return nil, err
+		}
+
+		res, err := tx.ExecContext(ctx,
+			`INSERT INTO reward_commitments (user_id, reward_id, target_cost, auto_contribute_percent, shared_pool_id)
+			 VALUES (?, ?, ?, ?, ?)`,
+			userID, rewardID, poolTarget, autoPercent, poolID)
+		if err != nil {
+			return nil, err
+		}
+		commitmentID, _ = res.LastInsertId()
+	} else {
+		// Personal: refuse if user has an active personal commitment.
+		var existing int64
+		if err := tx.QueryRowContext(ctx,
+			`SELECT id FROM reward_commitments
+			 WHERE user_id = ? AND status = ? AND shared_pool_id IS NULL`,
+			userID, model.CommitmentActive).Scan(&existing); err == nil {
+			return nil, ErrActiveCommitmentExists
+		} else if err != sql.ErrNoRows {
+			return nil, err
+		}
+
+		target := baseCost
+		var customCost sql.NullInt64
+		tx.QueryRowContext(ctx,
+			`SELECT custom_cost FROM reward_assignments WHERE reward_id = ? AND user_id = ?`,
+			rewardID, userID).Scan(&customCost)
+		if customCost.Valid {
+			target = int(customCost.Int64)
+		}
+
+		res, err := tx.ExecContext(ctx,
+			`INSERT INTO reward_commitments (user_id, reward_id, target_cost, auto_contribute_percent)
+			 VALUES (?, ?, ?, ?)`,
+			userID, rewardID, target, autoPercent)
+		if err != nil {
+			return nil, err
+		}
+		commitmentID, _ = res.LastInsertId()
 	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return s.GetActiveCommitmentForUser(ctx, userID)
+	return s.GetCommitment(ctx, commitmentID)
+}
+
+// GetCommitment loads a single commitment by id, with reward metadata and
+// derived AmountSaved (and Pool, for shared shares).
+func (s *Store) GetCommitment(ctx context.Context, commitmentID int64) (*model.RewardCommitment, error) {
+	c := &model.RewardCommitment{}
+	var redeemedAt, cancelledAt sql.NullTime
+	var poolID sql.NullInt64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT rc.id, rc.user_id, rc.reward_id, r.name, r.icon, rc.target_cost,
+		        rc.auto_contribute_percent, rc.status, rc.created_at,
+		        rc.redeemed_at, rc.cancelled_at, rc.shared_pool_id
+		 FROM reward_commitments rc
+		 JOIN rewards r ON r.id = rc.reward_id
+		 WHERE rc.id = ?`, commitmentID).
+		Scan(&c.ID, &c.UserID, &c.RewardID, &c.RewardName, &c.RewardIcon, &c.TargetCost,
+			&c.AutoContributePercent, &c.Status, &c.CreatedAt, &redeemedAt, &cancelledAt, &poolID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if redeemedAt.Valid {
+		c.RedeemedAt = &redeemedAt.Time
+	}
+	if cancelledAt.Valid {
+		c.CancelledAt = &cancelledAt.Time
+	}
+	if poolID.Valid {
+		id := poolID.Int64
+		c.SharedPoolID = &id
+	}
+	if err := s.hydrateCommitmentSaved(ctx, s.db, c); err != nil {
+		return nil, err
+	}
+	if c.SharedPoolID != nil {
+		pool, err := s.GetSharedPool(ctx, *c.SharedPoolID)
+		if err != nil {
+			return nil, err
+		}
+		c.Pool = pool
+	}
+	return c, nil
 }
 
 // ContributeToCommitment moves `amount` points from the user's spendable
-// balance into their active commitment. The amount is capped at the
-// commitment's remaining target so kids can't over-fund. Returns an error if
-// spendable balance is insufficient.
+// balance into their active commitment. The amount is capped so kids can't
+// over-fund: for personal goals it caps at the row's remaining target, for
+// shared shares it caps at the pool's remaining target (so the last kid in
+// can't push the pool past 100%).
 func (s *Store) ContributeToCommitment(ctx context.Context, userID, commitmentID int64, amount int) error {
 	if amount <= 0 {
 		return fmt.Errorf("amount must be positive")
@@ -1239,9 +1610,10 @@ func (s *Store) ContributeToCommitment(ctx context.Context, userID, commitmentID
 	var ownerID int64
 	var status string
 	var target int
+	var poolID sql.NullInt64
 	if err := tx.QueryRowContext(ctx,
-		`SELECT user_id, status, target_cost FROM reward_commitments WHERE id = ?`,
-		commitmentID).Scan(&ownerID, &status, &target); err != nil {
+		`SELECT user_id, status, target_cost, shared_pool_id FROM reward_commitments WHERE id = ?`,
+		commitmentID).Scan(&ownerID, &status, &target, &poolID); err != nil {
 		return fmt.Errorf("commitment not found")
 	}
 	if ownerID != userID {
@@ -1251,16 +1623,36 @@ func (s *Store) ContributeToCommitment(ctx context.Context, userID, commitmentID
 		return fmt.Errorf("commitment is not active")
 	}
 
-	var saved int
-	if err := tx.QueryRowContext(ctx,
-		`SELECT COALESCE(-SUM(amount), 0) FROM point_transactions
-		 WHERE reference_id = ? AND reason IN (?, ?)`,
-		commitmentID, model.ReasonCommitToGoal, model.ReasonGoalBreak).Scan(&saved); err != nil {
-		return err
+	var remaining int
+	if poolID.Valid {
+		var poolTarget, poolSaved int
+		if err := tx.QueryRowContext(ctx,
+			`SELECT target_cost FROM shared_commitment_pools WHERE id = ?`, poolID.Int64).
+			Scan(&poolTarget); err != nil {
+			return err
+		}
+		if err := tx.QueryRowContext(ctx,
+			`SELECT COALESCE(-SUM(pt.amount), 0)
+			 FROM point_transactions pt
+			 JOIN reward_commitments rc ON rc.id = pt.reference_id
+			 WHERE rc.shared_pool_id = ? AND rc.status = ? AND pt.reason IN (?, ?)`,
+			poolID.Int64, model.CommitmentActive, model.ReasonCommitToGoal, model.ReasonGoalBreak).
+			Scan(&poolSaved); err != nil {
+			return err
+		}
+		remaining = poolTarget - poolSaved
+	} else {
+		var saved int
+		if err := tx.QueryRowContext(ctx,
+			`SELECT COALESCE(-SUM(amount), 0) FROM point_transactions
+			 WHERE reference_id = ? AND reason IN (?, ?)`,
+			commitmentID, model.ReasonCommitToGoal, model.ReasonGoalBreak).Scan(&saved); err != nil {
+			return err
+		}
+		remaining = target - saved
 	}
-	remaining := target - saved
 	if remaining <= 0 {
-		return fmt.Errorf("commitment is already fully funded")
+		return fmt.Errorf("goal is already fully funded")
 	}
 	if amount > remaining {
 		amount = remaining
@@ -1353,56 +1745,100 @@ func (s *Store) BreakCommitment(ctx context.Context, userID, commitmentID int64)
 	return tx.Commit()
 }
 
-// applyAutoContributeTx auto-routes a fraction of a chore credit into the
-// user's active commitment, capped at the commitment's remaining target. A
-// no-op when there's no active commitment, percent is zero, or the
-// commitment is already fully funded.
+// applyAutoContributeTx auto-routes a fraction of a chore credit into each
+// of the user's active commitments (personal first, then shared shares in
+// join order). Each commitment is capped at its remaining target — for
+// shared shares the cap is the *pool's* remaining capacity so the last kid
+// in can't push the pool past 100%. Stops when the credit is exhausted.
 func (s *Store) applyAutoContributeTx(ctx context.Context, tx *sql.Tx, userID, completionID int64, creditAmount int) error {
 	if creditAmount <= 0 {
 		return nil
 	}
-	var commitmentID int64
-	var pct int
-	var target int
-	err := tx.QueryRowContext(ctx,
-		`SELECT id, auto_contribute_percent, target_cost FROM reward_commitments
-		 WHERE user_id = ? AND status = ?`,
-		userID, model.CommitmentActive).Scan(&commitmentID, &pct, &target)
-	if err == sql.ErrNoRows {
-		return nil
-	}
+	rows, err := tx.QueryContext(ctx,
+		`SELECT id, auto_contribute_percent, target_cost, shared_pool_id
+		 FROM reward_commitments
+		 WHERE user_id = ? AND status = ?
+		 ORDER BY shared_pool_id IS NULL DESC, created_at ASC`,
+		userID, model.CommitmentActive)
 	if err != nil {
 		return err
 	}
-	if pct <= 0 {
-		return nil
+	type slot struct {
+		id     int64
+		pct    int
+		target int
+		poolID sql.NullInt64
 	}
-
-	var saved int
-	if err := tx.QueryRowContext(ctx,
-		`SELECT COALESCE(-SUM(amount), 0) FROM point_transactions
-		 WHERE reference_id = ? AND reason IN (?, ?)`,
-		commitmentID, model.ReasonCommitToGoal, model.ReasonGoalBreak).Scan(&saved); err != nil {
+	var slots []slot
+	for rows.Next() {
+		var s slot
+		if err := rows.Scan(&s.id, &s.pct, &s.target, &s.poolID); err != nil {
+			rows.Close()
+			return err
+		}
+		slots = append(slots, s)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
 		return err
 	}
-	remaining := target - saved
-	if remaining <= 0 {
-		return nil
-	}
-	contribution := creditAmount * pct / 100
-	if contribution <= 0 {
-		return nil
-	}
-	if contribution > remaining {
-		contribution = remaining
-	}
 
+	creditLeft := creditAmount
 	note := fmt.Sprintf("auto:completion:%d", completionID)
-	_, err = tx.ExecContext(ctx,
-		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
-		 VALUES (?, ?, ?, ?, ?)`,
-		userID, -contribution, model.ReasonCommitToGoal, commitmentID, note)
-	return err
+	for _, sl := range slots {
+		if sl.pct <= 0 || creditLeft <= 0 {
+			continue
+		}
+		var remaining int
+		if sl.poolID.Valid {
+			var poolTarget, poolSaved int
+			if err := tx.QueryRowContext(ctx,
+				`SELECT target_cost FROM shared_commitment_pools WHERE id = ?`, sl.poolID.Int64).
+				Scan(&poolTarget); err != nil {
+				return err
+			}
+			if err := tx.QueryRowContext(ctx,
+				`SELECT COALESCE(-SUM(pt.amount), 0)
+				 FROM point_transactions pt
+				 JOIN reward_commitments rc ON rc.id = pt.reference_id
+				 WHERE rc.shared_pool_id = ? AND rc.status = ? AND pt.reason IN (?, ?)`,
+				sl.poolID.Int64, model.CommitmentActive, model.ReasonCommitToGoal, model.ReasonGoalBreak).
+				Scan(&poolSaved); err != nil {
+				return err
+			}
+			remaining = poolTarget - poolSaved
+		} else {
+			var saved int
+			if err := tx.QueryRowContext(ctx,
+				`SELECT COALESCE(-SUM(amount), 0) FROM point_transactions
+				 WHERE reference_id = ? AND reason IN (?, ?)`,
+				sl.id, model.ReasonCommitToGoal, model.ReasonGoalBreak).Scan(&saved); err != nil {
+				return err
+			}
+			remaining = sl.target - saved
+		}
+		if remaining <= 0 {
+			continue
+		}
+		contribution := creditAmount * sl.pct / 100
+		if contribution <= 0 {
+			continue
+		}
+		if contribution > remaining {
+			contribution = remaining
+		}
+		if contribution > creditLeft {
+			contribution = creditLeft
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+			 VALUES (?, ?, ?, ?, ?)`,
+			userID, -contribution, model.ReasonCommitToGoal, sl.id, note); err != nil {
+			return err
+		}
+		creditLeft -= contribution
+	}
+	return nil
 }
 
 // reverseAutoContributeTx reverses any auto-contributions tied to this
@@ -1660,15 +2096,46 @@ func (s *Store) UndoRedemption(ctx context.Context, redemptionID int64) error {
 	// goal_break we emitted at redeem time and reactivate the commitment so
 	// the saved points sit in the goal again. We identify the commitment by
 	// the surviving commit_to_goal rows for (this user, this reward).
+	//
+	// Shared pools are intentionally restricted to per-kid refund only: the
+	// pool stays redeemed (other contributors have their own redemptions and
+	// the reward is presumed delivered), and the kid's commitment row goes
+	// back to a quasi-cancelled state. This keeps the half-state from
+	// getting weirder than it needs to.
 	var commitmentID int64
+	var commitmentPoolID sql.NullInt64
 	err = tx.QueryRowContext(ctx,
-		`SELECT id FROM reward_commitments
+		`SELECT id, shared_pool_id FROM reward_commitments
 		 WHERE user_id = ? AND reward_id = ? AND status = ?`,
-		userID, rewardID, model.CommitmentRedeemed).Scan(&commitmentID)
+		userID, rewardID, model.CommitmentRedeemed).Scan(&commitmentID, &commitmentPoolID)
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
-	if commitmentID != 0 {
+	if commitmentID != 0 && commitmentPoolID.Valid {
+		// Shared share: drop the redemption-time goal_break (note='redeemed
+		// via family goal') so net spendable change for this kid is +pointsSpent
+		// and mark the commitment cancelled so it doesn't show as active.
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM point_transactions
+			 WHERE reason = ? AND reference_id = ? AND note = 'redeemed via family goal'`,
+			model.ReasonGoalBreak, commitmentID); err != nil {
+			return err
+		}
+		// Refund the kid's spent share to spendable.
+		if pointsSpent > 0 {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+				 VALUES (?, ?, ?, ?, 'undo shared redemption refund')`,
+				userID, pointsSpent, model.ReasonGoalBreak, commitmentID); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE reward_commitments SET status = ?, redeemed_at = NULL, cancelled_at = CURRENT_TIMESTAMP WHERE id = ?`,
+			model.CommitmentCancelled, commitmentID); err != nil {
+			return err
+		}
+	} else if commitmentID != 0 {
 		// Drop the redemption-time goal_break so the saved points sit in the
 		// commitment again, and try to flip the commitment back to active.
 		// If the kid started a new active commitment in the meantime we can't
@@ -1680,9 +2147,12 @@ func (s *Store) UndoRedemption(ctx context.Context, redemptionID int64) error {
 			model.ReasonGoalBreak, commitmentID); err != nil {
 			return err
 		}
+		// Only personal-active conflicts here — shared shares don't compete
+		// for the personal slot, so multiple actives can coexist.
 		var otherActive int
 		if err := tx.QueryRowContext(ctx,
-			`SELECT COUNT(1) FROM reward_commitments WHERE user_id = ? AND status = ? AND id != ?`,
+			`SELECT COUNT(1) FROM reward_commitments
+			 WHERE user_id = ? AND status = ? AND shared_pool_id IS NULL AND id != ?`,
 			userID, model.CommitmentActive, commitmentID).Scan(&otherActive); err != nil {
 			return err
 		}

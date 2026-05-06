@@ -1216,6 +1216,48 @@
   gap: 0.75rem;
 }
 
+/* Shared family goal card uses a teal accent so it's visually distinct from
+   the kid's personal goal at a glance. */
+.goalCardShared {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.12), rgba(56, 189, 248, 0.08));
+  border-color: rgba(34, 211, 238, 0.3);
+}
+
+.contributorList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  margin-top: -0.25rem;
+}
+
+.contributorChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+}
+
+.contributorChip strong {
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+.contributorChipMe {
+  background: rgba(34, 211, 238, 0.18);
+  border-color: rgba(34, 211, 238, 0.35);
+  color: #a5f3fc;
+}
+
+.contributorChipMe strong {
+  color: white;
+}
+
 .goalHeader {
   display: flex;
   align-items: center;

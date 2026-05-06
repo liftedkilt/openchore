@@ -49,6 +49,7 @@ func (h *RewardHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Icon        string `json:"icon"`
 		Cost        int    `json:"cost"`
 		Stock       *int   `json:"stock"`
+		Shareable   bool   `json:"shareable"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -66,6 +67,7 @@ func (h *RewardHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Cost:        req.Cost,
 		Stock:       req.Stock,
 		Active:      true,
+		Shareable:   req.Shareable,
 		CreatedBy:   user.ID,
 	}
 	if err := h.store.CreateReward(r.Context(), reward); err != nil {
@@ -93,6 +95,7 @@ func (h *RewardHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Cost        *int    `json:"cost"`
 		Stock       *int    `json:"stock"`
 		Active      *bool   `json:"active"`
+		Shareable   *bool   `json:"shareable"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -115,6 +118,9 @@ func (h *RewardHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Active != nil {
 		existing.Active = *req.Active
+	}
+	if req.Shareable != nil {
+		existing.Shareable = *req.Shareable
 	}
 	if err := h.store.UpdateReward(r.Context(), existing); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update reward")
@@ -292,7 +298,7 @@ func (h *RewardHandler) Contribute(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	c, err := h.store.GetActiveCommitmentForUser(r.Context(), user.ID)
+	c, err := h.store.GetCommitment(r.Context(), id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to reload commitment")
 		return
@@ -318,7 +324,7 @@ func (h *RewardHandler) SetAutoContribute(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	c, err := h.store.GetActiveCommitmentForUser(r.Context(), user.ID)
+	c, err := h.store.GetCommitment(r.Context(), id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to reload commitment")
 		return
@@ -338,4 +344,25 @@ func (h *RewardHandler) BreakCommitment(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// GetSharedPool returns the up-to-date pool details: target, total saved,
+// and per-contributor breakdown for the leaderboard. Used by kids' clients
+// to refresh after a sibling adds points.
+func (h *RewardHandler) GetSharedPool(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid pool id")
+		return
+	}
+	pool, err := h.store.GetSharedPool(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load pool")
+		return
+	}
+	if pool == nil {
+		writeError(w, http.StatusNotFound, "pool not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, pool)
 }

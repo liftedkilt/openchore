@@ -1,4 +1,4 @@
-import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardAssignment, RewardRedemption, RewardCommitment, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from './types';
+import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardAssignment, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from './types';
 
 const API_BASE = '/api';
 
@@ -253,6 +253,7 @@ export const api = {
       }),
     break: (commitmentId: number) =>
       fetchWithAuth(`/commitments/${commitmentId}`, { method: 'DELETE' }),
+    getPool: (poolId: number) => fetchWithAuth<SharedCommitmentPool>(`/pools/${poolId}`),
   },
   streaks: {
     getForUser: (userId: number) => fetchWithAuth<UserStreakData>(`/users/${userId}/streak`),
