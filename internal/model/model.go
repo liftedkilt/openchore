@@ -29,6 +29,15 @@ const (
 	ReasonExpiryPenalty   = "expiry_penalty"
 	ReasonPointsDecay     = "points_decay"
 	ReasonMissedChore     = "missed_chore"
+	ReasonCommitToGoal    = "commit_to_goal"
+	ReasonGoalBreak       = "goal_break"
+)
+
+// Commitment statuses
+const (
+	CommitmentActive    = "active"
+	CommitmentRedeemed  = "redeemed"
+	CommitmentCancelled = "cancelled"
 )
 
 // Photo source modes
@@ -165,6 +174,24 @@ type RewardRedemption struct {
 	UserID      int64     `json:"user_id"`
 	PointsSpent int       `json:"points_spent"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+// RewardCommitment represents a kid earmarking points toward a chosen reward.
+// AmountSaved is derived from point_transactions referencing this commitment
+// and is populated by the store layer (not stored on the row itself).
+type RewardCommitment struct {
+	ID                    int64      `json:"id"`
+	UserID                int64      `json:"user_id"`
+	RewardID              int64      `json:"reward_id"`
+	RewardName            string     `json:"reward_name,omitempty"`
+	RewardIcon            string     `json:"reward_icon,omitempty"`
+	TargetCost            int        `json:"target_cost"`
+	AmountSaved           int        `json:"amount_saved"`
+	AutoContributePercent int        `json:"auto_contribute_percent"`
+	Status                string     `json:"status"`
+	CreatedAt             time.Time  `json:"created_at"`
+	RedeemedAt            *time.Time `json:"redeemed_at,omitempty"`
+	CancelledAt           *time.Time `json:"cancelled_at,omitempty"`
 }
 
 // --- Streaks ---

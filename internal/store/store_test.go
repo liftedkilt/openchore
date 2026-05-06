@@ -2458,3 +2458,250 @@ func TestNullIdempotencyKeysAreNotUnique(t *testing.T) {
 		t.Errorf("expected 2 chore-credit rows with NULL keys, got %d", creditCount)
 	}
 }
+
+// ===== Reward Commitments =====
+
+func TestCommitmentManualSaveAndRedeem(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	kid := createTestUser(t, s, "Kid", "child")
+
+	// Big-ticket reward.
+	reward := &model.Reward{Name: "LEGO set", Cost: 500, Active: true, CreatedBy: parent.ID}
+	if err := s.CreateReward(ctx, reward); err != nil {
+		t.Fatalf("CreateReward: %v", err)
+	}
+
+	// Seed the kid with 700 points via an admin adjust so we don't need a chore.
+	if err := s.AdminAdjustPoints(ctx, kid.ID, 700, "test seed"); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	c, err := s.CreateCommitment(ctx, kid.ID, reward.ID, 0)
+	if err != nil {
+		t.Fatalf("CreateCommitment: %v", err)
+	}
+	if c.TargetCost != 500 {
+		t.Errorf("expected target_cost=500, got %d", c.TargetCost)
+	}
+	if c.AmountSaved != 0 {
+		t.Errorf("expected amount_saved=0 on fresh commitment, got %d", c.AmountSaved)
+	}
+
+	// A second active commitment for the same kid should be rejected.
+	if _, err := s.CreateCommitment(ctx, kid.ID, reward.ID, 0); err != store.ErrActiveCommitmentExists {
+		t.Errorf("expected ErrActiveCommitmentExists, got %v", err)
+	}
+
+	// Contribute 200 manually. Spendable should drop, saved should rise.
+	if err := s.ContributeToCommitment(ctx, kid.ID, c.ID, 200); err != nil {
+		t.Fatalf("ContributeToCommitment 200: %v", err)
+	}
+	bal, _ := s.GetPointBalance(ctx, kid.ID)
+	if bal != 500 {
+		t.Errorf("expected spendable 500 after 200 contribution, got %d", bal)
+	}
+	c, err = s.GetActiveCommitmentForUser(ctx, kid.ID)
+	if err != nil || c == nil {
+		t.Fatalf("GetActiveCommitmentForUser: %v / %v", err, c)
+	}
+	if c.AmountSaved != 200 {
+		t.Errorf("expected amount_saved=200, got %d", c.AmountSaved)
+	}
+
+	// Try to redeem before fully funded — should fail.
+	if _, err := s.RedeemReward(ctx, kid.ID, reward.ID); err == nil {
+		t.Errorf("expected redeem to fail before commitment is fully funded")
+	}
+
+	// Top up to target (300 more) — store should cap if asked for too much.
+	if err := s.ContributeToCommitment(ctx, kid.ID, c.ID, 1000); err != nil {
+		t.Fatalf("ContributeToCommitment top-up: %v", err)
+	}
+	c, _ = s.GetActiveCommitmentForUser(ctx, kid.ID)
+	if c.AmountSaved != 500 {
+		t.Errorf("expected saved capped at 500, got %d", c.AmountSaved)
+	}
+	bal, _ = s.GetPointBalance(ctx, kid.ID)
+	if bal != 200 {
+		t.Errorf("expected spendable 200 after full save, got %d", bal)
+	}
+
+	// Redeem now — should mark commitment redeemed and net spendable change to -500 across the
+	// whole flow (700 seeded → 200 spendable + 500 saved → 200 spendable + 0 saved + 1 redemption).
+	red, err := s.RedeemReward(ctx, kid.ID, reward.ID)
+	if err != nil {
+		t.Fatalf("RedeemReward: %v", err)
+	}
+	if red.PointsSpent != 500 {
+		t.Errorf("expected points_spent=500, got %d", red.PointsSpent)
+	}
+	bal, _ = s.GetPointBalance(ctx, kid.ID)
+	if bal != 200 {
+		t.Errorf("expected spendable 200 after redemption (unchanged), got %d", bal)
+	}
+	if got, _ := s.GetActiveCommitmentForUser(ctx, kid.ID); got != nil {
+		t.Errorf("expected no active commitment after redeem, got %+v", got)
+	}
+}
+
+func TestCommitmentBreakReturnsSavedToSpendable(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	kid := createTestUser(t, s, "Kid", "child")
+	reward := &model.Reward{Name: "Trip", Cost: 100, Active: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, reward)
+	s.AdminAdjustPoints(ctx, kid.ID, 80, "seed")
+
+	c, err := s.CreateCommitment(ctx, kid.ID, reward.ID, 0)
+	if err != nil {
+		t.Fatalf("CreateCommitment: %v", err)
+	}
+	if err := s.ContributeToCommitment(ctx, kid.ID, c.ID, 60); err != nil {
+		t.Fatalf("ContributeToCommitment: %v", err)
+	}
+
+	bal, _ := s.GetPointBalance(ctx, kid.ID)
+	if bal != 20 {
+		t.Errorf("expected spendable 20 after committing 60, got %d", bal)
+	}
+
+	if err := s.BreakCommitment(ctx, kid.ID, c.ID); err != nil {
+		t.Fatalf("BreakCommitment: %v", err)
+	}
+	bal, _ = s.GetPointBalance(ctx, kid.ID)
+	if bal != 80 {
+		t.Errorf("expected spendable 80 after break, got %d", bal)
+	}
+	if got, _ := s.GetActiveCommitmentForUser(ctx, kid.ID); got != nil {
+		t.Errorf("expected no active commitment after break, got %+v", got)
+	}
+	// A new commitment should now be allowed.
+	if _, err := s.CreateCommitment(ctx, kid.ID, reward.ID, 0); err != nil {
+		t.Errorf("expected to be able to create a new commitment, got %v", err)
+	}
+}
+
+func TestAutoContributeOnChoreCredit(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	kid := createTestUser(t, s, "Kid", "child")
+	reward := &model.Reward{Name: "Bike", Cost: 1000, Active: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, reward)
+
+	c, err := s.CreateCommitment(ctx, kid.ID, reward.ID, 25)
+	if err != nil {
+		t.Fatalf("CreateCommitment: %v", err)
+	}
+
+	// Simulate a chore completion paying 40 points. 25% should auto-contribute.
+	chore := createTestChore(t, s, "Big chore", 40, parent.ID)
+	cs := createTestSchedule(t, s, chore.ID, kid.ID, 1)
+	cc := &model.ChoreCompletion{ChoreScheduleID: cs.ID, CompletedBy: kid.ID, Status: model.StatusApproved, CompletionDate: "2026-05-06"}
+	if err := s.CompleteChore(ctx, cc); err != nil {
+		t.Fatalf("CompleteChore: %v", err)
+	}
+	if err := s.CreditChorePoints(ctx, kid.ID, cc.ID, 40); err != nil {
+		t.Fatalf("CreditChorePoints: %v", err)
+	}
+
+	bal, _ := s.GetPointBalance(ctx, kid.ID)
+	if bal != 30 {
+		t.Errorf("expected spendable 30 (40 credit - 10 auto), got %d", bal)
+	}
+	got, err := s.GetActiveCommitmentForUser(ctx, kid.ID)
+	if err != nil || got == nil {
+		t.Fatalf("GetActiveCommitmentForUser: %v / %v", err, got)
+	}
+	if got.AmountSaved != 10 {
+		t.Errorf("expected amount_saved=10 (25%% of 40), got %d", got.AmountSaved)
+	}
+
+	// Uncomplete the chore — both the credit and the auto-contribution should reverse.
+	if err := s.DebitChorePoints(ctx, kid.ID, cc.ID, 40); err != nil {
+		t.Fatalf("DebitChorePoints: %v", err)
+	}
+	bal, _ = s.GetPointBalance(ctx, kid.ID)
+	if bal != 0 {
+		t.Errorf("expected spendable 0 after uncomplete, got %d", bal)
+	}
+	got, _ = s.GetActiveCommitmentForUser(ctx, kid.ID)
+	if got.AmountSaved != 0 {
+		t.Errorf("expected amount_saved=0 after auto-revert, got %d", got.AmountSaved)
+	}
+
+	// Idempotency: calling DebitChorePoints again must not over-credit savings back.
+	if err := s.DebitChorePoints(ctx, kid.ID, cc.ID, 40); err != nil {
+		t.Fatalf("DebitChorePoints again: %v", err)
+	}
+	got, _ = s.GetActiveCommitmentForUser(ctx, kid.ID)
+	if got.AmountSaved != 0 {
+		t.Errorf("expected amount_saved still 0 after duplicate uncomplete, got %d", got.AmountSaved)
+	}
+	_ = c
+}
+
+func TestAutoContributeCapsAtTargetCost(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	kid := createTestUser(t, s, "Kid", "child")
+	reward := &model.Reward{Name: "Sticker", Cost: 5, Active: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, reward)
+	c, _ := s.CreateCommitment(ctx, kid.ID, reward.ID, 100)
+
+	chore := createTestChore(t, s, "Huge chore", 100, parent.ID)
+	cs := createTestSchedule(t, s, chore.ID, kid.ID, 1)
+	cc := &model.ChoreCompletion{ChoreScheduleID: cs.ID, CompletedBy: kid.ID, Status: model.StatusApproved, CompletionDate: "2026-05-06"}
+	s.CompleteChore(ctx, cc)
+	if err := s.CreditChorePoints(ctx, kid.ID, cc.ID, 100); err != nil {
+		t.Fatalf("CreditChorePoints: %v", err)
+	}
+
+	got, _ := s.GetActiveCommitmentForUser(ctx, kid.ID)
+	if got.AmountSaved != 5 {
+		t.Errorf("expected auto-contribute capped at target_cost 5, got %d", got.AmountSaved)
+	}
+	bal, _ := s.GetPointBalance(ctx, kid.ID)
+	if bal != 95 {
+		t.Errorf("expected spendable 95 after 5 was siphoned, got %d", bal)
+	}
+	_ = c
+}
+
+func TestCommitmentSnapshotsTargetCost(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	kid := createTestUser(t, s, "Kid", "child")
+	reward := &model.Reward{Name: "Toy", Cost: 100, Active: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, reward)
+
+	c, err := s.CreateCommitment(ctx, kid.ID, reward.ID, 0)
+	if err != nil {
+		t.Fatalf("CreateCommitment: %v", err)
+	}
+	if c.TargetCost != 100 {
+		t.Errorf("expected snapshotted target=100, got %d", c.TargetCost)
+	}
+
+	// Admin raises the price after the kid started saving.
+	reward.Cost = 200
+	if err := s.UpdateReward(ctx, reward); err != nil {
+		t.Fatalf("UpdateReward: %v", err)
+	}
+
+	// Refetch commitment — target_cost should still be the snapshotted value.
+	got, _ := s.GetActiveCommitmentForUser(ctx, kid.ID)
+	if got.TargetCost != 100 {
+		t.Errorf("expected target_cost still 100 (snapshotted), got %d", got.TargetCost)
+	}
+}

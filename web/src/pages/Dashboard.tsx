@@ -4,7 +4,7 @@ import { useTheme } from '../ThemeContext';
 import { api, APIError } from '../api';
 import type { ScheduledChore, UserStreakData, PointsData, Reward, RedemptionHistory, Theme } from '../types';
 import styles from './Dashboard.module.css';
-import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, KeyRound, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX, Undo2, Camera, Copy, Users } from 'lucide-react';
+import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, KeyRound, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX, Undo2, Camera, Copy, Users, Target, PiggyBank, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
@@ -178,6 +178,10 @@ export const Dashboard: React.FC = () => {
   const [redemptions, setRedemptions] = useState<RedemptionHistory[]>([]);
   const [redeemingId, setRedeemingId] = useState<number | null>(null);
   const [redeemedId, setRedeemedId] = useState<number | null>(null);
+  const [savingTowardId, setSavingTowardId] = useState<number | null>(null);
+  const [contributeAmount, setContributeAmount] = useState<string>('');
+  const [contributing, setContributing] = useState(false);
+  const [breakingGoal, setBreakingGoal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   // Per-schedule-id "request in flight" flag. Prevents double-POSTs when a
   // kid double-taps a chore tile (common on touchscreens), and lets us grey
@@ -348,12 +352,14 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleRedeem = async (reward: Reward) => {
-    if (!pointsData || pointsData.balance < reward.effective_cost) return;
+    if (!pointsData) return;
+    const commitment = pointsData.active_commitment;
+    const isCommittedReward = commitment && commitment.reward_id === reward.id;
+    if (!isCommittedReward && pointsData.balance < reward.effective_cost) return;
+    if (isCommittedReward && commitment.amount_saved < commitment.target_cost) return;
     setRedeemingId(reward.id);
     try {
       await api.rewards.redeem(reward.id);
-      // Optimistically update balance so it feels instant
-      setPointsData(prev => prev ? { ...prev, balance: prev.balance - reward.effective_cost } : prev);
       setRedeemingId(null);
       setRedeemedId(reward.id);
       confetti({
@@ -365,13 +371,88 @@ export const Dashboard: React.FC = () => {
       playComplete();
       if (navigator.vibrate) navigator.vibrate(50);
       showToast(`${reward.icon || '🎁'} ${reward.name} redeemed!`);
-      // Refresh real data in background
       await Promise.all([loadExtras(), loadRewards()]);
       setTimeout(() => setRedeemedId(null), 2000);
     } catch (e) {
       console.error('Redeem error:', e);
       setRedeemingId(null);
       showToast('Redemption failed — try again');
+    }
+  };
+
+  const handleSaveToward = async (reward: Reward) => {
+    if (!pointsData) return;
+    if (pointsData.active_commitment) {
+      showToast('You already have an active goal — finish or change it first');
+      return;
+    }
+    setSavingTowardId(reward.id);
+    try {
+      await api.commitments.commit(reward.id, 0);
+      showToast(`Saving toward ${reward.icon || '🎁'} ${reward.name}!`);
+      await loadExtras();
+    } catch (e) {
+      console.error('Save toward error:', e);
+      const msg = e instanceof APIError ? e.message : 'Could not start saving — try again';
+      showToast(msg);
+    } finally {
+      setSavingTowardId(null);
+    }
+  };
+
+  const handleContribute = async () => {
+    if (!pointsData?.active_commitment) return;
+    const amount = parseInt(contributeAmount, 10);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showToast('Enter a number of points to add');
+      return;
+    }
+    if (amount > pointsData.balance) {
+      showToast(`You only have ${pointsData.balance} spendable`);
+      return;
+    }
+    setContributing(true);
+    try {
+      await api.commitments.contribute(pointsData.active_commitment.id, amount);
+      setContributeAmount('');
+      await loadExtras();
+      showToast(`Saved ${amount} more!`);
+    } catch (e) {
+      console.error('Contribute error:', e);
+      const msg = e instanceof APIError ? e.message : 'Could not save — try again';
+      showToast(msg);
+    } finally {
+      setContributing(false);
+    }
+  };
+
+  const handleSetAutoContribute = async (percent: number) => {
+    if (!pointsData?.active_commitment) return;
+    // Optimistic so the slider feels responsive.
+    setPointsData(prev => prev && prev.active_commitment
+      ? { ...prev, active_commitment: { ...prev.active_commitment, auto_contribute_percent: percent } }
+      : prev);
+    try {
+      await api.commitments.setAutoContribute(pointsData.active_commitment.id, percent);
+    } catch (e) {
+      console.error('Auto-contribute error:', e);
+      await loadExtras();
+    }
+  };
+
+  const handleBreakCommitment = async () => {
+    if (!pointsData?.active_commitment) return;
+    if (!window.confirm('Stop saving? Your saved points will go back to your spendable balance.')) return;
+    setBreakingGoal(true);
+    try {
+      await api.commitments.break(pointsData.active_commitment.id);
+      await loadExtras();
+      showToast('Goal cancelled — points are back in your balance');
+    } catch (e) {
+      console.error('Break commitment error:', e);
+      showToast('Could not cancel goal — try again');
+    } finally {
+      setBreakingGoal(false);
     }
   };
 
@@ -822,16 +903,111 @@ export const Dashboard: React.FC = () => {
     );
   };
 
+  const renderGoalCard = () => {
+    const commitment = pointsData?.active_commitment;
+    if (!commitment) return null;
+    const pct = Math.min(100, Math.round((commitment.amount_saved / commitment.target_cost) * 100));
+    const fullyFunded = commitment.amount_saved >= commitment.target_cost;
+    const remaining = Math.max(0, commitment.target_cost - commitment.amount_saved);
+    return (
+      <div className={styles.goalCard}>
+        <div className={styles.goalHeader}>
+          <div className={styles.goalIcon}>{commitment.reward_icon || '🎯'}</div>
+          <div className={styles.goalTitleBlock}>
+            <div className={styles.goalLabel}>Saving toward</div>
+            <div className={styles.goalName}>{commitment.reward_name}</div>
+          </div>
+          {fullyFunded && <span className={styles.goalBadge}>Ready!</span>}
+        </div>
+        <div className={styles.goalAmounts}>
+          <span><strong>{commitment.amount_saved}</strong> / {commitment.target_cost} pts</span>
+          <span>{fullyFunded ? 'Fully funded 🎉' : `${remaining} to go`}</span>
+        </div>
+        <div className={styles.goalProgressTrack}>
+          <div
+            className={clsx(styles.goalProgressFill, fullyFunded && styles.goalProgressFillDone)}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+
+        <div className={styles.goalAuto}>
+          <PiggyBank size={14} />
+          <span className={styles.goalAutoLabel}>Auto-save</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={commitment.auto_contribute_percent}
+            onChange={e => handleSetAutoContribute(parseInt(e.target.value, 10))}
+            className={styles.goalAutoSlider}
+          />
+          <span className={styles.goalAutoValue}>{commitment.auto_contribute_percent}%</span>
+        </div>
+
+        {!fullyFunded && (
+          <div className={styles.goalContributeRow}>
+            <input
+              type="number"
+              min={1}
+              max={pointsData?.balance ?? 0}
+              placeholder={`Add points (max ${pointsData?.balance ?? 0})`}
+              value={contributeAmount}
+              onChange={e => setContributeAmount(e.target.value)}
+              className={styles.goalContributeInput}
+            />
+            <button
+              className={clsx(styles.goalBtn, styles.goalBtnPrimary)}
+              onClick={handleContribute}
+              disabled={contributing || !contributeAmount}
+              style={{ flex: '0 0 auto', minWidth: 90 }}
+            >
+              <Plus size={14} /> Save
+            </button>
+          </div>
+        )}
+
+        <div className={styles.goalActions}>
+          {fullyFunded && (
+            <button
+              className={clsx(styles.goalBtn, styles.goalBtnPrimary)}
+              onClick={() => {
+                const r = rewards.find(x => x.id === commitment.reward_id);
+                if (r) handleRedeem(r);
+              }}
+              disabled={redeemingId === commitment.reward_id}
+            >
+              <Gift size={14} /> Redeem now
+            </button>
+          )}
+          <button
+            className={clsx(styles.goalBtn, styles.goalBtnDanger)}
+            onClick={handleBreakCommitment}
+            disabled={breakingGoal}
+          >
+            <X size={14} /> Stop saving
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   const renderRewardsView = () => {
     const balance = pointsData?.balance ?? 0;
+    const committed = pointsData?.committed ?? 0;
+    const commitment = pointsData?.active_commitment;
 
     return (
       <div className={styles.rewardsView}>
         <div className={styles.rewardsBalance}>
           <Star size={20} className={styles.rewardsBalanceIcon} />
           <span className={styles.rewardsBalanceAmount}>{balance}</span>
-          <span className={styles.rewardsBalanceLabel}>points available</span>
+          <span className={styles.rewardsBalanceLabel}>
+            spendable{committed > 0 ? ` · ${committed} saved` : ''}
+          </span>
         </div>
+
+        {renderGoalCard()}
 
         {rewards.length === 0 ? (
           <div className={styles.empty}>
@@ -842,15 +1018,22 @@ export const Dashboard: React.FC = () => {
         ) : (
           <div className={styles.rewardsGrid}>
             {rewards.map(reward => {
+              const isCommittedReward = !!(commitment && commitment.reward_id === reward.id);
               const canAfford = balance >= reward.effective_cost;
+              const fullyFunded = isCommittedReward && commitment!.amount_saved >= commitment!.target_cost;
               const outOfStock = reward.stock !== null && reward.stock !== undefined && reward.stock <= 0;
               const isRedeeming = redeemingId === reward.id;
+              const isSaving = savingTowardId === reward.id;
+              const showSaveToward = !commitment && reward.effective_cost > balance;
 
               return (
-                <div key={reward.id} className={clsx(styles.rewardCard, !canAfford && styles.rewardCardLocked)}>
+                <div key={reward.id} className={clsx(styles.rewardCard, !canAfford && !isCommittedReward && styles.rewardCardLocked)}>
                   {reward.icon && <div className={styles.rewardIcon}>{reward.icon}</div>}
                   <div className={styles.rewardInfo}>
-                    <h3 className={styles.rewardName}>{reward.name}</h3>
+                    <h3 className={styles.rewardName}>
+                      {reward.name}
+                      {isCommittedReward && <> <span className={styles.goalBadge}><Target size={10} /> goal</span></>}
+                    </h3>
                     {reward.description && (
                       <p className={styles.rewardDesc}>{reward.description}</p>
                     )}
@@ -865,17 +1048,38 @@ export const Dashboard: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <button
-                    className={clsx(
-                      styles.redeemBtn,
-                      canAfford && !outOfStock && styles.redeemBtnActive,
-                      redeemedId === reward.id && styles.redeemBtnSuccess
+                  <div className={styles.rewardActions}>
+                    <button
+                      className={clsx(
+                        styles.redeemBtn,
+                        ((isCommittedReward && fullyFunded) || (!isCommittedReward && canAfford)) && !outOfStock && styles.redeemBtnActive,
+                        redeemedId === reward.id && styles.redeemBtnSuccess
+                      )}
+                      disabled={(isCommittedReward ? !fullyFunded : !canAfford) || outOfStock || isRedeeming || redeemedId === reward.id}
+                      onClick={() => handleRedeem(reward)}
+                    >
+                      {redeemedId === reward.id
+                        ? <><CheckCircle size={14} /> Redeemed!</>
+                        : isRedeeming
+                          ? '...'
+                          : outOfStock
+                            ? 'Gone'
+                            : isCommittedReward
+                              ? (fullyFunded ? 'Redeem' : `${commitment!.amount_saved}/${commitment!.target_cost}`)
+                              : canAfford
+                                ? 'Redeem'
+                                : `Need ${reward.effective_cost - balance}`}
+                    </button>
+                    {showSaveToward && !outOfStock && (
+                      <button
+                        className={styles.saveTowardBtn}
+                        onClick={() => handleSaveToward(reward)}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? '...' : <><Target size={12} /> Save toward</>}
+                      </button>
                     )}
-                    disabled={!canAfford || outOfStock || isRedeeming || redeemedId === reward.id}
-                    onClick={() => handleRedeem(reward)}
-                  >
-                    {redeemedId === reward.id ? <><CheckCircle size={14} /> Redeemed!</> : isRedeeming ? '...' : outOfStock ? 'Gone' : canAfford ? 'Redeem' : `Need ${reward.effective_cost - balance}`}
-                  </button>
+                  </div>
                 </div>
               );
             })}
@@ -971,6 +1175,38 @@ export const Dashboard: React.FC = () => {
       )}
     </div>
   );
+
+  // Lightweight banner that nudges the kid toward their goal from the daily
+  // view. Tap it to jump to the rewards tab where they can save more or
+  // redeem when fully funded.
+  const renderGoalBanner = () => {
+    const c = pointsData?.active_commitment;
+    if (!c) return null;
+    const pct = Math.min(100, Math.round((c.amount_saved / c.target_cost) * 100));
+    const fullyFunded = c.amount_saved >= c.target_cost;
+    return (
+      <div className={styles.goalCard} onClick={() => setView('rewards')} role="button" tabIndex={0}>
+        <div className={styles.goalHeader}>
+          <div className={styles.goalIcon}>{c.reward_icon || '🎯'}</div>
+          <div className={styles.goalTitleBlock}>
+            <div className={styles.goalLabel}>Saving toward</div>
+            <div className={styles.goalName}>{c.reward_name}</div>
+          </div>
+          {fullyFunded && <span className={styles.goalBadge}>Ready!</span>}
+        </div>
+        <div className={styles.goalAmounts}>
+          <span><strong>{c.amount_saved}</strong> / {c.target_cost} pts</span>
+          <span>{fullyFunded ? 'Tap to redeem 🎉' : `${c.target_cost - c.amount_saved} to go`}</span>
+        </div>
+        <div className={styles.goalProgressTrack}>
+          <div
+            className={clsx(styles.goalProgressFill, fullyFunded && styles.goalProgressFillDone)}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+    );
+  };
 
   // Streak milestone banner
   const renderStreakBanner = () => {
@@ -1134,6 +1370,7 @@ export const Dashboard: React.FC = () => {
         <>
           {view === 'daily' && renderProgressBar()}
           {view === 'daily' && renderPointsSummary()}
+          {view === 'daily' && renderGoalBanner()}
           {view === 'daily' && renderStreakBanner()}
 
           <nav className={styles.nav}>

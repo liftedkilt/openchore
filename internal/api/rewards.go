@@ -228,3 +228,114 @@ func (h *RewardHandler) ListRedemptions(w http.ResponseWriter, r *http.Request) 
 	}
 	writeJSON(w, http.StatusOK, redemptions)
 }
+
+// --- Commitments ---
+
+func (h *RewardHandler) ListCommitments(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+	commitments, err := h.store.ListCommitmentsForUser(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list commitments")
+		return
+	}
+	if commitments == nil {
+		commitments = []model.RewardCommitment{}
+	}
+	writeJSON(w, http.StatusOK, commitments)
+}
+
+func (h *RewardHandler) Commit(w http.ResponseWriter, r *http.Request) {
+	rewardID, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid reward id")
+		return
+	}
+	var req struct {
+		AutoContributePercent int `json:"auto_contribute_percent"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		// Body is optional; default to 0%.
+		req.AutoContributePercent = 0
+	}
+	user := UserFromContext(r.Context())
+	c, err := h.store.CreateCommitment(r.Context(), user.ID, rewardID, req.AutoContributePercent)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, c)
+}
+
+func (h *RewardHandler) Contribute(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid commitment id")
+		return
+	}
+	var req struct {
+		Amount int `json:"amount"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Amount <= 0 {
+		writeError(w, http.StatusBadRequest, "amount must be positive")
+		return
+	}
+	user := UserFromContext(r.Context())
+	if err := h.store.ContributeToCommitment(r.Context(), user.ID, id, req.Amount); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	c, err := h.store.GetActiveCommitmentForUser(r.Context(), user.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to reload commitment")
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
+}
+
+func (h *RewardHandler) SetAutoContribute(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid commitment id")
+		return
+	}
+	var req struct {
+		Percent int `json:"percent"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	user := UserFromContext(r.Context())
+	if err := h.store.SetCommitmentAutoContributePercent(r.Context(), user.ID, id, req.Percent); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	c, err := h.store.GetActiveCommitmentForUser(r.Context(), user.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to reload commitment")
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
+}
+
+func (h *RewardHandler) BreakCommitment(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid commitment id")
+		return
+	}
+	user := UserFromContext(r.Context())
+	if err := h.store.BreakCommitment(r.Context(), user.ID, id); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

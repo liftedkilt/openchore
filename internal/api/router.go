@@ -82,6 +82,14 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 			r.Get("/rewards", rewards.List)
 			r.Post("/rewards/{id}/redeem", rewards.Redeem)
 
+			// Reward commitments — kids commit points toward a chosen reward
+			// and watch progress instead of being tempted to drain spendable.
+			r.Get("/users/{id}/commitments", rewards.ListCommitments)
+			r.Post("/rewards/{id}/commit", rewards.Commit)
+			r.Post("/commitments/{id}/contribute", rewards.Contribute)
+			r.Put("/commitments/{id}/auto-contribute", rewards.SetAutoContribute)
+			r.Delete("/commitments/{id}", rewards.BreakCommitment)
+
 			// Admin-only routes
 			r.Group(func(r chi.Router) {
 				r.Use(RequireAdmin)

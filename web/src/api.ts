@@ -1,4 +1,4 @@
-import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardAssignment, RewardRedemption, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from './types';
+import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardAssignment, RewardRedemption, RewardCommitment, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from './types';
 
 const API_BASE = '/api';
 
@@ -233,6 +233,26 @@ export const api = {
     redeem: (id: number) => fetchWithAuth<RewardRedemption>(`/rewards/${id}/redeem`, { method: 'POST' }),
     listRedemptions: (userId: number) => fetchWithAuth<RedemptionHistory[]>(`/users/${userId}/redemptions`),
     undoRedemption: (redemptionId: number) => fetchWithAuth(`/redemptions/${redemptionId}`, { method: 'DELETE' }),
+  },
+  commitments: {
+    listForUser: (userId: number) => fetchWithAuth<RewardCommitment[]>(`/users/${userId}/commitments`),
+    commit: (rewardId: number, autoContributePercent: number) =>
+      fetchWithAuth<RewardCommitment>(`/rewards/${rewardId}/commit`, {
+        method: 'POST',
+        body: JSON.stringify({ auto_contribute_percent: autoContributePercent }),
+      }),
+    contribute: (commitmentId: number, amount: number) =>
+      fetchWithAuth<RewardCommitment>(`/commitments/${commitmentId}/contribute`, {
+        method: 'POST',
+        body: JSON.stringify({ amount }),
+      }),
+    setAutoContribute: (commitmentId: number, percent: number) =>
+      fetchWithAuth<RewardCommitment>(`/commitments/${commitmentId}/auto-contribute`, {
+        method: 'PUT',
+        body: JSON.stringify({ percent }),
+      }),
+    break: (commitmentId: number) =>
+      fetchWithAuth(`/commitments/${commitmentId}`, { method: 'DELETE' }),
   },
   streaks: {
     getForUser: (userId: number) => fetchWithAuth<UserStreakData>(`/users/${userId}/streak`),

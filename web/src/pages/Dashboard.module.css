@@ -1204,6 +1204,201 @@
   padding: 1rem 1.25rem;
 }
 
+/* --- Goal / Commitment --- */
+
+.goalCard {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(236, 72, 153, 0.08));
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: var(--radius-card);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.goalHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.goalIcon {
+  font-size: 1.75rem;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.goalTitleBlock {
+  flex: 1;
+  min-width: 0;
+}
+
+.goalLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.goalName {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.goalAmounts {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.goalAmounts strong {
+  color: var(--text-primary);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.goalProgressTrack {
+  height: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.goalProgressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-purple), var(--accent-blue));
+  transition: width 0.4s ease-out;
+}
+
+.goalProgressFillDone {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+}
+
+.goalActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.goalBtn {
+  flex: 1;
+  min-width: 110px;
+  padding: 0.55rem 0.9rem;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.goalBtnPrimary {
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+  color: white;
+  border-color: transparent;
+}
+
+.goalBtnDanger {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.25);
+}
+
+.goalAuto {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.goalAutoLabel {
+  white-space: nowrap;
+}
+
+.goalAutoSlider {
+  flex: 1;
+  accent-color: var(--accent-purple);
+}
+
+.goalAutoValue {
+  min-width: 2.5rem;
+  text-align: right;
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+.goalContributeRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.goalContributeInput {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.saveTowardBtn {
+  flex-shrink: 0;
+  padding: 0.55rem 0.85rem;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(168, 85, 247, 0.12);
+  color: #c4b5fd;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.saveTowardBtn:active {
+  transform: scale(0.96);
+}
+
+.rewardActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.goalBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #c4b5fd;
+  background: rgba(168, 85, 247, 0.15);
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
+}
+
 .rewardsBalanceIcon { color: var(--accent-blue); }
 
 .rewardsBalanceAmount {

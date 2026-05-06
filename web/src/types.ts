@@ -245,14 +245,31 @@ export interface PointTransaction {
   id: number;
   user_id: number;
   amount: number;
-  reason: 'chore_complete' | 'chore_uncomplete' | 'reward_redeem' | 'streak_bonus' | 'admin_adjust' | 'expiry_penalty' | 'points_decay' | 'missed_chore';
+  reason: 'chore_complete' | 'chore_uncomplete' | 'reward_redeem' | 'streak_bonus' | 'admin_adjust' | 'expiry_penalty' | 'points_decay' | 'missed_chore' | 'commit_to_goal' | 'goal_break';
   reference_id?: number;
   note?: string;
   created_at: string;
 }
 
+export interface RewardCommitment {
+  id: number;
+  user_id: number;
+  reward_id: number;
+  reward_name?: string;
+  reward_icon?: string;
+  target_cost: number;
+  amount_saved: number;
+  auto_contribute_percent: number;
+  status: 'active' | 'redeemed' | 'cancelled';
+  created_at: string;
+  redeemed_at?: string;
+  cancelled_at?: string;
+}
+
 export interface PointsData {
   balance: number;
+  committed: number;
+  active_commitment: RewardCommitment | null;
   transactions: PointTransaction[];
 }
 
