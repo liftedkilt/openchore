@@ -2963,3 +2963,227 @@ func TestSharedPoolAutoContributeStacksWithPersonal(t *testing.T) {
 		t.Errorf("expected shared saved=25, got %d", sharedSaved)
 	}
 }
+
+// Bob's dashboard fetches via ListActiveCommitmentsForUser(Bob), which
+// embeds the pool. Verify Alice's contribution is reflected in Bob's view
+// without Bob having to do anything — this is the path the bug report
+// implicates.
+func TestListActiveCommitmentsForUserSeesSiblingsContributions(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	alice := createTestUser(t, s, "Alice", "child")
+	bob := createTestUser(t, s, "Bob", "child")
+
+	reward := &model.Reward{Name: "Minecraft", Cost: 600, Active: true, Shareable: true, CreatedBy: parent.ID}
+	if err := s.CreateReward(ctx, reward); err != nil {
+		t.Fatalf("CreateReward: %v", err)
+	}
+	s.AdminAdjustPoints(ctx, alice.ID, 500, "seed")
+	s.AdminAdjustPoints(ctx, bob.ID, 500, "seed")
+
+	a, _ := s.CreateCommitment(ctx, alice.ID, reward.ID, 0)
+	b, _ := s.CreateCommitment(ctx, bob.ID, reward.ID, 0)
+
+	// Alice contributes first.
+	if err := s.ContributeToCommitment(ctx, alice.ID, a.ID, 300); err != nil {
+		t.Fatalf("Alice contribute: %v", err)
+	}
+
+	// Bob loads his dashboard.
+	bobCommitments, err := s.ListActiveCommitmentsForUser(ctx, bob.ID)
+	if err != nil {
+		t.Fatalf("ListActiveCommitmentsForUser(Bob): %v", err)
+	}
+	if len(bobCommitments) != 1 {
+		t.Fatalf("expected 1 commitment, got %d", len(bobCommitments))
+	}
+	bobsView := bobCommitments[0]
+	if bobsView.Pool == nil {
+		t.Fatalf("expected pool populated on Bob's shared share")
+	}
+	if bobsView.Pool.AmountSaved != 300 {
+		t.Errorf("expected pool.amount_saved=300 (Alice's contribution), got %d", bobsView.Pool.AmountSaved)
+	}
+	if len(bobsView.Pool.Contributors) != 2 {
+		t.Errorf("expected 2 contributors visible to Bob, got %d", len(bobsView.Pool.Contributors))
+	}
+	var aliceContrib, bobContrib int
+	for _, c := range bobsView.Pool.Contributors {
+		if c.UserID == alice.ID {
+			aliceContrib = c.AmountSaved
+		}
+		if c.UserID == bob.ID {
+			bobContrib = c.AmountSaved
+		}
+	}
+	if aliceContrib != 300 {
+		t.Errorf("expected Alice's contribution=300 visible to Bob, got %d", aliceContrib)
+	}
+	if bobContrib != 0 {
+		t.Errorf("expected Bob's contribution=0 (he hasn't put any in yet), got %d", bobContrib)
+	}
+
+	// Bob's own AmountSaved on the row should still be 0 (he hasn't contributed).
+	if bobsView.AmountSaved != 0 {
+		t.Errorf("expected Bob's row amount_saved=0, got %d", bobsView.AmountSaved)
+	}
+
+	// Now Bob contributes — pool total should be 500, and Alice's view via
+	// ListActiveCommitmentsForUser should reflect Bob's contribution too.
+	if err := s.ContributeToCommitment(ctx, bob.ID, b.ID, 200); err != nil {
+		t.Fatalf("Bob contribute: %v", err)
+	}
+	aliceCommitments, err := s.ListActiveCommitmentsForUser(ctx, alice.ID)
+	if err != nil {
+		t.Fatalf("ListActiveCommitmentsForUser(Alice): %v", err)
+	}
+	if aliceCommitments[0].Pool.AmountSaved != 500 {
+		t.Errorf("expected Alice to see pool=500, got %d", aliceCommitments[0].Pool.AmountSaved)
+	}
+}
+
+// Toggling shareable on AFTER kids have already committed personally must
+// migrate those commitments into a fresh shared pool. Otherwise siblings end
+// up in disconnected silos (the real-world bug: parent flipped the flag
+// after kids had been saving toward Minecraft individually).
+func TestUpdateRewardShareableTogglesMergesExistingCommits(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	alice := createTestUser(t, s, "Alice", "child")
+	bob := createTestUser(t, s, "Bob", "child")
+
+	reward := &model.Reward{Name: "Game", Cost: 200, Active: true, CreatedBy: parent.ID}
+	if err := s.CreateReward(ctx, reward); err != nil {
+		t.Fatalf("CreateReward: %v", err)
+	}
+	s.AdminAdjustPoints(ctx, alice.ID, 100, "seed")
+	s.AdminAdjustPoints(ctx, bob.ID, 100, "seed")
+
+	// Both kids start saving personally.
+	a, _ := s.CreateCommitment(ctx, alice.ID, reward.ID, 0)
+	b, _ := s.CreateCommitment(ctx, bob.ID, reward.ID, 0)
+	s.ContributeToCommitment(ctx, alice.ID, a.ID, 40)
+	s.ContributeToCommitment(ctx, bob.ID, b.ID, 30)
+
+	// Parent toggles shareable on.
+	reward.Shareable = true
+	if err := s.UpdateReward(ctx, reward); err != nil {
+		t.Fatalf("UpdateReward shareable=true: %v", err)
+	}
+
+	// Both commitments should now reference the same shared pool.
+	commitsA, _ := s.ListActiveCommitmentsForUser(ctx, alice.ID)
+	commitsB, _ := s.ListActiveCommitmentsForUser(ctx, bob.ID)
+	if len(commitsA) != 1 || commitsA[0].SharedPoolID == nil {
+		t.Fatalf("expected Alice's commitment migrated to a pool, got %+v", commitsA)
+	}
+	if len(commitsB) != 1 || commitsB[0].SharedPoolID == nil {
+		t.Fatalf("expected Bob's commitment migrated to a pool, got %+v", commitsB)
+	}
+	if *commitsA[0].SharedPoolID != *commitsB[0].SharedPoolID {
+		t.Errorf("expected both kids in same pool after toggle, got %d vs %d", *commitsA[0].SharedPoolID, *commitsB[0].SharedPoolID)
+	}
+
+	// The pool should reflect both kids' prior savings (40 + 30 = 70).
+	pool, _ := s.GetSharedPool(ctx, *commitsA[0].SharedPoolID)
+	if pool.AmountSaved != 70 {
+		t.Errorf("expected pool to retain both kids' savings = 70, got %d", pool.AmountSaved)
+	}
+	if len(pool.Contributors) != 2 {
+		t.Errorf("expected 2 contributors after migration, got %d", len(pool.Contributors))
+	}
+}
+
+func TestUpdateRewardShareableOffRefusesWhenPoolHasContributors(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	alice := createTestUser(t, s, "Alice", "child")
+	reward := &model.Reward{Name: "Trip", Cost: 100, Active: true, Shareable: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, reward)
+	s.AdminAdjustPoints(ctx, alice.ID, 50, "seed")
+	a, _ := s.CreateCommitment(ctx, alice.ID, reward.ID, 0)
+	s.ContributeToCommitment(ctx, alice.ID, a.ID, 25)
+
+	reward.Shareable = false
+	if err := s.UpdateReward(ctx, reward); err == nil {
+		t.Errorf("expected toggle-off to refuse while pool has active contributors")
+	}
+}
+
+func TestAutoContribute100PercentPersonal(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	kid := createTestUser(t, s, "Kid", "child")
+	reward := &model.Reward{Name: "LEGO", Cost: 200, Active: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, reward)
+	if _, err := s.CreateCommitment(ctx, kid.ID, reward.ID, 100); err != nil {
+		t.Fatalf("CreateCommitment: %v", err)
+	}
+
+	chore := createTestChore(t, s, "Big chore", 30, parent.ID)
+	cs := createTestSchedule(t, s, chore.ID, kid.ID, 1)
+	cc := &model.ChoreCompletion{ChoreScheduleID: cs.ID, CompletedBy: kid.ID, Status: model.StatusApproved, CompletionDate: "2026-05-06"}
+	if err := s.CompleteChore(ctx, cc); err != nil {
+		t.Fatalf("CompleteChore: %v", err)
+	}
+	if err := s.CreditChorePoints(ctx, kid.ID, cc.ID, 30); err != nil {
+		t.Fatalf("CreditChorePoints: %v", err)
+	}
+
+	bal, _ := s.GetPointBalance(ctx, kid.ID)
+	if bal != 0 {
+		t.Errorf("expected spendable 0 (all 30 auto-saved at 100%%), got %d", bal)
+	}
+	got, _ := s.GetActiveCommitmentForUser(ctx, kid.ID)
+	if got == nil || got.AmountSaved != 30 {
+		t.Errorf("expected 30 auto-saved on goal, got %+v", got)
+	}
+}
+
+// Mirror the actual UI flow: create commitment at 0% (default), then bump
+// auto-contribute to 100% via SetCommitmentAutoContributePercent (the slider
+// path). Then complete a chore. The bug report claims this doesn't auto-save.
+func TestAutoContributeAfterSliderUpdate(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	kid := createTestUser(t, s, "Kid", "child")
+	reward := &model.Reward{Name: "LEGO", Cost: 200, Active: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, reward)
+	c, err := s.CreateCommitment(ctx, kid.ID, reward.ID, 0)
+	if err != nil {
+		t.Fatalf("CreateCommitment: %v", err)
+	}
+
+	if err := s.SetCommitmentAutoContributePercent(ctx, kid.ID, c.ID, 100); err != nil {
+		t.Fatalf("SetCommitmentAutoContributePercent: %v", err)
+	}
+
+	chore := createTestChore(t, s, "Big chore", 25, parent.ID)
+	cs := createTestSchedule(t, s, chore.ID, kid.ID, 1)
+	cc := &model.ChoreCompletion{ChoreScheduleID: cs.ID, CompletedBy: kid.ID, Status: model.StatusApproved, CompletionDate: "2026-05-06"}
+	if err := s.CompleteChore(ctx, cc); err != nil {
+		t.Fatalf("CompleteChore: %v", err)
+	}
+	if err := s.CreditChorePoints(ctx, kid.ID, cc.ID, 25); err != nil {
+		t.Fatalf("CreditChorePoints: %v", err)
+	}
+
+	bal, _ := s.GetPointBalance(ctx, kid.ID)
+	if bal != 0 {
+		t.Errorf("expected spendable 0 after 100%% auto-save of 25 pts, got %d", bal)
+	}
+	got, _ := s.GetActiveCommitmentForUser(ctx, kid.ID)
+	if got == nil || got.AmountSaved != 25 {
+		t.Errorf("expected 25 auto-saved, got %+v", got)
+	}
+}

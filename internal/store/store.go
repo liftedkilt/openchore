@@ -887,11 +887,105 @@ func (s *Store) SetRewardAssignments(ctx context.Context, rewardID int64, assign
 	return tx.Commit()
 }
 
+// UpdateReward applies admin edits and, when the shareable flag transitions,
+// keeps existing kid commitments coherent:
+//   * shareable false → true: any active personal commits on this reward
+//     migrate into a new shared pool so siblings end up in the same pool
+//     instead of disconnected personal silos. Each kid's saved amount is
+//     preserved (it's derived from ledger rows referencing the commitment
+//     row, which we don't touch).
+//   * shareable true → false: refuse if there's an active shared pool with
+//     contributors — the admin must redeem or cancel it first. Otherwise
+//     untying the pool from the reward leaves a half-state nobody can fix.
 func (s *Store) UpdateReward(ctx context.Context, r *model.Reward) error {
-	_, err := s.db.ExecContext(ctx,
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Read the prior shareable flag so we can detect a transition.
+	var priorShareable int
+	if err := tx.QueryRowContext(ctx,
+		`SELECT shareable FROM rewards WHERE id = ?`, r.ID).Scan(&priorShareable); err != nil {
+		return fmt.Errorf("reward not found")
+	}
+	priorlyShareable := priorShareable == 1
+
+	if _, err := tx.ExecContext(ctx,
 		`UPDATE rewards SET name=?, description=?, icon=?, cost=?, stock=?, active=?, shareable=? WHERE id=?`,
-		r.Name, r.Description, r.Icon, r.Cost, r.Stock, boolToInt(r.Active), boolToInt(r.Shareable), r.ID)
-	return err
+		r.Name, r.Description, r.Icon, r.Cost, r.Stock, boolToInt(r.Active), boolToInt(r.Shareable), r.ID); err != nil {
+		return err
+	}
+
+	switch {
+	case !priorlyShareable && r.Shareable:
+		// Find active personal commits and migrate them into a fresh pool.
+		rows, err := tx.QueryContext(ctx,
+			`SELECT id FROM reward_commitments
+			 WHERE reward_id = ? AND status = ? AND shared_pool_id IS NULL`,
+			r.ID, model.CommitmentActive)
+		if err != nil {
+			return err
+		}
+		var legacyIDs []int64
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return err
+			}
+			legacyIDs = append(legacyIDs, id)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		if len(legacyIDs) > 0 {
+			res, err := tx.ExecContext(ctx,
+				`INSERT INTO shared_commitment_pools (reward_id, target_cost) VALUES (?, ?)`,
+				r.ID, r.Cost)
+			if err != nil {
+				return err
+			}
+			poolID, _ := res.LastInsertId()
+			for _, id := range legacyIDs {
+				if _, err := tx.ExecContext(ctx,
+					`UPDATE reward_commitments SET shared_pool_id = ?, target_cost = ? WHERE id = ?`,
+					poolID, r.Cost, id); err != nil {
+					return err
+				}
+			}
+		}
+
+	case priorlyShareable && !r.Shareable:
+		var activePool int64
+		err := tx.QueryRowContext(ctx,
+			`SELECT id FROM shared_commitment_pools WHERE reward_id = ? AND status = ?`,
+			r.ID, model.CommitmentActive).Scan(&activePool)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+		if activePool != 0 {
+			var contribs int
+			if err := tx.QueryRowContext(ctx,
+				`SELECT COUNT(1) FROM reward_commitments WHERE shared_pool_id = ? AND status = ?`,
+				activePool, model.CommitmentActive).Scan(&contribs); err != nil {
+				return err
+			}
+			if contribs > 0 {
+				return fmt.Errorf("reward has an active shared pool with %d contributor(s); redeem or have kids leave before turning off shareable", contribs)
+			}
+			// Empty pool — close it cleanly.
+			if _, err := tx.ExecContext(ctx,
+				`UPDATE shared_commitment_pools SET status = ?, cancelled_at = CURRENT_TIMESTAMP WHERE id = ?`,
+				model.CommitmentCancelled, activePool); err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (s *Store) DeleteReward(ctx context.Context, id int64) error {
