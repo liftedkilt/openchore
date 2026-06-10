@@ -5,6 +5,7 @@ import { App } from './App';
 import { AuthProvider } from './AuthContext';
 import { ThemeProvider } from './ThemeContext';
 import './styles/globals.css';
+import './i18n';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
