@@ -1,0 +1,12 @@
+{
+  "common": {
+    "back": "Back",
+    "save": "Save",
+    "language": "Language"
+  },
+  "test": {
+    "greeting": "Hi, {{name}}",
+    "points_one": "{{count}} point",
+    "points_other": "{{count}} points"
+  }
+}
