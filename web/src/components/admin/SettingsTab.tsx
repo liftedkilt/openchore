@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import type { Webhook, WebhookDelivery } from '../../types';
 import styles from '../../pages/AdminDashboard.module.css';
@@ -8,6 +9,8 @@ import { ExportConfigSection } from './ExportConfigSection';
 import { APITokensSection } from './APITokensSection';
 
 export const SettingsTab: React.FC = () => {
+  const { t } = useTranslation();
+
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -37,14 +40,14 @@ export const SettingsTab: React.FC = () => {
   const [deliveries, setDeliveries] = useState<WebhookDelivery[]>([]);
 
   const WEBHOOK_EVENTS = [
-    { id: 'chore.completed', label: 'Completed', icon: '✅' },
-    { id: 'chore.uncompleted', label: 'Uncompleted', icon: '↩️' },
-    { id: 'chore.expired', label: 'Expired', icon: '⏰' },
-    { id: 'chore.missed', label: 'Missed', icon: '❌' },
-    { id: 'reward.redeemed', label: 'Redeemed', icon: '🎁' },
-    { id: 'daily.complete', label: 'Daily Done', icon: '🌟' },
-    { id: 'streak.milestone', label: 'Streak', icon: '🔥' },
-    { id: 'points.decayed', label: 'Decay', icon: '📉' },
+    { id: 'chore.completed', label: t('admin.settingsTab.webhooks.events.completed'), icon: '✅' },
+    { id: 'chore.uncompleted', label: t('admin.settingsTab.webhooks.events.uncompleted'), icon: '↩️' },
+    { id: 'chore.expired', label: t('admin.settingsTab.webhooks.events.expired'), icon: '⏰' },
+    { id: 'chore.missed', label: t('admin.settingsTab.webhooks.events.missed'), icon: '❌' },
+    { id: 'reward.redeemed', label: t('admin.settingsTab.webhooks.events.redeemed'), icon: '🎁' },
+    { id: 'daily.complete', label: t('admin.settingsTab.webhooks.events.dailyDone'), icon: '🌟' },
+    { id: 'streak.milestone', label: t('admin.settingsTab.webhooks.events.streak'), icon: '🔥' },
+    { id: 'points.decayed', label: t('admin.settingsTab.webhooks.events.decay'), icon: '📉' },
   ];
 
   const allEventsSelected = webhookSelectedEvents.size === 0 || webhookSelectedEvents.size === WEBHOOK_EVENTS.length;
@@ -91,9 +94,9 @@ export const SettingsTab: React.FC = () => {
     setSaving(true);
     try {
       await api.admin.setSetting('base_url', baseUrl);
-      setMessage({ type: 'success', text: 'Base URL updated' });
+      setMessage({ type: 'success', text: t('admin.settingsTab.baseUrl.saveSuccess') });
     } catch {
-      setMessage({ type: 'error', text: 'Failed to update Base URL' });
+      setMessage({ type: 'error', text: t('admin.settingsTab.baseUrl.saveError') });
     }
     setSaving(false);
   };
@@ -104,9 +107,9 @@ export const SettingsTab: React.FC = () => {
     setDiscordMessage(null);
     try {
       await api.admin.setSetting('discord_webhook_url', discordUrl);
-      setDiscordMessage({ type: 'success', text: discordUrl ? 'Discord webhook URL saved' : 'Discord notifications disabled' });
+      setDiscordMessage({ type: 'success', text: discordUrl ? t('admin.settingsTab.discord.saveSuccess') : t('admin.settingsTab.discord.disabledSuccess') });
     } catch {
-      setDiscordMessage({ type: 'error', text: 'Failed to save Discord webhook URL' });
+      setDiscordMessage({ type: 'error', text: t('admin.settingsTab.discord.saveError') });
     }
     setDiscordSaving(false);
   };
@@ -129,12 +132,12 @@ export const SettingsTab: React.FC = () => {
         })
       });
       if (resp.ok) {
-        setDiscordMessage({ type: 'success', text: 'Test message sent to Discord!' });
+        setDiscordMessage({ type: 'success', text: t('admin.settingsTab.discord.testSuccess') });
       } else {
-        setDiscordMessage({ type: 'error', text: `Discord returned status ${resp.status}` });
+        setDiscordMessage({ type: 'error', text: t('admin.settingsTab.discord.testStatusError', { status: resp.status }) });
       }
     } catch {
-      setDiscordMessage({ type: 'error', text: 'Failed to reach Discord webhook URL' });
+      setDiscordMessage({ type: 'error', text: t('admin.settingsTab.discord.testNetworkError') });
     }
     setDiscordSaving(false);
   };
@@ -152,9 +155,9 @@ export const SettingsTab: React.FC = () => {
       if (aiTtsEnabled) {
         api.admin.triggerTTSSync().catch(() => {});
       }
-      setAiMessage({ type: 'success', text: 'AI settings saved' });
+      setAiMessage({ type: 'success', text: t('admin.settingsTab.ai.saveSuccess') });
     } catch {
-      setAiMessage({ type: 'error', text: 'Failed to save AI settings' });
+      setAiMessage({ type: 'error', text: t('admin.settingsTab.ai.saveError') });
     }
     setAiSaving(false);
   };
@@ -164,23 +167,23 @@ export const SettingsTab: React.FC = () => {
     setMessage(null);
 
     if (newPin.length < 4) {
-      setMessage({ type: 'error', text: 'New PIN must be at least 4 digits' });
+      setMessage({ type: 'error', text: t('admin.settingsTab.pin.errorTooShort') });
       return;
     }
     if (newPin !== confirmPin) {
-      setMessage({ type: 'error', text: 'New PINs do not match' });
+      setMessage({ type: 'error', text: t('admin.settingsTab.pin.errorMismatch') });
       return;
     }
 
     setSaving(true);
     try {
       await api.admin.updatePasscode(currentPin, newPin);
-      setMessage({ type: 'success', text: 'PIN updated successfully' });
+      setMessage({ type: 'success', text: t('admin.settingsTab.pin.saveSuccess') });
       setCurrentPin('');
       setNewPin('');
       setConfirmPin('');
     } catch {
-      setMessage({ type: 'error', text: 'Failed — check your current PIN' });
+      setMessage({ type: 'error', text: t('admin.settingsTab.pin.saveError') });
     }
     setSaving(false);
   };
@@ -226,43 +229,43 @@ export const SettingsTab: React.FC = () => {
 
   return (
     <div>
-      <h2 className={styles.sectionTitle}>Settings</h2>
+      <h2 className={styles.sectionTitle}>{t('admin.settingsTab.pageTitle')}</h2>
 
       <form className={styles.form} onSubmit={handleSaveBaseUrl}>
         <div className={styles.formHeader}>
-          <h3>System Base URL</h3>
+          <h3>{t('admin.settingsTab.baseUrl.title')}</h3>
         </div>
         <p className={styles.sectionDesc}>
-          The public URL of this server (e.g. <code>https://chores.example.com</code>). Used for QR codes and notifications.
+          {t('admin.settingsTab.baseUrl.description')} <code>https://chores.example.com</code>). {t('admin.settingsTab.baseUrl.descriptionSuffix')}
         </p>
         <div className={styles.formGroup}>
           <input
             className={styles.input}
             value={baseUrl}
             onChange={e => setBaseUrl(e.target.value)}
-            placeholder="https://your-domain.com"
+            placeholder={t('admin.settingsTab.baseUrl.placeholder')}
           />
         </div>
         <div className={styles.formActions}>
           <button type="submit" className={styles.btnPrimary} disabled={saving}>
-            <Save size={16} /> Save Base URL
+            <Save size={16} /> {t('admin.settingsTab.baseUrl.saveButton')}
           </button>
         </div>
       </form>
 
       <form className={styles.form} onSubmit={handleSaveDiscordUrl}>
         <div className={styles.formHeader}>
-          <h3>Discord Notifications</h3>
+          <h3>{t('admin.settingsTab.discord.title')}</h3>
         </div>
         <p className={styles.sectionDesc}>
-          Get notified in Discord when chores are completed, approved, or rejected. Paste a Discord webhook URL below.
+          {t('admin.settingsTab.discord.description')}
         </p>
         <div className={styles.formGroup}>
           <input
             className={styles.input}
             value={discordUrl}
             onChange={e => setDiscordUrl(e.target.value)}
-            placeholder="https://discord.com/api/webhooks/..."
+            placeholder={t('admin.settingsTab.discord.placeholder')}
           />
         </div>
         {discordMessage && (
@@ -272,11 +275,11 @@ export const SettingsTab: React.FC = () => {
         )}
         <div className={styles.formActions}>
           <button type="submit" className={styles.btnPrimary} disabled={discordSaving}>
-            <Save size={16} /> Save
+            <Save size={16} /> {t('admin.settingsTab.discord.saveButton')}
           </button>
           {discordUrl && (
             <button type="button" className={styles.btnSecondary} disabled={discordSaving} onClick={handleTestDiscord}>
-              Send Test
+              {t('admin.settingsTab.discord.testButton')}
             </button>
           )}
         </div>
@@ -284,20 +287,20 @@ export const SettingsTab: React.FC = () => {
 
       <form className={styles.form} onSubmit={handleSaveAISettings}>
         <div className={styles.formHeader}>
-          <h3>AI Photo Review</h3>
+          <h3>{t('admin.settingsTab.ai.title')}</h3>
         </div>
         <p className={styles.sectionDesc}>
-          Use AI to automatically verify chore completion photos. When enabled, uploaded photos are analyzed before marking a chore complete.
+          {t('admin.settingsTab.ai.description')}
         </p>
 
         <div className={styles.formGrid}>
           <label className={styles.checkboxLabel}>
             <input type="checkbox" checked={aiEnabled} onChange={e => setAiEnabled(e.target.checked)} />
-            Enable AI photo review
+            {t('admin.settingsTab.ai.enableLabel')}
           </label>
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>Auto-Approve Threshold (0 &ndash; 1)</label>
+            <label className={styles.label}>{t('admin.settingsTab.ai.thresholdLabel')}</label>
             <div className={styles.flexRow} style={{ gap: '0.75rem' }}>
               <input
                 type="range"
@@ -312,13 +315,13 @@ export const SettingsTab: React.FC = () => {
               <span style={{ fontSize: '0.9rem', fontWeight: 700, minWidth: '3ch', textAlign: 'right' }}>{aiThreshold}</span>
             </div>
             <span className={styles.helpText}>
-              Photos with confidence above this threshold are auto-approved. Lower values are more lenient.
+              {t('admin.settingsTab.ai.thresholdHelp')}
             </span>
           </div>
 
           <label className={styles.checkboxLabel}>
             <input type="checkbox" checked={aiTtsEnabled} onChange={e => setAiTtsEnabled(e.target.checked)} />
-            Generate TTS descriptions for chores
+            {t('admin.settingsTab.ai.ttsLabel')}
           </label>
         </div>
 
@@ -330,19 +333,19 @@ export const SettingsTab: React.FC = () => {
 
         <div className={styles.formActions}>
           <button type="submit" className={styles.btnPrimary} disabled={aiSaving}>
-            <Save size={16} /> {aiSaving ? 'Saving...' : 'Save AI Settings'}
+            <Save size={16} /> {aiSaving ? t('admin.settingsTab.ai.savingButton') : t('admin.settingsTab.ai.saveButton')}
           </button>
         </div>
       </form>
 
       <form className={styles.form} onSubmit={handleChangePin}>
         <div className={styles.formHeader}>
-          <h3>Change Admin PIN</h3>
+          <h3>{t('admin.settingsTab.pin.title')}</h3>
         </div>
 
         <div className={styles.formGrid}>
           <div className={styles.formGroup}>
-            <label className={styles.label}>Current PIN</label>
+            <label className={styles.label}>{t('admin.settingsTab.pin.currentLabel')}</label>
             <input
               className={styles.input}
               type="password"
@@ -350,13 +353,13 @@ export const SettingsTab: React.FC = () => {
               pattern="[0-9]*"
               value={currentPin}
               onChange={e => setCurrentPin(e.target.value.replace(/\D/g, ''))}
-              placeholder="Enter current PIN"
+              placeholder={t('admin.settingsTab.pin.currentPlaceholder')}
               required
             />
           </div>
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
-              <label className={styles.label}>New PIN</label>
+              <label className={styles.label}>{t('admin.settingsTab.pin.newLabel')}</label>
               <input
                 className={styles.input}
                 type="password"
@@ -364,12 +367,12 @@ export const SettingsTab: React.FC = () => {
                 pattern="[0-9]*"
                 value={newPin}
                 onChange={e => setNewPin(e.target.value.replace(/\D/g, ''))}
-                placeholder="4+ digits"
+                placeholder={t('admin.settingsTab.pin.newPlaceholder')}
                 required
               />
             </div>
             <div className={styles.formGroup}>
-              <label className={styles.label}>Confirm New PIN</label>
+              <label className={styles.label}>{t('admin.settingsTab.pin.confirmLabel')}</label>
               <input
                 className={styles.input}
                 type="password"
@@ -377,7 +380,7 @@ export const SettingsTab: React.FC = () => {
                 pattern="[0-9]*"
                 value={confirmPin}
                 onChange={e => setConfirmPin(e.target.value.replace(/\D/g, ''))}
-                placeholder="Re-enter"
+                placeholder={t('admin.settingsTab.pin.confirmPlaceholder')}
                 required
               />
             </div>
@@ -392,7 +395,7 @@ export const SettingsTab: React.FC = () => {
 
         <div className={styles.formActions}>
           <button type="submit" className={styles.btnPrimary} disabled={saving || !currentPin || !newPin || !confirmPin}>
-            <Save size={16} /> Update PIN
+            <Save size={16} /> {t('admin.settingsTab.pin.saveButton')}
           </button>
         </div>
       </form>
@@ -403,28 +406,28 @@ export const SettingsTab: React.FC = () => {
       {/* Webhooks Section */}
       <div className={styles.form} style={{ marginTop: '1.5rem' }}>
         <div className={styles.formHeader}>
-          <h3>Webhooks</h3>
+          <h3>{t('admin.settingsTab.webhooks.title')}</h3>
           <button className={styles.btnSmall} onClick={() => setShowWebhookForm(f => !f)}>
-            <Plus size={14} /> Add
+            <Plus size={14} /> {t('admin.settingsTab.webhooks.addButton')}
           </button>
         </div>
         <p className={styles.sectionDesc}>
-          Send events to external services (Home Assistant, Discord, etc.)
+          {t('admin.settingsTab.webhooks.description')}
         </p>
 
         {showWebhookForm && (
           <form onSubmit={handleCreateWebhook} style={{ marginBottom: '1rem' }}>
             <div className={styles.formGrid}>
               <div className={styles.formGroup}>
-                <label className={styles.label}>URL</label>
-                <input className={styles.input} value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} placeholder="https://..." required />
+                <label className={styles.label}>{t('admin.settingsTab.webhooks.form.urlLabel')}</label>
+                <input className={styles.input} value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} placeholder={t('admin.settingsTab.webhooks.form.urlPlaceholder')} required />
               </div>
               <div className={styles.formGroup}>
-                <label className={styles.label}>Secret (optional HMAC signing key)</label>
-                <input className={styles.input} value={webhookSecret} onChange={e => setWebhookSecret(e.target.value)} placeholder="Leave blank for unsigned" />
+                <label className={styles.label}>{t('admin.settingsTab.webhooks.form.secretLabel')}</label>
+                <input className={styles.input} value={webhookSecret} onChange={e => setWebhookSecret(e.target.value)} placeholder={t('admin.settingsTab.webhooks.form.secretPlaceholder')} />
               </div>
               <div className={styles.formGroup}>
-                <label className={styles.label}>Events {allEventsSelected && <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>(all)</span>}</label>
+                <label className={styles.label}>{t('admin.settingsTab.webhooks.form.eventsLabel')} {allEventsSelected && <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>({t('admin.settingsTab.webhooks.form.eventsAll')})</span>}</label>
                 <div className={styles.chipRow} style={{ gap: '0.4rem', marginTop: '0.3rem' }}>
                   {WEBHOOK_EVENTS.map(ev => {
                     const selected = webhookSelectedEvents.has(ev.id) || allEventsSelected;
@@ -443,14 +446,14 @@ export const SettingsTab: React.FC = () => {
               </div>
             </div>
             <div className={styles.formActions}>
-              <button type="submit" className={styles.btnPrimary}><Save size={14} /> Create</button>
-              <button type="button" className={styles.btnSecondary} onClick={() => setShowWebhookForm(false)}>Cancel</button>
+              <button type="submit" className={styles.btnPrimary}><Save size={14} /> {t('admin.settingsTab.webhooks.form.createButton')}</button>
+              <button type="button" className={styles.btnSecondary} onClick={() => setShowWebhookForm(false)}>{t('admin.settingsTab.webhooks.form.cancelButton')}</button>
             </div>
           </form>
         )}
 
         {webhooks.length === 0 && !showWebhookForm && (
-          <p className={styles.emptyTextItalic}>No webhooks configured</p>
+          <p className={styles.emptyTextItalic}>{t('admin.settingsTab.webhooks.empty')}</p>
         )}
 
         {webhooks.map(wh => (
@@ -464,14 +467,14 @@ export const SettingsTab: React.FC = () => {
               </div>
               <div className={styles.webhookMeta}>
                 {wh.events === '*' ? (
-                  <span>All events</span>
+                  <span>{t('admin.settingsTab.webhooks.allEvents')}</span>
                 ) : (
                   wh.events.split(',').map(e => {
                     const ev = WEBHOOK_EVENTS.find(we => we.id === e.trim());
                     return <span key={e} className={styles.webhookEventTag}>{ev ? `${ev.icon} ${ev.label}` : e.trim()}</span>;
                   })
                 )}
-                {wh.secret && <span>• Signed</span>}
+                {wh.secret && <span>• {t('admin.settingsTab.webhooks.signed')}</span>}
               </div>
             </div>
             <div className={styles.btnGroup}>
@@ -479,17 +482,17 @@ export const SettingsTab: React.FC = () => {
                 {expandedWebhook === wh.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </button>
               <button className={styles.btnSmall} onClick={() => handleToggleWebhook(wh)}>
-                {wh.active ? 'Disable' : 'Enable'}
+                {wh.active ? t('admin.settingsTab.webhooks.disableButton') : t('admin.settingsTab.webhooks.enableButton')}
               </button>
-              <button className={clsx(styles.btnSmall, styles.btnDanger)} aria-label="Delete webhook" onClick={() => handleDeleteWebhook(wh.id)}>
+              <button className={clsx(styles.btnSmall, styles.btnDanger)} aria-label={t('admin.settingsTab.webhooks.deleteAriaLabel')} onClick={() => handleDeleteWebhook(wh.id)}>
                 <Trash2 size={14} />
               </button>
             </div>
             {expandedWebhook === wh.id && (
               <div style={{ width: '100%', marginTop: '0.5rem' }}>
-                <h4 className={styles.deliveryHeader}>Recent Deliveries</h4>
+                <h4 className={styles.deliveryHeader}>{t('admin.settingsTab.webhooks.deliveries.title')}</h4>
                 {deliveries.length === 0 ? (
-                  <p className={styles.emptyTextItalic} style={{ fontSize: '0.8rem' }}>No deliveries yet</p>
+                  <p className={styles.emptyTextItalic} style={{ fontSize: '0.8rem' }}>{t('admin.settingsTab.webhooks.deliveries.empty')}</p>
                 ) : (
                   <div className={styles.deliveryList}>
                     {deliveries.map(d => (

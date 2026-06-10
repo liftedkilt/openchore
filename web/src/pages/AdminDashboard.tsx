@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import type { User } from '../types';
@@ -16,11 +17,13 @@ import { ActivityTab } from '../components/admin/ActivityTab';
 import { AIChoreChecker } from '../components/admin/AIChoreChecker';
 import { SettingsTab } from '../components/admin/SettingsTab';
 import { KidsStatusTab } from '../components/admin/KidsStatusTab';
+import { LanguageSelector } from '../components/LanguageSelector/LanguageSelector';
 
 type Tab = 'kids-status' | 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'ai' | 'settings';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { setUser } = useAuth();
   const [tab, setTab] = useState<Tab>('kids-status');
   const [ready, setReady] = useState(false);
@@ -79,38 +82,39 @@ export const AdminDashboard: React.FC = () => {
         <button className={styles.backBtn} onClick={() => { sessionStorage.removeItem('openchore_admin'); navigate('/login'); }}>
           <ArrowLeft size={18} />
         </button>
-        <h1 className={styles.title}>Admin</h1>
+        <h1 className={styles.title}>{t('admin.dashboard.title')}</h1>
+        <LanguageSelector />
         <button className={styles.btnSmall} style={{ marginLeft: 'auto' }} onClick={() => navigate('/admin/reports')}>
-          Reports
+          {t('admin.dashboard.reports')}
         </button>
       </header>
 
       <nav className={styles.nav}>
         <button className={clsx(styles.navItem, tab === 'kids-status' && styles.navItemActive)} onClick={() => setTab('kids-status')}>
-          <Home size={16} /> Kids
+          <Home size={16} /> {t('admin.dashboard.tabKids')}
         </button>
         <button className={clsx(styles.navItem, tab === 'chores' && styles.navItemActive)} onClick={() => setTab('chores')}>
-          <ListChecks size={16} /> Chores
+          <ListChecks size={16} /> {t('admin.dashboard.tabChores')}
         </button>
         <button className={clsx(styles.navItem, tab === 'approvals' && styles.navItemActive)} onClick={() => setTab('approvals')}>
           <Activity size={16} />
-          Approvals
+          {t('admin.dashboard.tabApprovals')}
           {pendingCount > 0 && <span className={styles.navBadge}>{pendingCount}</span>}
         </button>
         <button className={clsx(styles.navItem, tab === 'rewards' && styles.navItemActive)} onClick={() => setTab('rewards')}>
-          <Gift size={16} /> Rewards
+          <Gift size={16} /> {t('admin.dashboard.tabRewards')}
         </button>
         <button className={clsx(styles.navItem, tab === 'points' && styles.navItemActive)} onClick={() => setTab('points')}>
-          <Coins size={16} /> Points
+          <Coins size={16} /> {t('admin.dashboard.tabPoints')}
         </button>
         <button className={clsx(styles.navItem, tab === 'activity' && styles.navItemActive)} onClick={() => setTab('activity')}>
-          <Undo2 size={16} /> Log
+          <Undo2 size={16} /> {t('admin.dashboard.tabLog')}
         </button>
         <button className={clsx(styles.navItem, tab === 'users' && styles.navItemActive)} onClick={() => setTab('users')}>
-          <Users size={16} /> People
+          <Users size={16} /> {t('admin.dashboard.tabPeople')}
         </button>
         <button className={clsx(styles.navItem, tab === 'ai' && styles.navItemActive)} onClick={() => setTab('ai')}>
-          <Camera size={16} /> AI
+          <Camera size={16} /> {t('admin.dashboard.tabAi')}
         </button>
         <button className={clsx(styles.navItem, tab === 'settings' && styles.navItemActive)} onClick={() => setTab('settings')}>
           <Settings size={16} />
@@ -129,7 +133,7 @@ export const AdminDashboard: React.FC = () => {
         {tab === 'settings' && <SettingsTab />}
       </main>
 
-      <button className={styles.fab} onClick={() => setQuickAssignOpen(true)} title="Quick Assign">
+      <button className={styles.fab} onClick={() => setQuickAssignOpen(true)} title={t('admin.dashboard.quickAssign')}>
         <Plus size={24} />
       </button>
 

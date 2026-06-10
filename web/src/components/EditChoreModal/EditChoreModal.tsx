@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Save, Check, Play, Pause, RefreshCw, Sparkles } from 'lucide-react';
 import Modal from '../Modal/Modal';
 import { api, APIError } from '../../api';
@@ -18,6 +19,7 @@ interface Props {
 }
 
 const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, users, renderSchedules, renderTriggers }) => {
+  const { t } = useTranslation();
   const [title, setTitle] = useState(chore.title);
   const [description, setDescription] = useState(chore.description);
   const [category, setCategory] = useState(chore.category);
@@ -66,7 +68,7 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
     if (!audio) return;
     if (audio.paused) {
       audio.play().catch(() => {
-        setTtsError('Unable to play audio');
+        setTtsError(t('admin.editChore.ttsPlayError'));
       });
     } else {
       audio.pause();
@@ -86,7 +88,7 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
       onSaved();
       setTimeout(() => setTtsSaved(false), 2000);
     } catch (e) {
-      const msg = e instanceof APIError ? (e.data?.error || e.message) : (e instanceof Error ? e.message : 'Failed to regenerate TTS');
+      const msg = e instanceof APIError ? (e.data?.error || e.message) : (e instanceof Error ? e.message : t('admin.editChore.ttsRegenerateError'));
       setTtsError(msg);
     }
     setTtsRegenerating(false);
@@ -99,7 +101,7 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
       const resp = await api.chores.generateTTSDescription(chore.id);
       setTtsDescription(resp.description);
     } catch (e) {
-      const msg = e instanceof APIError ? (e.data?.error || e.message) : (e instanceof Error ? e.message : 'Failed to generate description');
+      const msg = e instanceof APIError ? (e.data?.error || e.message) : (e instanceof Error ? e.message : t('admin.editChore.ttsGenerateDescError'));
       setTtsError(msg);
     }
     setTtsGenerating(false);
@@ -126,82 +128,82 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
       onSaved();
       setTimeout(() => setSaved(false), 2000);
     } catch (e: any) {
-      setError(e.message || 'Failed to save');
+      setError(e.message || t('admin.editChore.saveError'));
     }
     setSaving(false);
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Edit: ${chore.title}`} maxWidth="600px">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('admin.editChore.modalTitle', { title: chore.title })} maxWidth="600px">
       {/* --- Chore Details --- */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
-          <span className={styles.sectionTitle}>Chore Details</span>
+          <span className={styles.sectionTitle}>{t('admin.editChore.sectionDetails')}</span>
         </div>
         <div className={styles.formGrid}>
           <div className={styles.formRow}>
             <div className={styles.formGroup} style={{ flex: 3 }}>
-              <label className={styles.label}>Title</label>
+              <label className={styles.label}>{t('admin.editChore.labelTitle')}</label>
               <input className={styles.input} value={title} onChange={e => setTitle(e.target.value)} />
             </div>
             <div className={styles.formGroup} style={{ flex: 0, minWidth: '65px' }}>
-              <label className={styles.label}>Icon</label>
+              <label className={styles.label}>{t('admin.editChore.labelIcon')}</label>
               <input className={styles.input} value={icon} onChange={e => setIcon(e.target.value)} style={{ textAlign: 'center' }} />
             </div>
           </div>
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>Description</label>
+            <label className={styles.label}>{t('admin.editChore.labelDescription')}</label>
             <input className={styles.input} value={description} onChange={e => setDescription(e.target.value)} />
           </div>
 
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
-              <label className={styles.label}>Category</label>
+              <label className={styles.label}>{t('admin.editChore.labelCategory')}</label>
               <select className={styles.input} value={category} onChange={e => setCategory(e.target.value as Chore['category'])}>
-                <option value="required">Required</option>
-                <option value="core">Core</option>
-                <option value="bonus">Bonus</option>
+                <option value="required">{t('admin.editChore.categoryRequired')}</option>
+                <option value="core">{t('admin.editChore.categoryCore')}</option>
+                <option value="bonus">{t('admin.editChore.categoryBonus')}</option>
               </select>
             </div>
             <div className={styles.formGroup}>
-              <label className={styles.label}>Points</label>
+              <label className={styles.label}>{t('admin.editChore.labelPoints')}</label>
               <input className={styles.input} type="number" min={0} value={points} onChange={e => setPoints(parseInt(e.target.value) || 0)} />
             </div>
             <div className={styles.formGroup}>
-              <label className={styles.label}>Penalty</label>
+              <label className={styles.label}>{t('admin.editChore.labelPenalty')}</label>
               <input className={styles.input} type="number" min={0} value={missedPenalty} onChange={e => setMissedPenalty(parseInt(e.target.value) || 0)} placeholder="0" />
             </div>
             <div className={styles.formGroup}>
-              <label className={styles.label}>Minutes</label>
+              <label className={styles.label}>{t('admin.editChore.labelMinutes')}</label>
               <input className={styles.input} type="number" min={0} value={minutes} onChange={e => setMinutes(parseInt(e.target.value) || 0)} />
             </div>
           </div>
 
           <div className={styles.checkRow}>
             <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)} />
-            <span className={styles.checkLabel}>Requires parent approval</span>
+            <span className={styles.checkLabel}>{t('admin.editChore.requiresApproval')}</span>
           </div>
           <div className={styles.checkRow}>
             <input type="checkbox" checked={requiresPhoto} onChange={e => setRequiresPhoto(e.target.checked)} />
-            <span className={styles.checkLabel}>Requires photo proof</span>
+            <span className={styles.checkLabel}>{t('admin.editChore.requiresPhoto')}</span>
           </div>
           {requiresPhoto && (
             <div className={styles.formGroup}>
-              <label className={styles.label}>Photo source</label>
+              <label className={styles.label}>{t('admin.editChore.labelPhotoSource')}</label>
               <select className={styles.input} value={photoSource} onChange={e => setPhotoSource(e.target.value as 'child' | 'external' | 'both')}>
-                <option value="child">Child uploads photo</option>
-                <option value="external">External system (e.g. camera)</option>
-                <option value="both">External with manual fallback</option>
+                <option value="child">{t('admin.editChore.photoSourceChild')}</option>
+                <option value="external">{t('admin.editChore.photoSourceExternal')}</option>
+                <option value="both">{t('admin.editChore.photoSourceBoth')}</option>
               </select>
             </div>
           )}
 
           <div className={styles.saveRow}>
-            {saved && <span className={styles.saved}><Check size={14} /> Saved</span>}
+            {saved && <span className={styles.saved}><Check size={14} /> {t('admin.editChore.savedLabel')}</span>}
             {error && <span className={styles.error}>{error}</span>}
             <button className={styles.btnPrimary} onClick={handleSave} disabled={saving || !title.trim()}>
-              <Save size={14} /> {saving ? 'Saving...' : 'Save Details'}
+              <Save size={14} /> {saving ? t('admin.editChore.savingLabel') : t('admin.editChore.saveDetailsBtn')}
             </button>
           </div>
         </div>
@@ -212,7 +214,7 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
       {/* --- TTS Audio --- */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
-          <span className={styles.sectionTitle}>Kokoro TTS</span>
+          <span className={styles.sectionTitle}>{t('admin.editChore.sectionTTS')}</span>
         </div>
         <div className={styles.formGrid}>
           {ttsAudioURL ? (
@@ -221,42 +223,42 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
                 type="button"
                 className={styles.ttsPlayBtn}
                 onClick={handlePlayPause}
-                aria-label={ttsPlaying ? 'Pause TTS audio' : 'Play TTS audio'}
-                title={ttsPlaying ? 'Pause' : 'Play'}
+                aria-label={ttsPlaying ? t('admin.editChore.ttsPauseAriaLabel') : t('admin.editChore.ttsPlayAriaLabel')}
+                title={ttsPlaying ? t('admin.editChore.ttsPauseTitle') : t('admin.editChore.ttsPlayTitle')}
               >
                 {ttsPlaying ? <Pause size={18} /> : <Play size={18} />}
               </button>
               <audio ref={audioRef} src={audioSrc} preload="none" />
               <span className={styles.ttsHint}>
-                {ttsPlaying ? 'Playing…' : 'Click to preview generated audio'}
+                {ttsPlaying ? t('admin.editChore.ttsPlaying') : t('admin.editChore.ttsClickPreview')}
               </span>
             </div>
           ) : (
-            <div className={styles.ttsHint}>No TTS audio has been generated for this chore yet.</div>
+            <div className={styles.ttsHint}>{t('admin.editChore.ttsNoAudio')}</div>
           )}
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>Spoken description (TTS prompt)</label>
+            <label className={styles.label}>{t('admin.editChore.labelTTSDescription')}</label>
             <textarea
               className={styles.textarea}
               value={ttsDescription}
               onChange={e => setTtsDescription(e.target.value)}
-              placeholder="What should the TTS voice say for this chore?"
+              placeholder={t('admin.editChore.ttsDescriptionPlaceholder')}
               rows={3}
             />
           </div>
 
           <div className={styles.saveRow}>
-            {ttsSaved && <span className={styles.saved}><Check size={14} /> Regenerated</span>}
+            {ttsSaved && <span className={styles.saved}><Check size={14} /> {t('admin.editChore.ttsRegeneratedLabel')}</span>}
             {ttsError && <span className={styles.error}>{ttsError}</span>}
             <button
               type="button"
               className={styles.btnSecondary}
               onClick={handleGenerateTTSDescription}
               disabled={ttsGenerating || ttsRegenerating}
-              title="Generate a new spoken description with AI"
+              title={t('admin.editChore.suggestTextTitle')}
             >
-              <Sparkles size={14} /> {ttsGenerating ? 'Generating…' : 'Suggest Text'}
+              <Sparkles size={14} /> {ttsGenerating ? t('admin.editChore.generatingLabel') : t('admin.editChore.suggestTextBtn')}
             </button>
             <button
               type="button"
@@ -266,7 +268,7 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
             >
               <RefreshCw size={14} className={ttsRegenerating ? styles.spin : ''} />
               {' '}
-              {ttsRegenerating ? 'Regenerating…' : 'Save & Regenerate Audio'}
+              {ttsRegenerating ? t('admin.editChore.regeneratingLabel') : t('admin.editChore.regenerateAudioBtn')}
             </button>
           </div>
         </div>

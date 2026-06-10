@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import type { User } from '../types';
 import styles from './PhotoUpload.module.css';
 import { Camera, Check, AlertCircle, Loader2 } from 'lucide-react';
 
 export const PhotoUpload: React.FC = () => {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const scheduleId = parseInt(searchParams.get('scheduleId') || '');
   const date = searchParams.get('date') || '';
@@ -44,7 +46,7 @@ export const PhotoUpload: React.FC = () => {
       
       setDone(true);
     } catch (err: any) {
-      setError(err.message || 'Failed to upload photo');
+      setError(err.message || t('photo.uploadFailed'));
     } finally {
       setLoading(false);
     }
@@ -55,8 +57,8 @@ export const PhotoUpload: React.FC = () => {
       <div className={styles.container}>
         <div className={styles.errorBox}>
           <AlertCircle size={48} />
-          <h1>Invalid Link</h1>
-          <p>This upload link is missing information.</p>
+          <h1>{t('photo.invalidLinkTitle')}</h1>
+          <p>{t('photo.invalidLinkBody')}</p>
         </div>
       </div>
     );
@@ -67,8 +69,8 @@ export const PhotoUpload: React.FC = () => {
       <div className={styles.container}>
         <div className={styles.successBox}>
           <div className={styles.checkCircle}><Check size={48} /></div>
-          <h1>Photo Uploaded!</h1>
-          <p>Great job{user ? `, ${user.name}` : ''}! You can close this tab now.</p>
+          <h1>{t('photo.successTitle')}</h1>
+          <p>{user ? t('photo.successBodyNamed', { name: user.name }) : t('photo.successBody')}</p>
         </div>
       </div>
     );
@@ -77,18 +79,18 @@ export const PhotoUpload: React.FC = () => {
   return (
     <div className={styles.container}>
       <header className={styles.header}>
-        <h1>Photo Proof</h1>
-        {user && <p>Uploading for {user.name}</p>}
+        <h1>{t('photo.pageTitle')}</h1>
+        {user && <p>{t('photo.uploadingFor', { name: user.name })}</p>}
       </header>
 
       <div className={styles.content}>
         <div className={styles.uploadCard}>
           <Camera size={64} className={styles.cameraIcon} />
-          <h2>Take a picture</h2>
-          <p>Show your completed chore to earn your points!</p>
-          
+          <h2>{t('photo.takePicture')}</h2>
+          <p>{t('photo.takePictureHint')}</p>
+
           <label className={styles.uploadBtn}>
-            {loading ? <Loader2 className={styles.spinner} /> : 'Open Camera'}
+            {loading ? <Loader2 className={styles.spinner} /> : t('photo.openCamera')}
             <input 
               type="file" 
               accept="image/*" 

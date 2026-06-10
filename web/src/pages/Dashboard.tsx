@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, type TouchEvent as ReactTouchEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../ThemeContext';
 import { api, APIError } from '../api';
@@ -24,6 +25,7 @@ const QRCodeModal: React.FC<{
   onComplete: () => void;
   onAIReject?: (scheduleId: number, feedback: string, audioUrl?: string) => void;
 }> = ({ chore, userId, baseUrl, onClose, onComplete, onAIReject }) => {
+  const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -74,7 +76,7 @@ const QRCodeModal: React.FC<{
           setUploadError(err.data.ai_review.feedback);
         }
       } else {
-        setUploadError(err.message || 'Upload failed');
+        setUploadError(err.message || t('dashboard.qr.uploadFailed'));
       }
     } finally {
       setUploading(false);
@@ -103,8 +105,8 @@ const QRCodeModal: React.FC<{
     <div className={styles.modalOverlay}>
       <div className={styles.qrModal}>
         <button className={styles.closeBtn} onClick={onClose}><X size={24} /></button>
-        <h2>{alreadyCompleted ? 'Add Photo Proof' : 'Photo Proof Needed'}</h2>
-        <p>Scan this code with another device, or upload directly from this one.</p>
+        <h2>{alreadyCompleted ? t('dashboard.qr.titleAddPhoto') : t('dashboard.qr.titlePhotoNeeded')}</h2>
+        <p>{t('dashboard.qr.scanOrUpload')}</p>
 
         <div className={styles.qrWrapper}>
           <QRCodeSVG value={uploadUrl} size={256} marginSize={4} />
@@ -113,7 +115,7 @@ const QRCodeModal: React.FC<{
         <div className={styles.qrActions}>
           <label className={styles.directUploadBtn}>
             {uploading ? <Loader2 className={styles.spinner} size={18} /> : <Camera size={18} />}
-            {uploading ? 'Uploading...' : 'Take Photo on This Device'}
+            {uploading ? t('dashboard.qr.uploading') : t('dashboard.qr.takePhoto')}
             <input
               type="file"
               accept="image/*"
@@ -126,7 +128,7 @@ const QRCodeModal: React.FC<{
 
           <button className={styles.copyLinkBtn} onClick={handleCopyLink}>
             <Copy size={18} />
-            {copied ? 'Copied!' : 'Copy Link'}
+            {copied ? t('dashboard.qr.copied') : t('dashboard.qr.copyLink')}
           </button>
         </div>
 
@@ -134,10 +136,10 @@ const QRCodeModal: React.FC<{
 
         <div className={styles.qrStatus}>
           <Loader2 className={styles.spinner} size={20} />
-          <span>Waiting for photo...</span>
+          <span>{t('dashboard.qr.waiting')}</span>
         </div>
 
-        <p className={styles.qrHelp}>{alreadyCompleted ? 'Upload a photo to add proof for this chore.' : 'Your chore will be finished automatically once you upload the photo.'}</p>
+        <p className={styles.qrHelp}>{alreadyCompleted ? t('dashboard.qr.helpAddPhoto') : t('dashboard.qr.helpComplete')}</p>
       </div>
     </div>
   );
@@ -160,6 +162,7 @@ const CATEGORY_ICON_MAP: Record<string, React.FC<{ size?: number }>> = {
 };
 
 export const Dashboard: React.FC = () => {
+  const { t } = useTranslation();
   const { user, setUser } = useAuth();
   const { theme, setTheme, config } = useTheme();
   const { playComplete, playAllDone } = useThemeSound();
@@ -334,7 +337,7 @@ export const Dashboard: React.FC = () => {
         console.error(err);
         const message = err instanceof APIError && err.data?.error
           ? String(err.data.error)
-          : "Couldn't save — try again";
+          : t('dashboard.errors.couldntSave');
         setToast(message);
         setTimeout(() => setToast(null), 3000);
       }
@@ -388,7 +391,7 @@ export const Dashboard: React.FC = () => {
     } catch (e) {
       console.error('Redeem error:', e);
       setRedeemingId(null);
-      const msg = e instanceof APIError ? e.message : 'Redemption failed — try again';
+      const msg = e instanceof APIError ? e.message : t('dashboard.errors.redemptionFailed');
       showToast(msg);
     }
   };
@@ -397,7 +400,7 @@ export const Dashboard: React.FC = () => {
     if (!pointsData) return;
     // Personal goals occupy a single slot; shared rewards stack freely.
     if (!reward.shareable && pointsData.active_commitments.some(c => !c.shared_pool_id)) {
-      showToast('You already have a personal goal — finish or change it first');
+      showToast(t('dashboard.errors.alreadyHasGoal'));
       return;
     }
     setSavingTowardId(reward.id);
@@ -409,7 +412,7 @@ export const Dashboard: React.FC = () => {
       await loadExtras();
     } catch (e) {
       console.error('Save toward error:', e);
-      const msg = e instanceof APIError ? e.message : 'Could not start saving — try again';
+      const msg = e instanceof APIError ? e.message : t('dashboard.errors.couldNotStartSaving');
       showToast(msg);
     } finally {
       setSavingTowardId(null);
@@ -421,11 +424,11 @@ export const Dashboard: React.FC = () => {
     const raw = contributeAmounts[commitmentId] ?? '';
     const amount = parseInt(raw, 10);
     if (!Number.isFinite(amount) || amount <= 0) {
-      showToast('Enter a number of points to add');
+      showToast(t('dashboard.errors.enterPoints'));
       return;
     }
     if (amount > pointsData.balance) {
-      showToast(`You only have ${pointsData.balance} spendable`);
+      showToast(t('dashboard.errors.notEnoughPoints', { balance: pointsData.balance }));
       return;
     }
     setContributingIds(prev => new Set(prev).add(commitmentId));
@@ -433,10 +436,10 @@ export const Dashboard: React.FC = () => {
       await api.commitments.contribute(commitmentId, amount);
       setContributeAmounts(prev => ({ ...prev, [commitmentId]: '' }));
       await loadExtras();
-      showToast(`Saved ${amount} more!`);
+      showToast(t('dashboard.errors.savedMore', { amount }));
     } catch (e) {
       console.error('Contribute error:', e);
-      const msg = e instanceof APIError ? e.message : 'Could not save — try again';
+      const msg = e instanceof APIError ? e.message : t('dashboard.errors.couldNotSave');
       showToast(msg);
     } finally {
       setContributingIds(prev => {
@@ -468,17 +471,17 @@ export const Dashboard: React.FC = () => {
 
   const handleBreakCommitment = async (commitmentId: number, isShared: boolean) => {
     const msg = isShared
-      ? 'Leave this family goal? Your contribution will come back to your spendable balance.'
-      : 'Stop saving? Your saved points will go back to your spendable balance.';
+      ? t('dashboard.errors.breakSharedConfirm')
+      : t('dashboard.errors.breakPersonalConfirm');
     if (!window.confirm(msg)) return;
     setBreakingIds(prev => new Set(prev).add(commitmentId));
     try {
       await api.commitments.break(commitmentId);
       await loadExtras();
-      showToast(isShared ? 'Left family goal — your share is back' : 'Goal cancelled — points are back in your balance');
+      showToast(isShared ? t('dashboard.errors.leftFamilyGoal') : t('dashboard.errors.goalCancelled'));
     } catch (e) {
       console.error('Break commitment error:', e);
-      showToast('Could not cancel goal — try again');
+      showToast(t('dashboard.errors.couldNotCancelGoal'));
     } finally {
       setBreakingIds(prev => {
         const next = new Set(prev);
@@ -697,7 +700,7 @@ export const Dashboard: React.FC = () => {
       <div key={choreKey} className={clsx(styles.choreCardWrap, canSwipe && styles.choreCardSwipeable)}>
         {canSwipe && (
           <div className={clsx(styles.swipeHint, canSwipeUndo ? styles.swipeHintUndo : styles.swipeHintDone)} style={canSwipeUndo ? { right: '1.25rem', left: 'auto' } : undefined}>
-            {canSwipeUndo ? <><Undo2 size={20} /> Undo</> : <><CheckCircle size={20} /> Done!</>}
+            {canSwipeUndo ? <><Undo2 size={20} /> {t('dashboard.chore.swipeUndo')}</> : <><CheckCircle size={20} /> {t('dashboard.chore.swipeDone')}</>}
           </div>
         )}
         <div
@@ -733,7 +736,7 @@ export const Dashboard: React.FC = () => {
                   }
                   speak(ttsText);
                 }}
-                aria-label={`Read ${chore.title} aloud`}
+                aria-label={t('dashboard.chore.readAloud', { title: chore.title })}
               >
                 <Volume2 size={16} />
               </button>
@@ -746,23 +749,23 @@ export const Dashboard: React.FC = () => {
             <span className={styles.metaItem}><Clock size={14} /> {chore.estimated_minutes || 5}m</span>
             <span className={clsx(styles.metaItem, isPointsLocked && styles.pointsLocked)}>
               {isPointsLocked ? (
-                <><Lock size={12} /> {chore.points_value} pts pending</>
+                <><Lock size={12} /> {chore.points_value} {t('dashboard.chore.ptsPending')}</>
               ) : (
-                <><Star size={14} /> {chore.points_value} pts</>
+                <><Star size={14} /> {chore.points_value} {t('dashboard.chore.pts')}</>
               )}
             </span>
             {isExpired && chore.due_by && (
               <span className={styles.expiredBadge}>
                 {chore.expiry_penalty === 'block'
-                  ? `Expired at ${chore.due_by}`
+                  ? t('dashboard.chore.expiredAt', { time: chore.due_by })
                   : chore.expiry_penalty === 'no_points'
-                  ? `Late (0 pts)`
-                  : `Late (-${chore.expiry_penalty_value} pts)`}
+                  ? t('dashboard.chore.lateZeroPts')
+                  : t('dashboard.chore.latePenalty', { value: chore.expiry_penalty_value })}
               </span>
             )}
           </div>
           {chore.completed_by_sibling && chore.completed_by_name && (
-            <p className={styles.siblingCompletedText}>Completed by {chore.completed_by_name}</p>
+            <p className={styles.siblingCompletedText}>{t('dashboard.chore.completedBy', { name: chore.completed_by_name })}</p>
           )}
         </div>
 
@@ -775,7 +778,7 @@ export const Dashboard: React.FC = () => {
           ) : isExpired && chore.expiry_penalty === 'block' ? (
             <div className={styles.countdownBox}>
               <X size={14} className={styles.countdownIcon} />
-              <span className={styles.countdownTime}>Expired</span>
+              <span className={styles.countdownTime}>{t('dashboard.chore.expired')}</span>
             </div>
           ) : (
             <>
@@ -783,8 +786,8 @@ export const Dashboard: React.FC = () => {
                 <button
                   onClick={(e) => { e.stopPropagation(); setQrChore(chore); }}
                   className={styles.photoUploadBtn}
-                  aria-label="Upload photo proof"
-                  title="Upload photo proof"
+                  aria-label={t('dashboard.chore.uploadPhotoProof')}
+                  title={t('dashboard.chore.uploadPhotoProof')}
                 >
                   <Camera size={20} />
                 </button>
@@ -793,7 +796,7 @@ export const Dashboard: React.FC = () => {
                 onClick={() => handleToggleComplete(chore)}
                 disabled={isToggling}
                 className={clsx(styles.completeBtn, chore.completed && !chore.completed_by_sibling && styles.completeBtnActive, chore.completed && chore.completed_by_sibling && styles.completeBtnSibling)}
-                aria-label={chore.completed ? "Mark incomplete" : "Mark complete"}
+                aria-label={chore.completed ? t('dashboard.chore.markIncomplete') : t('dashboard.chore.markComplete')}
               >
                 {chore.completed_by_sibling ? <Users size={32} /> : chore.completed ? <CheckCircle size={32} /> : <div className={styles.circle} />}
               </button>
@@ -820,7 +823,7 @@ export const Dashboard: React.FC = () => {
                     speak(feedbackText);
                   }
                 }}
-                aria-label="Listen to feedback"
+                aria-label={t('dashboard.chore.listenToFeedback')}
               >
                 <Volume2 size={16} />
               </button>
@@ -889,7 +892,7 @@ export const Dashboard: React.FC = () => {
                     <div className={styles.sectionDivider}>
                       <span className={styles.dividerLine} />
                       <Clock size={14} className={styles.dividerIcon} />
-                      <span className={styles.dividerText}>Coming up later</span>
+                      <span className={styles.dividerText}>{t('dashboard.daily.comingUpLater')}</span>
                       <span className={styles.dividerLine} />
                     </div>
                     {upcoming.map(chore => renderChoreCard(chore))}
@@ -956,14 +959,14 @@ export const Dashboard: React.FC = () => {
         <div className={styles.goalHeader}>
           <div className={styles.goalIcon}>{commitment.reward_icon || (isShared ? '👨‍👩‍👧' : '🎯')}</div>
           <div className={styles.goalTitleBlock}>
-            <div className={styles.goalLabel}>{isShared ? 'Family goal' : 'Saving toward'}</div>
+            <div className={styles.goalLabel}>{isShared ? t('dashboard.goal.familyGoal') : t('dashboard.goal.savingToward')}</div>
             <div className={styles.goalName}>{commitment.reward_name}</div>
           </div>
-          {fullyFunded && <span className={styles.goalBadge}>Ready!</span>}
+          {fullyFunded && <span className={styles.goalBadge}>{t('dashboard.goal.ready')}</span>}
         </div>
         <div className={styles.goalAmounts}>
           <span><strong>{totalSaved}</strong> / {target} pts</span>
-          <span>{fullyFunded ? (isShared ? 'Tap redeem 🎉' : 'Fully funded 🎉') : `${remaining} to go`}</span>
+          <span>{fullyFunded ? (isShared ? t('dashboard.goal.tapRedeem') : t('dashboard.goal.fullyFunded')) : t('dashboard.goal.toGo', { remaining })}</span>
         </div>
         <div className={styles.goalProgressTrack}>
           <div
@@ -979,7 +982,7 @@ export const Dashboard: React.FC = () => {
                 key={c.user_id}
                 className={clsx(styles.contributorChip, c.user_id === user?.id && styles.contributorChipMe)}
               >
-                {c.user_id === user?.id ? 'You' : c.user_name}: <strong>{c.amount_saved}</strong>
+                {c.user_id === user?.id ? t('dashboard.goal.you') : c.user_name}: <strong>{c.amount_saved}</strong>
               </span>
             ))}
           </div>
@@ -987,7 +990,7 @@ export const Dashboard: React.FC = () => {
 
         <div className={styles.goalAuto}>
           <PiggyBank size={14} />
-          <span className={styles.goalAutoLabel}>Auto-save</span>
+          <span className={styles.goalAutoLabel}>{t('dashboard.goal.autoSave')}</span>
           <input
             type="range"
             min={0}
@@ -1006,7 +1009,7 @@ export const Dashboard: React.FC = () => {
               type="number"
               min={1}
               max={pointsData?.balance ?? 0}
-              placeholder={`Add points (max ${pointsData?.balance ?? 0})`}
+              placeholder={t('dashboard.goal.addPointsPlaceholder', { max: pointsData?.balance ?? 0 })}
               value={contributeAmount}
               onChange={e => setContributeAmounts(prev => ({ ...prev, [commitment.id]: e.target.value }))}
               className={styles.goalContributeInput}
@@ -1017,7 +1020,7 @@ export const Dashboard: React.FC = () => {
               disabled={contributing || !contributeAmount}
               style={{ flex: '0 0 auto', minWidth: 90 }}
             >
-              <Plus size={14} /> Save
+              <Plus size={14} /> {t('dashboard.goal.save')}
             </button>
           </div>
         )}
@@ -1032,7 +1035,7 @@ export const Dashboard: React.FC = () => {
               }}
               disabled={redeemingId === commitment.reward_id}
             >
-              <Gift size={14} /> Redeem now
+              <Gift size={14} /> {t('dashboard.goal.redeemNow')}
             </button>
           )}
           <button
@@ -1040,7 +1043,7 @@ export const Dashboard: React.FC = () => {
             onClick={() => handleBreakCommitment(commitment.id, isShared)}
             disabled={breaking}
           >
-            <X size={14} /> {isShared ? 'Leave goal' : 'Stop saving'}
+            <X size={14} /> {isShared ? t('dashboard.goal.leaveGoal') : t('dashboard.goal.stopSaving')}
           </button>
         </div>
       </div>
@@ -1064,7 +1067,7 @@ export const Dashboard: React.FC = () => {
           <Star size={20} className={styles.rewardsBalanceIcon} />
           <span className={styles.rewardsBalanceAmount}>{balance}</span>
           <span className={styles.rewardsBalanceLabel}>
-            spendable{committed > 0 ? ` · ${committed} saved` : ''}
+            {committed > 0 ? t('dashboard.rewards.spendableWithSaved', { committed }) : t('dashboard.rewards.spendable')}
           </span>
         </div>
 
@@ -1073,8 +1076,8 @@ export const Dashboard: React.FC = () => {
         {rewards.length === 0 ? (
           <div className={styles.empty}>
             <Gift size={48} className={styles.emptyIcon} />
-            <h3>No rewards yet</h3>
-            <p>Ask a parent to add some rewards!</p>
+            <h3>{t('dashboard.rewards.noRewardsTitle')}</h3>
+            <p>{t('dashboard.rewards.noRewardsHint')}</p>
           </div>
         ) : (
           <div className={styles.rewardsGrid}>
@@ -1107,19 +1110,19 @@ export const Dashboard: React.FC = () => {
                   <div className={styles.rewardInfo}>
                     <h3 className={styles.rewardName}>
                       {reward.name}
-                      {isShared && <> <span className={styles.goalBadge}><Users size={10} /> family</span></>}
-                      {isCommittedReward && !isShared && <> <span className={styles.goalBadge}><Target size={10} /> goal</span></>}
+                      {isShared && <> <span className={styles.goalBadge}><Users size={10} /> {t('dashboard.rewards.familyBadge')}</span></>}
+                      {isCommittedReward && !isShared && <> <span className={styles.goalBadge}><Target size={10} /> {t('dashboard.rewards.goalBadge')}</span></>}
                     </h3>
                     {reward.description && (
                       <p className={styles.rewardDesc}>{reward.description}</p>
                     )}
                     <div className={styles.rewardMeta}>
                       <span className={styles.rewardCost}>
-                        <Star size={12} /> {reward.effective_cost} pts
+                        <Star size={12} /> {reward.effective_cost} {t('dashboard.rewards.costPts')}
                       </span>
                       {reward.stock !== null && reward.stock !== undefined && (
                         <span className={styles.rewardStock}>
-                          {reward.stock} left
+                          {reward.stock} {t('dashboard.rewards.stockLeft')}
                         </span>
                       )}
                     </div>
@@ -1135,18 +1138,18 @@ export const Dashboard: React.FC = () => {
                       onClick={() => handleRedeem(reward)}
                     >
                       {redeemedId === reward.id
-                        ? <><CheckCircle size={14} /> Redeemed!</>
+                        ? <><CheckCircle size={14} /> {t('dashboard.rewards.redeemed')}</>
                         : isRedeeming
-                          ? '...'
+                          ? t('dashboard.rewards.redeeming')
                           : outOfStock
-                            ? 'Gone'
+                            ? t('dashboard.rewards.gone')
                             : isCommittedReward
-                              ? (fullyFunded ? 'Redeem' : `${totalSaved}/${target}`)
+                              ? (fullyFunded ? t('dashboard.rewards.redeem') : `${totalSaved}/${target}`)
                               : canAfford
-                                ? 'Redeem'
+                                ? t('dashboard.rewards.redeem')
                                 : isShared
-                                  ? 'Family goal'
-                                  : `Need ${reward.effective_cost - balance}`}
+                                  ? t('dashboard.rewards.familyGoalBtn')
+                                  : t('dashboard.rewards.needMore', { amount: reward.effective_cost - balance })}
                     </button>
                     {showSaveToward && (
                       <button
@@ -1155,10 +1158,10 @@ export const Dashboard: React.FC = () => {
                         disabled={isSavingToward}
                       >
                         {isSavingToward
-                          ? '...'
+                          ? t('dashboard.rewards.savingToward')
                           : isShared
-                            ? <><Users size={12} /> Join goal</>
-                            : <><Target size={12} /> Save toward</>}
+                            ? <><Users size={12} /> {t('dashboard.rewards.joinGoal')}</>
+                            : <><Target size={12} /> {t('dashboard.rewards.saveToward')}</>}
                       </button>
                     )}
                   </div>
@@ -1171,14 +1174,14 @@ export const Dashboard: React.FC = () => {
         {redemptions.length > 0 && (
           <div className={styles.redemptionHistory}>
             <h3 className={styles.redemptionTitle}>
-              <ShoppingBag size={16} /> Recent Redemptions
+              <ShoppingBag size={16} /> {t('dashboard.rewards.redemptionTitle')}
             </h3>
             <div className={styles.redemptionList}>
               {redemptions.map(r => (
                 <div key={r.id} className={styles.redemptionItem}>
                   {r.reward_icon && <span className={styles.redemptionIcon}>{r.reward_icon}</span>}
                   <span className={styles.redemptionName}>{r.reward_name}</span>
-                  <span className={styles.redemptionCost}>-{r.points_spent} pts</span>
+                  <span className={styles.redemptionCost}>{t('dashboard.rewards.redemptionCost', { points: r.points_spent })}</span>
                   <span className={styles.redemptionDate}>
                     {new Date(r.created_at).toLocaleDateString()}
                   </span>
@@ -1200,7 +1203,7 @@ export const Dashboard: React.FC = () => {
             {allDone ? (
               <><Trophy size={16} className={styles.trophyIcon} /> {config.messages.allDone}</>
             ) : (
-              <>{completedCount} of {availableCount} complete</>
+              <>{t('dashboard.progress.ofComplete', { completed: completedCount, available: availableCount })}</>
             )}
           </div>
           <span className={styles.progressPercent}>{progressPercent}%</span>
@@ -1222,7 +1225,7 @@ export const Dashboard: React.FC = () => {
         <Star size={18} className={styles.statIconBalance} />
         <div className={styles.statInfo}>
           <span className={styles.statValue}>{pointsData?.balance ?? 0}</span>
-          <span className={styles.statLabel}>Balance</span>
+          <span className={styles.statLabel}>{t('dashboard.stats.balance')}</span>
         </div>
       </div>
 
@@ -1242,7 +1245,7 @@ export const Dashboard: React.FC = () => {
         <Zap size={18} className={styles.statIconEarned} />
         <div className={styles.statInfo}>
           <span className={styles.statValue}>{earned}</span>
-          <span className={styles.statLabel}>Today</span>
+          <span className={styles.statLabel}>{t('dashboard.stats.today')}</span>
         </div>
       </div>
 
@@ -1251,7 +1254,7 @@ export const Dashboard: React.FC = () => {
           <Lock size={18} className={styles.statIconPending} />
           <div className={styles.statInfo}>
             <span className={styles.statValue}>{pending}</span>
-            <span className={styles.statLabel}>Pending</span>
+            <span className={styles.statLabel}>{t('dashboard.stats.pending')}</span>
           </div>
         </div>
       )}
@@ -1277,14 +1280,14 @@ export const Dashboard: React.FC = () => {
               <div className={styles.goalHeader}>
                 <div className={styles.goalIcon}>{c.reward_icon || (isShared ? '👨‍👩‍👧' : '🎯')}</div>
                 <div className={styles.goalTitleBlock}>
-                  <div className={styles.goalLabel}>{isShared ? 'Family goal' : 'Saving toward'}</div>
+                  <div className={styles.goalLabel}>{isShared ? t('dashboard.goal.familyGoal') : t('dashboard.goal.savingToward')}</div>
                   <div className={styles.goalName}>{c.reward_name}</div>
                 </div>
-                {fullyFunded && <span className={styles.goalBadge}>Ready!</span>}
+                {fullyFunded && <span className={styles.goalBadge}>{t('dashboard.goal.ready')}</span>}
               </div>
               <div className={styles.goalAmounts}>
-                <span><strong>{totalSaved}</strong> / {target} pts{isShared && c.amount_saved !== totalSaved ? ` · you: ${c.amount_saved}` : ''}</span>
-                <span>{fullyFunded ? 'Tap to redeem 🎉' : `${target - totalSaved} to go`}</span>
+                <span><strong>{totalSaved}</strong> / {target} pts{isShared && c.amount_saved !== totalSaved ? ` · ${t('dashboard.goal.youContrib', { amount: c.amount_saved })}` : ''}</span>
+                <span>{fullyFunded ? t('dashboard.goal.tapToRedeem') : t('dashboard.goal.toGo', { remaining: target - totalSaved })}</span>
               </div>
               <div className={styles.goalProgressTrack}>
                 <div
@@ -1307,7 +1310,7 @@ export const Dashboard: React.FC = () => {
       <div className={styles.streakBanner}>
         <Flame size={16} className={styles.streakBannerIcon} />
         <span className={styles.streakBannerText}>
-          {next_reward.days_remaining} day{next_reward.days_remaining !== 1 ? 's' : ''} to <strong>{next_reward.label}</strong> (+{next_reward.bonus_points} pts)
+          {t('dashboard.streak.daysToMilestone', { count: next_reward.days_remaining })} <strong>{next_reward.label}</strong> (+{next_reward.bonus_points} pts)
         </span>
       </div>
     );
@@ -1322,7 +1325,7 @@ export const Dashboard: React.FC = () => {
       )}
       <header className={styles.header}>
         <div className={styles.userProfile}>
-          <button className={styles.avatarMini} onClick={() => { setShowAvatarPicker(!showAvatarPicker); setShowThemePicker(false); setShowColorPicker(false); }} aria-label="Change avatar">
+          <button className={styles.avatarMini} onClick={() => { setShowAvatarPicker(!showAvatarPicker); setShowThemePicker(false); setShowColorPicker(false); }} aria-label={t('dashboard.header.changeAvatar')}>
             {user?.avatar_url ? <img src={user.avatar_url} alt={user.name} /> : <div className={styles.avatarPlaceholder} />}
           </button>
           <div>
@@ -1339,25 +1342,25 @@ export const Dashboard: React.FC = () => {
               if (!next) stop();
             }}
             className={clsx(styles.ttsToggle, ttsEnabled && styles.ttsToggleActive)}
-            aria-label={ttsEnabled ? 'Disable read aloud' : 'Enable read aloud'}
+            aria-label={ttsEnabled ? t('dashboard.header.disableReadAloud') : t('dashboard.header.enableReadAloud')}
           >
             {ttsEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
           </button>
-          <button onClick={() => { setShowColorPicker(!showColorPicker); setShowThemePicker(false); setShowAvatarPicker(false); }} className={styles.themeBtn} aria-label="Change line color">
+          <button onClick={() => { setShowColorPicker(!showColorPicker); setShowThemePicker(false); setShowAvatarPicker(false); }} className={styles.themeBtn} aria-label={t('dashboard.header.changeLineColor')}>
             <Sparkles size={20} />
           </button>
-          <button onClick={() => { setShowThemePicker(!showThemePicker); setShowAvatarPicker(false); setShowColorPicker(false); }} className={styles.themeBtn} aria-label="Change theme">
+          <button onClick={() => { setShowThemePicker(!showThemePicker); setShowAvatarPicker(false); setShowColorPicker(false); }} className={styles.themeBtn} aria-label={t('dashboard.header.changeTheme')}>
             <Palette size={20} />
           </button>
           <button
             onClick={() => setShowPinSettings(true)}
             className={styles.themeBtn}
-            aria-label={user?.has_pin ? 'Change PIN' : 'Set PIN'}
-            title={user?.has_pin ? 'Change PIN' : 'Set PIN'}
+            aria-label={user?.has_pin ? t('dashboard.header.changePIN') : t('dashboard.header.setPIN')}
+            title={user?.has_pin ? t('dashboard.header.changePIN') : t('dashboard.header.setPIN')}
           >
             <KeyRound size={20} />
           </button>
-          <button onClick={logout} className={styles.logoutBtn} aria-label="Logout">
+          <button onClick={logout} className={styles.logoutBtn} aria-label={t('dashboard.header.logout')}>
             <LogOut size={20} />
           </button>
         </div>
@@ -1437,8 +1440,8 @@ export const Dashboard: React.FC = () => {
         <>
           <div className={styles.pausedBanner}>
             <div className={styles.pausedIcon}>🏖️</div>
-            <h2 className={styles.pausedTitle}>You're on a break!</h2>
-            <p className={styles.pausedText}>Enjoy your time off. Your chores are paused and no points will be deducted while you're away.</p>
+            <h2 className={styles.pausedTitle}>{t('dashboard.paused.title')}</h2>
+            <p className={styles.pausedText}>{t('dashboard.paused.text')}</p>
           </div>
 
           <nav className={styles.nav}>
@@ -1447,7 +1450,7 @@ export const Dashboard: React.FC = () => {
               onClick={() => setView('rewards')}
             >
               <ShoppingBag size={18} />
-              Rewards
+              {t('dashboard.nav.rewards')}
             </button>
           </nav>
 
@@ -1470,21 +1473,21 @@ export const Dashboard: React.FC = () => {
               onClick={() => setView('daily')}
             >
               <LayoutDashboard size={18} />
-              Today
+              {t('dashboard.nav.today')}
             </button>
             <button
               className={clsx(styles.navItem, view === 'weekly' && styles.navItemActive)}
               onClick={() => setView('weekly')}
             >
               <Calendar size={18} />
-              Week
+              {t('dashboard.nav.week')}
             </button>
             <button
               className={clsx(styles.navItem, view === 'rewards' && styles.navItemActive)}
               onClick={() => setView('rewards')}
             >
               <ShoppingBag size={18} />
-              Rewards
+              {t('dashboard.nav.rewards')}
             </button>
           </nav>
 
@@ -1507,43 +1510,46 @@ export const Dashboard: React.FC = () => {
   );
 };
 
-const THEME_OPTIONS: { id: Theme; name: string; icon: string; preview: string }[] = [
-  { id: 'default', name: 'Classic', icon: '🌊', preview: '#38bdf8' },
-  { id: 'quest', name: 'Quest', icon: '⚔️', preview: '#fbbf24' },
-  { id: 'galaxy', name: 'Galaxy', icon: '🚀', preview: '#a855f7' },
-  { id: 'forest', name: 'Forest', icon: '🌲', preview: '#4ade80' },
+const THEME_OPTIONS: { id: Theme; nameKey: string; icon: string; preview: string }[] = [
+  { id: 'default', nameKey: 'dashboard.themes.classic', icon: '🌊', preview: '#38bdf8' },
+  { id: 'quest', nameKey: 'dashboard.themes.quest', icon: '⚔️', preview: '#fbbf24' },
+  { id: 'galaxy', nameKey: 'dashboard.themes.galaxy', icon: '🚀', preview: '#a855f7' },
+  { id: 'forest', nameKey: 'dashboard.themes.forest', icon: '🌲', preview: '#4ade80' },
 ];
 
-const ThemePicker: React.FC<{ current: Theme; onSelect: (t: Theme) => void }> = ({ current, onSelect }) => (
-  <div className={styles.themePicker}>
-    {THEME_OPTIONS.map(t => (
-      <button
-        key={t.id}
-        className={clsx(styles.themeOption, current === t.id && styles.themeOptionActive)}
-        onClick={() => onSelect(t.id)}
-      >
-        <div className={styles.themePreview} style={{ backgroundColor: t.preview }}>
-          <span className={styles.themeEmoji}>{t.icon}</span>
-        </div>
-        <span className={styles.themeName}>{t.name}</span>
-      </button>
-    ))}
-  </div>
-);
+const ThemePicker: React.FC<{ current: Theme; onSelect: (t: Theme) => void }> = ({ current, onSelect }) => {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.themePicker}>
+      {THEME_OPTIONS.map(opt => (
+        <button
+          key={opt.id}
+          className={clsx(styles.themeOption, current === opt.id && styles.themeOptionActive)}
+          onClick={() => onSelect(opt.id)}
+        >
+          <div className={styles.themePreview} style={{ backgroundColor: opt.preview }}>
+            <span className={styles.themeEmoji}>{opt.icon}</span>
+          </div>
+          <span className={styles.themeName}>{t(opt.nameKey)}</span>
+        </button>
+      ))}
+    </div>
+  );
+};
 
 const AVATAR_STYLES = [
-  { id: 'avataaars-neutral', label: 'Classic' },
-  { id: 'adventurer-neutral', label: 'Adventure' },
-  { id: 'big-ears-neutral', label: 'Big Ears' },
-  { id: 'bottts-neutral', label: 'Robots' },
-  { id: 'fun-emoji', label: 'Emoji' },
-  { id: 'lorelei-neutral', label: 'Lorelei' },
-  { id: 'croodles-neutral', label: 'Doodle' },
-  { id: 'pixel-art-neutral', label: 'Pixel' },
-  { id: 'thumbs', label: 'Thumbs' },
-  { id: 'notionists-neutral', label: 'Sketch' },
-  { id: 'shapes', label: 'Shapes' },
-  { id: 'glass', label: 'Glass' },
+  { id: 'avataaars-neutral', labelKey: 'dashboard.avatarStyles.classic' },
+  { id: 'adventurer-neutral', labelKey: 'dashboard.avatarStyles.adventure' },
+  { id: 'big-ears-neutral', labelKey: 'dashboard.avatarStyles.bigEars' },
+  { id: 'bottts-neutral', labelKey: 'dashboard.avatarStyles.robots' },
+  { id: 'fun-emoji', labelKey: 'dashboard.avatarStyles.emoji' },
+  { id: 'lorelei-neutral', labelKey: 'dashboard.avatarStyles.lorelei' },
+  { id: 'croodles-neutral', labelKey: 'dashboard.avatarStyles.doodle' },
+  { id: 'pixel-art-neutral', labelKey: 'dashboard.avatarStyles.pixel' },
+  { id: 'thumbs', labelKey: 'dashboard.avatarStyles.thumbs' },
+  { id: 'notionists-neutral', labelKey: 'dashboard.avatarStyles.sketch' },
+  { id: 'shapes', labelKey: 'dashboard.avatarStyles.shapes' },
+  { id: 'glass', labelKey: 'dashboard.avatarStyles.glass' },
 ];
 
 const avatarUrl = (style: string, seed: string) =>
@@ -1555,6 +1561,7 @@ const AvatarPicker: React.FC<{
   onSelect: (url: string) => void;
   onClose: () => void;
 }> = ({ currentUrl, userName, onSelect, onClose }) => {
+  const { t } = useTranslation();
   const [selectedStyle, setSelectedStyle] = useState(
     (() => {
       const match = currentUrl?.match(/dicebear\.com\/\d+\.x\/([^/]+)\//);
@@ -1573,14 +1580,14 @@ const AvatarPicker: React.FC<{
   return (
     <div className={styles.avatarPicker}>
       <div className={styles.avatarPickerHeader}>
-        <h3 className={styles.avatarPickerTitle}>Choose Your Look</h3>
+        <h3 className={styles.avatarPickerTitle}>{t('dashboard.avatarPicker.title')}</h3>
         <button className={styles.avatarPickerClose} onClick={onClose}>
           <span>✕</span>
         </button>
       </div>
 
       <div className={styles.avatarPickerPreview}>
-        <img src={previewUrl} alt="Avatar preview" className={styles.avatarPickerImg} />
+        <img src={previewUrl} alt={t('dashboard.avatarPicker.preview')} className={styles.avatarPickerImg} />
       </div>
 
       <div className={styles.avatarStyleGrid}>
@@ -1590,22 +1597,22 @@ const AvatarPicker: React.FC<{
             className={clsx(styles.avatarStyleBtn, selectedStyle === s.id && styles.avatarStyleBtnActive)}
             onClick={() => setSelectedStyle(s.id)}
           >
-            <img src={avatarUrl(s.id, seed)} alt={s.label} className={styles.avatarStylePreview} />
-            <span className={styles.avatarStyleLabel}>{s.label}</span>
+            <img src={avatarUrl(s.id, seed)} alt={t(s.labelKey)} className={styles.avatarStylePreview} />
+            <span className={styles.avatarStyleLabel}>{t(s.labelKey)}</span>
           </button>
         ))}
       </div>
 
       <div className={styles.avatarPickerActions}>
         <button className={styles.avatarRandomBtn} onClick={randomize}>
-          Shuffle
+          {t('dashboard.avatarPicker.shuffle')}
         </button>
         <button
           className={styles.avatarSaveBtn}
           onClick={() => onSelect(previewUrl)}
           disabled={previewUrl === currentUrl}
         >
-          Save
+          {t('dashboard.avatarPicker.save')}
         </button>
       </div>
     </div>
@@ -1613,31 +1620,34 @@ const AvatarPicker: React.FC<{
 };
 
 const LINE_COLORS = [
-  { color: '#38bdf8', name: 'Sky' },
-  { color: '#a78bfa', name: 'Lavender' },
-  { color: '#f472b6', name: 'Pink' },
-  { color: '#34d399', name: 'Mint' },
-  { color: '#fb923c', name: 'Orange' },
-  { color: '#facc15', name: 'Yellow' },
-  { color: '#f87171', name: 'Red' },
-  { color: '#22d3ee', name: 'Cyan' },
-  { color: '#818cf8', name: 'Indigo' },
-  { color: '#e879f9', name: 'Magenta' },
-  { color: '#4ade80', name: 'Green' },
-  { color: '#ffffff', name: 'White' },
+  { color: '#38bdf8', nameKey: 'dashboard.lineColors.sky' },
+  { color: '#a78bfa', nameKey: 'dashboard.lineColors.lavender' },
+  { color: '#f472b6', nameKey: 'dashboard.lineColors.pink' },
+  { color: '#34d399', nameKey: 'dashboard.lineColors.mint' },
+  { color: '#fb923c', nameKey: 'dashboard.lineColors.orange' },
+  { color: '#facc15', nameKey: 'dashboard.lineColors.yellow' },
+  { color: '#f87171', nameKey: 'dashboard.lineColors.red' },
+  { color: '#22d3ee', nameKey: 'dashboard.lineColors.cyan' },
+  { color: '#818cf8', nameKey: 'dashboard.lineColors.indigo' },
+  { color: '#e879f9', nameKey: 'dashboard.lineColors.magenta' },
+  { color: '#4ade80', nameKey: 'dashboard.lineColors.green' },
+  { color: '#ffffff', nameKey: 'dashboard.lineColors.white' },
 ];
 
-const LineColorPicker: React.FC<{ current: string; onSelect: (color: string) => void }> = ({ current, onSelect }) => (
-  <div className={styles.themePicker}>
-    {LINE_COLORS.map(c => (
-      <button
-        key={c.color}
-        className={clsx(styles.themeOption, current === c.color && styles.themeOptionActive)}
-        onClick={() => onSelect(c.color)}
-      >
-        <div className={styles.themePreview} style={{ backgroundColor: c.color }} />
-        <span className={styles.themeName}>{c.name}</span>
-      </button>
-    ))}
-  </div>
-);
+const LineColorPicker: React.FC<{ current: string; onSelect: (color: string) => void }> = ({ current, onSelect }) => {
+  const { t } = useTranslation();
+  return (
+    <div className={styles.themePicker}>
+      {LINE_COLORS.map(c => (
+        <button
+          key={c.color}
+          className={clsx(styles.themeOption, current === c.color && styles.themeOptionActive)}
+          onClick={() => onSelect(c.color)}
+        >
+          <div className={styles.themePreview} style={{ backgroundColor: c.color }} />
+          <span className={styles.themeName}>{t(c.nameKey)}</span>
+        </button>
+      ))}
+    </div>
+  );
+};

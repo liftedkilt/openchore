@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../AuthContext';
 import { api } from '../api';
 import styles from './SetupWizard.module.css';
@@ -8,10 +9,10 @@ import { UserPlus, Check, ArrowRight, Sparkles, Trash2, Palette } from 'lucide-r
 type Step = 'welcome' | 'children' | 'themes' | 'chores' | 'finish';
 
 const THEMES = [
-  { id: 'default', name: 'Classic Blue', color: '#3b82f6' },
-  { id: 'quest', name: 'Quest Adventure', color: '#f59e0b' },
-  { id: 'galaxy', name: 'Galaxy Purple', color: '#8b5cf6' },
-  { id: 'forest', name: 'Nature Forest', color: '#10b981' },
+  { id: 'default', nameKey: 'themeClassicBlue', color: '#3b82f6' },
+  { id: 'quest', nameKey: 'themeQuestAdventure', color: '#f59e0b' },
+  { id: 'galaxy', nameKey: 'themeGalaxyPurple', color: '#8b5cf6' },
+  { id: 'forest', nameKey: 'themeNatureForest', color: '#10b981' },
 ];
 
 const CHORE_PRESETS = [
@@ -24,6 +25,7 @@ const CHORE_PRESETS = [
 ];
 
 export const SetupWizard: React.FC = () => {
+  const { t } = useTranslation();
   const [step, setStep] = useState<Step>('welcome');
   const [children, setChildren] = useState<{ name: string; age?: number; theme: string; id?: number }[]>([]);
   const [newName, setNewName] = useState('');
@@ -72,7 +74,7 @@ export const SetupWizard: React.FC = () => {
       setStep('finish');
     } catch (err) {
       console.error(err);
-      setError('Failed to complete setup. Please try again.');
+      setError(t('setup.errorSetupFailed'));
     } finally {
       setLoading(false);
     }
@@ -84,10 +86,10 @@ export const SetupWizard: React.FC = () => {
         return (
           <div className={styles.stepContent}>
             <div className={styles.iconCircle}><Sparkles size={48} /></div>
-            <h1>Welcome to OpenChore!</h1>
-            <p>Let's get your family set up in just a few minutes.</p>
+            <h1>{t('setup.welcomeTitle')}</h1>
+            <p>{t('setup.welcomeDescription')}</p>
             <button className={styles.primaryBtn} onClick={() => setStep('children')}>
-              Get Started <ArrowRight size={20} />
+              {t('setup.getStarted')} <ArrowRight size={20} />
             </button>
           </div>
         );
@@ -95,19 +97,19 @@ export const SetupWizard: React.FC = () => {
       case 'children':
         return (
           <div className={styles.stepContent}>
-            <h1>Who's doing chores?</h1>
-            <p>Add your children's names to get started.</p>
-            
+            <h1>{t('setup.childrenTitle')}</h1>
+            <p>{t('setup.childrenDescription')}</p>
+
             <div className={styles.inputRow}>
-              <input 
-                type="text" 
-                placeholder="Child's name" 
-                value={newName} 
+              <input
+                type="text"
+                placeholder={t('setup.childNamePlaceholder')}
+                value={newName}
                 onChange={e => setNewName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addChild()}
               />
               <button className={styles.addBtn} onClick={addChild} disabled={!newName.trim()}>
-                <UserPlus size={20} /> Add
+                <UserPlus size={20} /> {t('setup.addButton')}
               </button>
             </div>
 
@@ -123,12 +125,12 @@ export const SetupWizard: React.FC = () => {
             </div>
 
             <div className={styles.navBtns}>
-              <button 
-                className={styles.primaryBtn} 
-                disabled={children.length === 0} 
+              <button
+                className={styles.primaryBtn}
+                disabled={children.length === 0}
                 onClick={() => setStep('themes')}
               >
-                Next <ArrowRight size={20} />
+                {t('setup.next')} <ArrowRight size={20} />
               </button>
             </div>
           </div>
@@ -137,23 +139,23 @@ export const SetupWizard: React.FC = () => {
       case 'themes':
         return (
           <div className={styles.stepContent}>
-            <h1>Pick their style</h1>
-            <p>Each child can have their own favorite theme.</p>
+            <h1>{t('setup.themesTitle')}</h1>
+            <p>{t('setup.themesDescription')}</p>
             
             <div className={styles.themeGrid}>
               {children.map((c, i) => (
                 <div key={i} className={styles.themeCard}>
                   <span className={styles.childName}>{c.name}</span>
                   <div className={styles.themeOptions}>
-                    {THEMES.map(t => (
-                      <button 
-                        key={t.id} 
-                        className={`${styles.themeOption} ${c.theme === t.id ? styles.activeTheme : ''}`}
-                        style={{ backgroundColor: t.color }}
-                        onClick={() => updateChildTheme(i, t.id)}
-                        title={t.name}
+                    {THEMES.map(theme => (
+                      <button
+                        key={theme.id}
+                        className={`${styles.themeOption} ${c.theme === theme.id ? styles.activeTheme : ''}`}
+                        style={{ backgroundColor: theme.color }}
+                        onClick={() => updateChildTheme(i, theme.id)}
+                        title={t(`setup.${theme.nameKey}`)}
                       >
-                        {c.theme === t.id && <Check size={16} color="white" />}
+                        {c.theme === theme.id && <Check size={16} color="white" />}
                       </button>
                     ))}
                   </div>
@@ -162,9 +164,9 @@ export const SetupWizard: React.FC = () => {
             </div>
 
             <div className={styles.navBtns}>
-              <button className={styles.secondaryBtn} onClick={() => setStep('children')}>Back</button>
+              <button className={styles.secondaryBtn} onClick={() => setStep('children')}>{t('setup.back')}</button>
               <button className={styles.primaryBtn} onClick={() => setStep('chores')}>
-                Next <ArrowRight size={20} />
+                {t('setup.next')} <ArrowRight size={20} />
               </button>
             </div>
           </div>
@@ -173,8 +175,8 @@ export const SetupWizard: React.FC = () => {
       case 'chores':
         return (
           <div className={styles.stepContent}>
-            <h1>Assign first chores</h1>
-            <p>Select some common chores to get started. You can add more later.</p>
+            <h1>{t('setup.choresTitle')}</h1>
+            <p>{t('setup.choresDescription')}</p>
             
             <div className={styles.presetGrid}>
               {CHORE_PRESETS.map((p, i) => (
@@ -199,9 +201,9 @@ export const SetupWizard: React.FC = () => {
             {error && <p style={{ color: '#ef4444', fontSize: '0.9rem', marginTop: '0.5rem' }}>{error}</p>}
 
             <div className={styles.navBtns}>
-              <button className={styles.secondaryBtn} onClick={() => setStep('themes')}>Back</button>
+              <button className={styles.secondaryBtn} onClick={() => setStep('themes')}>{t('setup.back')}</button>
               <button className={styles.primaryBtn} onClick={handleFinish} disabled={loading}>
-                {loading ? 'Setting up...' : 'Finish Setup'}
+                {loading ? t('setup.settingUp') : t('setup.finishSetup')}
               </button>
             </div>
           </div>
@@ -211,10 +213,10 @@ export const SetupWizard: React.FC = () => {
         return (
           <div className={styles.stepContent}>
             <div className={styles.iconCircle} style={{ backgroundColor: '#10b981' }}><Check size={48} color="white" /></div>
-            <h1>All set!</h1>
-            <p>Your family is ready to start earning points.</p>
+            <h1>{t('setup.finishTitle')}</h1>
+            <p>{t('setup.finishDescription')}</p>
             <button className={styles.primaryBtn} onClick={() => navigate('/login')}>
-              Go to Login
+              {t('setup.goToLogin')}
             </button>
           </div>
         );

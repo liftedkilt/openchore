@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Delete } from 'lucide-react';
 import styles from './PinPad.module.css';
 
@@ -16,6 +17,7 @@ interface PinPadProps {
 }
 
 export const PinPad: React.FC<PinPadProps> = ({ prompt, error, onSubmit, length = 4, resetKey }) => {
+  const { t } = useTranslation();
   const [code, setCode] = useState('');
   const [shaking, setShaking] = useState(false);
 
@@ -78,7 +80,7 @@ export const PinPad: React.FC<PinPadProps> = ({ prompt, error, onSubmit, length 
           if (d === '') return <div key={i} className={styles.keyEmpty} />;
           if (d === 'del') {
             return (
-              <button key={i} type="button" className={styles.key} onClick={handleDelete} aria-label="Delete">
+              <button key={i} type="button" className={styles.key} onClick={handleDelete} aria-label={t('common.pinPad.deleteAriaLabel')}>
                 <Delete size={22} />
               </button>
             );

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface BarChartItem {
   label: string;
@@ -21,10 +22,11 @@ export const BarChart: React.FC<BarChartProps> = ({
   showValues = true,
   horizontal = false,
 }) => {
+  const { t } = useTranslation();
   if (data.length === 0) {
     return (
       <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-        No data
+        {t('reports.barChart.noData')}
       </div>
     );
   }

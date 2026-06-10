@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import type { User, ScheduledChore, UserStreakData, PointBalance, PendingCompletion } from '../../types';
 import adminStyles from '../../pages/AdminDashboard.module.css';
@@ -81,6 +82,7 @@ function initialsFor(name: string): string {
 }
 
 export const KidsStatusTab: React.FC = () => {
+  const { t } = useTranslation();
   const [kids, setKids] = useState<KidStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -148,7 +150,7 @@ export const KidsStatusTab: React.FC = () => {
       setKids(results);
     } catch (e) {
       console.error(e);
-      setError('Failed to load kids status. Try refreshing.');
+      setError(t('admin.kidsStatusTab.loadError'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -165,24 +167,24 @@ export const KidsStatusTab: React.FC = () => {
     });
   };
 
-  if (loading) return <p className={adminStyles.emptyText}>Loading...</p>;
+  if (loading) return <p className={adminStyles.emptyText}>{t('admin.kidsStatusTab.loading')}</p>;
 
   return (
     <div>
       <div className={styles.refreshBar}>
         <div>
-          <h2 className={adminStyles.sectionTitle}>Kids Status</h2>
+          <h2 className={adminStyles.sectionTitle}>{t('admin.kidsStatusTab.heading')}</h2>
           <p className={adminStyles.sectionSubtitle}>
-            Today's progress at a glance — {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+            {t('admin.kidsStatusTab.subtitle', { date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) })}
           </p>
         </div>
         <button
           className={adminStyles.btnSmall}
           onClick={load}
           disabled={refreshing}
-          title="Refresh"
+          title={t('admin.kidsStatusTab.refreshTitle')}
         >
-          <RefreshCw size={14} className={refreshing ? adminStyles.spinning : undefined} /> Refresh
+          <RefreshCw size={14} className={refreshing ? adminStyles.spinning : undefined} /> {t('admin.kidsStatusTab.refreshLabel')}
         </button>
       </div>
 
@@ -190,7 +192,7 @@ export const KidsStatusTab: React.FC = () => {
 
       {kids.length === 0 && (
         <div className={adminStyles.emptyState}>
-          <p>No children configured. Add a child in the People tab to see their status here.</p>
+          <p>{t('admin.kidsStatusTab.noChildren')}</p>
         </div>
       )}
 
@@ -238,28 +240,28 @@ export const KidsStatusTab: React.FC = () => {
                 <div className={styles.info}>
                   <div className={styles.nameRow}>
                     <span className={styles.name}>{kid.user.name}</span>
-                    {kid.user.paused && <span className={styles.pausedTag}>Paused</span>}
+                    {kid.user.paused && <span className={styles.pausedTag}>{t('admin.kidsStatusTab.paused')}</span>}
                     {hasAlert && (
                       <span className={styles.alertTag}>
-                        <AlertTriangle size={11} /> {b.overdue} overdue
+                        <AlertTriangle size={11} /> {t('admin.kidsStatusTab.overdue', { count: b.overdue })}
                       </span>
                     )}
                     {!hasAlert && allRequiredAndCoreDone && (
                       <span className={styles.doneTag}>
-                        <Check size={11} /> All done
+                        <Check size={11} /> {t('admin.kidsStatusTab.allDone')}
                       </span>
                     )}
                   </div>
 
                   <div className={styles.progressText}>
                     {totalChores === 0 ? (
-                      <span className={styles.progressTextMuted}>No chores scheduled today</span>
+                      <span className={styles.progressTextMuted}>{t('admin.kidsStatusTab.noChoresScheduled')}</span>
                     ) : (
                       <>
                         {b.requiredTotal > 0 && (
                           <span>
                             <strong>{b.requiredCompleted}</strong>
-                            <span className={styles.progressTextMuted}>/{b.requiredTotal}</span> required
+                            <span className={styles.progressTextMuted}>/{b.requiredTotal}</span> {t('admin.kidsStatusTab.categoryRequired')}
                           </span>
                         )}
                         {b.coreTotal > 0 && (
@@ -268,12 +270,12 @@ export const KidsStatusTab: React.FC = () => {
                             <strong style={b.requiredTotal > 0 ? { color: 'var(--text-primary)' } : undefined}>
                               {b.coreCompleted}
                             </strong>
-                            <span className={styles.progressTextMuted}>/{b.coreTotal}</span> core
+                            <span className={styles.progressTextMuted}>/{b.coreTotal}</span> {t('admin.kidsStatusTab.categoryCore')}
                           </span>
                         )}
                         {b.bonusTotal > 0 && (
                           <span className={styles.progressTextMuted}>
-                            · <strong style={{ color: 'var(--text-primary)' }}>{b.bonusCompleted}</strong>/{b.bonusTotal} bonus
+                            · <strong style={{ color: 'var(--text-primary)' }}>{b.bonusCompleted}</strong>/{b.bonusTotal} {t('admin.kidsStatusTab.categoryBonus')}
                           </span>
                         )}
                       </>
@@ -305,25 +307,25 @@ export const KidsStatusTab: React.FC = () => {
                   )}
                   {b.bonusTotal > 0 && !bonusUnlocked && (
                     <div className={styles.bonusHint}>
-                      Bonus unlocks when required + core are done
+                      {t('admin.kidsStatusTab.bonusHint')}
                     </div>
                   )}
 
                   <div className={styles.statsRow}>
                     <span className={clsx(styles.stat, styles.statStreak)}>
-                      <Flame size={13} /> {kid.streak}d streak
+                      <Flame size={13} /> {t('admin.kidsStatusTab.streak', { count: kid.streak })}
                     </span>
                     <span className={clsx(styles.stat, styles.statPoints)}>
-                      <Star size={13} /> {kid.balance} pts
+                      <Star size={13} /> {t('admin.kidsStatusTab.points', { count: kid.balance })}
                     </span>
                     {kid.pendingApprovals > 0 && (
                       <span className={clsx(styles.stat, styles.statPending)}>
-                        <Clock size={13} /> {kid.pendingApprovals} awaiting approval
+                        <Clock size={13} /> {t('admin.kidsStatusTab.awaitingApproval', { count: kid.pendingApprovals })}
                       </span>
                     )}
                     {b.pendingOnToday > 0 && b.pendingOnToday !== kid.pendingApprovals && (
                       <span className={clsx(styles.stat, styles.statPending)}>
-                        <Clock size={13} /> {b.pendingOnToday} pending today
+                        <Clock size={13} /> {t('admin.kidsStatusTab.pendingToday', { count: b.pendingOnToday })}
                       </span>
                     )}
                   </div>
@@ -338,17 +340,17 @@ export const KidsStatusTab: React.FC = () => {
               {isExpanded && (
                 <div id={detailsId} className={styles.details}>
                   {kid.loadError && (
-                    <div className={styles.error}>Couldn't load this child's chores.</div>
+                    <div className={styles.error}>{t('admin.kidsStatusTab.childLoadError')}</div>
                   )}
                   {!kid.loadError && kid.chores.length === 0 && (
-                    <div className={styles.emptyChore}>No chores scheduled today.</div>
+                    <div className={styles.emptyChore}>{t('admin.kidsStatusTab.noChoresScheduledDetail')}</div>
                   )}
                   {!kid.loadError && kid.chores.length > 0 && (
                     <>
                       {(['required', 'core', 'bonus'] as const).map(cat => {
                         const items = kid.chores.filter(c => c.category === cat);
                         if (items.length === 0) return null;
-                        const label = cat === 'required' ? 'Required' : cat === 'core' ? 'Core' : 'Bonus';
+                        const label = cat === 'required' ? t('admin.kidsStatusTab.labelRequired') : cat === 'core' ? t('admin.kidsStatusTab.labelCore') : t('admin.kidsStatusTab.labelBonus');
                         return (
                           <div key={cat} className={styles.categorySection}>
                             <span className={styles.categoryLabel}>{label}</span>
@@ -369,19 +371,19 @@ export const KidsStatusTab: React.FC = () => {
                                       {c.title}
                                     </span>
                                     {c.completed && isPending && (
-                                      <span className={clsx(styles.choreStatus, styles.statusPending)}>Pending</span>
+                                      <span className={clsx(styles.choreStatus, styles.statusPending)}>{t('admin.kidsStatusTab.statusPending')}</span>
                                     )}
                                     {c.completed && !isPending && (
                                       <span className={clsx(styles.choreStatus, styles.statusDone)}>
-                                        +{c.points_value}
+                                        {t('admin.kidsStatusTab.statusDone', { points: c.points_value })}
                                       </span>
                                     )}
                                     {!c.completed && isOverdue && (
-                                      <span className={clsx(styles.choreStatus, styles.statusOverdue)}>Overdue</span>
+                                      <span className={clsx(styles.choreStatus, styles.statusOverdue)}>{t('admin.kidsStatusTab.statusOverdue')}</span>
                                     )}
                                     {!c.completed && !isOverdue && (
                                       <span className={clsx(styles.choreStatus, styles.statusIdle)}>
-                                        {c.points_value} pts
+                                        {t('admin.kidsStatusTab.statusIdle', { points: c.points_value })}
                                       </span>
                                     )}
                                   </div>
@@ -401,7 +403,7 @@ export const KidsStatusTab: React.FC = () => {
       </div>
 
       <p className={styles.refreshHint} style={{ marginTop: '1rem', textAlign: 'center' }}>
-        Tap a child to see their chores for today.
+        {t('admin.kidsStatusTab.tapHint')}
       </p>
     </div>
   );

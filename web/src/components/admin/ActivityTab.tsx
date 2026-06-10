@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import type { User, PointTransaction } from '../../types';
 import styles from '../../pages/AdminDashboard.module.css';
@@ -6,6 +7,7 @@ import { Star, Gift, Coins, Flame, Undo2, Activity } from 'lucide-react';
 import clsx from 'clsx';
 
 export const ActivityTab: React.FC = () => {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<User[]>([]);
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,9 +46,9 @@ export const ActivityTab: React.FC = () => {
     const diffMin = Math.floor(diffMs / 60000);
     const diffHr = Math.floor(diffMs / 3600000);
 
-    if (diffMin < 1) return 'just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
-    if (diffHr < 24) return `${diffHr}h ago`;
+    if (diffMin < 1) return t('admin.activityTab.justNow');
+    if (diffMin < 60) return t('admin.activityTab.minutesAgo', { count: diffMin });
+    if (diffHr < 24) return t('admin.activityTab.hoursAgo', { count: diffHr });
 
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
       d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -54,14 +56,14 @@ export const ActivityTab: React.FC = () => {
 
   const getReasonLabel = (reason: string) => {
     switch (reason) {
-      case 'chore_complete': return 'Chore completed';
-      case 'chore_uncomplete': return 'Chore undone';
-      case 'reward_redeem': return 'Reward redeemed';
-      case 'streak_bonus': return 'Streak bonus';
-      case 'admin_adjust': return 'Admin adjustment';
-      case 'expiry_penalty': return 'Late penalty';
-      case 'points_decay': return 'Points decay';
-      case 'missed_chore': return 'Missed chore penalty';
+      case 'chore_complete': return t('admin.activityTab.reason.chore_complete');
+      case 'chore_uncomplete': return t('admin.activityTab.reason.chore_uncomplete');
+      case 'reward_redeem': return t('admin.activityTab.reason.reward_redeem');
+      case 'streak_bonus': return t('admin.activityTab.reason.streak_bonus');
+      case 'admin_adjust': return t('admin.activityTab.reason.admin_adjust');
+      case 'expiry_penalty': return t('admin.activityTab.reason.expiry_penalty');
+      case 'points_decay': return t('admin.activityTab.reason.points_decay');
+      case 'missed_chore': return t('admin.activityTab.reason.missed_chore');
       default: return reason;
     }
   };
@@ -87,15 +89,15 @@ export const ActivityTab: React.FC = () => {
     load();
   };
 
-  if (loading) return <p className={styles.emptyText}>Loading...</p>;
+  if (loading) return <p className={styles.emptyText}>{t('admin.activityTab.loading')}</p>;
 
   return (
     <div>
-      <h2 className={styles.sectionTitle}>Activity Log</h2>
-      <p className={styles.sectionSubtitle}>{transactions.length} events</p>
+      <h2 className={styles.sectionTitle}>{t('admin.activityTab.title')}</h2>
+      <p className={styles.sectionSubtitle}>{t('admin.activityTab.eventCount', { count: transactions.length })}</p>
 
       <div className={styles.activityList}>
-        {transactions.length === 0 && <p className={styles.emptyText}>No activity yet</p>}
+        {transactions.length === 0 && <p className={styles.emptyText}>{t('admin.activityTab.empty')}</p>}
         {transactions.map(txn => (
           <div key={`${txn.user_id}-${txn.id}`} className={styles.activityItem}>
             <div className={styles.activityIcon}>{getReasonIcon(txn.reason)}</div>
@@ -112,8 +114,8 @@ export const ActivityTab: React.FC = () => {
             </div>
             <button
               className={clsx(styles.iconBtn, styles.iconBtnSm)}
-              title="Undo this event"
-              aria-label="Undo this event"
+              title={t('admin.activityTab.undoTitle')}
+              aria-label={t('admin.activityTab.undoTitle')}
               onClick={() => handleUndo(txn)}
             >
               <Undo2 size={14} />

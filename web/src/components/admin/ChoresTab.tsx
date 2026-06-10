@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import type { Chore, User } from '../../types';
 import styles from '../../pages/AdminDashboard.module.css';
@@ -10,6 +11,7 @@ import { ScheduleManager } from './ScheduleManager';
 import { TriggerManager } from './TriggerManager';
 
 export const ChoresTab: React.FC = () => {
+  const { t } = useTranslation();
   const [chores, setChores] = useState<Chore[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [editingChore, setEditingChore] = useState<Chore | null>(null);
@@ -24,7 +26,7 @@ export const ChoresTab: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (id: number, name: string) => {
-    if (!confirm(`Delete chore "${name}"? This action cannot be undone.`)) return;
+    if (!confirm(t('admin.choresTab.confirmDelete', { name }))) return;
     await api.chores.delete(id);
     load();
   };
@@ -36,9 +38,9 @@ export const ChoresTab: React.FC = () => {
   return (
     <div>
       <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitle}>All Chores</h2>
+        <h2 className={styles.sectionTitle}>{t('admin.choresTab.heading')}</h2>
         <button className={styles.addBtn} onClick={() => setWizardOpen(true)}>
-          <Plus size={18} /> Add Chore
+          <Plus size={18} /> {t('admin.choresTab.addChore')}
         </button>
       </div>
 
@@ -76,17 +78,17 @@ export const ChoresTab: React.FC = () => {
                 </div>
                 {chore.description && <p className={styles.listItemDesc}>{chore.description}</p>}
                 <div className={styles.listItemMeta}>
-                  <span><Star size={12} /> {chore.points_value} pts</span>
-                  {chore.estimated_minutes && <span><Clock size={12} /> {chore.estimated_minutes}m</span>}
-                  {chore.requires_approval && <span title="Requires Approval"><Activity size={12} /> Approval</span>}
-                  {chore.requires_photo && <span title="Requires Photo"><Clock size={12} /> Photo</span>}
+                  <span><Star size={12} /> {t('admin.choresTab.points', { count: chore.points_value })}</span>
+                  {chore.estimated_minutes && <span><Clock size={12} /> {t('admin.choresTab.minutes', { count: chore.estimated_minutes })}</span>}
+                  {chore.requires_approval && <span title={t('admin.choresTab.requiresApprovalTitle')}><Activity size={12} /> {t('admin.choresTab.requiresApprovalLabel')}</span>}
+                  {chore.requires_photo && <span title={t('admin.choresTab.requiresPhotoTitle')}><Clock size={12} /> {t('admin.choresTab.requiresPhotoLabel')}</span>}
                 </div>
               </div>
               <div className={styles.listItemActions}>
-                <button className={styles.iconBtn} title="Edit" aria-label="Edit chore" onClick={(e) => { e.stopPropagation(); handleEdit(chore); }}>
+                <button className={styles.iconBtn} title={t('admin.choresTab.editTitle')} aria-label={t('admin.choresTab.editAriaLabel')} onClick={(e) => { e.stopPropagation(); handleEdit(chore); }}>
                   <Edit2 size={16} />
                 </button>
-                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} title="Delete" aria-label="Delete chore" onClick={(e) => { e.stopPropagation(); handleDelete(chore.id, chore.name); }}>
+                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} title={t('admin.choresTab.deleteTitle')} aria-label={t('admin.choresTab.deleteAriaLabel')} onClick={(e) => { e.stopPropagation(); handleDelete(chore.id, chore.name); }}>
                   <Trash2 size={16} />
                 </button>
               </div>

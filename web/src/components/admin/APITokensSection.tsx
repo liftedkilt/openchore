@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import type { APIToken } from '../../types';
 import styles from '../../pages/AdminDashboard.module.css';
@@ -6,6 +7,7 @@ import { Plus, Trash2, Check, Copy, Key, AlertTriangle } from 'lucide-react';
 import clsx from 'clsx';
 
 export const APITokensSection: React.FC = () => {
+  const { t } = useTranslation();
   const [tokens, setTokens] = useState<APIToken[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [tokenName, setTokenName] = useState('');
@@ -15,8 +17,8 @@ export const APITokensSection: React.FC = () => {
 
   const loadTokens = useCallback(async () => {
     try {
-      const t = await api.tokens.list();
-      setTokens(t);
+      const tokenList = await api.tokens.list();
+      setTokens(tokenList);
     } catch (e) { console.error(e); }
   }, []);
 
@@ -61,19 +63,19 @@ export const APITokensSection: React.FC = () => {
     }
   };
 
-  const activeTokens = tokens.filter(t => !t.revoked);
-  const revokedTokens = tokens.filter(t => t.revoked);
+  const activeTokens = tokens.filter(tok => !tok.revoked);
+  const revokedTokens = tokens.filter(tok => tok.revoked);
 
   return (
     <div className={styles.form} style={{ marginTop: '1.5rem' }}>
       <div className={styles.formHeader}>
-        <h3>API Tokens</h3>
+        <h3>{t('admin.apiTokens.heading')}</h3>
         <button className={styles.btnSmall} onClick={() => { setShowForm(f => !f); setNewToken(null); }}>
-          <Plus size={14} /> Add
+          <Plus size={14} /> {t('admin.apiTokens.addButton')}
         </button>
       </div>
       <p className={styles.sectionDesc}>
-        Generate tokens for external integrations (Home Assistant, scripts, etc.) to authenticate with the API.
+        {t('admin.apiTokens.description')}
       </p>
 
       {/* New token reveal banner */}
@@ -82,11 +84,11 @@ export const APITokensSection: React.FC = () => {
           <div className={styles.flexRow} style={{ marginBottom: '0.5rem' }}>
             <AlertTriangle size={16} style={{ color: '#f59e0b' }} />
             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b' }}>
-              Copy this token now — it will not be shown again
+              {t('admin.apiTokens.copyNowWarning')}
             </span>
           </div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-            Token for <strong>{newToken.name}</strong>:
+            {t('admin.apiTokens.tokenFor', { name: newToken.name })}
           </p>
           <div className={styles.flexRow}>
             <code className={styles.tokenCode}>
@@ -97,11 +99,11 @@ export const APITokensSection: React.FC = () => {
               onClick={() => handleCopy(newToken.token)}
               style={{ flexShrink: 0 }}
             >
-              {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
+              {copied ? <><Check size={14} /> {t('admin.apiTokens.copied')}</> : <><Copy size={14} /> {t('admin.apiTokens.copy')}</>}
             </button>
           </div>
           <button onClick={() => setNewToken(null)} className={styles.dismissBtn}>
-            Dismiss
+            {t('admin.apiTokens.dismiss')}
           </button>
         </div>
       )}
@@ -111,12 +113,12 @@ export const APITokensSection: React.FC = () => {
         <form onSubmit={handleCreate} style={{ marginBottom: '1rem' }}>
           <div className={styles.formGrid}>
             <div className={styles.formGroup}>
-              <label className={styles.label}>Token Name</label>
+              <label className={styles.label}>{t('admin.apiTokens.tokenNameLabel')}</label>
               <input
                 className={styles.input}
                 value={tokenName}
                 onChange={e => setTokenName(e.target.value)}
-                placeholder="e.g. Home Assistant, CI Pipeline"
+                placeholder={t('admin.apiTokens.tokenNamePlaceholder')}
                 required
                 autoFocus
               />
@@ -124,32 +126,32 @@ export const APITokensSection: React.FC = () => {
           </div>
           <div className={styles.formActions}>
             <button type="submit" className={styles.btnPrimary} disabled={creating || !tokenName.trim()}>
-              <Key size={14} /> {creating ? 'Creating...' : 'Create Token'}
+              <Key size={14} /> {creating ? t('admin.apiTokens.creating') : t('admin.apiTokens.createToken')}
             </button>
-            <button type="button" className={styles.btnSecondary} onClick={() => setShowForm(false)}>Cancel</button>
+            <button type="button" className={styles.btnSecondary} onClick={() => setShowForm(false)}>{t('admin.apiTokens.cancel')}</button>
           </div>
         </form>
       )}
 
       {/* Token list */}
       {activeTokens.length === 0 && revokedTokens.length === 0 && !showForm && (
-        <p className={styles.emptyTextItalic}>No API tokens created</p>
+        <p className={styles.emptyTextItalic}>{t('admin.apiTokens.noTokens')}</p>
       )}
 
-      {activeTokens.map(t => (
-        <div key={t.id} className={styles.listItem} style={{ marginBottom: '0.5rem' }}>
+      {activeTokens.map(tok => (
+        <div key={tok.id} className={styles.listItem} style={{ marginBottom: '0.5rem' }}>
           <div className={styles.listItemContentRow}>
             <Key size={16} style={{ color: 'var(--accent-blue)', flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className={styles.tokenName}>{t.name}</div>
+              <div className={styles.tokenName}>{tok.name}</div>
               <div className={styles.tokenMeta}>
-                <span>Created {new Date(t.created_at).toLocaleDateString()}</span>
-                {t.last_used_at && <span>Last used {new Date(t.last_used_at).toLocaleDateString()}</span>}
-                {!t.last_used_at && <span style={{ fontStyle: 'italic' }}>Never used</span>}
+                <span>{t('admin.apiTokens.created', { date: new Date(tok.created_at).toLocaleDateString() })}</span>
+                {tok.last_used_at && <span>{t('admin.apiTokens.lastUsed', { date: new Date(tok.last_used_at).toLocaleDateString() })}</span>}
+                {!tok.last_used_at && <span style={{ fontStyle: 'italic' }}>{t('admin.apiTokens.neverUsed')}</span>}
               </div>
             </div>
-            <button className={clsx(styles.btnSmall, styles.btnDanger)} onClick={() => handleRevoke(t.id)}>
-              <Trash2 size={14} /> Revoke
+            <button className={clsx(styles.btnSmall, styles.btnDanger)} onClick={() => handleRevoke(tok.id)}>
+              <Trash2 size={14} /> {t('admin.apiTokens.revoke')}
             </button>
           </div>
         </div>
@@ -158,17 +160,17 @@ export const APITokensSection: React.FC = () => {
       {revokedTokens.length > 0 && (
         <>
           <div className={styles.revokedLabel}>
-            Revoked
+            {t('admin.apiTokens.revokedLabel')}
           </div>
-          {revokedTokens.map(t => (
-            <div key={t.id} className={styles.listItem} style={{ marginBottom: '0.5rem', opacity: 0.5 }}>
+          {revokedTokens.map(tok => (
+            <div key={tok.id} className={styles.listItem} style={{ marginBottom: '0.5rem', opacity: 0.5 }}>
               <div className={styles.listItemContentRow}>
                 <Key size={16} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className={styles.tokenName} style={{ textDecoration: 'line-through' }}>{t.name}</div>
+                  <div className={styles.tokenName} style={{ textDecoration: 'line-through' }}>{tok.name}</div>
                   <div className={styles.tokenMeta}>
-                    <span>Created {new Date(t.created_at).toLocaleDateString()}</span>
-                    <span style={{ color: '#ef4444', fontWeight: 600 }}>Revoked</span>
+                    <span>{t('admin.apiTokens.created', { date: new Date(tok.created_at).toLocaleDateString() })}</span>
+                    <span style={{ color: '#ef4444', fontWeight: 600 }}>{t('admin.apiTokens.revokedStatus')}</span>
                   </div>
                 </div>
               </div>

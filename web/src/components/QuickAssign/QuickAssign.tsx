@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import Modal from '../Modal/Modal';
 import { api } from '../../api';
 import { localDateStr, toggleInArray } from '../../utils';
@@ -13,6 +14,7 @@ interface Props {
 }
 
 const QuickAssign: React.FC<Props> = ({ isOpen, onClose }) => {
+  const { t } = useTranslation();
   const [chores, setChores] = useState<Chore[]>([]);
   const [users, setUsers] = useState<User[]>([]);
 
@@ -89,19 +91,19 @@ const QuickAssign: React.FC<Props> = ({ isOpen, onClose }) => {
       );
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to assign chore');
+      setError(err.message || t('dashboard.quickAssign.errorFailed'));
     } finally {
       setAssigning(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Quick Assign" maxWidth="420px">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('dashboard.quickAssign.title')} maxWidth="420px">
       <div className={styles.form}>
         {error && <div className={styles.error}>{error}</div>}
 
         <div className={styles.section}>
-          <label className={styles.label}>Chore</label>
+          <label className={styles.label}>{t('dashboard.quickAssign.labelChore')}</label>
           <select
             className={styles.select}
             value={selectedChoreId}
@@ -110,11 +112,11 @@ const QuickAssign: React.FC<Props> = ({ isOpen, onClose }) => {
               setSelectedChoreId(val === 'new' ? 'new' : val === '' ? '' : Number(val));
             }}
           >
-            <option value="">Pick a chore...</option>
+            <option value="">{t('dashboard.quickAssign.chorePlaceholder')}</option>
             {chores.map(c => (
               <option key={c.id} value={c.id}>{c.title}</option>
             ))}
-            <option value="new">+ New chore...</option>
+            <option value="new">{t('dashboard.quickAssign.choreNewOption')}</option>
           </select>
 
           {selectedChoreId === 'new' && (
@@ -122,13 +124,13 @@ const QuickAssign: React.FC<Props> = ({ isOpen, onClose }) => {
               <input
                 className={styles.input}
                 type="text"
-                placeholder="Chore name"
+                placeholder={t('dashboard.quickAssign.choreNamePlaceholder')}
                 value={newTitle}
                 onChange={e => setNewTitle(e.target.value)}
                 autoFocus
               />
               <div className={styles.pointsRow}>
-                <label className={styles.labelSmall}>Points</label>
+                <label className={styles.labelSmall}>{t('dashboard.quickAssign.labelPoints')}</label>
                 <input
                   className={clsx(styles.input, styles.pointsInput)}
                   type="number"
@@ -142,7 +144,7 @@ const QuickAssign: React.FC<Props> = ({ isOpen, onClose }) => {
         </div>
 
         <div className={styles.section}>
-          <label className={styles.label}>Who</label>
+          <label className={styles.label}>{t('dashboard.quickAssign.labelWho')}</label>
           <div className={styles.avatarPicker}>
             {users.map(u => (
               <button
@@ -161,25 +163,25 @@ const QuickAssign: React.FC<Props> = ({ isOpen, onClose }) => {
         </div>
 
         <div className={styles.section}>
-          <label className={styles.label}>When</label>
+          <label className={styles.label}>{t('dashboard.quickAssign.labelWhen')}</label>
           <div className={styles.datePicker}>
             <button
               className={clsx(styles.dateChip, dateMode === 'today' && styles.dateChipActive)}
               onClick={() => setDateMode('today')}
             >
-              Today
+              {t('dashboard.quickAssign.dateToday')}
             </button>
             <button
               className={clsx(styles.dateChip, dateMode === 'tomorrow' && styles.dateChipActive)}
               onClick={() => setDateMode('tomorrow')}
             >
-              Tomorrow
+              {t('dashboard.quickAssign.dateTomorrow')}
             </button>
             <button
               className={clsx(styles.dateChip, dateMode === 'custom' && styles.dateChipActive)}
               onClick={() => setDateMode('custom')}
             >
-              Pick date
+              {t('dashboard.quickAssign.datePickDate')}
             </button>
           </div>
           {dateMode === 'custom' && (
@@ -197,7 +199,7 @@ const QuickAssign: React.FC<Props> = ({ isOpen, onClose }) => {
           disabled={!canAssign || assigning}
           onClick={handleAssign}
         >
-          {assigning ? 'Assigning...' : 'Assign'}
+          {assigning ? t('dashboard.quickAssign.btnAssigning') : t('dashboard.quickAssign.btnAssign')}
         </button>
       </div>
     </Modal>

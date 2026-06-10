@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import { BarChart } from '../components/charts/BarChart';
 import { LineChart } from '../components/charts/LineChart';
@@ -118,6 +119,7 @@ const categoryStyleMap: Record<string, string> = {
 
 export const Reports: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [period, setPeriod] = useState<Period>('week');
   const [date, setDate] = useState(todayStr());
   const [data, setData] = useState<ReportsData | null>(null);
@@ -131,7 +133,7 @@ export const Reports: React.FC = () => {
       const resp = await api.admin.getAISummary(userId, period, date);
       setAiSummaries(prev => ({ ...prev, [userId]: resp.summary }));
     } catch (e) {
-      const msg = e instanceof Error && e.message ? e.message : 'Failed to generate summary.';
+      const msg = e instanceof Error && e.message ? e.message : t('reports.failedToGenerateSummary');
       setAiSummaries(prev => ({ ...prev, [userId]: msg }));
     } finally {
       setSummaryLoading(prev => ({ ...prev, [userId]: false }));
@@ -170,7 +172,7 @@ export const Reports: React.FC = () => {
         <button className={styles.backBtn} onClick={() => navigate('/admin/dashboard')}>
           <ArrowLeft size={18} />
         </button>
-        <h1 className={styles.title}>Reports</h1>
+        <h1 className={styles.title}>{t('reports.title')}</h1>
       </header>
 
       {/* Period selector */}
@@ -185,7 +187,7 @@ export const Reports: React.FC = () => {
               className={clsx(styles.periodTab, period === p && styles.periodTabActive)}
               onClick={() => handlePeriodChange(p)}
             >
-              {p.charAt(0).toUpperCase() + p.slice(1)}
+              {t(`reports.period_${p}`)}
             </button>
           ))}
         </div>
@@ -201,11 +203,11 @@ export const Reports: React.FC = () => {
       )}
 
       {loading ? (
-        <div className={styles.loading}>Loading reports...</div>
+        <div className={styles.loading}>{t('reports.loadingReports')}</div>
       ) : !data ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}><BarChart3 size={48} /></div>
-          <div>Failed to load reports</div>
+          <div>{t('reports.failedToLoadReports')}</div>
         </div>
       ) : (
         <div className={styles.content}>
@@ -213,10 +215,10 @@ export const Reports: React.FC = () => {
           <div className={styles.card}>
             <div className={styles.cardTitle}>
               <Users size={16} className={styles.cardTitleIcon} />
-              Kid Scorecards
+              {t('reports.kidScorecards')}
             </div>
             {data.kids.length === 0 ? (
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>No data for this period</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>{t('reports.noDataForPeriod')}</div>
             ) : (
               <div className={styles.kidGrid}>
                 {data.kids.map(kid => (
@@ -232,9 +234,9 @@ export const Reports: React.FC = () => {
                       <div className={styles.kidInfo}>
                         <div className={styles.kidName}>{kid.name}</div>
                         <div className={styles.kidStats}>
-                          <span className={styles.kidStat}>{kid.total_completed}/{kid.total_assigned} done</span>
-                          <span className={styles.kidStat}>{kid.points_earned} pts</span>
-                          <span className={styles.kidStat}>{kid.current_streak}d streak</span>
+                          <span className={styles.kidStat}>{t('reports.doneCount', { completed: kid.total_completed, assigned: kid.total_assigned })}</span>
+                          <span className={styles.kidStat}>{t('reports.pointsEarned', { count: kid.points_earned })}</span>
+                          <span className={styles.kidStat}>{t('reports.streakDays', { count: kid.current_streak })}</span>
                         </div>
                       </div>
                       <div className={clsx(styles.kidRate, rateColor(kid.completion_rate))}>
@@ -252,9 +254,9 @@ export const Reports: React.FC = () => {
                         disabled={summaryLoading[kid.user_id]}
                       >
                         {summaryLoading[kid.user_id] ? (
-                          <><span className={styles.spinnerSmall} /> Generating...</>
+                          <><span className={styles.spinnerSmall} /> {t('reports.generating')}</>
                         ) : (
-                          <><Sparkles size={12} /> AI Summary</>
+                          <><Sparkles size={12} /> {t('reports.aiSummary')}</>
                         )}
                       </button>
                     )}
@@ -268,21 +270,21 @@ export const Reports: React.FC = () => {
           <div className={styles.card}>
             <div className={styles.cardTitle}>
               <TrendingUp size={16} className={styles.cardTitleIcon} />
-              Completion Trend
+              {t('reports.completionTrend')}
             </div>
             <LineChart
               height={200}
               series={[
                 {
-                  data: data.trend.map(t => ({ label: t.date, value: t.completed })),
+                  data: data.trend.map(d => ({ label: d.date, value: d.completed })),
                   color: '#22c55e',
-                  label: 'Completed',
+                  label: t('reports.seriesCompleted'),
                   filled: true,
                 },
                 {
-                  data: data.trend.map(t => ({ label: t.date, value: t.assigned })),
+                  data: data.trend.map(d => ({ label: d.date, value: d.assigned })),
                   color: 'var(--accent-blue)',
-                  label: 'Assigned',
+                  label: t('reports.seriesAssigned'),
                   filled: false,
                 },
               ]}
@@ -293,10 +295,10 @@ export const Reports: React.FC = () => {
           <div className={styles.card}>
             <div className={styles.cardTitle}>
               <AlertTriangle size={16} className={styles.cardTitleIcon} />
-              Most Missed Chores
+              {t('reports.mostMissedChores')}
             </div>
             {data.most_missed.length === 0 ? (
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>No missed chores!</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>{t('reports.noMissedChores')}</div>
             ) : (
               <BarChart
                 data={data.most_missed.map(m => ({
@@ -315,10 +317,10 @@ export const Reports: React.FC = () => {
           <div className={styles.card}>
             <div className={styles.cardTitle}>
               <BarChart3 size={16} className={styles.cardTitleIcon} />
-              Category Breakdown
+              {t('reports.categoryBreakdown')}
             </div>
             {data.categories.length === 0 ? (
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>No data</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>{t('reports.noData')}</div>
             ) : (
               <div className={styles.categoryList}>
                 {data.categories.map(cat => (
@@ -348,10 +350,10 @@ export const Reports: React.FC = () => {
           <div className={styles.card}>
             <div className={styles.cardTitle}>
               <Coins size={16} className={styles.cardTitleIcon} />
-              Points Flow
+              {t('reports.pointsFlow')}
             </div>
             {data.points.length === 0 ? (
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>No data</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>{t('reports.noData')}</div>
             ) : (
               <div className={styles.pointsGrid}>
                 {data.points.map(p => (
@@ -360,10 +362,10 @@ export const Reports: React.FC = () => {
                     <div className={styles.pointsValues}>
                       <span className={styles.pointsEarned}>+{p.points_earned}</span>
                       {p.points_decayed > 0 && (
-                        <span className={styles.pointsDecayed}>-{p.points_decayed} decay</span>
+                        <span className={styles.pointsDecayed}>{t('reports.pointsDecayed', { count: p.points_decayed })}</span>
                       )}
                       {p.points_spent > 0 && (
-                        <span className={styles.pointsSpent}>-{p.points_spent} spent</span>
+                        <span className={styles.pointsSpent}>{t('reports.pointsSpent', { count: p.points_spent })}</span>
                       )}
                     </div>
                   </div>
@@ -376,7 +378,7 @@ export const Reports: React.FC = () => {
           <div className={styles.card}>
             <div className={styles.cardTitle}>
               <Calendar size={16} className={styles.cardTitleIcon} />
-              Best / Worst Days
+              {t('reports.bestWorstDays')}
             </div>
             <BarChart
               data={data.day_of_week.map(d => ({

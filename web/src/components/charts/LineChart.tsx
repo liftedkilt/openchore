@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface LineChartPoint {
   label: string;
@@ -21,10 +22,11 @@ export const LineChart: React.FC<LineChartProps> = ({
   series,
   height = 200,
 }) => {
+  const { t } = useTranslation();
   if (series.length === 0 || series.every(s => s.data.length === 0)) {
     return (
       <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-        No data
+        {t('reports.lineChart.noData')}
       </div>
     );
   }
@@ -128,7 +130,7 @@ export const LineChart: React.FC<LineChartProps> = ({
         return (
           <g key={si} transform={`translate(${padding.left + si * 90}, ${chartHeight - 6})`}>
             <rect width={10} height={3} rx={1.5} fill={color} />
-            <text x={14} y={3} fill="var(--text-secondary)" fontSize="9">{s.label || `Series ${si + 1}`}</text>
+            <text x={14} y={3} fill="var(--text-secondary)" fontSize="9">{s.label || t('reports.lineChart.seriesFallback', { index: si + 1 })}</text>
           </g>
         );
       })}

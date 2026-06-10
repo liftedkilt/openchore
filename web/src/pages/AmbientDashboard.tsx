@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api, fetchAsUser } from '../api';
 import type { User, ScheduledChore, UserStreakData, PointsData } from '../types';
 import styles from './AmbientDashboard.module.css';
@@ -168,6 +169,7 @@ const TimelineChart: React.FC<{ kids: KidData[]; colors: string[] }> = ({ kids, 
 
 export const AmbientDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [kids, setKids] = useState<KidData[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
@@ -301,12 +303,12 @@ export const AmbientDashboard: React.FC = () => {
               </div>
               <h2 className={styles.name}>{kid.user.name}</h2>
               <div className={styles.completionCount}>{kid.completed}/{kid.total}</div>
-              <div className={styles.completionLabel}>chores done</div>
+              <div className={styles.completionLabel}>{t('ambient.choresDone')}</div>
               <div className={styles.statsRow}>
                 {kid.streak > 0 && (
-                  <span className={styles.streak}><Flame size={14} /> {kid.streak}d</span>
+                  <span className={styles.streak}><Flame size={14} /> {t('ambient.streakDays', { count: kid.streak })}</span>
                 )}
-                <span className={styles.points}>{kid.pointsToday} pts today</span>
+                <span className={styles.points}>{t('ambient.ptsToday', { count: kid.pointsToday })}</span>
               </div>
               {/* Color indicator matching chart line */}
               <div className={styles.colorDot} style={{ backgroundColor: color }} />
@@ -317,7 +319,7 @@ export const AmbientDashboard: React.FC = () => {
 
       {/* Combined timeline chart */}
       <div className={styles.chartPanel}>
-        <h3 className={styles.chartTitle}>Today's Progress</h3>
+        <h3 className={styles.chartTitle}>{t('ambient.todaysProgress')}</h3>
         <TimelineChart kids={sortedKids} colors={chartColors} />
       </div>
     </div>

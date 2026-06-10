@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api, APIError } from '../api';
 import { useAuth } from '../AuthContext';
 import type { User } from '../types';
 import styles from './ProfileSelection.module.css';
 import { UserCircle, Settings, Monitor, Lock, ArrowLeft } from 'lucide-react';
 import PinPad from '../components/PinPad/PinPad';
+import { LanguageSelector } from '../components/LanguageSelector/LanguageSelector';
 
 export const ProfileSelection: React.FC = () => {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<User[]>([]);
   const [pendingUser, setPendingUser] = useState<User | null>(null);
   const [pinError, setPinError] = useState('');
@@ -48,9 +51,9 @@ export const ProfileSelection: React.FC = () => {
       finalizeLogin(pendingUser);
     } catch (e) {
       if (e instanceof APIError && e.status === 401) {
-        setPinError('Incorrect PIN');
+        setPinError(t('profile.incorrectPin'));
       } else {
-        setPinError('Could not verify PIN');
+        setPinError(t('profile.couldNotVerifyPin'));
       }
     }
   };
@@ -64,7 +67,7 @@ export const ProfileSelection: React.FC = () => {
           className={styles.backBtn}
           onClick={() => { setPendingUser(null); setPinError(''); }}
         >
-          <ArrowLeft size={20} /> Back
+          <ArrowLeft size={20} /> {t('profile.back')}
         </button>
         <div className={styles.pinPrompt}>
           <div className={styles.pinAvatar}>
@@ -74,7 +77,7 @@ export const ProfileSelection: React.FC = () => {
           </div>
           <h1 className={styles.pinName}>{pendingUser.name}</h1>
           <PinPad
-            prompt="Enter your PIN"
+            prompt={t('profile.enterPin')}
             error={pinError}
             onSubmit={handlePinSubmit}
           />
@@ -94,12 +97,12 @@ export const ProfileSelection: React.FC = () => {
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.title}>Welcome back!</h1>
-      <p className={styles.subtitle}>Who's doing chores today?</p>
+      <h1 className={styles.title}>{t('profile.welcomeBack')}</h1>
+      <p className={styles.subtitle}>{t('profile.whoIsDoingChores')}</p>
 
       <div className={styles.grid}>
         {kids.map(u => (
-          <button key={u.id} className={styles.card} onClick={() => handleSelect(u)} role="button" aria-label={`Select profile for ${u.name}`}>
+          <button key={u.id} className={styles.card} onClick={() => handleSelect(u)} role="button" aria-label={t('profile.selectProfile', { name: u.name })}>
             <div className={styles.avatarWrapper}>
               {u.avatar_url ? (
                 <img src={u.avatar_url} alt={u.name} className={styles.avatar} />
@@ -107,7 +110,7 @@ export const ProfileSelection: React.FC = () => {
                 <UserCircle size={80} className={styles.placeholder} />
               )}
               {u.has_pin && (
-                <div className={styles.lockBadge} aria-label="PIN protected">
+                <div className={styles.lockBadge} aria-label={t('profile.pinProtected')}>
                   <Lock size={14} />
                 </div>
               )}
@@ -121,7 +124,7 @@ export const ProfileSelection: React.FC = () => {
         <div className={styles.adminSection}>
           <div className={styles.adminRow}>
             {admins.map(u => (
-              <button key={u.id} className={styles.adminCard} onClick={() => handleSelect(u)} role="button" aria-label={`Select profile for ${u.name}`}>
+              <button key={u.id} className={styles.adminCard} onClick={() => handleSelect(u)} role="button" aria-label={t('profile.selectProfile', { name: u.name })}>
                 <div className={styles.adminAvatar}>
                   {u.avatar_url ? <img src={u.avatar_url} alt={u.name} /> : <UserCircle size={32} />}
                 </div>
@@ -136,12 +139,13 @@ export const ProfileSelection: React.FC = () => {
       <div className={styles.bottomBtns}>
         <button className={styles.settingsBtn} onClick={() => navigate('/ambient')}>
           <Monitor size={18} />
-          <span>Wall Display</span>
+          <span>{t('profile.wallDisplay')}</span>
         </button>
         <button className={styles.settingsBtn} onClick={() => navigate('/admin')}>
           <Settings size={18} />
-          <span>Manage</span>
+          <span>{t('profile.manage')}</span>
         </button>
+        <LanguageSelector />
       </div>
     </div>
   );

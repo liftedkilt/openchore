@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import type { User, Theme, UserDecayConfig } from '../../types';
 import styles from '../../pages/AdminDashboard.module.css';
@@ -6,6 +7,7 @@ import { Plus, Trash2, Edit2, X, Save, Clock, Pause, Play, KeyRound } from 'luci
 import clsx from 'clsx';
 
 const DecayConfigEditor: React.FC<{ userId: number }> = ({ userId }) => {
+  const { t } = useTranslation();
   const [config, setConfig] = useState<UserDecayConfig | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [rate, setRate] = useState('5');
@@ -36,35 +38,35 @@ const DecayConfigEditor: React.FC<{ userId: number }> = ({ userId }) => {
     setSaving(false);
   };
 
-  if (!config) return <div className={styles.scheduleSection} style={{ padding: '0.5rem' }}>Loading...</div>;
+  if (!config) return <div className={styles.scheduleSection} style={{ padding: '0.5rem' }}>{t('admin.usersTab.loading')}</div>;
 
   return (
     <div className={styles.scheduleSection}>
       <div className={styles.scheduleHeader}>
-        <span className={styles.scheduleTitle}>Points Decay</span>
+        <span className={styles.scheduleTitle}>{t('admin.usersTab.decayTitle')}</span>
       </div>
       <div className={styles.scheduleForm}>
         <div className={styles.formGroup}>
           <label className={clsx(styles.label, styles.flexRow)}>
             <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} />
-            Enable points decay
+            {t('admin.usersTab.decayEnableLabel')}
           </label>
-          <span className={styles.helpText}>When enabled, points are deducted if non-bonus chores were not all completed the previous day.</span>
+          <span className={styles.helpText}>{t('admin.usersTab.decayHelpText')}</span>
         </div>
         {enabled && (
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
-              <label className={styles.label}>Points to deduct</label>
+              <label className={styles.label}>{t('admin.usersTab.decayPointsLabel')}</label>
               <input className={styles.input} type="number" min="1" value={rate} onChange={e => setRate(e.target.value)} />
             </div>
             <div className={styles.formGroup}>
-              <label className={styles.label}>Check every (hours)</label>
+              <label className={styles.label}>{t('admin.usersTab.decayIntervalLabel')}</label>
               <input className={styles.input} type="number" min="1" value={intervalHours} onChange={e => setIntervalHours(e.target.value)} />
             </div>
           </div>
         )}
         <button className={styles.btnPrimary} onClick={handleSave} disabled={saving} style={{ marginTop: '0.5rem' }}>
-          <Save size={14} /> Save
+          <Save size={14} /> {t('admin.usersTab.saveBtn')}
         </button>
       </div>
     </div>
@@ -76,6 +78,7 @@ const UserForm: React.FC<{
   onSave: () => void;
   onCancel: () => void;
 }> = ({ user, onSave, onCancel }) => {
+  const { t } = useTranslation();
   const [name, setName] = useState(user?.name || '');
   const [role, setRole] = useState(user?.role || 'child');
   const [age, setAge] = useState(user?.age?.toString() || '');
@@ -110,45 +113,45 @@ const UserForm: React.FC<{
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
       <div className={styles.formHeader}>
-        <h3>{user ? 'Edit Person' : 'New Person'}</h3>
+        <h3>{user ? t('admin.usersTab.formEditTitle') : t('admin.usersTab.formNewTitle')}</h3>
         <button type="button" className={styles.iconBtn} onClick={onCancel}><X size={18} /></button>
       </div>
 
       <div className={styles.formGrid}>
         <div className={styles.formRow}>
           <div className={styles.formGroup}>
-            <label className={styles.label}>Name</label>
-            <input className={styles.input} value={name} onChange={e => setName(e.target.value)} required placeholder="Name" />
+            <label className={styles.label}>{t('admin.usersTab.fieldName')}</label>
+            <input className={styles.input} value={name} onChange={e => setName(e.target.value)} required placeholder={t('admin.usersTab.fieldNamePlaceholder')} />
           </div>
           <div className={styles.formGroup}>
-            <label className={styles.label}>Role</label>
+            <label className={styles.label}>{t('admin.usersTab.fieldRole')}</label>
             <select className={styles.input} value={role} onChange={e => setRole(e.target.value)}>
-              <option value="child">Child</option>
-              <option value="admin">Admin</option>
+              <option value="child">{t('admin.usersTab.roleChild')}</option>
+              <option value="admin">{t('admin.usersTab.roleAdmin')}</option>
             </select>
           </div>
           <div className={styles.formGroup}>
-            <label className={styles.label}>Age</label>
-            <input className={styles.input} type="number" min="1" max="99" value={age} onChange={e => setAge(e.target.value)} placeholder="Optional" />
+            <label className={styles.label}>{t('admin.usersTab.fieldAge')}</label>
+            <input className={styles.input} type="number" min="1" max="99" value={age} onChange={e => setAge(e.target.value)} placeholder={t('admin.usersTab.fieldAgePlaceholder')} />
           </div>
         </div>
         {isChild && (
           <div className={styles.formGroup}>
-            <label className={styles.label}>Theme</label>
+            <label className={styles.label}>{t('admin.usersTab.fieldTheme')}</label>
             <select className={styles.input} value={userTheme} onChange={e => setUserTheme(e.target.value as Theme)}>
-              <option value="default">🌊 Classic</option>
-              <option value="quest">⚔️ Quest</option>
-              <option value="galaxy">🚀 Galaxy</option>
-              <option value="forest">🌲 Forest</option>
+              <option value="default">{t('admin.usersTab.themeDefault')}</option>
+              <option value="quest">{t('admin.usersTab.themeQuest')}</option>
+              <option value="galaxy">{t('admin.usersTab.themeGalaxy')}</option>
+              <option value="forest">{t('admin.usersTab.themeForest')}</option>
             </select>
           </div>
         )}
       </div>
 
       <div className={styles.formActions}>
-        <button type="button" className={styles.btnSecondary} onClick={onCancel}>Cancel</button>
+        <button type="button" className={styles.btnSecondary} onClick={onCancel}>{t('admin.usersTab.cancelBtn')}</button>
         <button type="submit" className={styles.btnPrimary} disabled={saving || !name}>
-          <Save size={16} /> {user ? 'Update' : 'Create'}
+          <Save size={16} /> {user ? t('admin.usersTab.updateBtn') : t('admin.usersTab.createBtn')}
         </button>
       </div>
     </form>
@@ -156,6 +159,7 @@ const UserForm: React.FC<{
 };
 
 export const UsersTab: React.FC = () => {
+  const { t } = useTranslation();
   const [users, setUsers] = useState<User[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -187,7 +191,7 @@ export const UsersTab: React.FC = () => {
   };
 
   const handleClearPin = async (user: User) => {
-    if (!confirm(`Reset ${user.name}'s profile PIN? They will be able to log in without a PIN until they set a new one.`)) return;
+    if (!confirm(t('admin.usersTab.confirmResetPin', { name: user.name }))) return;
     try {
       await api.users.clearPin(user.id);
       load();
@@ -205,9 +209,9 @@ export const UsersTab: React.FC = () => {
   return (
     <div>
       <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitle}>Family Members</h2>
+        <h2 className={styles.sectionTitle}>{t('admin.usersTab.sectionTitle')}</h2>
         <button className={styles.addBtn} onClick={() => { setEditingUser(null); setShowForm(true); }}>
-          <Plus size={18} /> Add Person
+          <Plus size={18} /> {t('admin.usersTab.addPersonBtn')}
         </button>
       </div>
 
@@ -229,10 +233,12 @@ export const UsersTab: React.FC = () => {
               <div className={styles.listItemInfo}>
                 <h3 className={styles.listItemTitle}>{u.name}</h3>
                 <div className={styles.listItemMeta}>
-                  <span className={clsx(styles.badge, u.role === 'admin' ? styles.badge_admin : styles.badge_child)}>{u.role}</span>
-                  {u.paused && <span className={clsx(styles.badge, styles.badge_paused)}>Paused</span>}
-                  {u.has_pin && <span className={clsx(styles.badge, styles.badge_child)}>PIN</span>}
-                  {u.age && <span>Age {u.age}</span>}
+                  <span className={clsx(styles.badge, u.role === 'admin' ? styles.badge_admin : styles.badge_child)}>
+                    {u.role === 'admin' ? t('admin.usersTab.roleAdmin') : t('admin.usersTab.roleChild')}
+                  </span>
+                  {u.paused && <span className={clsx(styles.badge, styles.badge_paused)}>{t('admin.usersTab.badgePaused')}</span>}
+                  {u.has_pin && <span className={clsx(styles.badge, styles.badge_child)}>{t('admin.usersTab.badgePin')}</span>}
+                  {u.age && <span>{t('admin.usersTab.ageDisplay', { age: u.age })}</span>}
                 </div>
               </div>
               <div className={styles.listItemActions}>
@@ -240,8 +246,8 @@ export const UsersTab: React.FC = () => {
                   <button
                     className={styles.iconBtn}
                     onClick={() => handleClearPin(u)}
-                    title="Reset profile PIN"
-                    aria-label="Reset profile PIN"
+                    title={t('admin.usersTab.resetPinTitle')}
+                    aria-label={t('admin.usersTab.resetPinTitle')}
                   >
                     <KeyRound size={16} />
                   </button>
@@ -250,21 +256,21 @@ export const UsersTab: React.FC = () => {
                   <button
                     className={clsx(styles.iconBtn, u.paused && styles.iconBtnActive)}
                     onClick={() => handleTogglePause(u)}
-                    title={u.paused ? 'Unpause (resume chores)' : 'Pause (vacation/sick mode)'}
-                    aria-label={u.paused ? 'Unpause user' : 'Pause user'}
+                    title={u.paused ? t('admin.usersTab.unpauseTitle') : t('admin.usersTab.pauseTitle')}
+                    aria-label={u.paused ? t('admin.usersTab.unpauseAriaLabel') : t('admin.usersTab.pauseAriaLabel')}
                   >
                     {u.paused ? <Play size={16} /> : <Pause size={16} />}
                   </button>
                 )}
                 {u.role === 'child' && (
-                  <button className={styles.iconBtn} onClick={() => setExpandedDecay(expandedDecay === u.id ? null : u.id)} title="Points decay settings" aria-label="Points decay settings">
+                  <button className={styles.iconBtn} onClick={() => setExpandedDecay(expandedDecay === u.id ? null : u.id)} title={t('admin.usersTab.decaySettingsTitle')} aria-label={t('admin.usersTab.decaySettingsTitle')}>
                     <Clock size={16} />
                   </button>
                 )}
-                <button className={styles.iconBtn} aria-label="Edit user" onClick={() => { setEditingUser(u); setShowForm(true); }}>
+                <button className={styles.iconBtn} aria-label={t('admin.usersTab.editUserAriaLabel')} onClick={() => { setEditingUser(u); setShowForm(true); }}>
                   <Edit2 size={16} />
                 </button>
-                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} aria-label="Delete user" onClick={() => handleDelete(u.id)}>
+                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} aria-label={t('admin.usersTab.deleteUserAriaLabel')} onClick={() => handleDelete(u.id)}>
                   <Trash2 size={16} />
                 </button>
               </div>

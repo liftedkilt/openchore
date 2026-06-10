@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import { Lock, Delete, ArrowLeft } from 'lucide-react';
 import styles from './AdminPasscode.module.css';
 
 export const AdminPasscode: React.FC = () => {
+  const { t } = useTranslation();
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [shaking, setShaking] = useState(false);
@@ -16,7 +18,7 @@ export const AdminPasscode: React.FC = () => {
       sessionStorage.setItem('openchore_admin', 'true');
       navigate('/admin/dashboard');
     } catch {
-      setError('Incorrect passcode');
+      setError(t('admin.passcode.incorrectPasscode'));
       setShaking(true);
       setTimeout(() => { setShaking(false); setCode(''); }, 600);
     }
@@ -56,15 +58,15 @@ export const AdminPasscode: React.FC = () => {
   return (
     <div className={styles.container}>
       <button className={styles.backBtn} onClick={() => navigate('/login')}>
-        <ArrowLeft size={20} /> Back
+        <ArrowLeft size={20} /> {t('admin.passcode.back')}
       </button>
 
       <div className={styles.content}>
         <div className={styles.iconWrapper}>
           <Lock size={32} />
         </div>
-        <h1 className={styles.title}>Parent Access</h1>
-        <p className={styles.subtitle}>Enter your passcode</p>
+        <h1 className={styles.title}>{t('admin.passcode.title')}</h1>
+        <p className={styles.subtitle}>{t('admin.passcode.subtitle')}</p>
 
         <div className={`${styles.dots} ${shaking ? styles.shake : ''}`}>
           {[0, 1, 2, 3].map(i => (
@@ -82,7 +84,7 @@ export const AdminPasscode: React.FC = () => {
             if (d === '') return <div key={i} className={styles.keyEmpty} />;
             if (d === 'del') {
               return (
-                <button key={i} className={styles.key} onClick={handleDelete} aria-label="Delete">
+                <button key={i} className={styles.key} onClick={handleDelete} aria-label={t('admin.passcode.deleteAriaLabel')}>
                   <Delete size={22} />
                 </button>
               );

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import type { User, PointBalance } from '../../types';
 import styles from '../../pages/AdminDashboard.module.css';
 import { Save, Star } from 'lucide-react';
 
 export const PointsTab: React.FC = () => {
+  const { t } = useTranslation();
   const [balances, setBalances] = useState<(PointBalance & { name: string })[]>([]);
   const [, setUsers] = useState<User[]>([]);
   const [adjustUser, setAdjustUser] = useState<number | null>(null);
@@ -41,7 +43,7 @@ export const PointsTab: React.FC = () => {
 
   return (
     <div>
-      <h2 className={styles.sectionTitle}>Point Balances</h2>
+      <h2 className={styles.sectionTitle}>{t('admin.pointsTab.heading')}</h2>
 
       <div className={styles.balanceGrid}>
         {balances.map(b => (
@@ -55,34 +57,34 @@ export const PointsTab: React.FC = () => {
               className={styles.adjustBtn}
               onClick={() => setAdjustUser(adjustUser === b.user_id ? null : b.user_id)}
             >
-              {adjustUser === b.user_id ? 'Cancel' : 'Adjust'}
+              {adjustUser === b.user_id ? t('admin.pointsTab.cancelButton') : t('admin.pointsTab.adjustButton')}
             </button>
 
             {adjustUser === b.user_id && (
               <div className={styles.adjustForm}>
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>
-                    <label className={styles.label}>Amount (+/-)</label>
+                    <label className={styles.label}>{t('admin.pointsTab.amountLabel')}</label>
                     <input
                       className={styles.input}
                       type="number"
                       value={adjustAmount}
                       onChange={e => setAdjustAmount(e.target.value)}
-                      placeholder="+10 or -5"
+                      placeholder={t('admin.pointsTab.amountPlaceholder')}
                     />
                   </div>
                   <div className={styles.formGroup} style={{ flex: 2 }}>
-                    <label className={styles.label}>Reason</label>
+                    <label className={styles.label}>{t('admin.pointsTab.reasonLabel')}</label>
                     <input
                       className={styles.input}
                       value={adjustNote}
                       onChange={e => setAdjustNote(e.target.value)}
-                      placeholder="Why?"
+                      placeholder={t('admin.pointsTab.reasonPlaceholder')}
                     />
                   </div>
                 </div>
                 <button className={styles.btnPrimary} onClick={handleAdjust} disabled={saving || !adjustAmount}>
-                  <Save size={14} /> Apply
+                  <Save size={14} /> {t('admin.pointsTab.applyButton')}
                 </button>
               </div>
             )}

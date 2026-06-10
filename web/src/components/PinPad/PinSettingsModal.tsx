@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, APIError } from '../../api';
 import Modal from '../Modal/Modal';
 import PinPad from './PinPad';
@@ -20,6 +21,7 @@ type Step =
   | 'done';
 
 export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasPin, onClose, onChanged }) => {
+  const { t } = useTranslation();
   const [step, setStep] = useState<Step>(hasPin ? 'menu' : 'new');
   const [intent, setIntent] = useState<'set' | 'change' | 'remove'>(hasPin ? 'change' : 'set');
   const [currentPin, setCurrentPin] = useState('');
@@ -57,7 +59,7 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
 
   const handleConfirmPin = async (pin: string) => {
     if (pin !== firstPin) {
-      setError("PINs don't match");
+      setError(t('common.pinSettings.errorPinsMismatch'));
       setFirstPin('');
       setStep('new');
       return;
@@ -65,21 +67,21 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
     setSaving(true);
     try {
       await api.users.setPin(userId, pin, currentPin || undefined);
-      setSuccessMsg(intent === 'set' ? 'PIN set' : 'PIN updated');
+      setSuccessMsg(intent === 'set' ? t('common.pinSettings.successPinSet') : t('common.pinSettings.successPinUpdated'));
       setStep('done');
       onChanged(true);
     } catch (e) {
       if (e instanceof APIError && e.status === 401) {
-        setError('Incorrect current PIN');
+        setError(t('common.pinSettings.errorIncorrectCurrentPin'));
         setCurrentPin('');
         setFirstPin('');
         setStep('current');
       } else if (e instanceof APIError && e.status === 400) {
-        setError(e.message || 'Invalid PIN');
+        setError(e.message || t('common.pinSettings.errorInvalidPin'));
         setFirstPin('');
         setStep('new');
       } else {
-        setError('Failed to save PIN');
+        setError(t('common.pinSettings.errorFailedSave'));
       }
     } finally {
       setSaving(false);
@@ -90,36 +92,36 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
     setSaving(true);
     try {
       await api.users.clearPin(userId, pin);
-      setSuccessMsg('PIN removed');
+      setSuccessMsg(t('common.pinSettings.successPinRemoved'));
       setStep('done');
       onChanged(false);
     } catch (e) {
       if (e instanceof APIError && e.status === 401) {
-        setError('Incorrect PIN');
+        setError(t('common.pinSettings.errorIncorrectPin'));
       } else {
-        setError('Failed to remove PIN');
+        setError(t('common.pinSettings.errorFailedRemove'));
       }
     } finally {
       setSaving(false);
     }
   };
 
-  const title = intent === 'remove' ? 'Remove PIN' : (hasPin ? 'Change PIN' : 'Set PIN');
+  const title = intent === 'remove' ? t('common.pinSettings.titleRemove') : (hasPin ? t('common.pinSettings.titleChange') : t('common.pinSettings.titleSet'));
 
   return (
     <Modal isOpen onClose={onClose} title={title} maxWidth="400px">
       <div className={styles.body}>
         {step === 'menu' && (
           <div className={styles.menu}>
-            <p className={styles.hint}>Your profile is protected by a PIN.</p>
-            <button className={styles.menuBtn} onClick={startChange}>Change PIN</button>
-            <button className={`${styles.menuBtn} ${styles.danger}`} onClick={startRemove}>Remove PIN</button>
+            <p className={styles.hint}>{t('common.pinSettings.menuHint')}</p>
+            <button className={styles.menuBtn} onClick={startChange}>{t('common.pinSettings.btnChange')}</button>
+            <button className={`${styles.menuBtn} ${styles.danger}`} onClick={startRemove}>{t('common.pinSettings.btnRemove')}</button>
           </div>
         )}
 
         {step === 'current' && (
           <PinPad
-            prompt="Enter your current PIN"
+            prompt={t('common.pinSettings.promptEnterCurrent')}
             error={error}
             onSubmit={handleCurrentPin}
           />
@@ -127,7 +129,7 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
 
         {step === 'new' && (
           <PinPad
-            prompt={intent === 'set' ? 'Choose a 4-digit PIN' : 'Enter a new 4-digit PIN'}
+            prompt={intent === 'set' ? t('common.pinSettings.promptChooseNew') : t('common.pinSettings.promptEnterNew')}
             error={error}
             onSubmit={handleNewPin}
           />
@@ -135,7 +137,7 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
 
         {step === 'confirm' && (
           <PinPad
-            prompt="Enter the same PIN again to confirm"
+            prompt={t('common.pinSettings.promptConfirm')}
             error={error}
             onSubmit={handleConfirmPin}
           />
@@ -143,7 +145,7 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
 
         {step === 'removeConfirm' && (
           <PinPad
-            prompt="Enter your current PIN to remove it"
+            prompt={t('common.pinSettings.promptEnterCurrentToRemove')}
             error={error}
             onSubmit={handleRemoveSubmit}
           />
@@ -152,11 +154,11 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
         {step === 'done' && (
           <div className={styles.done}>
             <p className={styles.doneText}>{successMsg}</p>
-            <button className={styles.menuBtn} onClick={onClose}>Done</button>
+            <button className={styles.menuBtn} onClick={onClose}>{t('common.pinSettings.btnDone')}</button>
           </div>
         )}
 
-        {saving && step !== 'done' && <p className={styles.saving}>Saving…</p>}
+        {saving && step !== 'done' && <p className={styles.saving}>{t('common.pinSettings.saving')}</p>}
       </div>
     </Modal>
   );

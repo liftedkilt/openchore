@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import type { User, Reward, StreakRewardItem } from '../../types';
 import styles from '../../pages/AdminDashboard.module.css';
@@ -10,6 +11,7 @@ const RewardAssignmentEditor: React.FC<{
   users: User[];
   onSave: () => void;
 }> = ({ reward, users, onSave }) => {
+  const { t } = useTranslation();
   const [assignments, setAssignments] = useState<{ user_id: number; custom_cost: string; enabled: boolean }[]>(
     users.map(u => {
       const existing = reward.assignments?.find(a => a.user_id === u.id);
@@ -53,7 +55,7 @@ const RewardAssignmentEditor: React.FC<{
   return (
     <div className={styles.assignmentEditor}>
       <div className={styles.assignmentHint}>
-        {anyAssigned ? 'Only checked kids can see this reward.' : 'No restrictions — all kids can see this reward.'}
+        {anyAssigned ? t('admin.rewardsTab.assignmentHintRestricted') : t('admin.rewardsTab.assignmentHintAll')}
       </div>
       {assignments.map(a => {
         const user = users.find(u => u.id === a.user_id);
@@ -72,16 +74,16 @@ const RewardAssignmentEditor: React.FC<{
                   min="1"
                   value={a.custom_cost}
                   onChange={e => setCost(a.user_id, e.target.value)}
-                  placeholder={`${reward.cost} (default)`}
+                  placeholder={t('admin.rewardsTab.customCostPlaceholder', { cost: reward.cost })}
                 />
-                <span className={styles.assignmentCostLabel}>pts</span>
+                <span className={styles.assignmentCostLabel}>{t('admin.rewardsTab.ptsLabel')}</span>
               </div>
             )}
           </div>
         );
       })}
       <button className={styles.btnPrimary} onClick={handleSave} disabled={saving} style={{ marginTop: '0.5rem' }}>
-        <Save size={14} /> Save Assignments
+        <Save size={14} /> {t('admin.rewardsTab.saveAssignments')}
       </button>
     </div>
   );
@@ -93,6 +95,7 @@ const RewardForm: React.FC<{
   onSave: () => void;
   onCancel: () => void;
 }> = ({ reward, onSave, onCancel }) => {
+  const { t } = useTranslation();
   const [name, setName] = useState(reward?.name || '');
   const [description, setDescription] = useState(reward?.description || '');
   const [icon, setIcon] = useState(reward?.icon || '');
@@ -129,55 +132,55 @@ const RewardForm: React.FC<{
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
       <div className={styles.formHeader}>
-        <h3>{reward ? 'Edit Reward' : 'New Reward'}</h3>
+        <h3>{reward ? t('admin.rewardsTab.editRewardTitle') : t('admin.rewardsTab.newRewardTitle')}</h3>
         <button type="button" className={styles.iconBtn} onClick={onCancel}><X size={18} /></button>
       </div>
 
       <div className={styles.formGrid}>
         <div className={styles.formRow}>
           <div className={styles.formGroup} style={{ flex: 3 }}>
-            <label className={styles.label}>Name</label>
-            <input className={styles.input} value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Ice Cream Trip" />
+            <label className={styles.label}>{t('admin.rewardsTab.fieldName')}</label>
+            <input className={styles.input} value={name} onChange={e => setName(e.target.value)} required placeholder={t('admin.rewardsTab.fieldNamePlaceholder')} />
           </div>
           <div className={styles.formGroup} style={{ flex: 1 }}>
-            <label className={styles.label}>Icon</label>
-            <input className={styles.input} value={icon} onChange={e => setIcon(e.target.value)} placeholder="emoji" style={{ textAlign: 'center', fontSize: '1.5rem' }} />
+            <label className={styles.label}>{t('admin.rewardsTab.fieldIcon')}</label>
+            <input className={styles.input} value={icon} onChange={e => setIcon(e.target.value)} placeholder={t('admin.rewardsTab.fieldIconPlaceholder')} style={{ textAlign: 'center', fontSize: '1.5rem' }} />
           </div>
         </div>
 
         <div className={styles.formGroup}>
-          <label className={styles.label}>Description</label>
-          <input className={styles.input} value={description} onChange={e => setDescription(e.target.value)} placeholder="What do they get?" />
+          <label className={styles.label}>{t('admin.rewardsTab.fieldDescription')}</label>
+          <input className={styles.input} value={description} onChange={e => setDescription(e.target.value)} placeholder={t('admin.rewardsTab.fieldDescriptionPlaceholder')} />
         </div>
 
         <div className={styles.formRow}>
           <div className={styles.formGroup}>
-            <label className={styles.label} title="How many points the child needs to redeem this reward.">Cost (pts)</label>
+            <label className={styles.label} title={t('admin.rewardsTab.fieldCostTitle')}>{t('admin.rewardsTab.fieldCost')}</label>
             <input className={styles.input} type="number" min="1" value={cost} onChange={e => setCost(e.target.value)} />
           </div>
           <div className={styles.formGroup}>
-            <label className={styles.label} title="Limit how many times this reward can be redeemed. Leave blank for unlimited.">Stock (blank = unlimited)</label>
+            <label className={styles.label} title={t('admin.rewardsTab.fieldStockTitle')}>{t('admin.rewardsTab.fieldStock')}</label>
             <input className={styles.input} type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} placeholder="∞" />
           </div>
         </div>
 
         <div className={styles.formGroup}>
-          <label className={styles.label} title="Shareable rewards become a family pool: multiple kids can save together and the cost is split based on each kid's contribution.">
+          <label className={styles.label} title={t('admin.rewardsTab.fieldShareableTitle')}>
             <input
               type="checkbox"
               checked={shareable}
               onChange={e => setShareable(e.target.checked)}
               style={{ marginRight: '0.5rem' }}
             />
-            Shareable / family goal — multiple kids can pool points together
+            {t('admin.rewardsTab.fieldShareableLabel')}
           </label>
         </div>
       </div>
 
       <div className={styles.formActions}>
-        <button type="button" className={styles.btnSecondary} onClick={onCancel}>Cancel</button>
+        <button type="button" className={styles.btnSecondary} onClick={onCancel}>{t('admin.rewardsTab.cancel')}</button>
         <button type="submit" className={styles.btnPrimary} disabled={saving || !name || !cost}>
-          <Save size={16} /> {reward ? 'Update' : 'Create'}
+          <Save size={16} /> {reward ? t('admin.rewardsTab.update') : t('admin.rewardsTab.create')}
         </button>
       </div>
     </form>
@@ -185,6 +188,7 @@ const RewardForm: React.FC<{
 };
 
 const StreakRewardForm: React.FC<{ onSave: () => void }> = ({ onSave }) => {
+  const { t } = useTranslation();
   const [days, setDays] = useState('7');
   const [points, setPoints] = useState('25');
   const [label, setLabel] = useState('');
@@ -210,21 +214,21 @@ const StreakRewardForm: React.FC<{ onSave: () => void }> = ({ onSave }) => {
     <form className={styles.form} onSubmit={handleSubmit}>
       <div className={styles.formRow}>
         <div className={styles.formGroup}>
-          <label className={styles.label}>Days</label>
+          <label className={styles.label}>{t('admin.rewardsTab.streakFieldDays')}</label>
           <input className={styles.input} type="number" min="1" value={days} onChange={e => setDays(e.target.value)} />
         </div>
         <div className={styles.formGroup}>
-          <label className={styles.label}>Bonus Pts</label>
+          <label className={styles.label}>{t('admin.rewardsTab.streakFieldBonusPts')}</label>
           <input className={styles.input} type="number" min="1" value={points} onChange={e => setPoints(e.target.value)} />
         </div>
         <div className={styles.formGroup} style={{ flex: 2 }}>
-          <label className={styles.label}>Label</label>
-          <input className={styles.input} value={label} onChange={e => setLabel(e.target.value)} placeholder="e.g. Week Warrior!" />
+          <label className={styles.label}>{t('admin.rewardsTab.streakFieldLabel')}</label>
+          <input className={styles.input} value={label} onChange={e => setLabel(e.target.value)} placeholder={t('admin.rewardsTab.streakFieldLabelPlaceholder')} />
         </div>
       </div>
       <div className={styles.formActions}>
         <button type="submit" className={styles.btnPrimary} disabled={saving || !days || !points}>
-          <Save size={16} /> Add Milestone
+          <Save size={16} /> {t('admin.rewardsTab.addMilestone')}
         </button>
       </div>
     </form>
@@ -232,6 +236,7 @@ const StreakRewardForm: React.FC<{ onSave: () => void }> = ({ onSave }) => {
 };
 
 export const RewardsTab: React.FC = () => {
+  const { t } = useTranslation();
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [streakRewards, setStreakRewards] = useState<StreakRewardItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -267,9 +272,9 @@ export const RewardsTab: React.FC = () => {
     <div>
       {/* Rewards */}
       <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitle}>Rewards Store</h2>
+        <h2 className={styles.sectionTitle}>{t('admin.rewardsTab.rewardsStoreTitle')}</h2>
         <button className={styles.addBtn} onClick={() => { setEditingReward(null); setShowForm(true); }}>
-          <Plus size={18} /> Add Reward
+          <Plus size={18} /> {t('admin.rewardsTab.addReward')}
         </button>
       </div>
 
@@ -283,7 +288,7 @@ export const RewardsTab: React.FC = () => {
       )}
 
       <div className={styles.list}>
-        {rewards.length === 0 && <p className={styles.emptyText}>No rewards yet</p>}
+        {rewards.length === 0 && <p className={styles.emptyText}>{t('admin.rewardsTab.noRewards')}</p>}
         {rewards.map(r => (
           <div key={r.id} className={styles.listItem}>
             <div className={styles.listItemMain}>
@@ -292,25 +297,25 @@ export const RewardsTab: React.FC = () => {
                 <h3 className={styles.listItemTitle}>{r.name}</h3>
                 {r.description && <p className={styles.listItemDesc}>{r.description}</p>}
                 <div className={styles.listItemMeta}>
-                  <span><Star size={12} /> {r.cost} pts</span>
-                  <span>{r.stock !== null && r.stock !== undefined ? `${r.stock} in stock` : 'Unlimited'}</span>
+                  <span><Star size={12} /> {r.cost} {t('admin.rewardsTab.pts')}</span>
+                  <span>{r.stock !== null && r.stock !== undefined ? t('admin.rewardsTab.inStock', { count: r.stock }) : t('admin.rewardsTab.unlimited')}</span>
                   <span className={r.active ? styles.statusActive : styles.statusInactive}>
-                    {r.active ? 'Active' : 'Inactive'}
+                    {r.active ? t('admin.rewardsTab.active') : t('admin.rewardsTab.inactive')}
                   </span>
                 </div>
                 <button className={styles.assignmentToggle} onClick={() => toggleAssignments(r.id)}>
                   <Users size={12} />
                   {r.assignments && r.assignments.length > 0
-                    ? `${r.assignments.length} kid${r.assignments.length > 1 ? 's' : ''} assigned`
-                    : 'All kids (no restrictions)'}
+                    ? t('admin.rewardsTab.kidsAssigned', { count: r.assignments.length })
+                    : t('admin.rewardsTab.allKids')}
                   {expandedAssignments === r.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 </button>
               </div>
               <div className={styles.listItemActions}>
-                <button className={styles.iconBtn} aria-label="Edit reward" onClick={() => { setEditingReward(r); setShowForm(true); }}>
+                <button className={styles.iconBtn} aria-label={t('admin.rewardsTab.ariaEditReward')} onClick={() => { setEditingReward(r); setShowForm(true); }}>
                   <Edit2 size={16} />
                 </button>
-                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} aria-label="Delete reward" onClick={() => handleDeleteReward(r.id)}>
+                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} aria-label={t('admin.rewardsTab.ariaDeleteReward')} onClick={() => handleDeleteReward(r.id)}>
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -326,18 +331,18 @@ export const RewardsTab: React.FC = () => {
       <div className={styles.sectionHeader} style={{ marginTop: '2rem' }}>
         <h2 className={styles.sectionTitle}>
           <Flame size={18} style={{ color: '#f59e0b', marginRight: '0.4rem' }} />
-          Streak Milestones
+          {t('admin.rewardsTab.streakMilestonesTitle')}
         </h2>
         <button className={styles.addBtn} onClick={() => setShowStreakForm(!showStreakForm)}>
           {showStreakForm ? <X size={18} /> : <Plus size={18} />}
-          {showStreakForm ? 'Cancel' : 'Add'}
+          {showStreakForm ? t('admin.rewardsTab.cancel') : t('admin.rewardsTab.add')}
         </button>
       </div>
 
       {showStreakForm && <StreakRewardForm onSave={() => { setShowStreakForm(false); load(); }} />}
 
       <div className={styles.list}>
-        {streakRewards.length === 0 && <p className={styles.emptyText}>No streak milestones yet</p>}
+        {streakRewards.length === 0 && <p className={styles.emptyText}>{t('admin.rewardsTab.noStreakMilestones')}</p>}
         {streakRewards.map(sr => (
           <div key={sr.id} className={styles.listItem}>
             <div className={styles.listItemMain}>
@@ -345,11 +350,11 @@ export const RewardsTab: React.FC = () => {
               <div className={styles.listItemInfo}>
                 <h3 className={styles.listItemTitle}>{sr.label || `${sr.streak_days}-Day Streak`}</h3>
                 <div className={styles.listItemMeta}>
-                  <span><Star size={12} /> +{sr.bonus_points} bonus pts</span>
+                  <span><Star size={12} /> +{sr.bonus_points} {t('admin.rewardsTab.bonusPts')}</span>
                 </div>
               </div>
               <div className={styles.listItemActions}>
-                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} aria-label="Delete streak reward" onClick={() => handleDeleteStreakReward(sr.id)}>
+                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} aria-label={t('admin.rewardsTab.ariaDeleteStreakReward')} onClick={() => handleDeleteStreakReward(sr.id)}>
                   <Trash2 size={16} />
                 </button>
               </div>

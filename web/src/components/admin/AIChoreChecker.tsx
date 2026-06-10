@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import styles from '../../pages/AdminDashboard.module.css';
 import { Check, Camera, Volume2, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 
 export const AIChoreChecker: React.FC = () => {
+  const { t } = useTranslation();
   const [choreTitle, setChoreTitle] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export const AIChoreChecker: React.FC = () => {
 
       setStep('done');
     } catch (err: any) {
-      setError(err.message || 'Test failed');
+      setError(err.message || t('admin.aiChoreChecker.errorTestFailed'));
       setStep('error');
     }
   };
@@ -69,16 +71,16 @@ export const AIChoreChecker: React.FC = () => {
       const { audio_url } = await api.admin.synthesizeTTS(result.feedback);
       setResult({ ...result, feedback_audio: audio_url });
     } catch (err: unknown) {
-      setError(`TTS failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(t('admin.aiChoreChecker.errorTtsFailed', { message: err instanceof Error ? err.message : t('admin.aiChoreChecker.errorUnknown') }));
     } finally {
       setRetryingAudio(false);
     }
   };
 
   const stepLabels = [
-    { key: 'uploading', label: 'Uploading photo' },
-    { key: 'analyzing', label: 'AI analyzing photo' },
-    { key: 'generating_audio', label: 'Generating audio' },
+    { key: 'uploading', label: t('admin.aiChoreChecker.stepUploading') },
+    { key: 'analyzing', label: t('admin.aiChoreChecker.stepAnalyzing') },
+    { key: 'generating_audio', label: t('admin.aiChoreChecker.stepGeneratingAudio') },
   ];
   const activeStepIndex = stepLabels.findIndex(s => s.key === step);
   const isWorking = step === 'uploading' || step === 'analyzing' || step === 'generating_audio';
@@ -86,30 +88,30 @@ export const AIChoreChecker: React.FC = () => {
   return (
     <div className={styles.form}>
       <div className={styles.formHeader}>
-        <h3>AI Chore Checker</h3>
+        <h3>{t('admin.aiChoreChecker.heading')}</h3>
       </div>
       <p className={styles.sectionDesc}>
-        Type a chore name, snap a photo, and see how the AI evaluates it — including Kokoro TTS audio.
+        {t('admin.aiChoreChecker.description')}
       </p>
 
       <form onSubmit={handleTest}>
         <div className={styles.formGrid}>
           <div className={styles.formGroup}>
-            <label className={styles.label}>Chore Name</label>
+            <label className={styles.label}>{t('admin.aiChoreChecker.labelChoreName')}</label>
             <input
               className={styles.input}
               value={choreTitle}
               onChange={e => setChoreTitle(e.target.value)}
-              placeholder="e.g. Pick Up Toys, Make Bed, Clean Kitchen"
+              placeholder={t('admin.aiChoreChecker.placeholderChoreName')}
               disabled={isWorking}
             />
           </div>
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>Photo</label>
+            <label className={styles.label}>{t('admin.aiChoreChecker.labelPhoto')}</label>
             <label className={styles.photoUploadLabel} style={{ cursor: isWorking ? 'default' : 'pointer', opacity: isWorking ? 0.5 : 1 }}>
               <Camera size={16} />
-              {photoFile ? photoFile.name : 'Choose photo...'}
+              {photoFile ? photoFile.name : t('admin.aiChoreChecker.choosePhoto')}
               <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} style={{ display: 'none' }} disabled={isWorking} />
             </label>
           </div>
@@ -117,13 +119,13 @@ export const AIChoreChecker: React.FC = () => {
 
         {photoPreview && (
           <div className={styles.photoPreview}>
-            <img src={photoPreview} alt="Preview" />
+            <img src={photoPreview} alt={t('admin.aiChoreChecker.photoPreviewAlt')} />
           </div>
         )}
 
         <div className={styles.formActions}>
           <button type="submit" className={styles.saveBtn} disabled={!choreTitle || !photoFile || isWorking}>
-            {isWorking ? <><Loader2 size={16} className={styles.spinning} /> Working...</> : 'Test Review'}
+            {isWorking ? <><Loader2 size={16} className={styles.spinning} /> {t('admin.aiChoreChecker.buttonWorking')}</> : t('admin.aiChoreChecker.buttonTestReview')}
           </button>
         </div>
       </form>
@@ -155,9 +157,9 @@ export const AIChoreChecker: React.FC = () => {
         <div className={clsx(styles.statusBox, result.complete ? styles.statusBoxSuccess : styles.statusBoxReject)}>
           <div className={styles.flexRow} style={{ marginBottom: '0.5rem', fontWeight: 600 }}>
             <span style={{ fontSize: '1.2rem' }}>{result.complete ? '✅' : '❌'}</span>
-            <span>{result.complete ? 'Approved' : 'Rejected'}</span>
+            <span>{result.complete ? t('admin.aiChoreChecker.resultApproved') : t('admin.aiChoreChecker.resultRejected')}</span>
             <span style={{ marginLeft: 'auto', fontWeight: 400, opacity: 0.7 }}>
-              Confidence: {(result.confidence * 100).toFixed(0)}%
+              {t('admin.aiChoreChecker.confidence', { value: (result.confidence * 100).toFixed(0) })}
             </span>
           </div>
           <div className={styles.flexRow}>
@@ -167,7 +169,7 @@ export const AIChoreChecker: React.FC = () => {
                 onClick={handlePlayAudio}
                 disabled={playingAudio}
                 className={styles.audioPlayBtn}
-                aria-label="Listen to feedback"
+                aria-label={t('admin.aiChoreChecker.ariaListenFeedback')}
               >
                 {playingAudio ? <Loader2 size={16} className={styles.spinning} /> : <Volume2 size={16} />}
               </button>
@@ -176,7 +178,7 @@ export const AIChoreChecker: React.FC = () => {
                 onClick={handleRetryAudio}
                 disabled={retryingAudio}
                 className={styles.audioPlayBtn}
-                aria-label="Generate audio"
+                aria-label={t('admin.aiChoreChecker.ariaGenerateAudio')}
               >
                 {retryingAudio ? <Loader2 size={16} className={styles.spinning} /> : <Volume2 size={16} />}
               </button>
