@@ -22,6 +22,8 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    // Default to node; component tests opt into jsdom via a
+    // `// @vitest-environment jsdom` docblock at the top of the file.
     environment: 'node',
   },
 })

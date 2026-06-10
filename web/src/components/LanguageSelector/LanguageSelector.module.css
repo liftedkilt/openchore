@@ -1,0 +1,9 @@
+.select {
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #ccc);
+  background: var(--surface, #fff);
+  color: var(--text, #222);
+  cursor: pointer;
+}
