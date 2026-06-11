@@ -457,6 +457,18 @@ func (s *Store) ReverseUncompleteDebits(ctx context.Context, completionID int64)
 	return reversed, nil
 }
 
+// ReverseAutoContributeReversals deletes any goal_break transactions that were
+// recorded to revert auto-contributions for the given completion ID. Used
+// when reviving a soft-deleted completion.
+func (s *Store) ReverseAutoContributeReversals(ctx context.Context, completionID int64) error {
+	revertNote := fmt.Sprintf("auto_revert:completion:%d", completionID)
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM point_transactions WHERE reference_id = ? AND reason = ? AND note = ?`,
+		completionID, model.ReasonGoalBreak, revertNote)
+	return err
+}
+
+
 func (s *Store) GetSchedule(ctx context.Context, id int64) (*model.ChoreSchedule, error) {
 	cs := &model.ChoreSchedule{}
 	err := s.db.QueryRowContext(ctx,

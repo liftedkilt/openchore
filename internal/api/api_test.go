@@ -2301,6 +2301,129 @@ func TestRequiredCompletionOpensBonusGate(t *testing.T) {
 	}
 }
 
+// TestRequiredChoresGateCoreChorePoints verifies that core chores are gated by
+// required chores on the same day, and that completing a required chore
+// retroactively credits both core and bonus chores that were capped at 0.
+func TestRequiredChoresGateCoreChorePoints(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// 1. Required chore worth 5 points
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title": "Required Chore", "category": "required", "points_value": 5,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	// 2. Core chore worth 10 points
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title": "Core Chore", "category": "core", "points_value": 10,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/2/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	// 3. Bonus chore worth 20 points
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title": "Bonus Chore", "category": "bonus", "points_value": 20,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/3/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+
+	// Set up a reward and commitment (50% auto-contribute)
+	env.request(t, "POST", "/api/rewards", map[string]any{
+		"name": "Toy", "cost": 100,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/rewards/1/commit", map[string]any{
+		"auto_contribute_percent": 50,
+	}, childHeaders(kidID))
+
+	today := time.Now().Format(model.DateFormat)
+
+	// Complete Core first -> required is pending, so core should credit 0.
+	env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected 0 balance (core points gated by incomplete required chore), got %v", pts["balance"])
+	}
+	if pts["committed"].(float64) != 0 {
+		t.Fatalf("expected 0 committed (no points gained), got %v", pts["committed"])
+	}
+
+	// Complete Bonus second -> required is pending, so bonus should credit 0.
+	env.expectStatus(t, "POST", "/api/schedules/3/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected 0 balance (bonus gated), got %v", pts["balance"])
+	}
+
+	// Complete Required third -> this should:
+	// - award required points (5)
+	// - retroactively credit core points (10)
+	// - retroactively credit bonus points (20)
+	// Net balance earned: 35. With 50% auto-contribute, 17 points saved (5*0.5 + 10*0.5 + 20*0.5 = 2 + 5 + 10 = 17)
+	// and 18 points left in spendable balance.
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 18 {
+		t.Fatalf("expected 18 spendable balance (35 total - 17 saved), got %v", pts["balance"])
+	}
+	if pts["committed"].(float64) != 17 {
+		t.Fatalf("expected 17 points saved to goal, got %v", pts["committed"])
+	}
+
+	// Uncheck and recheck the core chore - should not double credit
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/2/complete?date=%s", today), nil, adminHeaders(), http.StatusNoContent)
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	// Unchecking the 10-point core chore refunds the 5 points that were committed to the goal
+	// and debits 5 points from spendable. Balance becomes 18 - 5 = 13. Committed becomes 17 - 5 = 12.
+	if pts["balance"].(float64) != 13 {
+		t.Fatalf("expected 13 spendable after unchecking core chore, got %v", pts["balance"])
+	}
+	if pts["committed"].(float64) != 12 {
+		t.Fatalf("expected 12 committed after unchecking core chore, got %v", pts["committed"])
+	}
+
+	// Recheck core chore -> should revive and re-evaluate gate, crediting the 10 points (5 spendable, 5 committed)
+	env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 18 {
+		t.Fatalf("expected 18 spendable after rechecking core chore, got %v", pts["balance"])
+	}
+	if pts["committed"].(float64) != 17 {
+		t.Fatalf("expected 17 committed after rechecking core chore, got %v", pts["committed"])
+	}
+}
+
+
 // =================== BCRYPT PASSCODE TESTS ===================
 
 func TestBcryptPasscodeRoundTrip(t *testing.T) {
