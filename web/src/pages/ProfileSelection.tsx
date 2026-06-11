@@ -7,7 +7,6 @@ import type { User } from '../types';
 import styles from './ProfileSelection.module.css';
 import { UserCircle, Settings, Monitor, Lock, ArrowLeft } from 'lucide-react';
 import PinPad from '../components/PinPad/PinPad';
-import { LanguageSelector } from '../components/LanguageSelector/LanguageSelector';
 
 export const ProfileSelection: React.FC = () => {
   const { t } = useTranslation();
@@ -145,7 +144,6 @@ export const ProfileSelection: React.FC = () => {
           <Settings size={18} />
           <span>{t('profile.manage')}</span>
         </button>
-        <LanguageSelector />
       </div>
     </div>
   );

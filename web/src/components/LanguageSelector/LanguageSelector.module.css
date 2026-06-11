@@ -1,9 +1,34 @@
 .select {
-  font: inherit;
-  padding: 0.4rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 1.6rem 0.35rem 0.7rem; /* extra right padding for arrow */
   border-radius: 8px;
-  border: 1px solid var(--border, #ccc);
-  background: var(--surface, #fff);
-  color: var(--text, #222);
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
+  appearance: none; /* remove default appearance to use custom styles/arrow */
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f8fafc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.45rem center;
+  background-size: 0.75rem;
+  transition: var(--transition, all 0.2s ease);
+}
+
+.select:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.15);
+}
+
+.select option {
+  background: var(--bg-secondary, #1e293b);
+  color: var(--text-primary, #f8fafc);
 }
