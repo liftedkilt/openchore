@@ -8,9 +8,9 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  API_IMAGE: ghcr.io/liftedkilt/openchore/api
-  WEB_IMAGE: ghcr.io/liftedkilt/openchore/web
-  LITERT_IMAGE: ghcr.io/liftedkilt/openchore/litert
+  API_IMAGE: ghcr.io/riddl3-git/openchore/api
+  WEB_IMAGE: ghcr.io/riddl3-git/openchore/web
+  LITERT_IMAGE: ghcr.io/riddl3-git/openchore/litert
 
 jobs:
   test:
