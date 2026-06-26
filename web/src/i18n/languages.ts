@@ -9,6 +9,7 @@ export interface LanguageOption {
 // matching locales/<code>/translation.json file (see web/src/i18n/index.ts).
 export const LANGUAGES: LanguageOption[] = [
   { code: 'en', label: 'English' },
+  { code: 'de', label: 'Deutsch' },
 ];
 
 export const SUPPORTED_CODES = LANGUAGES.map((l) => l.code);
