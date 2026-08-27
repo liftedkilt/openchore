@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -4001,4 +4002,577 @@ func TestProfilePinWebhookEvents(t *testing.T) {
 		}
 	}
 }
+
+// =================== ATOMIC CHORE COMPLETION & RANDOM ORDER TESTS (Issue #13) ===================
+
+func TestAtomicChoreCompletionPointCreditFailureRollback(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+	today := time.Now().Format("2006-01-02")
+
+	// Create required chore (10 points)
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":        "Clean Room",
+		"category":     "required",
+		"points_value": 10,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": today,
+	}, adminHeaders())
+
+	// Simulate a database failure during point crediting by installing an abort trigger on point_transactions
+	_, err := env.db.Exec(`CREATE TRIGGER fail_points_insert BEFORE INSERT ON point_transactions
+	BEGIN
+		SELECT RAISE(ABORT, 'simulated point credit failure');
+	END;`)
+	if err != nil {
+		t.Fatalf("failed to create failure trigger: %v", err)
+	}
+
+	// Attempt to complete the chore — must fail with 500 Internal Server Error
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, childHeaders(kidID), http.StatusInternalServerError)
+
+	// Verify atomicity: chore completion row must NOT exist in the database (rolled back)
+	var completionCount int
+	if err := env.db.QueryRow(`SELECT COUNT(*) FROM chore_completions WHERE chore_schedule_id = 1`).Scan(&completionCount); err != nil {
+		t.Fatalf("failed to count completions: %v", err)
+	}
+	if completionCount != 0 {
+		t.Fatalf("expected 0 completions after rollback, got %d", completionCount)
+	}
+
+	// Verify points balance is 0
+	var pointsCount int
+	if err := env.db.QueryRow(`SELECT COUNT(*) FROM point_transactions WHERE user_id = ?`, kidID).Scan(&pointsCount); err != nil {
+		t.Fatalf("failed to count point transactions: %v", err)
+	}
+	if pointsCount != 0 {
+		t.Fatalf("expected 0 point transactions, got %d", pointsCount)
+	}
+
+	// Drop trigger to simulate resolution of the database error
+	if _, err := env.db.Exec(`DROP TRIGGER fail_points_insert`); err != nil {
+		t.Fatalf("failed to drop failure trigger: %v", err)
+	}
+
+	// Retry completion — must succeed
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, childHeaders(kidID), http.StatusCreated)
+
+	// Verify points balance is now 10
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 10 {
+		t.Fatalf("expected balance 10 after retry, got %v", pts["balance"])
+	}
+}
+
+func TestAtomicApprovalPointCreditFailureRollback(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+	today := time.Now().Format("2006-01-02")
+
+	// Create chore requiring approval (15 points)
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":             "Mow Lawn",
+		"category":          "required",
+		"points_value":      15,
+		"requires_approval": true,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": today,
+	}, adminHeaders())
+
+	// Child completes chore (becomes pending approval, 0 points credited yet)
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, childHeaders(kidID), http.StatusCreated)
+
+	// Install trigger to simulate point credit failure on approval
+	_, err := env.db.Exec(`CREATE TRIGGER fail_points_insert BEFORE INSERT ON point_transactions
+	BEGIN
+		SELECT RAISE(ABORT, 'simulated approval point credit failure');
+	END;`)
+	if err != nil {
+		t.Fatalf("failed to create failure trigger: %v", err)
+	}
+
+	// Admin attempts to approve — must fail with 500
+	env.expectStatus(t, "POST", "/api/completions/1/approve", nil, adminHeaders(), http.StatusInternalServerError)
+
+	// Verify status is STILL pending (NOT approved)
+	var status string
+	if err := env.db.QueryRow(`SELECT status FROM chore_completions WHERE id = 1`).Scan(&status); err != nil {
+		t.Fatalf("failed to get completion status: %v", err)
+	}
+	if status != model.StatusPending {
+		t.Fatalf("expected completion status to remain 'pending' after rollback, got %q", status)
+	}
+
+	// Drop trigger and approve again
+	if _, err := env.db.Exec(`DROP TRIGGER fail_points_insert`); err != nil {
+		t.Fatalf("failed to drop failure trigger: %v", err)
+	}
+
+	env.expectStatus(t, "POST", "/api/completions/1/approve", nil, adminHeaders(), http.StatusOK)
+
+	// Verify points balance is now 15
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 15 {
+		t.Fatalf("expected balance 15, got %v", pts["balance"])
+	}
+}
+
+func TestAtomicUncompletePointDebitFailureRollback(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+	today := time.Now().Format("2006-01-02")
+
+	// Create required chore (10 points)
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":        "Clean Room",
+		"category":     "required",
+		"points_value": 10,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": today,
+	}, adminHeaders())
+
+	// Complete chore
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, childHeaders(kidID), http.StatusCreated)
+
+	// Simulate failure when inserting debit transaction
+	_, err := env.db.Exec(`CREATE TRIGGER fail_debit BEFORE INSERT ON point_transactions WHEN NEW.amount < 0
+	BEGIN
+		SELECT RAISE(ABORT, 'simulated point debit failure');
+	END;`)
+	if err != nil {
+		t.Fatalf("failed to create failure trigger: %v", err)
+	}
+
+	// Attempt uncomplete — must fail with 500
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/1/complete?date=%s", today), nil, adminHeaders(), http.StatusInternalServerError)
+
+	// Completion must STILL be active (uncompleted_at IS NULL)
+	var uncompletedAt sql.NullString
+	if err := env.db.QueryRow(`SELECT uncompleted_at FROM chore_completions WHERE id = 1`).Scan(&uncompletedAt); err != nil {
+		t.Fatalf("failed to query completion: %v", err)
+	}
+	if uncompletedAt.Valid {
+		t.Fatalf("expected uncompleted_at to be NULL after rollback, got %v", uncompletedAt.String)
+	}
+
+	// Balance must still be 10
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 10 {
+		t.Fatalf("expected balance 10, got %v", pts["balance"])
+	}
+
+	// Drop trigger and uncomplete again
+	if _, err := env.db.Exec(`DROP TRIGGER fail_debit`); err != nil {
+		t.Fatalf("failed to drop failure trigger: %v", err)
+	}
+
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/1/complete?date=%s", today), nil, adminHeaders(), http.StatusNoContent)
+
+	// Balance must now be 0
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected balance 0 after uncomplete, got %v", pts["balance"])
+	}
+}
+
+func TestRandomOrderChoreCompletionsPointTotals(t *testing.T) {
+	// Test all 6 permutations of completing [Required (10), Core (20), Bonus (30)]
+	// Expected total is ALWAYS 60 points regardless of completion order.
+	permutations := [][]string{
+		{"required", "core", "bonus"},
+		{"required", "bonus", "core"},
+		{"core", "required", "bonus"},
+		{"core", "bonus", "required"},
+		{"bonus", "required", "core"},
+		{"bonus", "core", "required"},
+	}
+
+	today := time.Now().Format("2006-01-02")
+
+	for _, order := range permutations {
+		order := order
+		t.Run(strings.Join(order, "_"), func(t *testing.T) {
+			env := setupTest(t)
+			env.createAdmin(t)
+			kidID := env.createChild(t, "Kid")
+
+			// Create 3 chores: Required (10 pts), Core (20 pts), Bonus (30 pts)
+			env.request(t, "POST", "/api/chores", map[string]any{
+				"title":        "Req Chore",
+				"category":     "required",
+				"points_value": 10,
+			}, adminHeaders())
+			env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+				"assigned_to":   kidID,
+				"specific_date": today,
+			}, adminHeaders())
+
+			env.request(t, "POST", "/api/chores", map[string]any{
+				"title":        "Core Chore",
+				"category":     "core",
+				"points_value": 20,
+			}, adminHeaders())
+			env.request(t, "POST", "/api/chores/2/schedules", map[string]any{
+				"assigned_to":   kidID,
+				"specific_date": today,
+			}, adminHeaders())
+
+			env.request(t, "POST", "/api/chores", map[string]any{
+				"title":        "Bonus Chore",
+				"category":     "bonus",
+				"points_value": 30,
+			}, adminHeaders())
+			env.request(t, "POST", "/api/chores/3/schedules", map[string]any{
+				"assigned_to":   kidID,
+				"specific_date": today,
+			}, adminHeaders())
+
+			scheduleMap := map[string]int{
+				"required": 1,
+				"core":     2,
+				"bonus":    3,
+			}
+
+			for _, category := range order {
+				schedID := scheduleMap[category]
+				env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", schedID), map[string]any{
+					"completed_by":    kidID,
+					"completion_date": today,
+				}, childHeaders(kidID), http.StatusCreated)
+			}
+
+			// Final points balance must be EXACTLY 60
+			resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+			var pts map[string]any
+			decodeBody(t, resp, &pts)
+			balance := pts["balance"].(float64)
+			if balance != 60 {
+				t.Fatalf("order %v: expected final balance 60, got %v", order, balance)
+			}
+
+			// Sum of all point transactions must also be exactly 60
+			txs := pts["transactions"].([]any)
+			var totalFromTxs float64
+			for _, txItem := range txs {
+				txMap := txItem.(map[string]any)
+				totalFromTxs += txMap["amount"].(float64)
+			}
+			if totalFromTxs != 60 {
+				t.Fatalf("order %v: expected total from transactions 60, got %v", order, totalFromTxs)
+			}
+		})
+	}
+}
+
+func TestRandomOrderMultipleChoresPerCategoryPointTotals(t *testing.T) {
+	// 2 Required (10, 15), 2 Core (20, 25), 2 Bonus (30, 35) => Total = 135 pts.
+	today := time.Now().Format("2006-01-02")
+	expectedTotal := 10 + 15 + 20 + 25 + 30 + 35 // 135
+
+	// Run 10 randomized completion orders with different random seeds
+	for seed := int64(1); seed <= 10; seed++ {
+		seed := seed
+		t.Run(fmt.Sprintf("seed_%d", seed), func(t *testing.T) {
+			env := setupTest(t)
+			env.createAdmin(t)
+			kidID := env.createChild(t, "Kid")
+
+			chores := []struct {
+				title    string
+				category string
+				points   int
+			}{
+				{"Req 1", "required", 10},
+				{"Req 2", "required", 15},
+				{"Core 1", "core", 20},
+				{"Core 2", "core", 25},
+				{"Bonus 1", "bonus", 30},
+				{"Bonus 2", "bonus", 35},
+			}
+
+			for i, c := range chores {
+				choreID := i + 1
+				env.request(t, "POST", "/api/chores", map[string]any{
+					"title":        c.title,
+					"category":     c.category,
+					"points_value": c.points,
+				}, adminHeaders())
+				env.request(t, "POST", fmt.Sprintf("/api/chores/%d/schedules", choreID), map[string]any{
+					"assigned_to":   kidID,
+					"specific_date": today,
+				}, adminHeaders())
+			}
+
+			// Generate randomized order of schedule IDs 1..6
+			scheduleIDs := []int{1, 2, 3, 4, 5, 6}
+			r := rand.New(rand.NewSource(seed))
+			r.Shuffle(len(scheduleIDs), func(i, j int) {
+				scheduleIDs[i], scheduleIDs[j] = scheduleIDs[j], scheduleIDs[i]
+			})
+
+			for _, schedID := range scheduleIDs {
+				env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", schedID), map[string]any{
+					"completed_by":    kidID,
+					"completion_date": today,
+				}, childHeaders(kidID), http.StatusCreated)
+			}
+
+			// Final points balance must be EXACTLY 135
+			resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+			var pts map[string]any
+			decodeBody(t, resp, &pts)
+			balance := pts["balance"].(float64)
+			if balance != float64(expectedTotal) {
+				t.Fatalf("seed %d (order %v): expected balance %d, got %v", seed, scheduleIDs, expectedTotal, balance)
+			}
+
+			// Sum of all point transactions must match
+			txs := pts["transactions"].([]any)
+			var totalFromTxs float64
+			for _, txItem := range txs {
+				txMap := txItem.(map[string]any)
+				totalFromTxs += txMap["amount"].(float64)
+			}
+			if totalFromTxs != float64(expectedTotal) {
+				t.Fatalf("seed %d: expected total transactions %d, got %v", seed, expectedTotal, totalFromTxs)
+			}
+		})
+	}
+}
+
+func TestRandomOrderCompletionsWithApprovalsPointTotals(t *testing.T) {
+	// Mix instant and approval-required chores:
+	// Req 1 (10 pts, requires approval)
+	// Req 2 (15 pts, instant)
+	// Core 1 (20 pts, requires approval)
+	// Core 2 (25 pts, instant)
+	// Bonus 1 (30 pts, requires approval)
+	// Bonus 2 (35 pts, instant)
+	// Total expected = 135 pts.
+	today := time.Now().Format("2006-01-02")
+	expectedTotal := 135
+
+	for seed := int64(1); seed <= 5; seed++ {
+		seed := seed
+		t.Run(fmt.Sprintf("seed_%d", seed), func(t *testing.T) {
+			env := setupTest(t)
+			env.createAdmin(t)
+			kidID := env.createChild(t, "Kid")
+
+			type choreDef struct {
+				title            string
+				category         string
+				points           int
+				requiresApproval bool
+			}
+
+			chores := []choreDef{
+				{"Req 1", "required", 10, true},
+				{"Req 2", "required", 15, false},
+				{"Core 1", "core", 20, true},
+				{"Core 2", "core", 25, false},
+				{"Bonus 1", "bonus", 30, true},
+				{"Bonus 2", "bonus", 35, false},
+			}
+
+			for i, c := range chores {
+				choreID := i + 1
+				env.request(t, "POST", "/api/chores", map[string]any{
+					"title":             c.title,
+					"category":          c.category,
+					"points_value":      c.points,
+					"requires_approval": c.requiresApproval,
+				}, adminHeaders())
+				env.request(t, "POST", fmt.Sprintf("/api/chores/%d/schedules", choreID), map[string]any{
+					"assigned_to":   kidID,
+					"specific_date": today,
+				}, adminHeaders())
+			}
+
+			// Shuffle completion order
+			scheduleIDs := []int{1, 2, 3, 4, 5, 6}
+			r := rand.New(rand.NewSource(seed))
+			r.Shuffle(len(scheduleIDs), func(i, j int) {
+				scheduleIDs[i], scheduleIDs[j] = scheduleIDs[j], scheduleIDs[i]
+			})
+
+			for _, schedID := range scheduleIDs {
+				env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", schedID), map[string]any{
+					"completed_by":    kidID,
+					"completion_date": today,
+				}, childHeaders(kidID), http.StatusCreated)
+			}
+
+			// Find all pending completions and approve them
+			resp := env.expectStatus(t, "GET", "/api/completions/pending", nil, adminHeaders(), http.StatusOK)
+			var pendingList []map[string]any
+			decodeBody(t, resp, &pendingList)
+
+			// Shuffle approval order as well
+			r.Shuffle(len(pendingList), func(i, j int) {
+				pendingList[i], pendingList[j] = pendingList[j], pendingList[i]
+			})
+
+			for _, p := range pendingList {
+				compID := int64(p["id"].(float64))
+				env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%d/approve", compID), nil, adminHeaders(), http.StatusOK)
+			}
+
+			// Verify final points balance is 135
+			resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+			var pts map[string]any
+			decodeBody(t, resp, &pts)
+			balance := pts["balance"].(float64)
+			if balance != float64(expectedTotal) {
+				t.Fatalf("seed %d: expected balance %d, got %v", seed, expectedTotal, balance)
+			}
+		})
+	}
+}
+
+func TestRandomOrderCompletionsAndUncompletionsPointTotals(t *testing.T) {
+	today := time.Now().Format("2006-01-02")
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	// Create Req (10), Core (20), Bonus (30)
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":        "Req",
+		"category":     "required",
+		"points_value": 10,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": today,
+	}, adminHeaders())
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":        "Core",
+		"category":     "core",
+		"points_value": 20,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/2/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": today,
+	}, adminHeaders())
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":        "Bonus",
+		"category":     "bonus",
+		"points_value": 30,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/3/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": today,
+	}, adminHeaders())
+
+	// Step 1: Complete Bonus first -> 0 pts
+	env.expectStatus(t, "POST", "/api/schedules/3/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, childHeaders(kidID), http.StatusCreated)
+
+	var pts map[string]any
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected 0 points after only bonus, got %v", pts["balance"])
+	}
+
+	// Step 2: Complete Core second -> 0 pts
+	env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, childHeaders(kidID), http.StatusCreated)
+
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected 0 points after bonus + core, got %v", pts["balance"])
+	}
+
+	// Step 3: Complete Req third -> opens both gates -> total 60 pts
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, childHeaders(kidID), http.StatusCreated)
+
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 60 {
+		t.Fatalf("expected 60 points after all 3 completed, got %v", pts["balance"])
+	}
+
+	// Step 4: Uncomplete Bonus -> debits 30 -> balance 30
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/3/complete?date=%s", today), nil, adminHeaders(), http.StatusNoContent)
+
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 30 {
+		t.Fatalf("expected 30 points after uncompleting bonus, got %v", pts["balance"])
+	}
+
+	// Step 5: Uncomplete Core -> debits 20 -> balance 10
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/2/complete?date=%s", today), nil, adminHeaders(), http.StatusNoContent)
+
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 10 {
+		t.Fatalf("expected 10 points after uncompleting core, got %v", pts["balance"])
+	}
+
+	// Step 6: Re-complete Bonus (revival flow) -> Req is complete, but Core is not -> 0 additional points credited -> balance 10
+	env.expectStatus(t, "POST", "/api/schedules/3/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, childHeaders(kidID), http.StatusCreated)
+
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 10 {
+		t.Fatalf("expected 10 points after reviving bonus without core, got %v", pts["balance"])
+	}
+
+	// Step 7: Re-complete Core (revival flow) -> Req is complete, Core is revived (20 pts), and bonus gate opens (30 pts) -> balance 60
+	env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, childHeaders(kidID), http.StatusCreated)
+
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 60 {
+		t.Fatalf("expected 60 points after reviving core and opening bonus gate, got %v", pts["balance"])
+	}
+}
+
 

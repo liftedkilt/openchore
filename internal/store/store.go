@@ -367,6 +367,91 @@ func (s *Store) CompleteChore(ctx context.Context, cc *model.ChoreCompletion) er
 	return nil
 }
 
+// CompleteChoreAndCreditPoints atomically inserts a chore completion and, if immediately approved,
+// credits chore points (or records an expiry penalty) in a single database transaction.
+// If any database operation fails, the entire transaction is rolled back so no partial state is left.
+func (s *Store) CompleteChoreAndCreditPoints(ctx context.Context, cc *model.ChoreCompletion, pts int, expiryPenalty int) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx,
+		`INSERT INTO chore_completions (chore_schedule_id, completed_by, status, photo_url, completion_date, ai_feedback, ai_confidence)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		cc.ChoreScheduleID, cc.CompletedBy, cc.Status, cc.PhotoURL, cc.CompletionDate, cc.AIFeedback, cc.AIConfidence)
+	if err != nil {
+		return err
+	}
+	cc.ID, _ = res.LastInsertId()
+
+	if cc.Status == model.StatusApproved {
+		if pts > 0 {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+				 VALUES (?, ?, ?, ?, '')`,
+				cc.CompletedBy, pts, model.ReasonChoreComplete, cc.ID); err != nil {
+				return err
+			}
+			if err := s.applyAutoContributeTx(ctx, tx, cc.CompletedBy, cc.ID, pts); err != nil {
+				return err
+			}
+		}
+		if expiryPenalty > 0 {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+				 VALUES (?, ?, ?, ?, 'Late completion penalty')`,
+				cc.CompletedBy, -expiryPenalty, model.ReasonExpiryPenalty, cc.ID); err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit()
+}
+
+// ApproveCompletionAndCreditPoints atomically updates a pending completion status to approved
+// and credits the awarded points in a single database transaction.
+func (s *Store) ApproveCompletionAndCreditPoints(ctx context.Context, completionID int64, adminID int64, pts int) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx,
+		`UPDATE chore_completions
+		   SET status = ?, approved_by = ?, approved_at = CURRENT_TIMESTAMP
+		 WHERE id = ? AND status = ?`,
+		model.StatusApproved, adminID, completionID, model.StatusPending)
+	if err != nil {
+		return err
+	}
+	updated, _ := res.RowsAffected()
+	if updated == 0 {
+		return fmt.Errorf("completion %d not found or not pending", completionID)
+	}
+
+	if pts > 0 {
+		var userID int64
+		if err := tx.QueryRowContext(ctx, `SELECT completed_by FROM chore_completions WHERE id = ?`, completionID).Scan(&userID); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+			 VALUES (?, ?, ?, ?, '')`,
+			userID, pts, model.ReasonChoreComplete, completionID); err != nil {
+			return err
+		}
+		if err := s.applyAutoContributeTx(ctx, tx, userID, completionID, pts); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 // UncompleteChore removes (or soft-deletes) the completion for a schedule +
 // date. approved and pending completions are soft-deleted (uncompleted_at
 // set) so the kid can re-check without losing the photo + AI approval
@@ -414,6 +499,61 @@ func (s *Store) UncompleteChore(ctx context.Context, scheduleID int64, completio
 	return err
 }
 
+// UncompleteChoreAndDebitPoints atomically uncompletes a chore (soft-deleting approved/pending rows,
+// or hard-deleting ai_rejected/rejected rows) and debits any net points that were credited for it.
+func (s *Store) UncompleteChoreAndDebitPoints(ctx context.Context, scheduleID int64, completionDate string, userID int64, completionID int64, netPoints int) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx,
+		`UPDATE chore_completions
+		   SET uncompleted_at = CURRENT_TIMESTAMP
+		 WHERE chore_schedule_id = ?
+		   AND completion_date = ?
+		   AND uncompleted_at IS NULL
+		   AND status IN (?, ?)`,
+		scheduleID, completionDate, model.StatusApproved, model.StatusPending)
+	if err != nil {
+		return err
+	}
+	updated, _ := res.RowsAffected()
+	if updated == 0 {
+		var softDeleted int
+		if err := tx.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM chore_completions
+			 WHERE chore_schedule_id = ?
+			   AND completion_date = ?
+			   AND uncompleted_at IS NOT NULL
+			   AND status IN (?, ?)`,
+			scheduleID, completionDate, model.StatusApproved, model.StatusPending,
+		).Scan(&softDeleted); err == nil && softDeleted > 0 {
+			return tx.Commit()
+		}
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM chore_completions WHERE chore_schedule_id = ? AND completion_date = ?`,
+			scheduleID, completionDate); err != nil {
+			return err
+		}
+	}
+
+	if completionID > 0 && netPoints != 0 && userID > 0 {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+			 VALUES (?, ?, ?, ?, '')`,
+			userID, -netPoints, model.ReasonChoreUncomplete, completionID); err != nil {
+			return err
+		}
+		if err := s.reverseAutoContributeTx(ctx, tx, userID, completionID); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 // ReviveCompletion clears uncompleted_at on a soft-deleted completion so the
 // row is once again treated as live/completed. completed_at is refreshed to
 // "now" so downstream consumers (activity feeds, streak calculators, "recent
@@ -427,6 +567,39 @@ func (s *Store) ReviveCompletion(ctx context.Context, id int64) error {
 		       completed_at   = CURRENT_TIMESTAMP
 		 WHERE id = ?`, id)
 	return err
+}
+
+// ReviveCompletionAndReverseDebits atomically revives a soft-deleted completion,
+// removes chore_uncomplete debits, and restores auto-contributions in a single transaction.
+func (s *Store) ReviveCompletionAndReverseDebits(ctx context.Context, id int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE chore_completions
+		   SET uncompleted_at = NULL,
+		       completed_at   = CURRENT_TIMESTAMP
+		 WHERE id = ?`, id); err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM point_transactions WHERE reference_id = ? AND reason = ?`,
+		id, model.ReasonChoreUncomplete); err != nil {
+		return err
+	}
+
+	revertNote := fmt.Sprintf("auto_revert:completion:%d", id)
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM point_transactions WHERE reason = ? AND note = ?`,
+		model.ReasonGoalBreak, revertNote); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 // ReverseUncompleteDebits deletes any chore_uncomplete transactions that were
@@ -2525,6 +2698,38 @@ func (s *Store) UncompleteByFCFSGroup(ctx context.Context, groupID, date string)
 		 ) AND completion_date = ?`,
 		groupID, date)
 	return err
+}
+
+// UncompleteFCFSGroupAndDebitPoints atomically deletes all completions for an FCFS group on a given date
+// and debits any net points that were credited for the completion.
+func (s *Store) UncompleteFCFSGroupAndDebitPoints(ctx context.Context, groupID, date string, userID int64, existing *model.ChoreCompletion, netPoints int) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM chore_completions WHERE chore_schedule_id IN (
+		   SELECT id FROM chore_schedules WHERE fcfs_group_id = ?
+		 ) AND completion_date = ?`,
+		groupID, date); err != nil {
+		return err
+	}
+
+	if existing != nil && netPoints != 0 && userID > 0 {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+			 VALUES (?, ?, ?, ?, '')`,
+			userID, -netPoints, model.ReasonChoreUncomplete, existing.ID); err != nil {
+			return err
+		}
+		if err := s.reverseAutoContributeTx(ctx, tx, userID, existing.ID); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 // --- Chore Triggers ---
