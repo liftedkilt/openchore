@@ -357,9 +357,9 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 
 func (s *Store) CompleteChore(ctx context.Context, cc *model.ChoreCompletion) error {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO chore_completions (chore_schedule_id, completed_by, status, photo_url, completion_date, ai_feedback, ai_confidence)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		cc.ChoreScheduleID, cc.CompletedBy, cc.Status, cc.PhotoURL, cc.CompletionDate, cc.AIFeedback, cc.AIConfidence)
+		`INSERT INTO chore_completions (chore_schedule_id, completed_by, status, photo_url, completion_date, ai_feedback, ai_confidence, approved_by, approved_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		cc.ChoreScheduleID, cc.CompletedBy, cc.Status, cc.PhotoURL, cc.CompletionDate, cc.AIFeedback, cc.AIConfidence, cc.ApprovedBy, cc.ApprovedAt)
 	if err != nil {
 		return err
 	}
@@ -378,9 +378,9 @@ func (s *Store) CompleteChoreAndCreditPoints(ctx context.Context, cc *model.Chor
 	defer tx.Rollback()
 
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO chore_completions (chore_schedule_id, completed_by, status, photo_url, completion_date, ai_feedback, ai_confidence)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		cc.ChoreScheduleID, cc.CompletedBy, cc.Status, cc.PhotoURL, cc.CompletionDate, cc.AIFeedback, cc.AIConfidence)
+		`INSERT INTO chore_completions (chore_schedule_id, completed_by, status, photo_url, completion_date, ai_feedback, ai_confidence, approved_by, approved_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		cc.ChoreScheduleID, cc.CompletedBy, cc.Status, cc.PhotoURL, cc.CompletionDate, cc.AIFeedback, cc.AIConfidence, cc.ApprovedBy, cc.ApprovedAt)
 	if err != nil {
 		return err
 	}
