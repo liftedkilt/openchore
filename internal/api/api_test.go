@@ -4575,4 +4575,89 @@ func TestRandomOrderCompletionsAndUncompletionsPointTotals(t *testing.T) {
 	}
 }
 
+func TestAdminCompletingApprovalRequiredChoreSkipsPending(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+	today := time.Now().Format("2006-01-02")
+
+	// Chore 1: requires_approval = true (10 pts)
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":             "Chore 1",
+		"category":          "required",
+		"points_value":      10,
+		"requires_approval": true,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": today,
+	}, adminHeaders())
+
+	// Admin completes Chore 1 on behalf of child -> should be immediately approved
+	resp := env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+
+	var comp map[string]any
+	decodeBody(t, resp, &comp)
+	if comp["status"] != model.StatusApproved {
+		t.Fatalf("expected status 'approved' when admin completes, got %q", comp["status"])
+	}
+
+	// Points should be immediately credited to kid
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 10 {
+		t.Fatalf("expected balance 10, got %v", pts["balance"])
+	}
+
+	// Pending approvals list must be empty
+	resp = env.expectStatus(t, "GET", "/api/completions/pending", nil, adminHeaders(), http.StatusOK)
+	var pending []map[string]any
+	decodeBody(t, resp, &pending)
+	if len(pending) != 0 {
+		t.Fatalf("expected 0 pending completions, got %d", len(pending))
+	}
+
+	// Chore 2: requires_approval = true (15 pts)
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":             "Chore 2",
+		"category":          "required",
+		"points_value":      15,
+		"requires_approval": true,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/2/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": today,
+	}, adminHeaders())
+
+	// Child completes Chore 2 -> should be pending approval
+	resp = env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, childHeaders(kidID), http.StatusCreated)
+
+	decodeBody(t, resp, &comp)
+	if comp["status"] != model.StatusPending {
+		t.Fatalf("expected status 'pending' when child completes, got %q", comp["status"])
+	}
+
+	// Balance should still be 10 (Chore 2 points not credited yet)
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 10 {
+		t.Fatalf("expected balance 10, got %v", pts["balance"])
+	}
+
+	// Pending approvals list should have Chore 2
+	resp = env.expectStatus(t, "GET", "/api/completions/pending", nil, adminHeaders(), http.StatusOK)
+	decodeBody(t, resp, &pending)
+	if len(pending) != 1 {
+		t.Fatalf("expected 1 pending completion, got %d", len(pending))
+	}
+}
+
+
 

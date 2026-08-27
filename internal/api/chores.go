@@ -451,6 +451,13 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 					writeError(w, http.StatusInternalServerError, "failed to revive completion")
 					return
 				}
+				if user != nil && user.Role == "admin" && existing.Status == model.StatusPending {
+					existing.Status = model.StatusApproved
+					existing.ApprovedBy = &user.ID
+					now := time.Now()
+					existing.ApprovedAt = &now
+					_ = h.store.UpdateCompletionStatus(r.Context(), existing.ID, model.StatusApproved, user.ID)
+				}
 				if existing.Status == model.StatusApproved {
 					// Bonus chores that were originally credited 0 points (because
 					// required/core weren't done yet) can now qualify if the kid has
@@ -613,15 +620,23 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	status := model.StatusApproved
-	if chore != nil && chore.RequiresApproval {
-		status = model.StatusPending
-	}
-
 	user := UserFromContext(r.Context())
 	completedBy := user.ID
 	if req.CompletedBy != 0 {
 		completedBy = req.CompletedBy
+	}
+
+	status := model.StatusApproved
+	if chore != nil && chore.RequiresApproval && (user == nil || user.Role != "admin") {
+		status = model.StatusPending
+	}
+
+	var approvedBy *int64
+	var approvedAt *time.Time
+	if status == model.StatusApproved && user != nil && user.Role == "admin" {
+		approvedBy = &user.ID
+		now := time.Now()
+		approvedAt = &now
 	}
 
 	completion := &model.ChoreCompletion{
@@ -632,6 +647,8 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		CompletionDate:  req.CompletionDate,
 		AIFeedback:      aiFeedback,
 		AIConfidence:    aiConfidence,
+		ApprovedBy:      approvedBy,
+		ApprovedAt:      approvedAt,
 	}
 	var pts int
 	var expiryPenalty int
