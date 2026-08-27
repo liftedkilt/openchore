@@ -447,22 +447,11 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 			// be revivable — treat them as fresh retry targets by hard-deleting
 			// and falling through to the normal complete flow.
 			if existing.Status == model.StatusApproved || existing.Status == model.StatusPending {
-				if err := h.store.ReviveCompletion(r.Context(), existing.ID); err != nil {
+				if err := h.store.ReviveCompletionAndReverseDebits(r.Context(), existing.ID); err != nil {
 					writeError(w, http.StatusInternalServerError, "failed to revive completion")
 					return
 				}
-				// Restore the child's balance by deleting the chore_uncomplete
-				// debit rows that were inserted when they unchecked. Crediting
-				// a new chore_complete row would double-count on subsequent
-				// unchecks (since GetNetPointsForCompletion would return a
-				// higher number), so we surgically remove the debit instead.
 				if existing.Status == model.StatusApproved {
-					if _, err := h.store.ReverseUncompleteDebits(r.Context(), existing.ID); err != nil {
-						log.Printf("error reversing uncomplete debits for completion %d: %v", existing.ID, err)
-					}
-					if err := h.store.ReverseAutoContributeReversals(r.Context(), existing.ID); err != nil {
-						log.Printf("error reversing auto-contribute reversals for completion %d: %v", existing.ID, err)
-					}
 					// Bonus chores that were originally credited 0 points (because
 					// required/core weren't done yet) can now qualify if the kid has
 					// since finished the rest of the day. Re-run the gate and credit
@@ -644,12 +633,8 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		AIFeedback:      aiFeedback,
 		AIConfidence:    aiConfidence,
 	}
-	if err := h.store.CompleteChore(r.Context(), completion); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to complete chore")
-		return
-	}
-
 	var pts int
+	var expiryPenalty int
 	// Only calculate points and streak if immediately approved
 	if status == model.StatusApproved {
 		// Credit or penalize points based on expiry status
@@ -675,17 +660,17 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 				pts = 0
 			case model.ExpiryPenalty:
 				pts = 0
-				if err := h.store.DebitExpiryPenalty(r.Context(), completedBy, completion.ID, schedule.ExpiryPenaltyValue); err != nil {
-					log.Printf("error debiting expiry penalty for user %d completion %d: %v", completedBy, completion.ID, err)
-				}
+				expiryPenalty = schedule.ExpiryPenaltyValue
 			}
 		}
-		if pts > 0 {
-			if err := h.store.CreditChorePoints(r.Context(), completedBy, completion.ID, pts); err != nil {
-				log.Printf("error crediting chore points for user %d completion %d: %v", completedBy, completion.ID, err)
-			}
-		}
+	}
 
+	if err := h.store.CompleteChoreAndCreditPoints(r.Context(), completion, pts, expiryPenalty); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to complete chore")
+		return
+	}
+
+	if status == model.StatusApproved {
 		// Completing a required chore can be the event that opens the core gate.
 		if chore != nil && chore.Category == model.CategoryRequired {
 			h.creditPendingCorePoints(r.Context(), completedBy, req.CompletionDate)
@@ -824,25 +809,25 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var completedBy int64
+	var completionID int64
+	var netPoints int
 	if existing != nil {
 		completedBy = existing.CompletedBy
-		// Reverse the actual net points for this completion (handles normal credit and penalty debits)
+		completionID = existing.ID
 		net, err := h.store.GetNetPointsForCompletion(r.Context(), existing.ID)
-		if err == nil && net != 0 {
-			if err := h.store.DebitChorePoints(r.Context(), existing.CompletedBy, existing.ID, net); err != nil {
-				log.Printf("error debiting chore points for user %d completion %d: %v", existing.CompletedBy, existing.ID, err)
-			}
+		if err == nil {
+			netPoints = net
 		}
 	}
 
 	// FCFS: uncomplete all siblings in the group
 	if schedule != nil && schedule.AssignmentType == model.AssignmentFCFS && schedule.FcfsGroupID != nil {
-		if err := h.store.UncompleteByFCFSGroup(r.Context(), *schedule.FcfsGroupID, dateStr); err != nil {
+		if err := h.store.UncompleteFCFSGroupAndDebitPoints(r.Context(), *schedule.FcfsGroupID, dateStr, completedBy, existing, netPoints); err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to uncomplete FCFS group")
 			return
 		}
 	} else {
-		if err := h.store.UncompleteChore(r.Context(), scheduleID, dateStr); err != nil {
+		if err := h.store.UncompleteChoreAndDebitPoints(r.Context(), scheduleID, dateStr, completedBy, completionID, netPoints); err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to uncomplete chore")
 			return
 		}
@@ -912,12 +897,7 @@ func (h *ChoreHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	admin := UserFromContext(r.Context())
-	if err := h.store.UpdateCompletionStatus(r.Context(), id, model.StatusApproved, admin.ID); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to approve")
-		return
-	}
-
-	// Calculate and award points now that it's approved
+	// Calculate and award points atomically with approval
 	schedule, _ := h.store.GetSchedule(r.Context(), completion.ChoreScheduleID)
 	var pts int
 	if schedule != nil {
@@ -937,12 +917,16 @@ func (h *ChoreHandler) Approve(w http.ResponseWriter, r *http.Request) {
 				pts = 0
 			}
 		}
+	}
 
-		if pts > 0 {
-			if err := h.store.CreditChorePoints(r.Context(), completion.CompletedBy, completion.ID, pts); err != nil {
-				log.Printf("error crediting chore points for user %d completion %d: %v", completion.CompletedBy, completion.ID, err)
-			}
-		}
+	admin := UserFromContext(r.Context())
+	if err := h.store.ApproveCompletionAndCreditPoints(r.Context(), id, admin.ID, pts); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to approve")
+		return
+	}
+
+	if schedule != nil {
+		chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
 
 		// Approving a required completion can be the event that opens the core gate.
 		if chore != nil && chore.Category == model.CategoryRequired {
@@ -1325,30 +1309,34 @@ func (h *ChoreHandler) SuggestPoints(w http.ResponseWriter, r *http.Request) {
 }
 
 // shouldAwardBonusPoints returns true if all required and core chores for the
-// given user and date are complete, meaning bonus points should be awarded.
+// given user and date are approved, meaning bonus points should be awarded.
 func (h *ChoreHandler) shouldAwardBonusPoints(ctx context.Context, userID int64, date string) bool {
 	todayChores, err := h.store.GetScheduledChoresForUser(ctx, userID, []string{date}, time.Now())
 	if err != nil {
 		return false
 	}
 	for _, c := range todayChores {
-		if !c.Completed && (c.Category == model.CategoryRequired || c.Category == model.CategoryCore) {
-			return false
+		if c.Category == model.CategoryRequired || c.Category == model.CategoryCore {
+			if !c.Completed || c.CompletionStatus == nil || *c.CompletionStatus != model.StatusApproved {
+				return false
+			}
 		}
 	}
 	return true
 }
 
 // shouldAwardCorePoints returns true if all required chores for the
-// given user and date are complete, meaning core points should be awarded.
+// given user and date are approved, meaning core points should be awarded.
 func (h *ChoreHandler) shouldAwardCorePoints(ctx context.Context, userID int64, date string) bool {
 	todayChores, err := h.store.GetScheduledChoresForUser(ctx, userID, []string{date}, time.Now())
 	if err != nil {
 		return false
 	}
 	for _, c := range todayChores {
-		if !c.Completed && c.Category == model.CategoryRequired {
-			return false
+		if c.Category == model.CategoryRequired {
+			if !c.Completed || c.CompletionStatus == nil || *c.CompletionStatus != model.StatusApproved {
+				return false
+			}
 		}
 	}
 	return true
