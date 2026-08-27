@@ -4125,7 +4125,7 @@ func TestAtomicApprovalPointCreditFailureRollback(t *testing.T) {
 		t.Fatalf("failed to drop failure trigger: %v", err)
 	}
 
-	env.expectStatus(t, "POST", "/api/completions/1/approve", nil, adminHeaders(), http.StatusOK)
+	env.expectStatus(t, "POST", "/api/completions/1/approve", nil, adminHeaders(), http.StatusNoContent)
 
 	// Verify points balance is now 15
 	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
@@ -4443,7 +4443,7 @@ func TestRandomOrderCompletionsWithApprovalsPointTotals(t *testing.T) {
 
 			for _, p := range pendingList {
 				compID := int64(p["id"].(float64))
-				env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%d/approve", compID), nil, adminHeaders(), http.StatusOK)
+				env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%d/approve", compID), nil, adminHeaders(), http.StatusNoContent)
 			}
 
 			// Verify final points balance is 135
@@ -4550,7 +4550,7 @@ func TestRandomOrderCompletionsAndUncompletionsPointTotals(t *testing.T) {
 		t.Fatalf("expected 10 points after uncompleting core, got %v", pts["balance"])
 	}
 
-	// Step 6: Re-complete Bonus (revival flow) -> Req is complete, but Core is not -> 0 additional points credited -> balance 10
+	// Step 6: Re-complete Bonus (revival flow) -> restores pre-uncheck state (+30) -> balance 40
 	env.expectStatus(t, "POST", "/api/schedules/3/complete", map[string]any{
 		"completed_by":    kidID,
 		"completion_date": today,
@@ -4558,11 +4558,11 @@ func TestRandomOrderCompletionsAndUncompletionsPointTotals(t *testing.T) {
 
 	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
 	decodeBody(t, resp, &pts)
-	if pts["balance"].(float64) != 10 {
-		t.Fatalf("expected 10 points after reviving bonus without core, got %v", pts["balance"])
+	if pts["balance"].(float64) != 40 {
+		t.Fatalf("expected 40 points after reviving bonus, got %v", pts["balance"])
 	}
 
-	// Step 7: Re-complete Core (revival flow) -> Req is complete, Core is revived (20 pts), and bonus gate opens (30 pts) -> balance 60
+	// Step 7: Re-complete Core (revival flow) -> restores pre-uncheck state (+20) -> balance 60
 	env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
 		"completed_by":    kidID,
 		"completion_date": today,
@@ -4571,7 +4571,7 @@ func TestRandomOrderCompletionsAndUncompletionsPointTotals(t *testing.T) {
 	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
 	decodeBody(t, resp, &pts)
 	if pts["balance"].(float64) != 60 {
-		t.Fatalf("expected 60 points after reviving core and opening bonus gate, got %v", pts["balance"])
+		t.Fatalf("expected 60 points after reviving core, got %v", pts["balance"])
 	}
 }
 
