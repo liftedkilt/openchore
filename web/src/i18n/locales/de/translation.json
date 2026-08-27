@@ -460,11 +460,18 @@
         "empty": "Keine Webhooks konfiguriert",
         "enableButton": "Aktivieren",
         "events": {
+          "adminPasscodeChanged": "Admin-Passcode geändert",
+          "adminPasscodeFailed": "Admin-Passcode fehlgeschlagen",
+          "adminPasscodeVerified": "Admin-Passcode verifiziert",
           "completed": "Abgeschlossen",
           "dailyDone": "Tagesaufgaben geschafft!",
           "decay": "Verfallen",
           "expired": "Abgelaufen",
           "missed": "Verpasst",
+          "profilePinChanged": "Profil-PIN geändert",
+          "profilePinCleared": "Profil-PIN gelöscht",
+          "profilePinFailed": "Profil-PIN fehlgeschlagen",
+          "profilePinVerified": "Profil-PIN verifiziert",
           "redeemed": "Eingelöst",
           "streak": "Streak",
           "uncompleted": "Zurückgesetzt"

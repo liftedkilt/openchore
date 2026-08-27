@@ -19,15 +19,22 @@ import (
 
 // Event types
 const (
-	EventChoreCompleted   = "chore.completed"
-	EventChoreUncompleted = "chore.uncompleted"
-	EventChoreExpired     = "chore.expired"
-	EventRewardRedeemed   = "reward.redeemed"
-	EventDailyComplete    = "daily.complete"
-	EventStreakMilestone   = "streak.milestone"
-	EventPointsDecayed       = "points.decayed"
-	EventChoreMissed         = "chore.missed"
-	EventChoreFCFSCompleted  = "chore.fcfs_completed"
+	EventChoreCompleted        = "chore.completed"
+	EventChoreUncompleted      = "chore.uncompleted"
+	EventChoreExpired          = "chore.expired"
+	EventRewardRedeemed        = "reward.redeemed"
+	EventDailyComplete         = "daily.complete"
+	EventStreakMilestone       = "streak.milestone"
+	EventPointsDecayed         = "points.decayed"
+	EventChoreMissed           = "chore.missed"
+	EventChoreFCFSCompleted    = "chore.fcfs_completed"
+	EventAdminPasscodeVerified = "auth.admin_passcode.verified"
+	EventAdminPasscodeFailed   = "auth.admin_passcode.failed"
+	EventAdminPasscodeChanged  = "auth.admin_passcode.changed"
+	EventProfilePinVerified    = "auth.profile_pin.verified"
+	EventProfilePinFailed      = "auth.profile_pin.failed"
+	EventProfilePinChanged     = "auth.profile_pin.changed"
+	EventProfilePinCleared     = "auth.profile_pin.cleared"
 )
 
 type Dispatcher struct {

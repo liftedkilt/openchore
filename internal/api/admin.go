@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
@@ -8,6 +9,7 @@ import (
 
 	"github.com/liftedkilt/openchore/internal/config"
 	"github.com/liftedkilt/openchore/internal/store"
+	"github.com/liftedkilt/openchore/internal/webhook"
 )
 
 // writableSettings is the allowlist of setting keys that can be written via
@@ -25,11 +27,12 @@ var writableSettings = map[string]bool{
 }
 
 type AdminHandler struct {
-	store *store.Store
+	store      *store.Store
+	dispatcher *webhook.Dispatcher
 }
 
-func NewAdminHandler(s *store.Store) *AdminHandler {
-	return &AdminHandler{store: s}
+func NewAdminHandler(s *store.Store, dispatcher *webhook.Dispatcher) *AdminHandler {
+	return &AdminHandler{store: s, dispatcher: dispatcher}
 }
 
 type verifyPasscodeRequest struct {
@@ -49,9 +52,25 @@ func (h *AdminHandler) VerifyPasscode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ip := clientIP(r)
 	if err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(req.Passcode)); err != nil {
+		log.Printf("auth: failed admin passcode attempt from %s", ip)
+		if h.dispatcher != nil {
+			h.dispatcher.Fire(webhook.EventAdminPasscodeFailed, map[string]any{
+				"ip_address": ip,
+				"user_agent": r.UserAgent(),
+			})
+		}
 		writeError(w, http.StatusUnauthorized, "incorrect passcode")
 		return
+	}
+
+	log.Printf("auth: admin passcode verified from %s", ip)
+	if h.dispatcher != nil {
+		h.dispatcher.Fire(webhook.EventAdminPasscodeVerified, map[string]any{
+			"ip_address": ip,
+			"user_agent": r.UserAgent(),
+		})
 	}
 
 	writeJSON(w, http.StatusOK, map[string]bool{"valid": true})
@@ -78,7 +97,15 @@ func (h *AdminHandler) UpdatePasscode(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to check passcode")
 		return
 	}
+	ip := clientIP(r)
 	if err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(req.OldPasscode)); err != nil {
+		log.Printf("auth: failed admin passcode update attempt from %s", ip)
+		if h.dispatcher != nil {
+			h.dispatcher.Fire(webhook.EventAdminPasscodeFailed, map[string]any{
+				"ip_address": ip,
+				"user_agent": r.UserAgent(),
+			})
+		}
 		writeError(w, http.StatusUnauthorized, "incorrect current passcode")
 		return
 	}
@@ -92,6 +119,22 @@ func (h *AdminHandler) UpdatePasscode(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.SetSetting(r.Context(), "admin_passcode", string(hashed)); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update passcode")
 		return
+	}
+
+	caller := UserFromContext(r.Context())
+	var actorID int64
+	var actorName string
+	if caller != nil {
+		actorID = caller.ID
+		actorName = caller.Name
+	}
+	log.Printf("auth: admin passcode changed by user %d (%s) from %s", actorID, actorName, ip)
+	if h.dispatcher != nil {
+		h.dispatcher.Fire(webhook.EventAdminPasscodeChanged, map[string]any{
+			"actor_id":   actorID,
+			"actor_name": actorName,
+			"ip_address": ip,
+		})
 	}
 
 	writeJSON(w, http.StatusOK, map[string]bool{"updated": true})

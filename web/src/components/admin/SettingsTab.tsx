@@ -48,6 +48,13 @@ export const SettingsTab: React.FC = () => {
     { id: 'daily.complete', label: t('admin.settingsTab.webhooks.events.dailyDone'), icon: '🌟' },
     { id: 'streak.milestone', label: t('admin.settingsTab.webhooks.events.streak'), icon: '🔥' },
     { id: 'points.decayed', label: t('admin.settingsTab.webhooks.events.decay'), icon: '📉' },
+    { id: 'auth.admin_passcode.verified', label: t('admin.settingsTab.webhooks.events.adminPasscodeVerified'), icon: '🔑' },
+    { id: 'auth.admin_passcode.failed', label: t('admin.settingsTab.webhooks.events.adminPasscodeFailed'), icon: '🚫' },
+    { id: 'auth.admin_passcode.changed', label: t('admin.settingsTab.webhooks.events.adminPasscodeChanged'), icon: '🔄' },
+    { id: 'auth.profile_pin.verified', label: t('admin.settingsTab.webhooks.events.profilePinVerified'), icon: '🔓' },
+    { id: 'auth.profile_pin.failed', label: t('admin.settingsTab.webhooks.events.profilePinFailed'), icon: '⚠️' },
+    { id: 'auth.profile_pin.changed', label: t('admin.settingsTab.webhooks.events.profilePinChanged'), icon: '🔢' },
+    { id: 'auth.profile_pin.cleared', label: t('admin.settingsTab.webhooks.events.profilePinCleared'), icon: '🗑️' },
   ];
 
   const allEventsSelected = webhookSelectedEvents.size === 0 || webhookSelectedEvents.size === WEBHOOK_EVENTS.length;
