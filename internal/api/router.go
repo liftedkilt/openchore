@@ -18,9 +18,9 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 
 	discordNotifier := discord.NewNotifier(s)
 
-	users := NewUserHandler(s)
+	users := NewUserHandler(s, dispatcher)
 	chores := NewChoreHandler(s, dispatcher, discordNotifier)
-	admin := NewAdminHandler(s)
+	admin := NewAdminHandler(s, dispatcher)
 	points := NewPointsHandler(s)
 	rewards := NewRewardHandler(s, dispatcher)
 	streaks := NewStreakHandler(s)

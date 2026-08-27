@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -8,14 +9,16 @@ import (
 
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/store"
+	"github.com/liftedkilt/openchore/internal/webhook"
 )
 
 type UserHandler struct {
-	store *store.Store
+	store      *store.Store
+	dispatcher *webhook.Dispatcher
 }
 
-func NewUserHandler(s *store.Store) *UserHandler {
-	return &UserHandler{store: s}
+func NewUserHandler(s *store.Store, dispatcher *webhook.Dispatcher) *UserHandler {
+	return &UserHandler{store: s, dispatcher: dispatcher}
 }
 
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -399,10 +402,36 @@ func (h *UserHandler) VerifyPin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "profile has no pin")
 		return
 	}
+
+	ip := clientIP(r)
+	targetUser, _ := h.store.GetUser(r.Context(), id)
+	targetName := ""
+	if targetUser != nil {
+		targetName = targetUser.Name
+	}
+
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Pin)); err != nil {
+		log.Printf("auth: failed pin attempt for user %d (%s) from %s", id, targetName, ip)
+		if h.dispatcher != nil {
+			h.dispatcher.Fire(webhook.EventProfilePinFailed, map[string]any{
+				"user_id":    id,
+				"user_name":  targetName,
+				"ip_address": ip,
+			})
+		}
 		writeError(w, http.StatusUnauthorized, "incorrect pin")
 		return
 	}
+
+	log.Printf("auth: user %d (%s) pin verified from %s", id, targetName, ip)
+	if h.dispatcher != nil {
+		h.dispatcher.Fire(webhook.EventProfilePinVerified, map[string]any{
+			"user_id":    id,
+			"user_name":  targetName,
+			"ip_address": ip,
+		})
+	}
+
 	writeJSON(w, http.StatusOK, map[string]bool{"valid": true})
 }
 
@@ -447,25 +476,36 @@ func (h *UserHandler) SetPin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ip := clientIP(r)
+	targetUser, err := h.store.GetUser(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get user")
+		return
+	}
+	if targetUser == nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	targetName := targetUser.Name
+
 	existingHash, err := h.store.GetUserPinHash(r.Context(), id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to check pin")
 		return
 	}
-	if existingHash == "" {
-		// No PIN set yet — ensure the target user actually exists.
-		u, err := h.store.GetUser(r.Context(), id)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to get user")
-			return
-		}
-		if u == nil {
-			writeError(w, http.StatusNotFound, "user not found")
-			return
-		}
-	} else if !adminOverride {
+	if existingHash != "" && !adminOverride {
 		// Caller is changing their own PIN — must supply the current value.
 		if err := bcrypt.CompareHashAndPassword([]byte(existingHash), []byte(req.CurrentPin)); err != nil {
+			log.Printf("auth: failed pin change attempt for user %d (%s) by user %d (%s) from %s", id, targetName, caller.ID, caller.Name, ip)
+			if h.dispatcher != nil {
+				h.dispatcher.Fire(webhook.EventProfilePinFailed, map[string]any{
+					"user_id":    id,
+					"user_name":  targetName,
+					"actor_id":   caller.ID,
+					"actor_name": caller.Name,
+					"ip_address": ip,
+				})
+			}
 			writeError(w, http.StatusUnauthorized, "incorrect current pin")
 			return
 		}
@@ -480,6 +520,20 @@ func (h *UserHandler) SetPin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to save pin")
 		return
 	}
+
+	log.Printf("auth: user %d (%s) pin set by user %d (%s) from %s (admin_override=%v)", id, targetName, caller.ID, caller.Name, ip, adminOverride)
+	if h.dispatcher != nil {
+		h.dispatcher.Fire(webhook.EventProfilePinChanged, map[string]any{
+			"user_id":        id,
+			"user_name":      targetName,
+			"actor_id":       caller.ID,
+			"actor_name":     caller.Name,
+			"admin_override": adminOverride,
+			"is_new":         existingHash == "",
+			"ip_address":     ip,
+		})
+	}
+
 	writeJSON(w, http.StatusOK, map[string]bool{"has_pin": true})
 }
 
@@ -511,6 +565,18 @@ func (h *UserHandler) ClearPin(w http.ResponseWriter, r *http.Request) {
 	}
 	adminOverride := isAdmin && !targetIsSelf
 
+	ip := clientIP(r)
+	targetUser, err := h.store.GetUser(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get user")
+		return
+	}
+	if targetUser == nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	targetName := targetUser.Name
+
 	existingHash, err := h.store.GetUserPinHash(r.Context(), id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to check pin")
@@ -529,6 +595,16 @@ func (h *UserHandler) ClearPin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := bcrypt.CompareHashAndPassword([]byte(existingHash), []byte(req.CurrentPin)); err != nil {
+			log.Printf("auth: failed pin clear attempt for user %d (%s) by user %d (%s) from %s", id, targetName, caller.ID, caller.Name, ip)
+			if h.dispatcher != nil {
+				h.dispatcher.Fire(webhook.EventProfilePinFailed, map[string]any{
+					"user_id":    id,
+					"user_name":  targetName,
+					"actor_id":   caller.ID,
+					"actor_name": caller.Name,
+					"ip_address": ip,
+				})
+			}
 			writeError(w, http.StatusUnauthorized, "incorrect current pin")
 			return
 		}
@@ -538,6 +614,19 @@ func (h *UserHandler) ClearPin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to clear pin")
 		return
 	}
+
+	log.Printf("auth: user %d (%s) pin cleared by user %d (%s) from %s (admin_override=%v)", id, targetName, caller.ID, caller.Name, ip, adminOverride)
+	if h.dispatcher != nil {
+		h.dispatcher.Fire(webhook.EventProfilePinCleared, map[string]any{
+			"user_id":        id,
+			"user_name":      targetName,
+			"actor_id":       caller.ID,
+			"actor_name":     caller.Name,
+			"admin_override": adminOverride,
+			"ip_address":     ip,
+		})
+	}
+
 	writeJSON(w, http.StatusOK, map[string]bool{"has_pin": false})
 }
 

@@ -3820,3 +3820,183 @@ func TestProfilePinAdminMustVerifyOwnCurrentPin(t *testing.T) {
 	env.expectStatus(t, "DELETE", "/api/users/1/pin",
 		map[string]any{"current_pin": "5678"}, adminHeaders(), http.StatusOK)
 }
+
+// =================== AUTH & PIN EVENT LOGGING / WEBHOOK TESTS ===================
+
+func TestAdminPasscodeWebhookEvents(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	var mu sync.Mutex
+	var receivedEvents []string
+	var receivedPayloads []webhook.Payload
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		receivedEvents = append(receivedEvents, r.Header.Get("X-OpenChore-Event"))
+		body, _ := io.ReadAll(r.Body)
+		var p webhook.Payload
+		_ = json.Unmarshal(body, &p)
+		receivedPayloads = append(receivedPayloads, p)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	// Register webhook for all events
+	env.expectStatus(t, "POST", "/api/admin/webhooks", map[string]any{
+		"url":    ts.URL,
+		"events": "*",
+	}, adminHeaders(), http.StatusCreated)
+
+	// 1. Successful verification
+	env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
+		"passcode": "0000",
+	}, nil, http.StatusOK)
+
+	// 2. Failed verification
+	env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
+		"passcode": "9999",
+	}, nil, http.StatusUnauthorized)
+
+	// 3. Failed passcode update (wrong current passcode)
+	env.expectStatus(t, "PUT", "/api/admin/passcode", map[string]any{
+		"old_passcode": "wrong",
+		"new_passcode": "validpass1",
+	}, adminHeaders(), http.StatusUnauthorized)
+
+	// 4. Successful passcode update
+	env.expectStatus(t, "PUT", "/api/admin/passcode", map[string]any{
+		"old_passcode": "0000",
+		"new_passcode": "validpass1",
+	}, adminHeaders(), http.StatusOK)
+
+	time.Sleep(500 * time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	expectedEvents := []string{
+		webhook.EventAdminPasscodeVerified,
+		webhook.EventAdminPasscodeFailed,
+		webhook.EventAdminPasscodeFailed,
+		webhook.EventAdminPasscodeChanged,
+	}
+
+	if len(receivedEvents) != len(expectedEvents) {
+		t.Fatalf("expected %d events, got %d: %v", len(expectedEvents), len(receivedEvents), receivedEvents)
+	}
+
+	for i, exp := range expectedEvents {
+		if receivedEvents[i] != exp {
+			t.Errorf("event %d: expected %q, got %q", i, exp, receivedEvents[i])
+		}
+	}
+
+	// Verify payloads never contain plaintext passcodes
+	for i, p := range receivedPayloads {
+		dataBytes, _ := json.Marshal(p.Data)
+		dataStr := string(dataBytes)
+		if strings.Contains(dataStr, "0000") || strings.Contains(dataStr, "validpass1") || strings.Contains(dataStr, "wrong") {
+			t.Errorf("payload %d leaks passcode in data: %s", i, dataStr)
+		}
+	}
+}
+
+func TestProfilePinWebhookEvents(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+
+	var mu sync.Mutex
+	var receivedEvents []string
+	var receivedPayloads []webhook.Payload
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		receivedEvents = append(receivedEvents, r.Header.Get("X-OpenChore-Event"))
+		body, _ := io.ReadAll(r.Body)
+		var p webhook.Payload
+		_ = json.Unmarshal(body, &p)
+		receivedPayloads = append(receivedPayloads, p)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	// Register webhook for all events
+	env.expectStatus(t, "POST", "/api/admin/webhooks", map[string]any{
+		"url":    ts.URL,
+		"events": "*",
+	}, adminHeaders(), http.StatusCreated)
+
+	// 1. Initial PIN set
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidID), map[string]any{
+		"new_pin": "1234",
+	}, childHeaders(kidID), http.StatusOK)
+
+	// 2. Successful PIN verify
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID), map[string]any{
+		"pin": "1234",
+	}, nil, http.StatusOK)
+
+	// 3. Failed PIN verify
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID), map[string]any{
+		"pin": "0000",
+	}, nil, http.StatusUnauthorized)
+
+	// 4. Failed PIN change (wrong current_pin)
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidID), map[string]any{
+		"current_pin": "wrong",
+		"new_pin":     "5678",
+	}, childHeaders(kidID), http.StatusUnauthorized)
+
+	// 5. Successful PIN change
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidID), map[string]any{
+		"current_pin": "1234",
+		"new_pin":     "5678",
+	}, childHeaders(kidID), http.StatusOK)
+
+	// 6. Admin reset PIN (override)
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidID), map[string]any{
+		"new_pin": "9999",
+	}, adminHeaders(), http.StatusOK)
+
+	// 7. Admin clear PIN
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/users/%d/pin", kidID), nil, adminHeaders(), http.StatusOK)
+
+	time.Sleep(500 * time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	expectedEvents := []string{
+		webhook.EventProfilePinChanged,
+		webhook.EventProfilePinVerified,
+		webhook.EventProfilePinFailed,
+		webhook.EventProfilePinFailed,
+		webhook.EventProfilePinChanged,
+		webhook.EventProfilePinChanged,
+		webhook.EventProfilePinCleared,
+	}
+
+	if len(receivedEvents) != len(expectedEvents) {
+		t.Fatalf("expected %d events, got %d: %v", len(expectedEvents), len(receivedEvents), receivedEvents)
+	}
+
+	for i, exp := range expectedEvents {
+		if receivedEvents[i] != exp {
+			t.Errorf("event %d: expected %q, got %q", i, exp, receivedEvents[i])
+		}
+	}
+
+	// Verify payloads never contain plaintext PINs
+	for i, p := range receivedPayloads {
+		dataBytes, _ := json.Marshal(p.Data)
+		dataStr := string(dataBytes)
+		if strings.Contains(dataStr, "1234") || strings.Contains(dataStr, "5678") || strings.Contains(dataStr, "9999") {
+			t.Errorf("payload %d leaks PIN in data: %s", i, dataStr)
+		}
+	}
+}
+
