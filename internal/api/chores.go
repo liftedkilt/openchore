@@ -432,6 +432,8 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	user := UserFromContext(r.Context())
+
 	// Check if already completed
 	existing, err := h.store.GetCompletionForScheduleDate(r.Context(), scheduleID, req.CompletionDate)
 	if err != nil {
@@ -620,7 +622,6 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	user := UserFromContext(r.Context())
 	completedBy := user.ID
 	if req.CompletedBy != 0 {
 		completedBy = req.CompletedBy
