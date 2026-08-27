@@ -919,7 +919,6 @@ func (h *ChoreHandler) Approve(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	admin := UserFromContext(r.Context())
 	if err := h.store.ApproveCompletionAndCreditPoints(r.Context(), id, admin.ID, pts); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to approve")
 		return
