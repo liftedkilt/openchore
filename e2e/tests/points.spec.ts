@@ -24,8 +24,8 @@ test.describe('Points System', () => {
     const today = new Date().toISOString().slice(0, 10);
     const chores = await apiGet(page, `/users/3/chores?view=daily&date=${today}`, 3);
 
-    // Find an incomplete chore
-    const incomplete = chores.find((c: any) => !c.completed && c.available);
+    // Find an incomplete required chore so points are awarded immediately without gating
+    const incomplete = chores.find((c: any) => !c.completed && c.available && c.category === 'required');
     if (!incomplete) return; // All done for today
 
     await page.request.post(`/api/schedules/${incomplete.schedule_id}/complete`, {
