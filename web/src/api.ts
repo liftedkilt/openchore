@@ -182,6 +182,11 @@ export const api = {
     listPending: () => fetchWithAuth<PendingCompletion[]>('/completions/pending'),
     approve: (completionId: number) => fetchWithAuth(`/completions/${completionId}/approve`, { method: 'POST' }),
     reject: (completionId: number) => fetchWithAuth(`/completions/${completionId}/reject`, { method: 'POST' }),
+    excuse: (scheduleId: number, date: string, reason?: string) =>
+      fetchWithAuth(`/schedules/${scheduleId}/excuse`, {
+        method: 'POST',
+        body: JSON.stringify({ date, reason: reason ?? '' }),
+      }),
     listSchedules: (choreId: number) =>
       fetchWithAuth<ChoreSchedule[]>(`/chores/${choreId}/schedules`),
     createSchedule: (choreId: number, data: Partial<ChoreSchedule>) =>

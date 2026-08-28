@@ -12,14 +12,20 @@ test.describe('Chore Completion', () => {
     const pointsText = await page.getByText(/\d+ pts/i).first().textContent();
     const initialPoints = parseInt(pointsText?.match(/(\d+)/)?.[1] || '0');
 
-    // Find "Make Bed" — a daily required chore assigned to Natalie
-    const makeBed = page.getByText('Make Bed').first();
-    await expect(makeBed).toBeVisible();
+    // Find "Brush Teeth (Morning)" chore card
+    const choreCard = page.locator('xpath=//div[contains(@class, "choreCard")][.//text()[contains(., "Brush Teeth (Morning)")]]').first();
+    await expect(choreCard).toBeVisible({ timeout: 10_000 });
 
-    // Click the complete button (the circle/checkmark next to the chore)
-    const choreCard = makeBed.locator('xpath=ancestor::div[contains(@class, "choreCard")]');
-    const completeBtn = choreCard.locator('button[aria-label="Mark complete"]');
-    await completeBtn.click();
+    // If it was already completed by another parallel test, uncomplete it first
+    const markIncompleteBtn = choreCard.locator('button[aria-label="Mark incomplete"]');
+    if (await markIncompleteBtn.isVisible().catch(() => false)) {
+      await markIncompleteBtn.click();
+      await expect(choreCard.locator('button[aria-label="Mark complete"]')).toBeVisible({ timeout: 5_000 });
+    }
+
+    // Click mark complete
+    const markCompleteBtn = choreCard.locator('button[aria-label="Mark complete"]');
+    await markCompleteBtn.click();
 
     // Verify the chore shows as completed (button changes to "Mark incomplete")
     await expect(choreCard.locator('button[aria-label="Mark incomplete"]')).toBeVisible({ timeout: 5_000 });

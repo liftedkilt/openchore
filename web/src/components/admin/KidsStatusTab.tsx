@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   RefreshCw,
   Circle,
+  ShieldCheck,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { localDateStr } from '../../utils';
@@ -149,13 +150,25 @@ export const KidsStatusTab: React.FC = () => {
 
       setKids(results);
     } catch (e) {
-      console.error(e);
       setError(t('admin.kidsStatusTab.loadError'));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [today]);
+  }, [today, t]);
+
+  const handleExcuse = async (e: React.MouseEvent, chore: ScheduledChore) => {
+    e.stopPropagation();
+    const promptMsg = t('admin.kidsStatusTab.excusePrompt', { title: chore.title }) || `Excuse "${chore.title}" for today? Enter optional reason:`;
+    const reason = window.prompt(promptMsg);
+    if (reason === null) return; // user cancelled prompt
+    try {
+      await api.chores.excuse(chore.schedule_id, chore.date, reason);
+      load();
+    } catch (err) {
+      console.error('Failed to excuse chore:', err);
+    }
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -358,10 +371,13 @@ export const KidsStatusTab: React.FC = () => {
                               {items.map(c => {
                                 const isOverdue = !c.completed && c.expired && c.category !== 'bonus';
                                 const isPending = c.completion_status === 'pending';
+                                const isExcused = c.completion_status === 'excused';
                                 return (
                                   <div key={c.schedule_id + '-' + c.date} className={styles.choreItem}>
-                                    {c.completed ? (
+                                    {c.completed && !isExcused ? (
                                       <Check size={14} className={clsx(styles.choreIcon, styles.choreIconDone)} />
+                                    ) : isExcused ? (
+                                      <ShieldCheck size={14} className={clsx(styles.choreIcon, styles.choreIconDone)} />
                                     ) : isOverdue ? (
                                       <AlertTriangle size={14} className={clsx(styles.choreIcon, styles.choreIconOverdue)} />
                                     ) : (
@@ -370,10 +386,15 @@ export const KidsStatusTab: React.FC = () => {
                                     <span className={clsx(styles.choreTitle, c.completed && styles.choreTitleDone)}>
                                       {c.title}
                                     </span>
-                                    {c.completed && isPending && (
+                                    {isExcused && (
+                                      <span className={clsx(styles.choreStatus, styles.statusExcused)} title={c.ai_feedback || undefined}>
+                                        {t('admin.kidsStatusTab.statusExcused')}
+                                      </span>
+                                    )}
+                                    {c.completed && isPending && !isExcused && (
                                       <span className={clsx(styles.choreStatus, styles.statusPending)}>{t('admin.kidsStatusTab.statusPending')}</span>
                                     )}
-                                    {c.completed && !isPending && (
+                                    {c.completed && !isPending && !isExcused && (
                                       <span className={clsx(styles.choreStatus, styles.statusDone)}>
                                         {t('admin.kidsStatusTab.statusDone', { points: c.points_value })}
                                       </span>
@@ -385,6 +406,15 @@ export const KidsStatusTab: React.FC = () => {
                                       <span className={clsx(styles.choreStatus, styles.statusIdle)}>
                                         {t('admin.kidsStatusTab.statusIdle', { points: c.points_value })}
                                       </span>
+                                    )}
+                                    {!c.completed && (
+                                      <button
+                                        className={styles.excuseBtn}
+                                        onClick={(e) => handleExcuse(e, c)}
+                                        title={t('admin.kidsStatusTab.excuseButtonTooltip')}
+                                      >
+                                        {t('admin.kidsStatusTab.excuseButton')}
+                                      </button>
                                     )}
                                   </div>
                                 );

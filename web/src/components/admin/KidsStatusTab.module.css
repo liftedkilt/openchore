@@ -310,6 +310,29 @@
   color: var(--text-secondary);
 }
 
+.statusExcused {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--accent-indigo, #818cf8);
+}
+
+.excuseBtn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.15s ease;
+}
+
+.excuseBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
 .choreIcon {
   flex-shrink: 0;
   color: var(--text-secondary);

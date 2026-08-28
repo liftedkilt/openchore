@@ -110,6 +110,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 				r.Get("/chores/{id}/schedules", chores.ListSchedules)
 				r.Post("/chores/{id}/schedules", chores.CreateSchedule)
 				r.Delete("/chores/{id}/schedules/{scheduleID}", chores.DeleteSchedule)
+				r.Post("/schedules/{scheduleID}/excuse", chores.Excuse)
 
 				// Chore triggers
 				r.Get("/chores/{id}/triggers", triggers.ListForChore)

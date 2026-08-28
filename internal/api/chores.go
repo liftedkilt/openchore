@@ -1334,7 +1334,7 @@ func (h *ChoreHandler) shouldAwardBonusPoints(ctx context.Context, userID int64,
 	}
 	for _, c := range todayChores {
 		if c.Category == model.CategoryRequired || c.Category == model.CategoryCore {
-			if !c.Completed || c.CompletionStatus == nil || *c.CompletionStatus != model.StatusApproved {
+			if !c.Completed || c.CompletionStatus == nil || (*c.CompletionStatus != model.StatusApproved && *c.CompletionStatus != model.StatusExcused) {
 				return false
 			}
 		}
@@ -1343,7 +1343,7 @@ func (h *ChoreHandler) shouldAwardBonusPoints(ctx context.Context, userID int64,
 }
 
 // shouldAwardCorePoints returns true if all required chores for the
-// given user and date are approved, meaning core points should be awarded.
+// given user and date are approved or excused, meaning core points should be awarded.
 func (h *ChoreHandler) shouldAwardCorePoints(ctx context.Context, userID int64, date string) bool {
 	todayChores, err := h.store.GetScheduledChoresForUser(ctx, userID, []string{date}, time.Now())
 	if err != nil {
@@ -1351,7 +1351,7 @@ func (h *ChoreHandler) shouldAwardCorePoints(ctx context.Context, userID int64, 
 	}
 	for _, c := range todayChores {
 		if c.Category == model.CategoryRequired {
-			if !c.Completed || c.CompletionStatus == nil || *c.CompletionStatus != model.StatusApproved {
+			if !c.Completed || c.CompletionStatus == nil || (*c.CompletionStatus != model.StatusApproved && *c.CompletionStatus != model.StatusExcused) {
 				return false
 			}
 		}
@@ -1445,4 +1445,60 @@ func (h *ChoreHandler) creditPendingCorePoints(ctx context.Context, userID int64
 		}
 	}
 }
+
+type ExcuseRequest struct {
+	Date   string `json:"date"`
+	Reason string `json:"reason"`
+}
+
+func (h *ChoreHandler) Excuse(w http.ResponseWriter, r *http.Request) {
+	scheduleID, err := urlParamInt64(r, "scheduleID")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid schedule id")
+		return
+	}
+
+	var req ExcuseRequest
+	_ = decodeJSON(r, &req)
+
+	if req.Date == "" {
+		req.Date = time.Now().Format(model.DateFormat)
+	}
+
+	admin := UserFromContext(r.Context())
+	if admin == nil || admin.Role != "admin" {
+		writeError(w, http.StatusForbidden, "admin access required to excuse chores")
+		return
+	}
+
+	completion, err := h.store.ExcuseChoreAndRefundPenalty(r.Context(), scheduleID, req.Date, admin.ID, req.Reason)
+	if err != nil {
+		log.Printf("error excusing chore schedule %d: %v", scheduleID, err)
+		writeError(w, http.StatusInternalServerError, "failed to excuse chore")
+		return
+	}
+
+	// Excusing a required chore can open the core or bonus gate
+	schedule, _ := h.store.GetSchedule(r.Context(), scheduleID)
+	if schedule != nil {
+		chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
+		if chore != nil && chore.Category == model.CategoryRequired {
+			h.creditPendingCorePoints(r.Context(), schedule.AssignedTo, req.Date)
+		}
+		if chore != nil && (chore.Category == model.CategoryRequired || chore.Category == model.CategoryCore) {
+			h.creditPendingBonusPoints(r.Context(), schedule.AssignedTo, req.Date)
+		}
+	}
+
+	h.dispatcher.Fire("chore.excused", map[string]any{
+		"schedule_id":     scheduleID,
+		"completion_id":   completion.ID,
+		"completion_date": req.Date,
+		"excused_by":      admin.ID,
+		"reason":          req.Reason,
+	})
+
+	writeJSON(w, http.StatusCreated, completion)
+}
+
 

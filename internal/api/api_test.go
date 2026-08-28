@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -4658,6 +4659,186 @@ func TestAdminCompletingApprovalRequiredChoreSkipsPending(t *testing.T) {
 		t.Fatalf("expected 1 pending completion, got %d", len(pending))
 	}
 }
+
+func TestExcuseChoreRequiresAdmin(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+	today := time.Now().Format("2006-01-02")
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":        "Mow Lawn",
+		"category":     "required",
+		"points_value": 10,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": today,
+	}, adminHeaders())
+
+	// Child cannot excuse chore
+	env.expectStatus(t, "POST", "/api/schedules/1/excuse", map[string]any{
+		"date":   today,
+		"reason": "Too hot outside",
+	}, childHeaders(kidID), http.StatusForbidden)
+
+	// Admin can excuse chore
+	resp := env.expectStatus(t, "POST", "/api/schedules/1/excuse", map[string]any{
+		"date":   today,
+		"reason": "Extreme heat wave",
+	}, adminHeaders(), http.StatusCreated)
+
+	var comp map[string]any
+	decodeBody(t, resp, &comp)
+	if comp["status"] != model.StatusExcused {
+		t.Fatalf("expected status 'excused', got %q", comp["status"])
+	}
+	if comp["ai_feedback"] != "Extreme heat wave" {
+		t.Fatalf("expected reason 'Extreme heat wave', got %v", comp["ai_feedback"])
+	}
+}
+
+func TestExcuseChoreAndRefundMissedPenalty(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+	today := time.Now().Format("2006-01-02")
+
+	// Set initial balance to 20 points
+	env.expectStatus(t, "POST", "/api/points/adjust", map[string]any{
+		"user_id": kidID,
+		"amount":  20,
+		"reason":  "Initial balance",
+	}, adminHeaders(), http.StatusNoContent)
+
+	// Create chore with missed_penalty_value = 5
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":                "Clean Garage",
+		"category":             "required",
+		"points_value":         10,
+		"missed_penalty_value": 5,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": today,
+	}, adminHeaders())
+
+	// Simulate missed chore penalty (-5 pts)
+	if err := env.store.DebitMissedChore(context.Background(), int64(kidID), 1, 5, today); err != nil {
+		t.Fatalf("failed to debit missed chore: %v", err)
+	}
+
+	// Balance should now be 15
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 15 {
+		t.Fatalf("expected balance 15 after penalty, got %v", pts["balance"])
+	}
+
+	// Admin excuses chore
+	env.expectStatus(t, "POST", "/api/schedules/1/excuse", map[string]any{
+		"date":   today,
+		"reason": "Kid had a fever",
+	}, adminHeaders(), http.StatusCreated)
+
+	// Balance should be refunded back to 20!
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 20 {
+		t.Fatalf("expected balance 20 after refund, got %v", pts["balance"])
+	}
+
+	// Re-excusing should be idempotent and not double-refund
+	env.expectStatus(t, "POST", "/api/schedules/1/excuse", map[string]any{
+		"date":   today,
+		"reason": "Kid had a fever (updated)",
+	}, adminHeaders(), http.StatusCreated)
+
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 20 {
+		t.Fatalf("expected balance to remain 20, got %v", pts["balance"])
+	}
+}
+
+func TestExcuseChoreOpensCoreAndBonusGate(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+	today := time.Now().Format("2006-01-02")
+
+	// Create Req (10), Core (20), Bonus (30)
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":        "Req",
+		"category":     "required",
+		"points_value": 10,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": today,
+	}, adminHeaders())
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":        "Core",
+		"category":     "core",
+		"points_value": 20,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/2/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": today,
+	}, adminHeaders())
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title":        "Bonus",
+		"category":     "bonus",
+		"points_value": 30,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/3/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": today,
+	}, adminHeaders())
+
+	// Complete Core & Bonus first (0 points credited because Req is incomplete)
+	env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, childHeaders(kidID), http.StatusCreated)
+
+	env.expectStatus(t, "POST", "/api/schedules/3/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": today,
+	}, childHeaders(kidID), http.StatusCreated)
+
+	var pts map[string]any
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 0 {
+		t.Fatalf("expected 0 points initially, got %v", pts["balance"])
+	}
+
+	// Admin excuses the Required chore
+	env.expectStatus(t, "POST", "/api/schedules/1/excuse", map[string]any{
+		"date":   today,
+		"reason": "Heavy snowstorm",
+	}, adminHeaders(), http.StatusCreated)
+
+	// Opening the gate should retroactively credit Core (20) + Bonus (30) = 50 points!
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	decodeBody(t, resp, &pts)
+	if pts["balance"].(float64) != 50 {
+		t.Fatalf("expected 50 points after excusing required chore, got %v", pts["balance"])
+	}
+
+	// Verify streak is intact (1)
+	streakResp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/streak", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var streakData map[string]any
+	decodeBody(t, streakResp, &streakData)
+	if streakData["current_streak"].(float64) != 1 {
+		t.Fatalf("expected current_streak 1 with excused chore, got %v", streakData["current_streak"])
+	}
+}
+
 
 
 
