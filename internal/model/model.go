@@ -18,6 +18,7 @@ const (
 	StatusApproved   = "approved"
 	StatusRejected   = "rejected"
 	StatusAIRejected = "ai_rejected"
+	StatusExcused    = "excused"
 )
 
 // Point transaction reasons

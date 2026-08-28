@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -250,9 +251,10 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 				  AND cc3.uncompleted_at IS NULL
 				ORDER BY CASE cc3.status
 					WHEN 'approved' THEN 1
-					WHEN 'pending'  THEN 2
-					WHEN 'rejected' THEN 3
-					WHEN 'ai_rejected' THEN 4
+					WHEN 'excused'  THEN 2
+					WHEN 'pending'  THEN 3
+					WHEN 'rejected' THEN 4
+					WHEN 'ai_rejected' THEN 5
 				END
 				LIMIT 1
 			)
@@ -450,6 +452,95 @@ func (s *Store) ApproveCompletionAndCreditPoints(ctx context.Context, completion
 	}
 
 	return tx.Commit()
+}
+
+// ExcuseChoreAndRefundPenalty marks a chore as excused for a schedule and date,
+// records the admin approval metadata and reason, and refunds any missed-chore
+// penalties that were already debited for this schedule and date.
+func (s *Store) ExcuseChoreAndRefundPenalty(ctx context.Context, scheduleID int64, date string, adminID int64, reason string) (*model.ChoreCompletion, error) {
+	schedule, err := s.GetSchedule(ctx, scheduleID)
+	if err != nil {
+		return nil, err
+	}
+	if schedule == nil {
+		return nil, fmt.Errorf("schedule not found: %d", scheduleID)
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	userID := schedule.AssignedTo
+	var completionID int64
+	var existingStatus string
+
+	err = tx.QueryRowContext(ctx,
+		`SELECT id, status FROM chore_completions
+		 WHERE chore_schedule_id = ? AND completion_date = ?
+		 ORDER BY id DESC LIMIT 1`,
+		scheduleID, date).Scan(&completionID, &existingStatus)
+
+	now := time.Now()
+	if err == nil {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE chore_completions
+			   SET status = ?, approved_by = ?, approved_at = ?, ai_feedback = ?, uncompleted_at = NULL
+			 WHERE id = ?`,
+			model.StatusExcused, adminID, now, reason, completionID); err != nil {
+			return nil, err
+		}
+	} else if errors.Is(err, sql.ErrNoRows) {
+		res, err := tx.ExecContext(ctx,
+			`INSERT INTO chore_completions (chore_schedule_id, completed_by, status, photo_url, completion_date, ai_feedback, approved_by, approved_at)
+			 VALUES (?, ?, ?, '', ?, ?, ?, ?)`,
+			scheduleID, userID, model.StatusExcused, date, reason, adminID, now)
+		if err != nil {
+			return nil, err
+		}
+		completionID, _ = res.LastInsertId()
+	} else {
+		return nil, err
+	}
+
+	// Refund any missed chore penalty that was applied for this schedule + date
+	key := missedChorePenaltyKey(userID, scheduleID, date)
+	var penaltyAmount int
+	err = tx.QueryRowContext(ctx,
+		`SELECT -amount FROM point_transactions WHERE idempotency_key = ? AND reason = ?`,
+		key, model.ReasonMissedChore).Scan(&penaltyAmount)
+	if err == nil && penaltyAmount > 0 {
+		refundKey := fmt.Sprintf("waived:%s", key)
+		var alreadyRefunded int
+		if err := tx.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM point_transactions WHERE idempotency_key = ?`, refundKey).Scan(&alreadyRefunded); err == nil && alreadyRefunded == 0 {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note, idempotency_key)
+				 VALUES (?, ?, ?, ?, 'Penalty waived: chore excused', ?)`,
+				userID, penaltyAmount, model.ReasonAdminAdjust, completionID, refundKey); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	_ = s.RecalculateStreak(ctx, userID, date)
+
+	cc := &model.ChoreCompletion{
+		ID:              completionID,
+		ChoreScheduleID: scheduleID,
+		CompletedBy:     userID,
+		Status:          model.StatusExcused,
+		CompletionDate:  date,
+		AIFeedback:      reason,
+		ApprovedBy:      &adminID,
+		ApprovedAt:      &now,
+	}
+	return cc, nil
 }
 
 // UncompleteChore removes (or soft-deletes) the completion for a schedule +
