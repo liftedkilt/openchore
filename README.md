@@ -1,290 +1,217 @@
+<div align="center">
+
 # OpenChore
 
-A family chore management system designed for a wall-mounted iPad. Gamifies household tasks with a points economy, rewards store, streaks, approval workflows, and per-kid theming. Installable as a fullscreen PWA on iOS and Android.
+**Household chores, turned into a game your kids actually check.**
 
-## Features
+A self-hosted family chore tracker with a points economy, a rewards store,
+streaks, and an always-on wall display. One Go binary, one SQLite file, no cloud
+account.
 
-### Chore Management
-- **Chore library** with categories: Required, Core, and Bonus
-- **Flexible scheduling**: weekly (pick days), every-N-days interval, or one-off dates
-- **Time locks**: chores hidden until a set time (`available_at`), grouped by morning/afternoon/evening
-- **Deadlines**: chores expire after a set time (`due_by`) with configurable penalties
-- **Multi-child assignment**: assign the same schedule to multiple kids at once
-- **Family chores**: `family` assignment type — anyone can complete
-- **Multi-step creation wizard**: guided chore + schedule setup in one flow
-- **Photo proof**: chores can require photo evidence via QR code scan from a second device
-- **Chore triggers**: per-chore webhook URLs for external systems (Home Assistant, etc.) with cooldown and default assignee
-- **AI photo review**: optional LLM-powered verification of photo proof submissions (Gemma 4 via LiteRT)
-- **Text-to-speech**: AI-generated audio descriptions of chores via Kokoro TTS
+[![Build](https://github.com/liftedkilt/openchore/actions/workflows/build.yml/badge.svg)](https://github.com/liftedkilt/openchore/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![PWA](https://img.shields.io/badge/PWA-installable-5A0FC8)](https://web.dev/progressive-web-apps/)
 
-### Approval Workflow
-- Chores can require parent approval before points are awarded
-- Admin dashboard shows pending completions for review (approve/reject)
-- Discord notifications for approval requests and chore events (via webhook URL in settings)
+<img src="docs/screenshots/ambient-dashboard.png" alt="OpenChore wall display showing three children's daily progress" width="100%">
 
-### Points Economy
-- Points earned on chore completion (configurable per chore, with schedule-level multiplier)
-- **Required-first rule**: core chore points are held pending until all required chores are done
-- **Expiry penalties**: when a deadline passes, configurable per schedule:
-  - **Block**: cannot complete at all (breaks streak)
-  - **No points**: can complete to keep streak, but earns 0 points
-  - **Penalty**: can complete, but deducts a set number of points
-- **Points decay**: per-user configurable daily decay if non-bonus chores weren't all completed the previous day
-- Full transaction ledger (credit/debit history with reasons)
+</div>
 
-### Rewards Store
-- Admin-created rewards with point costs and optional stock limits
-- Per-kid reward visibility and custom pricing
-- Redemption history with admin undo capability
-- Optimistic UI with toast notifications and haptic feedback
+---
 
-### Streaks & Milestones
-- Daily streak tracking (consecutive days with all non-bonus chores completed)
-- Admin-configurable streak milestones with bonus point rewards
-- Streak display with next-milestone progress
+## Why OpenChore
 
-### Webhooks
-- Outbound webhooks for key events: `chore.completed`, `chore.uncompleted`, `chore.expired`, `reward.redeemed`, `daily.complete`, `streak.milestone`, `points.decayed`
-- HMAC-SHA256 request signing
-- Delivery logging with response tracking
+Chore charts fall apart because nobody looks at them. OpenChore is built for a
+tablet mounted where the family already stands — the kitchen wall — so the chart
+looks back.
 
-### Admin
-- **Passcode-protected panel** (PIN-based, no user accounts required; default passcode is `0000`)
-- **Reports dashboard**: weekly/monthly/yearly views with charts — kid scorecards, most-missed chores, completion trends, category breakdown, points flow, day-of-week analysis
-- **Vacation mode**: pause a kid's chores without deleting schedules
-- **Config export**: export current configuration as YAML
+- **It runs on your hardware.** A single static binary and a SQLite file. No
+  subscription, no account, no telemetry.
+- **Points are a real economy.** Every credit and debit lands in a transaction
+  ledger. Kids spend on rewards you define, at prices you set.
+- **The rules do the nagging.** Deadlines, time locks, expiry penalties, and
+  daily decay are enforced by the server, not by you at 9pm.
+- **Built to be wired up.** Signed outbound webhooks, per-chore trigger URLs,
+  API tokens, and a Home Assistant integration.
+- **Optional local AI.** Photo proof can be checked by a vision model, and chores
+  can be read aloud — both running on your own machine, if you want them at all.
 
-### Theming & Personalization
-- 4 built-in themes: Default, Quest, Galaxy, Forest
-- Per-kid theme selection with custom category labels, icons, greetings, sounds, and confetti colors
-- **Line color picker**: kids choose their color on the ambient dashboard race graph
-- **Avatar picker**: 12 DiceBear styles with shuffle and pastel backgrounds
-- Synthesized sound effects on completion (Web Audio API)
+## Quick start
 
-### Quick Assign
-- **Floating action button** on admin dashboard for instant one-off chore assignment
-- Pick an existing chore or create a new one, select kids, pick today/tomorrow/custom date
-- No need to navigate through the full chore wizard for ad-hoc tasks
-
-### PWA Support
-- Web app manifest with `standalone` display for fullscreen home screen apps
-- Apple mobile web app meta tags for iOS Safari
-
-### AI Features (Optional)
-- **AI photo review**: submitted photo proofs are automatically verified by a local LLM (Gemma 4 E4B via LiteRT) — checks whether the photo matches the chore description before approval
-- **Text-to-speech**: AI-generated chore descriptions read aloud via Kokoro-FastAPI, replacing browser SpeechSynthesis for higher-quality audio
-- **AI Chore Checker**: admin tool to test photo review and TTS synthesis with any chore name and photo
-
-AI services (LiteRT + Kokoro TTS) start by default:
 ```bash
+git clone https://github.com/liftedkilt/openchore.git
+cd openchore
+cp config/config.example.yaml config/config.yaml   # your family, chores, rewards
 docker compose up -d
 ```
 
-**Resource requirements:** LiteRT (gemma4:e4b) needs ~3.1 GB RAM; Kokoro TTS adds ~2 GB. Total AI stack is ~5 GB additional.
+Open **http://localhost:8080** and pick a profile.
 
-Configure from **Admin --> Settings --> AI Settings**. AI model and endpoint are configured via environment variables in `compose.yaml`, not the UI.
+> [!IMPORTANT]
+> The admin passcode is `0000` on a fresh database, or whatever
+> `settings.admin_passcode` says in your config (the example file uses `1234`).
+> Change it under **Admin → Settings** before putting this on your network.
 
-### Accessibility
-- **Text-to-speech**: speaker button on chore cards reads title and description aloud. When Kokoro TTS is enabled, uses AI-generated audio; otherwise falls back to browser SpeechSynthesis API. Defaults on for kids age 7 and under; any user can toggle via header button. Preference persisted per-user.
-- **Swipe-to-complete**: swipe right on a chore card to mark it done (touch devices). Visual green "Done!" hint with 100px threshold.
-- **Ambient dashboard**: wall-mounted family overview mode with auto-rotation between kids
+`config.yaml` is applied **only when the database is empty**. After first boot,
+manage everything from the admin panel — or wipe and re-seed with
+`./redeploy.sh --wipe`. Starting with no config at all drops you into a guided
+setup wizard instead.
 
-## Tech Stack
+Want the AI extras? They sit behind a compose profile and are off by default:
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | Go 1.25+, chi/v5 router |
-| Database | SQLite3 (WAL mode, foreign keys) |
-| Migrations | golang-migrate with embedded SQL |
-| Frontend | React 18, TypeScript, Vite |
-| Styling | CSS Modules |
-| Icons | lucide-react |
-| Charts | Custom SVG (BarChart, LineChart components) |
-| Testing | Go standard library + httptest (267 integration tests) |
-| Containers | Multi-stage Alpine builds, Podman/Docker Compose |
-
-## Getting Started
-
-### Prerequisites
-- Go 1.25+
-- Node.js 22+ and npm
-
-### Install Dependencies
 ```bash
-make install
+docker compose --profile ai up -d    # adds LiteRT (~3.1 GB) + Kokoro TTS (~2 GB)
 ```
 
-### Development
+## How the points work
+
+The scheduling model is what makes the economy hold together. Chores fall into
+three tiers, and the tiers gate each other:
+
+| Tier | Behavior |
+|------|----------|
+| **Required** | Non-negotiable. Nothing else pays out until these are done. |
+| **Core** | The daily routine. Points are held **pending** until every required chore is complete. |
+| **Bonus** | Optional extras. Only awarded once required *and* core are finished. |
+
+That single rule stops the obvious exploit: cherry-picking the fun 15-point
+bonus chore and skipping the ones that matter.
+
+Around it sit the other levers:
+
+- **Time locks** — a chore stays hidden until `available_at`, and groups itself
+  into morning / afternoon / evening.
+- **Deadlines** — past `due_by`, a schedule either **blocks** completion, awards
+  **no points**, or applies a **penalty**, your choice per schedule.
+- **Decay** — an optional daily debit when the previous day was left unfinished.
+- **Streaks** — consecutive days with everything non-bonus done, with milestone
+  bonuses you configure.
+- **Approval** — chores can require a parent to sign off, with photo proof, before
+  points are released.
+
+## A look around
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/kid-dashboard.png" alt="A child's daily chore list"></td>
+<td width="50%"><img src="docs/screenshots/rewards-store.png" alt="The rewards store"></td>
+</tr>
+<tr>
+<td align="center"><b>Today</b> — grouped by time of day, with pending points and streak progress</td>
+<td align="center"><b>Rewards</b> — spend the balance on things you actually control</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/kid-week.png" alt="Weekly chore view"></td>
+<td><img src="docs/screenshots/admin-kids.png" alt="Admin dashboard showing each child's status"></td>
+</tr>
+<tr>
+<td align="center"><b>Week</b> — what's done, what's locked, what's coming</td>
+<td align="center"><b>Admin</b> — every kid's day at a glance</td>
+</tr>
+</table>
+
+## Features
+
+<table>
+<tr><td valign="top" width="33%">
+
+**Scheduling**
+- Weekly, every-N-days, or one-off
+- Time locks and deadlines
+- Multi-child assignment
+- Family and first-come chores
+- Quick-assign for ad-hoc tasks
+- Vacation mode
+
+</td><td valign="top" width="33%">
+
+**Economy**
+- Transaction ledger
+- Rewards store with stock limits
+- Per-kid pricing and visibility
+- Savings commitments and pools
+- Streak milestones
+- Configurable decay and penalties
+
+</td><td valign="top" width="33%">
+
+**Household**
+- Parent approval queue
+- Photo proof via QR handoff
+- Discord notifications
+- Reports: scorecards, trends, misses
+- 4 themes, per-kid personalization
+- English and German
+
+</td></tr>
+<tr><td valign="top">
+
+**Integrations**
+- Outbound webhooks, HMAC-signed
+- Delivery log with responses
+- Per-chore trigger URLs
+- Bearer API tokens
+- Home Assistant integration
+
+</td><td valign="top">
+
+**Optional AI** (local)
+- Photo verification via Gemma 4 / LiteRT
+- Text-to-speech via Kokoro
+- Chore description drafting
+- Point-value suggestions
+
+</td><td valign="top">
+
+**Accessibility**
+- Read-aloud chore cards
+- Swipe-to-complete
+- 44px minimum tap targets
+- Installable PWA, fullscreen
+- Ambient wall display mode
+
+</td></tr>
+</table>
+
+## Configuration
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | `8080` | API listen port |
+| `DB_PATH` | `openchore.db` | SQLite file location |
+| `CONFIG_PATH` | `config/config.yaml` | Seed configuration |
+| `TZ` | system | **Set this** — deadlines and time locks depend on it |
+| `WEB_PORT` | `8080` | Host port for the web container |
+| `AI_ENDPOINT` | `http://litert:8080` | Vision backend (LiteRT or Ollama) |
+| `TTS_ENDPOINT` | `http://kokoro:8880` | Kokoro TTS service |
+
+## Development
+
+Requires Go 1.25+ and Node 22+.
+
 ```bash
-make dev    # Copies config.example.yaml if needed, wipes DB, runs API (port 8080) and Vite dev server
+make install    # Go modules + npm packages
+make dev        # wipes the DB, seeds from config, runs API :8080 + Vite :5173
+make test       # Go integration tests against a real SQLite DB
+make test-e2e   # Playwright suite, fresh database
+make build      # static binary + production bundle
 ```
 
-Or run them separately:
-```bash
-make api    # Go API server only
-make ui     # Vite dev server only
-```
+`make dev` **deletes the database** on every run — that's how re-seeding works.
+Point `DB_PATH` elsewhere if you care about the data.
 
-### Seed Data
+The stack is Go with `chi` and pure-Go SQLite (`CGO_ENABLED=0`, WAL, single
+writer), React 18 + TypeScript + Vite on the front, and `golang-migrate` with
+embedded SQL for schema changes. Tests are integration-first: a real database
+and `httptest`, no mocks.
 
-There is no separate seed command. The server auto-applies `config/config.yaml` on first boot when the database is empty. `make dev` copies `config/config.example.yaml` to `config/config.yaml` if it doesn't exist, wipes the DB, and starts both servers — so seed data is applied automatically.
+## Documentation
 
-### Environment Variables
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8080` | API server port |
-| `DB_PATH` | `openchore.db` | SQLite database file path |
-| `CONFIG_PATH` | `config/config.yaml` | Path to seed/config YAML file |
-| `TZ` | system | Timezone (important for deadline/time-lock accuracy) |
-| `AI_ENDPOINT` | `http://litert:8080` | AI backend URL (LiteRT or Ollama) |
-| `TTS_ENDPOINT` | `http://kokoro:8880` | Kokoro TTS service URL |
-
-### Running Tests
-```bash
-make test   # Runs all Go integration tests
-```
-
-### Production Build
-```bash
-make build  # Builds Go binary + Vite production bundle
-```
-
-### Container Deployment
-```bash
-podman-compose up -d    # or docker compose up -d
-```
-
-The compose setup runs:
-- **api**: Go server with SQLite volume mount
-- **web**: Nginx serving the Vite build, proxying `/api` to the API container
-
-## Project Structure
-
-```
-.
-├── cmd/server/main.go        # Entry point: migrations, config seeding, background workers, HTTP server
-├── config/
-│   └── config.example.yaml   # Development seed data (users, chores, schedules, rewards, webhooks)
-├── internal/
-│   ├── api/                  # HTTP handlers and router
-│   │   ├── router.go         # Route definitions and middleware
-│   │   ├── chores.go         # Chore CRUD, schedules, completions, approvals, photo upload
-│   │   ├── triggers.go       # Per-chore trigger webhooks
-│   │   ├── points.go         # Points balance, adjustments, decay config
-│   │   ├── rewards.go        # Rewards store, redemptions
-│   │   ├── reports.go        # Admin analytics/reports
-│   │   ├── api_test.go       # Integration test suite
-│   │   ├── reports_test.go   # Reports endpoint tests
-│   │   └── triggers_test.go  # Trigger endpoint tests
-│   ├── ai/                   # AI photo review + TTS description generation
-│   ├── discord/              # Discord webhook notifications
-│   │   └── notifier.go       # Sends approval requests, chore events to Discord
-│   ├── model/model.go        # Data types (User, Chore, Schedule, Trigger, etc.)
-│   ├── aibackend/            # AI backend client (LiteRT/Ollama, Gemma 4 vision model)
-│   ├── store/store.go        # SQLite data access layer
-│   ├── tts/                  # Kokoro TTS client (text-to-speech via Kokoro-FastAPI)
-│   └── webhook/              # Async webhook dispatcher + background checkers
-│       ├── dispatcher.go     # Event firing, HMAC signing, delivery logging
-│       ├── expiry.go         # Background expiry checker (1-min interval)
-│       └── decay.go          # Background decay checker (15-min interval)
-├── migrations/               # Embedded SQL migrations (001–007)
-├── web/                      # React frontend
-│   └── src/
-│       ├── api.ts            # Typed API client
-│       ├── types.ts          # TypeScript interfaces + theme config
-│       ├── pages/
-│       │   ├── Dashboard.tsx          # Kid view (daily/weekly/rewards)
-│       │   ├── AdminDashboard.tsx     # Admin panel (chores/users/rewards/points/settings)
-│       │   ├── AdminPasscode.tsx      # PIN entry screen
-│       │   ├── AmbientDashboard.tsx   # Wall-mounted family overview
-│       │   ├── PhotoUpload.tsx        # QR-scanned photo upload page
-│       │   ├── ProfileSelection.tsx   # User picker
-│       │   ├── Reports.tsx            # Admin analytics with charts
-│       │   └── SetupWizard.tsx        # First-boot setup flow
-│       ├── components/
-│       │   ├── Modal/                 # Reusable modal component
-│       │   ├── CreateChoreWizard/     # Multi-step chore creation
-│       │   ├── EditChoreModal/        # Chore editing with schedules + triggers
-│       │   ├── QuickAssign/           # One-off chore assignment FAB + modal
-│       │   └── charts/               # BarChart and LineChart (SVG)
-│       └── hooks/
-│           ├── useIdleRedirect.ts     # Auto-redirect after inactivity
-│           ├── useTextToSpeech.ts     # Browser SpeechSynthesis wrapper
-│           └── useThemeSound.ts       # Web Audio API completion sounds
-├── compose.yaml              # Container orchestration
-├── Containerfile             # Multi-stage Go build
-└── Makefile                  # Dev/build/test commands
-```
-
-## API Reference
-
-### Public (no auth)
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/users` | List all users |
-| GET | `/api/users/{id}` | Get user details |
-| POST | `/api/admin/verify` | Verify admin passcode |
-| POST | `/api/setup` | Initial setup (only when no users exist) |
-| POST | `/api/hooks/trigger/{uuid}` | Fire a chore trigger (UUID is auth) |
-
-### Authenticated (`X-User-ID` header)
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/users/{id}/chores?view=daily&date=YYYY-MM-DD` | Get scheduled chores |
-| POST | `/api/schedules/{id}/complete` | Complete a chore |
-| DELETE | `/api/schedules/{id}/complete?date=YYYY-MM-DD` | Undo completion |
-| POST | `/api/upload` | Upload photo proof |
-| GET | `/api/users/{id}/points` | Get point balance + history |
-| GET | `/api/users/{id}/streak` | Get streak data |
-| GET | `/api/rewards` | List available rewards |
-| POST | `/api/rewards/{id}/redeem` | Redeem a reward |
-| GET | `/api/users/{id}/redemptions` | Redemption history |
-| PUT | `/api/users/{id}/theme` | Update theme preference |
-| PUT | `/api/users/{id}/avatar` | Update avatar URL |
-| PUT | `/api/users/{id}/line-color` | Update ambient graph line color |
-
-### Admin (requires admin role)
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/users` | Create user |
-| PUT | `/api/users/{id}` | Update user |
-| DELETE | `/api/users/{id}` | Delete user |
-| PUT | `/api/users/{id}/pause` | Pause user (vacation mode) |
-| PUT | `/api/users/{id}/unpause` | Unpause user |
-| GET/POST | `/api/chores[/{id}]` | Chore list/create |
-| GET/PUT/DELETE | `/api/chores/{id}` | Chore read/update/delete |
-| GET/POST | `/api/chores/{id}/schedules` | Schedule list/create |
-| DELETE | `/api/chores/{id}/schedules/{sid}` | Delete schedule |
-| GET/POST | `/api/chores/{id}/triggers` | Trigger list/create |
-| PUT/DELETE | `/api/triggers/{id}` | Update/delete trigger |
-| GET | `/api/completions/pending` | List pending approvals |
-| POST | `/api/completions/{id}/approve` | Approve completion |
-| POST | `/api/completions/{id}/reject` | Reject completion |
-| GET/PUT | `/api/admin/settings/{key}` | Read/write settings |
-| PUT | `/api/admin/passcode` | Update admin PIN |
-| GET | `/api/points/balances` | All user balances |
-| POST | `/api/points/adjust` | Manual point adjustment |
-| GET/PUT | `/api/admin/users/{id}/decay` | Decay config per user |
-| GET/POST | `/api/rewards[/all]` | Reward list/create |
-| PUT/DELETE | `/api/rewards/{id}` | Update/delete reward |
-| PUT | `/api/rewards/{id}/assignments` | Per-kid reward visibility |
-| DELETE | `/api/redemptions/{id}` | Undo redemption |
-| GET/POST/DELETE | `/api/admin/streak-rewards[/{id}]` | Streak milestone CRUD |
-| GET | `/api/admin/reports` | Analytics/reports data |
-| GET | `/api/admin/export-config` | Export config as YAML |
-| POST | `/api/admin/ai/test` | Test AI photo review |
-| POST | `/api/admin/ai/tts` | Synthesize TTS audio for text |
-| GET/POST/PUT/DELETE | `/api/admin/webhooks[/{id}]` | Webhook CRUD |
-| GET | `/api/admin/webhooks/{id}/deliveries` | Webhook delivery log |
-
-## Chore Categories
-
-| Category | Purpose |
-|----------|---------|
-| **Required** | Must-do chores. Core chore points are held pending until all required chores are completed. |
-| **Core** | Standard daily chores. Points earned only after required chores are done. |
-| **Bonus** | Optional extra chores for additional points. |
+- [API reference](docs/api.md) — endpoints, auth, and webhook events
+- [Roadmap](ROADMAP.md) — shipped and planned
+- [CLAUDE.md](CLAUDE.md) — architecture notes and conventions
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+[MIT](LICENSE)
