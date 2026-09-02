@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { loginAsAdmin, selectUser, apiGet } from './helpers/setup';
+import { loginAsAdmin, selectUser, apiGet, localDateStr } from './helpers/setup';
 
 test.describe('Points System', () => {
   test('admin can manually adjust points via API', async ({ page }) => {
@@ -21,7 +21,7 @@ test.describe('Points System', () => {
 
   test('completing a chore creates a point transaction', async ({ page }) => {
     // Complete a chore via API and verify points transaction is created
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateStr();
     const chores = await apiGet(page, `/users/3/chores?view=daily&date=${today}`, 3);
 
     // Find an incomplete required chore so points are awarded immediately without gating

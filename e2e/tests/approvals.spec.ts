@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { loginAsAdmin, apiGet } from './helpers/setup';
+import { loginAsAdmin, apiGet, localDateStr } from './helpers/setup';
 
 test.describe('Approval Workflow', () => {
   test('chore requiring approval goes to pending queue', async ({ page }) => {
@@ -24,7 +24,8 @@ test.describe('Approval Workflow', () => {
     });
 
     // Complete the chore as Natalie
-    const dateStr = today.toISOString().slice(0, 10);
+    // Local, not UTC: must match the weekday used for the schedule above.
+    const dateStr = localDateStr(today);
     const chores = await apiGet(page, `/users/3/chores?view=daily&date=${dateStr}`, 3);
     const scheduled = chores.find((c: any) => c.title === 'E2E Approval Test');
     expect(scheduled).toBeTruthy();
