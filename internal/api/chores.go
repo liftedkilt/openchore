@@ -550,13 +550,11 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	var aiConfidence float64
 	if req.PhotoURL != "" && h.reviewer != nil {
 		aiEnabled, _ := h.store.GetSetting(r.Context(), "ai_enabled")
-		if aiEnabled == "true" {
-			photoPath := req.PhotoURL
-			// Convert relative URL to file path
-			if len(photoPath) > 0 && photoPath[0] == '/' {
-				photoPath = "data" + photoPath // /uploads/x.jpg -> data/uploads/x.jpg
-			}
-
+		photoPath, pathErr := resolveUploadPath(req.PhotoURL)
+		if pathErr != nil {
+			log.Printf("ai: skipping review: %v", pathErr)
+		}
+		if aiEnabled == "true" && pathErr == nil {
 			thresholdStr, _ := h.store.GetSetting(r.Context(), "ai_auto_approve_threshold")
 			threshold := 0.85
 			if t, err := strconv.ParseFloat(thresholdStr, 64); err == nil && t > 0 {
@@ -1083,9 +1081,10 @@ func (h *ChoreHandler) TestAIReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	photoPath := req.PhotoURL
-	if len(photoPath) > 0 && photoPath[0] == '/' {
-		photoPath = "data" + photoPath
+	photoPath, err := resolveUploadPath(req.PhotoURL)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid photo_url")
+		return
 	}
 
 	t0 := time.Now()
