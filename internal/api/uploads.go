@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -80,4 +81,23 @@ func (h *ChoreHandler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"url": "/uploads/" + filename,
 	})
+}
+
+// resolveUploadPath converts a stored photo URL (e.g. "/uploads/123_upload.jpg")
+// into a path on disk inside uploadDir. Only plain filenames within the uploads
+// directory are accepted, so user-supplied values can't escape it.
+func resolveUploadPath(photoURL string) (string, error) {
+	name := strings.TrimPrefix(photoURL, "/uploads/")
+	if name == photoURL {
+		name = strings.TrimPrefix(photoURL, "uploads/")
+		if name == photoURL {
+			return "", fmt.Errorf("photo url %q is not an upload", photoURL)
+		}
+	}
+	// filepath.Base strips any directory traversal ("../", nested paths).
+	name = filepath.Base(filepath.Clean("/" + name))
+	if name == "." || name == string(filepath.Separator) || name == "" {
+		return "", fmt.Errorf("photo url %q has no filename", photoURL)
+	}
+	return filepath.Join(uploadDir, name), nil
 }
