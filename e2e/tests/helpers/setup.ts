@@ -39,3 +39,17 @@ export async function apiGet(page: Page, path: string, userId = 1) {
   expect(resp.ok()).toBeTruthy();
   return resp.json();
 }
+
+/**
+ * Today's date as YYYY-MM-DD in the *local* timezone.
+ *
+ * The Go server decides what "today" means using its own local clock, so tests
+ * must ask for the same day. `new Date().toISOString().slice(0, 10)` returns
+ * the UTC date, which is a different day from local for much of the world —
+ * under TZ=Asia/Tokyo it asks the server for yesterday, and lookups for
+ * chores scheduled "today" come back empty.
+ */
+export function localDateStr(d = new Date()) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
