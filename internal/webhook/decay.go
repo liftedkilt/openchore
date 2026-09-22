@@ -32,6 +32,23 @@ func NewPointsDecayChecker(s *store.Store, d *Dispatcher) *PointsDecayChecker {
 	}
 }
 
+// SetInterval overrides how often the checker ticks. The 15 minute default
+// is right for production; the server lowers it from POINTS_DECAY_INTERVAL so
+// the e2e suite can observe a decay without waiting a quarter of an hour.
+// Non-positive durations are ignored.
+func (pdc *PointsDecayChecker) SetInterval(d time.Duration) {
+	if d > 0 {
+		pdc.interval = d
+	}
+}
+
+// CheckNow runs one decay pass synchronously. Start already does an immediate
+// pass on startup; this is the same work without the goroutine, so callers
+// that need to observe the result (tests, mainly) don't have to race a ticker.
+func (pdc *PointsDecayChecker) CheckNow(ctx context.Context) {
+	pdc.check(ctx)
+}
+
 func (pdc *PointsDecayChecker) Start(ctx context.Context) {
 	// Run an immediate check on startup so decays are applied promptly after
 	// a restart rather than having to wait a full tick.

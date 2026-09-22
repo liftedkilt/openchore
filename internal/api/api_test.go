@@ -4839,6 +4839,162 @@ func TestExcuseChoreOpensCoreAndBonusGate(t *testing.T) {
 	}
 }
 
+// TestPointsDecayReachesGoalSavings drives the reported loophole through the
+// real HTTP surface a kid and a parent actually use: the kid saves every
+// point into an expensive goal they never redeem, skips a chore, and used to
+// walk away untouched because the spendable balance decay clamped against
+// already excluded committed points.
+func TestPointsDecayReachesGoalSavings(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+	ctx := context.Background()
 
+	// Parent puts an expensive reward on the board; kid commits to it.
+	env.expectStatus(t, "POST", "/api/rewards", map[string]any{
+		"name": "Nintendo Switch", "cost": 5000,
+	}, adminHeaders(), http.StatusCreated)
+	resp := env.expectStatus(t, "POST", "/api/rewards/1/commit", map[string]any{
+		"auto_contribute_percent": 0,
+	}, childHeaders(kidID), http.StatusCreated)
+	var commitment map[string]any
+	decodeBody(t, resp, &commitment)
+	commitmentID := int(commitment["id"].(float64))
 
+	// Kid banks every point they have.
+	env.expectStatus(t, "POST", "/api/points/adjust", map[string]any{
+		"user_id": kidID, "amount": 50, "note": "allowance",
+	}, adminHeaders(), http.StatusNoContent)
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/commitments/%d/contribute", commitmentID),
+		map[string]any{"amount": 50}, childHeaders(kidID), http.StatusOK)
 
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var before map[string]any
+	decodeBody(t, resp, &before)
+	if before["balance"].(float64) != 0 || before["committed"].(float64) != 50 {
+		t.Fatalf("expected balance 0 / committed 50, got balance=%v committed=%v",
+			before["balance"], before["committed"])
+	}
+
+	// A required chore was on yesterday's list and never got done.
+	yesterday := time.Now().AddDate(0, 0, -1)
+	env.expectStatus(t, "POST", "/api/chores", map[string]any{
+		"title": "Take out the trash", "category": "required", "points_value": 10,
+	}, adminHeaders(), http.StatusCreated)
+	env.expectStatus(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(yesterday.Weekday()),
+	}, adminHeaders(), http.StatusCreated)
+
+	// Parent turns on decay for this kid.
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/admin/users/%d/decay", kidID), map[string]any{
+		"enabled": true, "decay_rate": 7, "decay_interval_hours": 24,
+	}, adminHeaders(), http.StatusOK)
+
+	webhook.NewPointsDecayChecker(env.store, webhook.NewDispatcher(env.store)).CheckNow(ctx)
+
+	// The hoard is not a safe harbour: the goal is 7 lighter and the
+	// spendable balance is untouched at 0.
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var after map[string]any
+	decodeBody(t, resp, &after)
+	if after["balance"].(float64) != 0 {
+		t.Errorf("expected spendable balance 0, got %v", after["balance"])
+	}
+	if after["committed"].(float64) != 43 {
+		t.Errorf("expected 43 still committed after a 7-point decay, got %v", after["committed"])
+	}
+
+	// The ledger the parent sees in the activity feed tells the whole story.
+	txs, _ := after["transactions"].([]any)
+	var decayAmount, reclaimAmount float64
+	var reclaimRef float64
+	for _, raw := range txs {
+		tx := raw.(map[string]any)
+		switch tx["reason"] {
+		case "points_decay":
+			decayAmount += tx["amount"].(float64)
+		case "goal_break":
+			reclaimAmount += tx["amount"].(float64)
+			reclaimRef = tx["reference_id"].(float64)
+		}
+	}
+	if decayAmount != -7 {
+		t.Errorf("expected a -7 points_decay row, got %v", decayAmount)
+	}
+	if reclaimAmount != 7 {
+		t.Errorf("expected a +7 goal_break row funding the decay, got %v", reclaimAmount)
+	}
+	if int(reclaimRef) != commitmentID {
+		t.Errorf("expected the goal_break row to reference commitment %d, got %v", commitmentID, reclaimRef)
+	}
+
+	// The goal card the kid looks at shows the loss, and stays open.
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/commitments", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var commitments []map[string]any
+	decodeBody(t, resp, &commitments)
+	if len(commitments) != 1 {
+		t.Fatalf("expected 1 commitment, got %d", len(commitments))
+	}
+	if commitments[0]["amount_saved"].(float64) != 43 {
+		t.Errorf("expected the goal to show 43 saved, got %v", commitments[0]["amount_saved"])
+	}
+	if commitments[0]["status"] != "active" {
+		t.Errorf("expected the goal to stay active, got %v", commitments[0]["status"])
+	}
+}
+
+// A kid who did everything yesterday keeps their savings, decay enabled or not.
+func TestPointsDecayLeavesGoalAloneWhenChoresDone(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+	ctx := context.Background()
+
+	env.expectStatus(t, "POST", "/api/rewards", map[string]any{
+		"name": "Nintendo Switch", "cost": 5000,
+	}, adminHeaders(), http.StatusCreated)
+	resp := env.expectStatus(t, "POST", "/api/rewards/1/commit", map[string]any{
+		"auto_contribute_percent": 0,
+	}, childHeaders(kidID), http.StatusCreated)
+	var commitment map[string]any
+	decodeBody(t, resp, &commitment)
+	commitmentID := int(commitment["id"].(float64))
+
+	env.expectStatus(t, "POST", "/api/points/adjust", map[string]any{
+		"user_id": kidID, "amount": 50, "note": "allowance",
+	}, adminHeaders(), http.StatusNoContent)
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/commitments/%d/contribute", commitmentID),
+		map[string]any{"amount": 50}, childHeaders(kidID), http.StatusOK)
+
+	yesterday := time.Now().AddDate(0, 0, -1)
+	env.expectStatus(t, "POST", "/api/chores", map[string]any{
+		"title": "Take out the trash", "category": "required", "points_value": 10,
+	}, adminHeaders(), http.StatusCreated)
+	env.expectStatus(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID,
+		"day_of_week": int(yesterday.Weekday()),
+	}, adminHeaders(), http.StatusCreated)
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": yesterday.Format(model.DateFormat),
+	}, adminHeaders(), http.StatusCreated)
+
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/admin/users/%d/decay", kidID), map[string]any{
+		"enabled": true, "decay_rate": 7, "decay_interval_hours": 24,
+	}, adminHeaders(), http.StatusOK)
+
+	webhook.NewPointsDecayChecker(env.store, webhook.NewDispatcher(env.store)).CheckNow(ctx)
+
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var after map[string]any
+	decodeBody(t, resp, &after)
+	if after["committed"].(float64) != 50 {
+		t.Errorf("expected the goal untouched at 50, got %v", after["committed"])
+	}
+	for _, raw := range after["transactions"].([]any) {
+		if raw.(map[string]any)["reason"] == "points_decay" {
+			t.Fatal("expected no decay for a kid who finished yesterday's chores")
+		}
+	}
+}

@@ -188,6 +188,7 @@ Around it sit the other levers:
 | `WEB_PORT` | `8080` | Host port for the web container |
 | `AI_ENDPOINT` | `http://litert:8080` | Vision backend (LiteRT or Ollama) |
 | `TTS_ENDPOINT` | `http://kokoro:8880` | Kokoro TTS service |
+| `POINTS_DECAY_INTERVAL` | `15m` | How often the decay worker checks (the e2e suite shortens it) |
 
 ## Development
 

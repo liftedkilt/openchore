@@ -1531,6 +1531,296 @@ func TestDebitDecayWithClawback_PersonalGoalBeforeSharedPool(t *testing.T) {
 	}
 }
 
+// decayGoalFixture wires up a kid with `balance` spendable points and a
+// personal goal holding `saved`, returning the kid and the commitment.
+func decayGoalFixture(t *testing.T, s *store.Store, balance, saved int) (*model.User, *model.RewardCommitment) {
+	t.Helper()
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	admin := createTestUser(t, s, "Parent", "admin")
+	if err := s.AdminAdjustPoints(ctx, u.ID, balance+saved, ""); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	r := &model.Reward{Name: "Bike", Cost: 5000, Active: true, CreatedBy: admin.ID}
+	if err := s.CreateReward(ctx, r); err != nil {
+		t.Fatalf("CreateReward: %v", err)
+	}
+	c, err := s.CreateCommitment(ctx, u.ID, r.ID, 0)
+	if err != nil {
+		t.Fatalf("CreateCommitment: %v", err)
+	}
+	if saved > 0 {
+		if err := s.ContributeToCommitment(ctx, u.ID, c.ID, saved); err != nil {
+			t.Fatalf("ContributeToCommitment: %v", err)
+		}
+	}
+	return u, c
+}
+
+// Only the shortfall is reclaimed — a goal with plenty in it keeps the rest.
+func TestDebitDecayWithClawback_TakesOnlyTheShortfall(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u, c := decayGoalFixture(t, s, 4, 100)
+
+	debit, clawbacks, err := s.DebitDecayWithClawback(ctx, u.ID, 10, "2026-04-11", "decay")
+	if err != nil {
+		t.Fatalf("DebitDecayWithClawback: %v", err)
+	}
+	if debit != 10 {
+		t.Errorf("expected debit=10, got %d", debit)
+	}
+	if len(clawbacks) != 1 || clawbacks[0].Amount != 6 {
+		t.Fatalf("expected a 6-point shortfall reclaimed, got %+v", clawbacks)
+	}
+	after, _ := s.GetCommitment(ctx, c.ID)
+	if after.AmountSaved != 94 {
+		t.Errorf("expected 94 left in the goal, got %d", after.AmountSaved)
+	}
+	if balance, _ := s.GetPointBalance(ctx, u.ID); balance != 0 {
+		t.Errorf("expected spendable balance 0, got %d", balance)
+	}
+}
+
+// A kid with enough spendable points never has their goal touched.
+func TestDebitDecayWithClawback_LeavesGoalAloneWhenBalanceCovers(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u, c := decayGoalFixture(t, s, 40, 60)
+
+	debit, clawbacks, err := s.DebitDecayWithClawback(ctx, u.ID, 10, "2026-04-11", "decay")
+	if err != nil {
+		t.Fatalf("DebitDecayWithClawback: %v", err)
+	}
+	if debit != 10 || len(clawbacks) != 0 {
+		t.Fatalf("expected a plain 10-point debit with no clawback, got debit=%d clawbacks=%+v", debit, clawbacks)
+	}
+	after, _ := s.GetCommitment(ctx, c.ID)
+	if after.AmountSaved != 60 {
+		t.Errorf("expected the goal untouched at 60, got %d", after.AmountSaved)
+	}
+	if balance, _ := s.GetPointBalance(ctx, u.ID); balance != 30 {
+		t.Errorf("expected spendable balance 30, got %d", balance)
+	}
+}
+
+// A sibling's contributions to a shared pool are not the decaying kid's to lose.
+func TestDebitDecayWithClawback_LeavesSiblingSharesAlone(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	admin := createTestUser(t, s, "Parent", "admin")
+	slacker := createTestUser(t, s, "Slacker", "child")
+	sibling := createTestUser(t, s, "Sibling", "child")
+	s.AdminAdjustPoints(ctx, slacker.ID, 50, "")
+	s.AdminAdjustPoints(ctx, sibling.ID, 50, "")
+
+	r := &model.Reward{Name: "Trampoline", Cost: 5000, Active: true, Shareable: true, CreatedBy: admin.ID}
+	if err := s.CreateReward(ctx, r); err != nil {
+		t.Fatalf("CreateReward: %v", err)
+	}
+	slackerC, err := s.CreateCommitment(ctx, slacker.ID, r.ID, 0)
+	if err != nil {
+		t.Fatalf("CreateCommitment (slacker): %v", err)
+	}
+	siblingC, err := s.CreateCommitment(ctx, sibling.ID, r.ID, 0)
+	if err != nil {
+		t.Fatalf("CreateCommitment (sibling): %v", err)
+	}
+	if err := s.ContributeToCommitment(ctx, slacker.ID, slackerC.ID, 50); err != nil {
+		t.Fatalf("ContributeToCommitment (slacker): %v", err)
+	}
+	if err := s.ContributeToCommitment(ctx, sibling.ID, siblingC.ID, 50); err != nil {
+		t.Fatalf("ContributeToCommitment (sibling): %v", err)
+	}
+
+	if _, _, err := s.DebitDecayWithClawback(ctx, slacker.ID, 20, "2026-04-11", "decay"); err != nil {
+		t.Fatalf("DebitDecayWithClawback: %v", err)
+	}
+
+	slackerAfter, _ := s.GetCommitment(ctx, slackerC.ID)
+	if slackerAfter.AmountSaved != 30 {
+		t.Errorf("expected the slacker's share down to 30, got %d", slackerAfter.AmountSaved)
+	}
+	siblingAfter, _ := s.GetCommitment(ctx, siblingC.ID)
+	if siblingAfter.AmountSaved != 50 {
+		t.Errorf("expected the sibling's share untouched at 50, got %d", siblingAfter.AmountSaved)
+	}
+	if balance, _ := s.GetPointBalance(ctx, sibling.ID); balance != 0 {
+		t.Errorf("expected the sibling's spendable balance untouched at 0, got %d", balance)
+	}
+	if siblingAfter.Pool == nil || siblingAfter.Pool.AmountSaved != 80 {
+		t.Errorf("expected the pool total at 80 (100 less the 20 decayed), got %+v", siblingAfter.Pool)
+	}
+}
+
+// Points in a goal the kid already broke are back in the balance, and a
+// redeemed goal's points are spent — neither is a source for a clawback.
+func TestDebitDecayWithClawback_IgnoresInactiveGoals(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u, c := decayGoalFixture(t, s, 0, 40)
+	if err := s.BreakCommitment(ctx, u.ID, c.ID); err != nil {
+		t.Fatalf("BreakCommitment: %v", err)
+	}
+
+	// Breaking returned the 40 points to spendable, so the debit comes
+	// straight out of the balance with no clawback against the dead goal.
+	debit, clawbacks, err := s.DebitDecayWithClawback(ctx, u.ID, 10, "2026-04-11", "decay")
+	if err != nil {
+		t.Fatalf("DebitDecayWithClawback: %v", err)
+	}
+	if debit != 10 {
+		t.Errorf("expected debit=10, got %d", debit)
+	}
+	if len(clawbacks) != 0 {
+		t.Fatalf("expected no clawback against a cancelled goal, got %+v", clawbacks)
+	}
+	if balance, _ := s.GetPointBalance(ctx, u.ID); balance != 30 {
+		t.Errorf("expected spendable balance 30, got %d", balance)
+	}
+}
+
+// A repeat run for the same date must change nothing at all — in particular
+// it must not leave a goal_break row behind from the rolled-back clawback.
+func TestDebitDecayWithClawback_IdempotentRollsBackClawback(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u, c := decayGoalFixture(t, s, 0, 40)
+
+	if _, _, err := s.DebitDecayWithClawback(ctx, u.ID, 10, "2026-04-11", "decay"); err != nil {
+		t.Fatalf("DebitDecayWithClawback: %v", err)
+	}
+	after, _ := s.GetCommitment(ctx, c.ID)
+	if after.AmountSaved != 30 {
+		t.Fatalf("expected 30 saved after the first pass, got %d", after.AmountSaved)
+	}
+
+	_, clawbacks, err := s.DebitDecayWithClawback(ctx, u.ID, 10, "2026-04-11", "decay")
+	if !errors.Is(err, store.ErrDecayAlreadyApplied) {
+		t.Fatalf("expected ErrDecayAlreadyApplied on the repeat, got %v", err)
+	}
+	if len(clawbacks) != 0 {
+		t.Errorf("expected no clawback reported on the rejected repeat, got %+v", clawbacks)
+	}
+
+	again, _ := s.GetCommitment(ctx, c.ID)
+	if again.AmountSaved != 30 {
+		t.Errorf("expected the goal still at 30 after the rejected repeat, got %d", again.AmountSaved)
+	}
+	if balance, _ := s.GetPointBalance(ctx, u.ID); balance != 0 {
+		t.Errorf("expected spendable balance still 0, got %d", balance)
+	}
+
+	// Exactly one decay row and one clawback row in the ledger.
+	txs, err := s.ListPointTransactions(ctx, u.ID, 50)
+	if err != nil {
+		t.Fatalf("ListPointTransactions: %v", err)
+	}
+	decayRows, breakRows := 0, 0
+	for _, tx := range txs {
+		switch tx.Reason {
+		case model.ReasonPointsDecay:
+			decayRows++
+		case model.ReasonGoalBreak:
+			breakRows++
+		}
+	}
+	if decayRows != 1 || breakRows != 1 {
+		t.Errorf("expected 1 decay row and 1 goal_break row, got %d and %d", decayRows, breakRows)
+	}
+}
+
+// A kid with nothing anywhere decays by nothing, and writes no ledger row —
+// so tomorrow's decay for a different date is still free to apply.
+func TestDebitDecayWithClawback_NothingToTake(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Broke", "child")
+
+	debit, clawbacks, err := s.DebitDecayWithClawback(ctx, u.ID, 10, "2026-04-11", "decay")
+	if err != nil {
+		t.Fatalf("DebitDecayWithClawback: %v", err)
+	}
+	if debit != 0 || len(clawbacks) != 0 {
+		t.Fatalf("expected a no-op, got debit=%d clawbacks=%+v", debit, clawbacks)
+	}
+	txs, _ := s.ListPointTransactions(ctx, u.ID, 50)
+	if len(txs) != 0 {
+		t.Errorf("expected no ledger rows written, got %d", len(txs))
+	}
+}
+
+// Missed-chore penalties can leave a balance below zero. Decay must still
+// reach the savings without driving the balance further negative.
+func TestDebitDecayWithClawback_NegativeBalanceStillRaidsGoals(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u, c := decayGoalFixture(t, s, 0, 40)
+	// Push spendable to -10 the way an unclamped missed-chore penalty would.
+	if err := s.AdminAdjustPoints(ctx, u.ID, -10, "penalty"); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	debit, clawbacks, err := s.DebitDecayWithClawback(ctx, u.ID, 7, "2026-04-11", "decay")
+	if err != nil {
+		t.Fatalf("DebitDecayWithClawback: %v", err)
+	}
+	if debit != 7 {
+		t.Errorf("expected debit=7, got %d", debit)
+	}
+	if len(clawbacks) != 1 || clawbacks[0].Amount != 7 {
+		t.Fatalf("expected 7 reclaimed from the goal, got %+v", clawbacks)
+	}
+	// The reclaim and the debit cancel out, so the deficit doesn't deepen.
+	if balance, _ := s.GetPointBalance(ctx, u.ID); balance != -10 {
+		t.Errorf("expected spendable balance to stay at -10, got %d", balance)
+	}
+	after, _ := s.GetCommitment(ctx, c.ID)
+	if after.AmountSaved != 33 {
+		t.Errorf("expected 33 left in the goal, got %d", after.AmountSaved)
+	}
+}
+
+// A goal emptied by decay is still open for business: the kid can save into
+// it again, and it stays unredeemable until it's back at its target.
+func TestDebitDecayWithClawback_DrainedGoalCanBeRefilled(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u, c := decayGoalFixture(t, s, 0, 30)
+
+	if _, _, err := s.DebitDecayWithClawback(ctx, u.ID, 30, "2026-04-11", "decay"); err != nil {
+		t.Fatalf("DebitDecayWithClawback: %v", err)
+	}
+	drained, _ := s.GetCommitment(ctx, c.ID)
+	if drained.AmountSaved != 0 || drained.Status != model.CommitmentActive {
+		t.Fatalf("expected an empty but still-active goal, got saved=%d status=%q", drained.AmountSaved, drained.Status)
+	}
+
+	s.AdminAdjustPoints(ctx, u.ID, 25, "allowance")
+	if err := s.ContributeToCommitment(ctx, u.ID, c.ID, 25); err != nil {
+		t.Fatalf("ContributeToCommitment after drain: %v", err)
+	}
+	refilled, _ := s.GetCommitment(ctx, c.ID)
+	if refilled.AmountSaved != 25 {
+		t.Errorf("expected 25 saved after refilling, got %d", refilled.AmountSaved)
+	}
+
+	// Still short of the 5000 target, so redemption stays blocked.
+	if _, err := s.RedeemReward(ctx, u.ID, refilled.RewardID); err == nil {
+		t.Error("expected redemption to be refused while the goal is under target")
+	}
+}
+
 func TestDebitMissedChoreAndHasPenalty(t *testing.T) {
 	s := setupStore(t)
 	ctx := context.Background()

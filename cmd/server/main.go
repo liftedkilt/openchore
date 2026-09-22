@@ -68,6 +68,17 @@ func main() {
 	decayChecker := webhook.NewDecayChecker(s, dispatcher)
 	go decayChecker.Start(context.Background())
 	pointsDecayChecker := webhook.NewPointsDecayChecker(s, dispatcher)
+	// POINTS_DECAY_INTERVAL shortens the decay cadence. The e2e suite sets it
+	// so a decay is observable within a test run instead of 15 minutes later.
+	if v := os.Getenv("POINTS_DECAY_INTERVAL"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			log.Printf("ignoring invalid POINTS_DECAY_INTERVAL %q", v)
+		} else {
+			pointsDecayChecker.SetInterval(d)
+			log.Printf("points decay interval overridden to %s", d)
+		}
+	}
 	go pointsDecayChecker.Start(context.Background())
 
 	// Webhook delivery log cleanup (issue #18): bounded retention for webhook_deliveries.

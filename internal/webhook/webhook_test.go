@@ -1163,6 +1163,201 @@ func TestPointsDecayChecker_ReachesIntoGoalSavings(t *testing.T) {
 	}
 }
 
+// TestPointsDecayChecker_ReportsClawbackInWebhook checks that the
+// points.decayed payload says how much came out of savings and which goal it
+// came from, so a Discord/webhook notification can explain the hit rather
+// than leaving a kid wondering why their goal shrank.
+func TestPointsDecayChecker_ReportsClawbackInWebhook(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	var mu sync.Mutex
+	var decayPayloads []map[string]any
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if r.Header.Get("X-OpenChore-Event") == EventPointsDecayed {
+			var payload map[string]any
+			if err := json.Unmarshal(body, &payload); err == nil {
+				mu.Lock()
+				decayPayloads = append(decayPayloads, payload)
+				mu.Unlock()
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+	createWebhook(t, env, ts.URL, "", "*", true)
+
+	parentID := createParentUser(t, env, "Parent")
+	childID := createChildUser(t, env, "Child")
+	if err := env.store.AdminAdjustPoints(ctx, childID, 50, ""); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	reward := &model.Reward{Name: "Nintendo Switch", Cost: 5000, Active: true, CreatedBy: parentID}
+	if err := env.store.CreateReward(ctx, reward); err != nil {
+		t.Fatalf("CreateReward: %v", err)
+	}
+	commitment, err := env.store.CreateCommitment(ctx, childID, reward.ID, 0)
+	if err != nil {
+		t.Fatalf("CreateCommitment: %v", err)
+	}
+	if err := env.store.ContributeToCommitment(ctx, childID, commitment.ID, 50); err != nil {
+		t.Fatalf("ContributeToCommitment: %v", err)
+	}
+
+	yesterday := time.Now().AddDate(0, 0, -1)
+	createChoreWithSchedule(t, env, parentID, childID, "required", int(yesterday.Weekday()), nil, 0)
+
+	if err := env.store.SetUserDecayConfig(ctx, &model.UserDecayConfig{
+		UserID: childID, Enabled: true, DecayRate: 7, DecayIntervalHours: 24,
+	}); err != nil {
+		t.Fatalf("SetUserDecayConfig: %v", err)
+	}
+
+	NewPointsDecayChecker(env.store, env.dispatcher).check(ctx)
+
+	time.Sleep(300 * time.Millisecond)
+	mu.Lock()
+	defer mu.Unlock()
+	if len(decayPayloads) != 1 {
+		t.Fatalf("expected 1 points.decayed payload, got %d", len(decayPayloads))
+	}
+	payload := decayPayloads[0]
+	data, ok := payload["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected a data object in the payload, got %+v", payload)
+	}
+	if data["amount"] != float64(7) {
+		t.Errorf("expected amount=7, got %v", data["amount"])
+	}
+	if data["reclaimed_from_goals"] != float64(7) {
+		t.Errorf("expected reclaimed_from_goals=7, got %v", data["reclaimed_from_goals"])
+	}
+	clawbacks, ok := data["goal_clawbacks"].([]any)
+	if !ok || len(clawbacks) != 1 {
+		t.Fatalf("expected 1 goal clawback in the payload, got %v", data["goal_clawbacks"])
+	}
+	cb := clawbacks[0].(map[string]any)
+	if cb["reward_name"] != "Nintendo Switch" {
+		t.Errorf("expected the goal named in the payload, got %v", cb["reward_name"])
+	}
+	if cb["amount"] != float64(7) {
+		t.Errorf("expected clawback amount=7, got %v", cb["amount"])
+	}
+	if cb["shared"] != false {
+		t.Errorf("expected shared=false for a personal goal, got %v", cb["shared"])
+	}
+}
+
+// TestPointsDecayChecker_AutoContributeCannotShelterPoints replays the
+// loophole the way it actually happened at home: the kid sets auto-contribute
+// to 100%, so every point they earn lands in the goal and their spendable
+// balance sits at zero all week. Decay has to keep biting anyway.
+func TestPointsDecayChecker_AutoContributeCannotShelterPoints(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	parentID := createParentUser(t, env, "Parent")
+	childID := createChildUser(t, env, "Child")
+
+	reward := &model.Reward{Name: "Dirt Bike", Cost: 5000, Active: true, CreatedBy: parentID}
+	if err := env.store.CreateReward(ctx, reward); err != nil {
+		t.Fatalf("CreateReward: %v", err)
+	}
+	commitment, err := env.store.CreateCommitment(ctx, childID, reward.ID, 100)
+	if err != nil {
+		t.Fatalf("CreateCommitment: %v", err)
+	}
+
+	// The chore the kid likes: done yesterday, 10 points, all auto-routed
+	// into the goal. The chore they don't: left undone, same day.
+	yesterday := time.Now().AddDate(0, 0, -1)
+	_, doneScheduleID := createChoreWithSchedule(t, env, parentID, childID, "required", int(yesterday.Weekday()), nil, 0)
+	createChoreWithSchedule(t, env, parentID, childID, "core", int(yesterday.Weekday()), nil, 0)
+
+	if err := env.store.CompleteChoreAndCreditPoints(ctx, &model.ChoreCompletion{
+		ChoreScheduleID: doneScheduleID,
+		CompletedBy:     childID,
+		Status:          model.StatusApproved,
+		CompletionDate:  yesterday.Format(model.DateFormat),
+	}, 10, 0); err != nil {
+		t.Fatalf("CompleteChoreAndCreditPoints: %v", err)
+	}
+
+	saved, err := env.store.GetCommitment(ctx, commitment.ID)
+	if err != nil {
+		t.Fatalf("GetCommitment: %v", err)
+	}
+	if saved.AmountSaved != 10 {
+		t.Fatalf("expected the 10 earned points auto-routed into the goal, got %d", saved.AmountSaved)
+	}
+	if balance, _ := env.store.GetPointBalance(ctx, childID); balance != 0 {
+		t.Fatalf("expected a spendable balance of 0, got %d", balance)
+	}
+
+	if err := env.store.SetUserDecayConfig(ctx, &model.UserDecayConfig{
+		UserID: childID, Enabled: true, DecayRate: 4, DecayIntervalHours: 24,
+	}); err != nil {
+		t.Fatalf("SetUserDecayConfig: %v", err)
+	}
+
+	NewPointsDecayChecker(env.store, env.dispatcher).check(ctx)
+
+	after, _ := env.store.GetCommitment(ctx, commitment.ID)
+	if after.AmountSaved != 6 {
+		t.Errorf("expected the goal down to 6 after a 4-point decay, got %d", after.AmountSaved)
+	}
+	if balance, _ := env.store.GetPointBalance(ctx, childID); balance != 0 {
+		t.Errorf("expected the spendable balance still 0, got %d", balance)
+	}
+}
+
+// CheckNow is the exported door onto the same pass Start makes on startup;
+// callers that need to observe a decay shouldn't have to race the ticker.
+func TestPointsDecayChecker_CheckNowRunsAPass(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	parentID := createParentUser(t, env, "Parent")
+	childID := createChildUser(t, env, "Child")
+	if err := env.store.AdminAdjustPoints(ctx, childID, 100, ""); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	yesterday := time.Now().AddDate(0, 0, -1)
+	createChoreWithSchedule(t, env, parentID, childID, "required", int(yesterday.Weekday()), nil, 0)
+
+	if err := env.store.SetUserDecayConfig(ctx, &model.UserDecayConfig{
+		UserID: childID, Enabled: true, DecayRate: 7, DecayIntervalHours: 24,
+	}); err != nil {
+		t.Fatalf("SetUserDecayConfig: %v", err)
+	}
+
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+	pdc.CheckNow(ctx)
+
+	if balance, _ := env.store.GetPointBalance(ctx, childID); balance != 93 {
+		t.Errorf("expected balance 93 after CheckNow, got %d", balance)
+	}
+}
+
+func TestPointsDecayChecker_SetIntervalIgnoresNonPositive(t *testing.T) {
+	env := setupTest(t)
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+
+	pdc.SetInterval(2 * time.Second)
+	if pdc.interval != 2*time.Second {
+		t.Errorf("expected interval 2s, got %v", pdc.interval)
+	}
+	pdc.SetInterval(0)
+	pdc.SetInterval(-1 * time.Minute)
+	if pdc.interval != 2*time.Second {
+		t.Errorf("expected a non-positive interval to be ignored, got %v", pdc.interval)
+	}
+}
+
 // TestPointsDecayChecker_NoDecayWithDuplicateCompletions verifies that decay
 // is NOT applied when a chore has both an ai_rejected and an approved
 // completion record (duplicate rows). This can happen when the
