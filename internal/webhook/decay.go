@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -107,41 +108,47 @@ func (pdc *PointsDecayChecker) check(ctx context.Context) {
 			continue
 		}
 
-		// Clamp the debit so decay never pushes the balance negative.
-		balance, err := pdc.store.GetPointBalance(ctx, cfg.UserID)
-		if err != nil {
-			log.Printf("points-decay: failed to get balance for user %d: %v", cfg.UserID, err)
+		// Decay draws on the spendable balance first and then on points
+		// already committed to savings goals. Goal savings are deliberately
+		// not a safe harbour: without the clawback a kid could shelter every
+		// point they earn from decay by parking it in an expensive goal they
+		// never redeem, and cherry-pick which chores to do. The store clamps
+		// the debit so it can never push the balance negative.
+		note := fmt.Sprintf("Points decay for %s — missed: %s", yesterday, strings.Join(missedTitles, ", "))
+		debit, clawbacks, err := pdc.store.DebitDecayWithClawback(ctx, cfg.UserID, cfg.DecayRate, yesterday, note)
+		switch {
+		case errors.Is(err, store.ErrDecayAlreadyApplied):
+			// This date was already debited — fall through to update
+			// last_decay_at so we don't keep retrying.
+			log.Printf("points-decay: already debited user %d for %s (idempotency), advancing timer", cfg.UserID, yesterday)
+		case err != nil:
+			log.Printf("points-decay: failed to debit user %d: %v", cfg.UserID, err)
 			continue
-		}
-		debit := cfg.DecayRate
-		if debit > balance {
-			debit = balance
-		}
-
-		if debit > 0 {
-			note := fmt.Sprintf("Points decay for %s — missed: %s", yesterday, strings.Join(missedTitles, ", "))
-			if err := pdc.store.DebitDecay(ctx, cfg.UserID, debit, yesterday, note); err != nil {
-				// If the idempotency key rejects the insert, this date was
-				// already debited — fall through to update last_decay_at so
-				// we don't keep retrying.
-				if strings.Contains(err.Error(), "UNIQUE constraint failed") {
-					log.Printf("points-decay: already debited user %d for %s (idempotency), advancing timer", cfg.UserID, yesterday)
-				} else {
-					log.Printf("points-decay: failed to debit user %d: %v", cfg.UserID, err)
-					continue
-				}
+		case debit > 0:
+			reclaimed := 0
+			goalNames := make([]string, 0, len(clawbacks))
+			for _, cb := range clawbacks {
+				reclaimed += cb.Amount
+				goalNames = append(goalNames, cb.RewardName)
+			}
+			if reclaimed > 0 {
+				log.Printf("points-decay: debited %d points from user %d (%s) for missed chores on %s (missed: %s; %d reclaimed from goals: %s)",
+					debit, user.ID, user.Name, yesterday, strings.Join(missedTitles, ", "),
+					reclaimed, strings.Join(goalNames, ", "))
 			} else {
 				log.Printf("points-decay: debited %d points from user %d (%s) for missed chores on %s (missed: %s)",
 					debit, user.ID, user.Name, yesterday, strings.Join(missedTitles, ", "))
-
-				pdc.dispatcher.Fire(EventPointsDecayed, map[string]any{
-					"user_id":    user.ID,
-					"user_name":  user.Name,
-					"amount":     debit,
-					"date":       yesterday,
-					"missed":     missedTitles,
-				})
 			}
+
+			pdc.dispatcher.Fire(EventPointsDecayed, map[string]any{
+				"user_id":              user.ID,
+				"user_name":            user.Name,
+				"amount":               debit,
+				"date":                 yesterday,
+				"missed":               missedTitles,
+				"reclaimed_from_goals": reclaimed,
+				"goal_clawbacks":       clawbacks,
+			})
 		}
 
 		if err := pdc.store.UpdateLastDecayAt(ctx, cfg.UserID, now); err != nil {

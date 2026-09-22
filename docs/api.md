@@ -180,7 +180,7 @@ attempt is recorded in the delivery log.
 | `reward.redeemed` | A reward is redeemed |
 | `daily.complete` | A kid finishes everything non-bonus for the day |
 | `streak.milestone` | A streak milestone is reached |
-| `points.decayed` | Daily decay debits a balance |
+| `points.decayed` | Daily decay debits a balance (payload reports any points reclaimed from savings goals) |
 | `chore.missed` | A chore ends the day unfinished |
 | `chore.fcfs_completed` | A first-come-first-served chore is claimed |
 | `auth.admin_passcode.verified` `auth.admin_passcode.failed` `auth.admin_passcode.changed` | Admin passcode activity |

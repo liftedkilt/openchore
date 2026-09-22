@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -1328,21 +1329,205 @@ func TestDebitExpiryPenalty(t *testing.T) {
 	}
 }
 
-func TestDebitDecay(t *testing.T) {
+func TestDebitDecayWithClawback(t *testing.T) {
 	s := setupStore(t)
 	ctx := context.Background()
 
 	u := createTestUser(t, s, "Child", "child")
 	s.AdminAdjustPoints(ctx, u.ID, 100, "")
 
-	err := s.DebitDecay(ctx, u.ID, 5, "2026-04-11", "Points decay for 2026-04-11 — missed: Test")
+	debit, clawbacks, err := s.DebitDecayWithClawback(ctx, u.ID, 5, "2026-04-11", "Points decay for 2026-04-11 — missed: Test")
 	if err != nil {
-		t.Fatalf("DebitDecay: %v", err)
+		t.Fatalf("DebitDecayWithClawback: %v", err)
+	}
+	if debit != 5 {
+		t.Errorf("expected debit=5, got %d", debit)
+	}
+	if len(clawbacks) != 0 {
+		t.Errorf("expected no goal clawback when the balance covers the debit, got %v", clawbacks)
 	}
 
 	balance, _ := s.GetPointBalance(ctx, u.ID)
 	if balance != 95 {
 		t.Errorf("expected balance=95, got %d", balance)
+	}
+}
+
+func TestDebitDecayWithClawback_Idempotent(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	s.AdminAdjustPoints(ctx, u.ID, 100, "")
+
+	if _, _, err := s.DebitDecayWithClawback(ctx, u.ID, 5, "2026-04-11", "decay"); err != nil {
+		t.Fatalf("DebitDecayWithClawback: %v", err)
+	}
+	_, _, err := s.DebitDecayWithClawback(ctx, u.ID, 5, "2026-04-11", "decay")
+	if !errors.Is(err, store.ErrDecayAlreadyApplied) {
+		t.Fatalf("expected ErrDecayAlreadyApplied on repeat, got %v", err)
+	}
+
+	balance, _ := s.GetPointBalance(ctx, u.ID)
+	if balance != 95 {
+		t.Errorf("expected balance=95 after the duplicate attempt, got %d", balance)
+	}
+}
+
+// Points parked in a savings goal must not shelter a kid from decay: the
+// spendable balance is spent first, then the goal is raided for the rest.
+func TestDebitDecayWithClawback_RaidsGoalSavings(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	admin := createTestUser(t, s, "Parent", "admin")
+	s.AdminAdjustPoints(ctx, u.ID, 100, "")
+
+	r := &model.Reward{Name: "Bike", Cost: 500, Active: true, CreatedBy: admin.ID}
+	if err := s.CreateReward(ctx, r); err != nil {
+		t.Fatalf("CreateReward: %v", err)
+	}
+	c, err := s.CreateCommitment(ctx, u.ID, r.ID, 0)
+	if err != nil {
+		t.Fatalf("CreateCommitment: %v", err)
+	}
+	// Bank everything toward the goal — spendable balance drops to 0.
+	if err := s.ContributeToCommitment(ctx, u.ID, c.ID, 100); err != nil {
+		t.Fatalf("ContributeToCommitment: %v", err)
+	}
+	if balance, _ := s.GetPointBalance(ctx, u.ID); balance != 0 {
+		t.Fatalf("expected spendable balance 0 after committing, got %d", balance)
+	}
+
+	debit, clawbacks, err := s.DebitDecayWithClawback(ctx, u.ID, 7, "2026-04-11", "decay")
+	if err != nil {
+		t.Fatalf("DebitDecayWithClawback: %v", err)
+	}
+	if debit != 7 {
+		t.Errorf("expected debit=7, got %d", debit)
+	}
+	if len(clawbacks) != 1 || clawbacks[0].CommitmentID != c.ID || clawbacks[0].Amount != 7 {
+		t.Fatalf("expected a 7-point clawback from commitment %d, got %+v", c.ID, clawbacks)
+	}
+	if clawbacks[0].RewardName != "Bike" {
+		t.Errorf("expected reward name Bike, got %q", clawbacks[0].RewardName)
+	}
+
+	// Spendable stays at 0 (the reclaimed points went straight out again) and
+	// the goal now shows 93 saved.
+	if balance, _ := s.GetPointBalance(ctx, u.ID); balance != 0 {
+		t.Errorf("expected spendable balance 0 after decay, got %d", balance)
+	}
+	after, err := s.GetCommitment(ctx, c.ID)
+	if err != nil {
+		t.Fatalf("GetCommitment: %v", err)
+	}
+	if after.AmountSaved != 93 {
+		t.Errorf("expected 93 saved after the clawback, got %d", after.AmountSaved)
+	}
+	if after.Status != model.CommitmentActive {
+		t.Errorf("expected the commitment to stay active, got %q", after.Status)
+	}
+}
+
+// Decay can empty a goal but must never drive the balance negative.
+func TestDebitDecayWithClawback_ClampsToTotalHoldings(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	admin := createTestUser(t, s, "Parent", "admin")
+	s.AdminAdjustPoints(ctx, u.ID, 10, "")
+
+	r := &model.Reward{Name: "Bike", Cost: 500, Active: true, CreatedBy: admin.ID}
+	if err := s.CreateReward(ctx, r); err != nil {
+		t.Fatalf("CreateReward: %v", err)
+	}
+	c, err := s.CreateCommitment(ctx, u.ID, r.ID, 0)
+	if err != nil {
+		t.Fatalf("CreateCommitment: %v", err)
+	}
+	if err := s.ContributeToCommitment(ctx, u.ID, c.ID, 6); err != nil {
+		t.Fatalf("ContributeToCommitment: %v", err)
+	}
+
+	// 4 spendable + 6 saved = 10 total, against a decay rate of 25.
+	debit, clawbacks, err := s.DebitDecayWithClawback(ctx, u.ID, 25, "2026-04-11", "decay")
+	if err != nil {
+		t.Fatalf("DebitDecayWithClawback: %v", err)
+	}
+	if debit != 10 {
+		t.Errorf("expected debit clamped to 10, got %d", debit)
+	}
+	if len(clawbacks) != 1 || clawbacks[0].Amount != 6 {
+		t.Fatalf("expected the goal drained of 6 points, got %+v", clawbacks)
+	}
+	if balance, _ := s.GetPointBalance(ctx, u.ID); balance != 0 {
+		t.Errorf("expected balance clamped to 0, got %d", balance)
+	}
+	after, _ := s.GetCommitment(ctx, c.ID)
+	if after.AmountSaved != 0 {
+		t.Errorf("expected 0 saved after the goal was drained, got %d", after.AmountSaved)
+	}
+}
+
+// Personal goals are raided before a share of a shared family pool.
+func TestDebitDecayWithClawback_PersonalGoalBeforeSharedPool(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	admin := createTestUser(t, s, "Parent", "admin")
+	s.AdminAdjustPoints(ctx, u.ID, 100, "")
+
+	personal := &model.Reward{Name: "Bike", Cost: 500, Active: true, CreatedBy: admin.ID}
+	if err := s.CreateReward(ctx, personal); err != nil {
+		t.Fatalf("CreateReward: %v", err)
+	}
+	shared := &model.Reward{Name: "Trampoline", Cost: 800, Active: true, Shareable: true, CreatedBy: admin.ID}
+	if err := s.CreateReward(ctx, shared); err != nil {
+		t.Fatalf("CreateReward: %v", err)
+	}
+
+	pc, err := s.CreateCommitment(ctx, u.ID, personal.ID, 0)
+	if err != nil {
+		t.Fatalf("CreateCommitment (personal): %v", err)
+	}
+	sc, err := s.CreateCommitment(ctx, u.ID, shared.ID, 0)
+	if err != nil {
+		t.Fatalf("CreateCommitment (shared): %v", err)
+	}
+	if err := s.ContributeToCommitment(ctx, u.ID, pc.ID, 20); err != nil {
+		t.Fatalf("ContributeToCommitment (personal): %v", err)
+	}
+	if err := s.ContributeToCommitment(ctx, u.ID, sc.ID, 80); err != nil {
+		t.Fatalf("ContributeToCommitment (shared): %v", err)
+	}
+
+	debit, clawbacks, err := s.DebitDecayWithClawback(ctx, u.ID, 30, "2026-04-11", "decay")
+	if err != nil {
+		t.Fatalf("DebitDecayWithClawback: %v", err)
+	}
+	if debit != 30 {
+		t.Errorf("expected debit=30, got %d", debit)
+	}
+	if len(clawbacks) != 2 {
+		t.Fatalf("expected both goals raided, got %+v", clawbacks)
+	}
+	if clawbacks[0].CommitmentID != pc.ID || clawbacks[0].Amount != 20 || clawbacks[0].Shared {
+		t.Errorf("expected the personal goal drained first, got %+v", clawbacks[0])
+	}
+	if clawbacks[1].CommitmentID != sc.ID || clawbacks[1].Amount != 10 || !clawbacks[1].Shared {
+		t.Errorf("expected 10 taken from the shared share, got %+v", clawbacks[1])
+	}
+
+	sharedAfter, _ := s.GetCommitment(ctx, sc.ID)
+	if sharedAfter.AmountSaved != 70 {
+		t.Errorf("expected 70 left in the shared share, got %d", sharedAfter.AmountSaved)
+	}
+	if sharedAfter.Pool == nil || sharedAfter.Pool.AmountSaved != 70 {
+		t.Errorf("expected the pool total to drop to 70, got %+v", sharedAfter.Pool)
 	}
 }
 

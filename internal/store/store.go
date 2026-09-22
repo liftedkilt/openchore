@@ -2645,13 +2645,164 @@ func (s *Store) DebitExpiryPenalty(ctx context.Context, userID, completionID int
 	return err
 }
 
-func (s *Store) DebitDecay(ctx context.Context, userID int64, amount int, date, note string) error {
+// DecayClawback records that points already committed to a savings goal were
+// pulled back out to fund a points-decay debit.
+type DecayClawback struct {
+	CommitmentID int64  `json:"commitment_id"`
+	RewardName   string `json:"reward_name"`
+	Amount       int    `json:"amount"`
+	Shared       bool   `json:"shared"`
+}
+
+// ErrDecayAlreadyApplied is returned by DebitDecayWithClawback when the
+// (user, date) pair has already been debited — the idempotency key rejected
+// the insert and the whole attempt (including any clawback) was rolled back.
+var ErrDecayAlreadyApplied = fmt.Errorf("points decay already applied for this user and date")
+
+// DebitDecayWithClawback applies up to `amount` points of decay for a user on
+// `date`, drawing first on the spendable balance and then on points the kid
+// has already socked away in savings goals.
+//
+// Without the clawback, points committed to a goal are invisible to decay
+// (the spendable balance that decay clamps against already excludes them),
+// so a kid could shelter an unlimited number of points from decay simply by
+// saving toward an expensive goal they never redeem. Reclaimed points are
+// released with ordinary goal_break ledger rows, which is the same mechanism
+// as breaking a commitment by hand, so derived goal progress stays correct.
+//
+// Goals are raided personal-first, then shared family-pool shares (a kid's
+// own share only — siblings' contributions are never touched), newest goal
+// first within each group so long-running savings survive longest. The debit
+// is still clamped so it can never push the balance negative, and everything
+// happens in one transaction: if the idempotency key rejects the decay row,
+// the clawback is rolled back with it.
+func (s *Store) DebitDecayWithClawback(ctx context.Context, userID int64, amount int, date, note string) (int, []DecayClawback, error) {
+	if amount <= 0 {
+		return 0, nil, nil
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer tx.Rollback()
+
+	var spendable int
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(amount), 0) FROM point_transactions WHERE user_id = ?`, userID).
+		Scan(&spendable); err != nil {
+		return 0, nil, err
+	}
+	if spendable < 0 {
+		spendable = 0
+	}
+
+	var clawbacks []DecayClawback
+	if need := amount - spendable; need > 0 {
+		reclaimed, cb, err := s.clawBackFromGoalsTx(ctx, tx, userID, need, date)
+		if err != nil {
+			return 0, nil, err
+		}
+		spendable += reclaimed
+		clawbacks = cb
+	}
+
+	debit := amount
+	if debit > spendable {
+		debit = spendable
+	}
+	if debit <= 0 {
+		// Nothing to take. Roll back so no stray goal_break rows survive
+		// (there should be none, but be explicit about it).
+		return 0, nil, nil
+	}
+
 	key := fmt.Sprintf("points_decay:%d:%s", userID, date)
-	_, err := s.db.ExecContext(ctx,
+	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO point_transactions (user_id, amount, reason, note, idempotency_key)
 		 VALUES (?, ?, ?, ?, ?)`,
-		userID, -amount, model.ReasonPointsDecay, note, key)
-	return err
+		userID, -debit, model.ReasonPointsDecay, note, key); err != nil {
+		if isUniqueConstraintErr(err) {
+			return 0, nil, ErrDecayAlreadyApplied
+		}
+		return 0, nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, nil, err
+	}
+	return debit, clawbacks, nil
+}
+
+// clawBackFromGoalsTx releases up to `need` points from the user's active
+// savings goals back into their spendable balance, returning the total
+// reclaimed and a per-goal breakdown. Callers must run it inside a
+// transaction that also writes the debit those points are funding.
+func (s *Store) clawBackFromGoalsTx(ctx context.Context, tx *sql.Tx, userID int64, need int, date string) (int, []DecayClawback, error) {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT rc.id, r.name, rc.shared_pool_id,
+		        COALESCE(-SUM(pt.amount), 0) AS saved
+		 FROM reward_commitments rc
+		 JOIN rewards r ON r.id = rc.reward_id
+		 LEFT JOIN point_transactions pt
+		        ON pt.reference_id = rc.id AND pt.reason IN (?, ?)
+		 WHERE rc.user_id = ? AND rc.status = ?
+		 GROUP BY rc.id
+		 HAVING saved > 0
+		 ORDER BY rc.shared_pool_id IS NULL DESC, rc.created_at DESC, rc.id DESC`,
+		model.ReasonCommitToGoal, model.ReasonGoalBreak, userID, model.CommitmentActive)
+	if err != nil {
+		return 0, nil, err
+	}
+	type goal struct {
+		id     int64
+		name   string
+		shared bool
+		saved  int
+	}
+	var goals []goal
+	for rows.Next() {
+		var g goal
+		var poolID sql.NullInt64
+		if err := rows.Scan(&g.id, &g.name, &poolID, &g.saved); err != nil {
+			rows.Close()
+			return 0, nil, err
+		}
+		g.shared = poolID.Valid
+		goals = append(goals, g)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, nil, err
+	}
+
+	reclaimNote := fmt.Sprintf("Reclaimed for points decay on %s", date)
+	reclaimed := 0
+	var clawbacks []DecayClawback
+	for _, g := range goals {
+		if need <= 0 {
+			break
+		}
+		take := g.saved
+		if take > need {
+			take = need
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+			 VALUES (?, ?, ?, ?, ?)`,
+			userID, take, model.ReasonGoalBreak, g.id, reclaimNote); err != nil {
+			return 0, nil, err
+		}
+		clawbacks = append(clawbacks, DecayClawback{
+			CommitmentID: g.id,
+			RewardName:   g.name,
+			Amount:       take,
+			Shared:       g.shared,
+		})
+		reclaimed += take
+		need -= take
+	}
+	return reclaimed, clawbacks, nil
 }
 
 // missedChorePenaltyKey returns the structured idempotency key used to

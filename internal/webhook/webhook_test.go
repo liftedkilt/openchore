@@ -1104,6 +1104,65 @@ func TestPointsDecayChecker_ClampsToNonNegativeBalance(t *testing.T) {
 	}
 }
 
+// TestPointsDecayChecker_ReachesIntoGoalSavings covers the loophole where a
+// kid banks every point into a savings goal they never redeem: because the
+// spendable balance excludes committed points, decay used to clamp to zero
+// and the hoard was effectively immune. Decay must reach into the goal.
+func TestPointsDecayChecker_ReachesIntoGoalSavings(t *testing.T) {
+	env := setupTest(t)
+	ctx := context.Background()
+
+	parentID := createParentUser(t, env, "Parent")
+	childID := createChildUser(t, env, "Child")
+
+	if err := env.store.AdminAdjustPoints(ctx, childID, 50, ""); err != nil {
+		t.Fatalf("AdminAdjustPoints: %v", err)
+	}
+
+	reward := &model.Reward{Name: "Expensive Lego Set", Cost: 5000, Active: true, CreatedBy: parentID}
+	if err := env.store.CreateReward(ctx, reward); err != nil {
+		t.Fatalf("CreateReward: %v", err)
+	}
+	commitment, err := env.store.CreateCommitment(ctx, childID, reward.ID, 0)
+	if err != nil {
+		t.Fatalf("CreateCommitment: %v", err)
+	}
+	if err := env.store.ContributeToCommitment(ctx, childID, commitment.ID, 50); err != nil {
+		t.Fatalf("ContributeToCommitment: %v", err)
+	}
+	if balance, _ := env.store.GetPointBalance(ctx, childID); balance != 0 {
+		t.Fatalf("expected spendable balance 0 after saving everything, got %d", balance)
+	}
+
+	yesterday := time.Now().AddDate(0, 0, -1)
+	createChoreWithSchedule(t, env, parentID, childID, "required", int(yesterday.Weekday()), nil, 0)
+
+	if err := env.store.SetUserDecayConfig(ctx, &model.UserDecayConfig{
+		UserID: childID, Enabled: true, DecayRate: 7, DecayIntervalHours: 24,
+	}); err != nil {
+		t.Fatalf("SetUserDecayConfig: %v", err)
+	}
+
+	pdc := NewPointsDecayChecker(env.store, env.dispatcher)
+	pdc.check(ctx)
+
+	// The debit comes out of the goal, not out of thin air: spendable stays
+	// at 0 and the goal loses the 7 points.
+	if balance, _ := env.store.GetPointBalance(ctx, childID); balance != 0 {
+		t.Errorf("expected spendable balance 0 after decay, got %d", balance)
+	}
+	after, err := env.store.GetCommitment(ctx, commitment.ID)
+	if err != nil {
+		t.Fatalf("GetCommitment: %v", err)
+	}
+	if after.AmountSaved != 43 {
+		t.Errorf("expected 43 saved after decay reclaimed 7, got %d", after.AmountSaved)
+	}
+	if after.Status != model.CommitmentActive {
+		t.Errorf("expected the goal to stay active, got %q", after.Status)
+	}
+}
+
 // TestPointsDecayChecker_NoDecayWithDuplicateCompletions verifies that decay
 // is NOT applied when a chore has both an ai_rejected and an approved
 // completion record (duplicate rows). This can happen when the

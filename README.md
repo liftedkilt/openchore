@@ -85,6 +85,9 @@ Around it sit the other levers:
 - **Deadlines** — past `due_by`, a schedule either **blocks** completion, awards
   **no points**, or applies a **penalty**, your choice per schedule.
 - **Decay** — an optional daily debit when the previous day was left unfinished.
+  Points already committed to a savings goal are not a safe harbour: if the
+  spendable balance can't cover the debit, decay reclaims the rest from the
+  kid's goals (personal first, then their share of a family pool).
 - **Streaks** — consecutive days with everything non-bonus done, with milestone
   bonuses you configure.
 - **Approval** — chores can require a parent to sign off, with photo proof, before
