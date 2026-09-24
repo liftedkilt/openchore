@@ -245,6 +245,120 @@
   color: var(--accent-blue);
 }
 
+/* --- Sign-in steps --- */
+.stepHint {
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.oidcButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.oidcBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.oidcBtn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.claimForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  width: 100%;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.field input {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  letter-spacing: 0.2em;
+}
+
+.primaryBtn {
+  margin-top: 0.5rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: 14px;
+  font-weight: 700;
+  color: white;
+  background: var(--accent-blue);
+  border: none;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.6;
+}
+
+.errorText {
+  margin-top: 0.75rem;
+  color: var(--accent-red, #f87171);
+  text-align: center;
+  font-weight: 600;
+}
+
+.errorBanner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: 560px;
+  margin-bottom: 2rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  color: #fecaca;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }

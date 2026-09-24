@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '../../api';
+import { api, APIError } from '../../api';
 import type { User, Theme, UserDecayConfig } from '../../types';
 import styles from '../../pages/AdminDashboard.module.css';
-import { Plus, Trash2, Edit2, X, Save, Clock, Pause, Play, KeyRound } from 'lucide-react';
+import { Plus, Trash2, Edit2, X, Save, Clock, Pause, Play, KeyRound, Link2 } from 'lucide-react';
+import LinkedAccountsModal from '../LinkedAccounts/LinkedAccountsModal';
 import clsx from 'clsx';
 
 const DecayConfigEditor: React.FC<{ userId: number }> = ({ userId }) => {
@@ -80,32 +81,49 @@ const UserForm: React.FC<{
 }> = ({ user, onSave, onCancel }) => {
   const { t } = useTranslation();
   const [name, setName] = useState(user?.name || '');
-  const [role, setRole] = useState(user?.role || 'child');
+  const [role, setRole] = useState<'admin' | 'child'>(user?.role || 'child');
   const [age, setAge] = useState(user?.age?.toString() || '');
   const [userTheme, setUserTheme] = useState<Theme>(user?.theme || 'default');
+  const [pin, setPin] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const isChild = role === 'child';
+  // Parents always need a way to sign in: a PIN, or a linked account.
+  const hasCredential = !!user && (user.has_pin || user.auth_providers.length > 0);
+  const pinRequired = role === 'admin' && !hasCredential;
+  const showPin = !user || pinRequired;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    if (pin && !/^\d{4,8}$/.test(pin)) {
+      setError(t('admin.usersTab.pinFormat'));
+      return;
+    }
+    if (pinRequired && !pin) {
+      setError(t('admin.usersTab.pinRequiredForParent'));
+      return;
+    }
     setSaving(true);
     try {
-      const data: Partial<User> = {
+      const data: Partial<User> & { pin?: string } = {
         name,
-        role: role as 'admin' | 'child',
+        role,
         age: age ? parseInt(age) : undefined,
-        theme: isChild ? userTheme : 'default',
+        theme: userTheme,
         avatar_url: `https://api.dicebear.com/9.x/avataaars-neutral/svg?seed=${encodeURIComponent(name)}`,
       };
       if (user) {
+        // Promoting someone without a credential: give them the PIN first.
+        if (pin) await api.users.setPin(user.id, pin);
         await api.users.update(user.id, data);
       } else {
+        if (pin) data.pin = pin;
         await api.users.create(data);
       }
       onSave();
     } catch (err) {
-      console.error(err);
+      setError(err instanceof APIError ? err.message : String(err));
     }
     setSaving(false);
   };
@@ -125,7 +143,7 @@ const UserForm: React.FC<{
           </div>
           <div className={styles.formGroup}>
             <label className={styles.label}>{t('admin.usersTab.fieldRole')}</label>
-            <select className={styles.input} value={role} onChange={e => setRole(e.target.value)}>
+            <select className={styles.input} value={role} onChange={e => setRole(e.target.value as 'admin' | 'child')}>
               <option value="child">{t('admin.usersTab.roleChild')}</option>
               <option value="admin">{t('admin.usersTab.roleAdmin')}</option>
             </select>
@@ -135,18 +153,38 @@ const UserForm: React.FC<{
             <input className={styles.input} type="number" min="1" max="99" value={age} onChange={e => setAge(e.target.value)} placeholder={t('admin.usersTab.fieldAgePlaceholder')} />
           </div>
         </div>
-        {isChild && (
+        {showPin && (
           <div className={styles.formGroup}>
-            <label className={styles.label}>{t('admin.usersTab.fieldTheme')}</label>
-            <select className={styles.input} value={userTheme} onChange={e => setUserTheme(e.target.value as Theme)}>
-              <option value="default">{t('admin.usersTab.themeDefault')}</option>
-              <option value="quest">{t('admin.usersTab.themeQuest')}</option>
-              <option value="galaxy">{t('admin.usersTab.themeGalaxy')}</option>
-              <option value="forest">{t('admin.usersTab.themeForest')}</option>
-            </select>
+            <label className={styles.label}>
+              {pinRequired ? t('admin.usersTab.fieldPinRequired') : t('admin.usersTab.fieldPinOptional')}
+            </label>
+            <input
+              className={styles.input}
+              type="password"
+              inputMode="numeric"
+              autoComplete="new-password"
+              value={pin}
+              onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+              placeholder={t('admin.usersTab.fieldPinPlaceholder')}
+              required={pinRequired}
+            />
+            <span className={styles.helpText}>{t('admin.usersTab.fieldPinHelp')}</span>
           </div>
         )}
+        <div className={styles.formGroup}>
+          <label className={styles.label}>{t('admin.usersTab.fieldTheme')}</label>
+          <select className={styles.input} value={userTheme} onChange={e => setUserTheme(e.target.value as Theme)}>
+            <option value="default">{t('admin.usersTab.themeDefault')}</option>
+            <option value="quest">{t('admin.usersTab.themeQuest')}</option>
+            <option value="galaxy">{t('admin.usersTab.themeGalaxy')}</option>
+            <option value="forest">{t('admin.usersTab.themeForest')}</option>
+          </select>
+        </div>
       </div>
+
+      {error && (
+        <p className={clsx(styles.feedbackMsg, styles.feedbackMsgError)} role="alert">{error}</p>
+      )}
 
       <div className={styles.formActions}>
         <button type="button" className={styles.btnSecondary} onClick={onCancel}>{t('admin.usersTab.cancelBtn')}</button>
@@ -164,6 +202,8 @@ export const UsersTab: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [expandedDecay, setExpandedDecay] = useState<number | null>(null);
+  const [accountsFor, setAccountsFor] = useState<User | null>(null);
+  const [listError, setListError] = useState('');
 
   const load = useCallback(async () => {
     const u = await api.users.list();
@@ -173,7 +213,12 @@ export const UsersTab: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (id: number) => {
-    await api.users.delete(id);
+    setListError('');
+    try {
+      await api.users.delete(id);
+    } catch (err) {
+      setListError(err instanceof APIError ? err.message : String(err));
+    }
     load();
   };
 
@@ -192,11 +237,12 @@ export const UsersTab: React.FC = () => {
 
   const handleClearPin = async (user: User) => {
     if (!confirm(t('admin.usersTab.confirmResetPin', { name: user.name }))) return;
+    setListError('');
     try {
       await api.users.clearPin(user.id);
       load();
     } catch (err) {
-      console.error(err);
+      setListError(err instanceof APIError ? err.message : String(err));
     }
   };
 
@@ -223,6 +269,19 @@ export const UsersTab: React.FC = () => {
         />
       )}
 
+      {listError && (
+        <p className={clsx(styles.feedbackMsg, styles.feedbackMsgError)} role="alert">{listError}</p>
+      )}
+
+      {accountsFor && (
+        <LinkedAccountsModal
+          user={accountsFor}
+          self={false}
+          onClose={() => setAccountsFor(null)}
+          onChanged={() => load()}
+        />
+      )}
+
       <div className={styles.list}>
         {users.map(u => (
           <div key={u.id} className={clsx(styles.listItem, u.paused && styles.listItemPaused)}>
@@ -238,6 +297,9 @@ export const UsersTab: React.FC = () => {
                   </span>
                   {u.paused && <span className={clsx(styles.badge, styles.badge_paused)}>{t('admin.usersTab.badgePaused')}</span>}
                   {u.has_pin && <span className={clsx(styles.badge, styles.badge_child)}>{t('admin.usersTab.badgePin')}</span>}
+                  {u.auth_providers.length > 0 && (
+                    <span className={clsx(styles.badge, styles.badge_child)}>{t('admin.usersTab.badgeLinked', { count: u.auth_providers.length })}</span>
+                  )}
                   {u.age && <span>{t('admin.usersTab.ageDisplay', { age: u.age })}</span>}
                 </div>
               </div>
@@ -252,21 +314,27 @@ export const UsersTab: React.FC = () => {
                     <KeyRound size={16} />
                   </button>
                 )}
-                {u.role === 'child' && (
+                {u.auth_providers.length > 0 && (
                   <button
-                    className={clsx(styles.iconBtn, u.paused && styles.iconBtnActive)}
-                    onClick={() => handleTogglePause(u)}
-                    title={u.paused ? t('admin.usersTab.unpauseTitle') : t('admin.usersTab.pauseTitle')}
-                    aria-label={u.paused ? t('admin.usersTab.unpauseAriaLabel') : t('admin.usersTab.pauseAriaLabel')}
+                    className={styles.iconBtn}
+                    onClick={() => setAccountsFor(u)}
+                    title={t('admin.usersTab.linkedAccountsTitle')}
+                    aria-label={t('admin.usersTab.linkedAccountsTitle')}
                   >
-                    {u.paused ? <Play size={16} /> : <Pause size={16} />}
+                    <Link2 size={16} />
                   </button>
                 )}
-                {u.role === 'child' && (
-                  <button className={styles.iconBtn} onClick={() => setExpandedDecay(expandedDecay === u.id ? null : u.id)} title={t('admin.usersTab.decaySettingsTitle')} aria-label={t('admin.usersTab.decaySettingsTitle')}>
-                    <Clock size={16} />
-                  </button>
-                )}
+                <button
+                  className={clsx(styles.iconBtn, u.paused && styles.iconBtnActive)}
+                  onClick={() => handleTogglePause(u)}
+                  title={u.paused ? t('admin.usersTab.unpauseTitle') : t('admin.usersTab.pauseTitle')}
+                  aria-label={u.paused ? t('admin.usersTab.unpauseAriaLabel') : t('admin.usersTab.pauseAriaLabel')}
+                >
+                  {u.paused ? <Play size={16} /> : <Pause size={16} />}
+                </button>
+                <button className={styles.iconBtn} onClick={() => setExpandedDecay(expandedDecay === u.id ? null : u.id)} title={t('admin.usersTab.decaySettingsTitle')} aria-label={t('admin.usersTab.decaySettingsTitle')}>
+                  <Clock size={16} />
+                </button>
                 <button className={styles.iconBtn} aria-label={t('admin.usersTab.editUserAriaLabel')} onClick={() => { setEditingUser(u); setShowForm(true); }}>
                   <Edit2 size={16} />
                 </button>
@@ -275,7 +343,7 @@ export const UsersTab: React.FC = () => {
                 </button>
               </div>
             </div>
-            {expandedDecay === u.id && u.role === 'child' && (
+            {expandedDecay === u.id && (
               <DecayConfigEditor userId={u.id} />
             )}
           </div>

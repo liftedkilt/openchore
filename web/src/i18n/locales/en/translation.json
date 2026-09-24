@@ -202,6 +202,7 @@
       "unknown": "Unknown"
     },
     "dashboard": {
+      "backToMyChores": "Back to {{name}}'s chores",
       "quickAssign": "Quick Assign",
       "reports": "Reports",
       "tabAi": "AI",
@@ -266,12 +267,18 @@
       "categoryCore": "core",
       "categoryRequired": "required",
       "childLoadError": "Couldn't load this child's chores.",
+      "confirmUndo": "Undo \"{{title}}\" for {{name}}? Points earned for it will be removed.",
+      "excuseButton": "Excuse",
+      "excuseButtonTooltip": "Excuse this chore and waive any missed penalty",
+      "excusePrompt": "Excuse \"{{title}}\" for today? Enter optional reason (e.g. sick, weather, trip):",
       "heading": "Kids Status",
       "labelBonus": "Bonus",
       "labelCore": "Core",
       "labelRequired": "Required",
       "loadError": "Failed to load kids status. Try refreshing.",
       "loading": "Loading...",
+      "markDone": "Mark \"{{title}}\" done for {{name}}",
+      "markNotDone": "Undo \"{{title}}\" for {{name}}",
       "noChildren": "No children configured. Add a child in the People tab to see their status here.",
       "noChoresScheduled": "No chores scheduled today",
       "noChoresScheduledDetail": "No chores scheduled today.",
@@ -289,20 +296,11 @@
       "statusIdle": "{{points}} pts",
       "statusOverdue": "Overdue",
       "statusPending": "Pending",
-      "excuseButton": "Excuse",
-      "excuseButtonTooltip": "Excuse this chore and waive any missed penalty",
-      "excusePrompt": "Excuse \"{{title}}\" for today? Enter optional reason (e.g. sick, weather, trip):",
       "streak_one": "{{count}}d streak",
       "streak_other": "{{count}}d streak",
       "subtitle": "Today's progress at a glance — {{date}}",
-      "tapHint": "Tap a child to see their chores for today."
-    },
-    "passcode": {
-      "back": "Back",
-      "deleteAriaLabel": "Delete",
-      "incorrectPasscode": "Incorrect passcode",
-      "subtitle": "Enter your passcode",
-      "title": "Parent Access"
+      "tapHint": "Tap a person to see today's chores. Tap a chore's circle to mark it done on their behalf.",
+      "toggleError": "Couldn't update \"{{title}}\": {{error}}"
     },
     "pointsTab": {
       "adjustButton": "Adjust",
@@ -437,19 +435,11 @@
         "title": "Discord Notifications"
       },
       "pageTitle": "Settings",
-      "pin": {
-        "confirmLabel": "Confirm New PIN",
-        "confirmPlaceholder": "Re-enter",
-        "currentLabel": "Current PIN",
-        "currentPlaceholder": "Enter current PIN",
-        "errorMismatch": "New PINs do not match",
-        "errorTooShort": "New PIN must be at least 4 digits",
-        "newLabel": "New PIN",
-        "newPlaceholder": "4+ digits",
-        "saveButton": "Update PIN",
-        "saveError": "Failed — check your current PIN",
-        "saveSuccess": "PIN updated successfully",
-        "title": "Change Admin PIN"
+      "signIn": {
+        "description": "Each parent signs in to their own profile with a PIN or a linked account; the Manage button then appears on their dashboard. Set or change your PIN with the key icon on your dashboard.",
+        "noProviders": "No single sign-on (OIDC) providers are configured. Add them under auth.oidc in config.yaml or with the OIDC_* environment variables.",
+        "providersConfigured": "Single sign-on providers configured on this server:",
+        "title": "Sign-in"
       },
       "webhooks": {
         "addButton": "Add",
@@ -464,14 +454,16 @@
         "empty": "No webhooks configured",
         "enableButton": "Enable",
         "events": {
-          "adminPasscodeChanged": "Admin Passcode Changed",
-          "adminPasscodeFailed": "Admin Passcode Failed",
-          "adminPasscodeVerified": "Admin Passcode Verified",
+          "adminPasscodeFailed": "Legacy Admin Passcode Failed",
+          "adminPasscodeVerified": "Legacy Admin Passcode Used",
           "completed": "Completed",
           "dailyDone": "Daily Done",
           "decay": "Decay",
           "expired": "Expired",
+          "identityLinked": "Account Linked",
+          "identityUnlinked": "Account Unlinked",
           "missed": "Missed",
+          "oidcLogin": "Signed In With Linked Account",
           "profilePinChanged": "Profile PIN Changed",
           "profilePinCleared": "Profile PIN Cleared",
           "profilePinFailed": "Profile PIN Failed",
@@ -528,6 +520,8 @@
     "usersTab": {
       "addPersonBtn": "Add Person",
       "ageDisplay": "Age {{age}}",
+      "badgeLinked_one": "{{count}} linked account",
+      "badgeLinked_other": "{{count}} linked accounts",
       "badgePaused": "Paused",
       "badgePin": "PIN",
       "cancelBtn": "Cancel",
@@ -545,13 +539,20 @@
       "fieldAgePlaceholder": "Optional",
       "fieldName": "Name",
       "fieldNamePlaceholder": "Name",
+      "fieldPinHelp": "They can change it later from their own profile.",
+      "fieldPinOptional": "PIN (optional)",
+      "fieldPinPlaceholder": "4–8 digits",
+      "fieldPinRequired": "PIN (required for parents)",
       "fieldRole": "Role",
       "fieldTheme": "Theme",
       "formEditTitle": "Edit Person",
       "formNewTitle": "New Person",
+      "linkedAccountsTitle": "Linked accounts",
       "loading": "Loading...",
       "pauseAriaLabel": "Pause user",
       "pauseTitle": "Pause (vacation/sick mode)",
+      "pinFormat": "PIN must be 4–8 digits",
+      "pinRequiredForParent": "Parents need a PIN (or a linked account) to sign in.",
       "resetPinTitle": "Reset profile PIN",
       "roleAdmin": "Admin",
       "roleChild": "Child",
@@ -577,6 +578,7 @@
   "common": {
     "back": "Back",
     "language": "Language",
+    "loading": "Loading…",
     "modal": {},
     "pinPad": {
       "deleteAriaLabel": "Delete"
@@ -686,7 +688,9 @@
       "changeTheme": "Change theme",
       "disableReadAloud": "Disable read aloud",
       "enableReadAloud": "Enable read aloud",
+      "linkedAccounts": "Linked accounts",
       "logout": "Logout",
+      "manage": "Manage",
       "setPIN": "Set PIN"
     },
     "lineColors": {
@@ -781,6 +785,19 @@
       "quest": "Quest"
     }
   },
+  "linkedAccounts": {
+    "confirmSignOutEverywhere": "Sign this profile out on every device, including this one?",
+    "confirmUnlink": "Unlink {{provider}}? Devices signed in with it will be signed out.",
+    "introOther": "Accounts {{name}} can sign in with. Only {{name}} can link new ones, from their own profile.",
+    "introSelf": "Link an account to sign in with it instead of (or as well as) your PIN — handy on your own phone, where you stay signed in.",
+    "link": "Link {{provider}}",
+    "linkFailed": "Could not link the account",
+    "linkedToast": "Account linked",
+    "noProviders": "No sign-in providers are configured on this server.",
+    "signOutEverywhere": "Sign out on all devices",
+    "title": "Linked accounts",
+    "unlink": "Unlink"
+  },
   "photo": {
     "invalidLinkBody": "This upload link is missing information.",
     "invalidLinkTitle": "Invalid Link",
@@ -795,13 +812,38 @@
     "uploadingFor": "Uploading for {{name}}"
   },
   "profile": {
+    "authError": {
+      "exchangeFailed": "{{provider}} sign-in could not be verified. Please try again.",
+      "generic": "Sign-in failed. Please try again.",
+      "invalidState": "The sign-in link expired. Please try again.",
+      "linkedToOther": "That account is already linked to another profile.",
+      "notLinked": "That {{provider}} account isn't linked to a profile yet. Sign in with your PIN and link it from your profile first.",
+      "providerError": "{{provider}} sign-in was cancelled or failed.",
+      "providerUnavailable": "{{provider}} is not reachable right now.",
+      "sessionRequired": "Sign in to your profile before linking an account.",
+      "wrongAccount": "That {{provider}} account belongs to a different profile."
+    },
     "back": "Back",
+    "claim": {
+      "confirmPin": "Confirm PIN",
+      "intro": "Parent profiles need a PIN. Choose one to continue.",
+      "introLegacy": "The shared admin passcode has been replaced by a PIN on each parent profile. Enter the old passcode once and choose your own PIN.",
+      "legacyPasscode": "Old admin passcode",
+      "newPin": "New PIN (4–8 digits)",
+      "pinFormat": "PIN must be 4–8 digits",
+      "pinMismatch": "PINs don't match",
+      "submit": "Save PIN and sign in"
+    },
+    "continueWith": "Continue with {{provider}}",
     "couldNotVerifyPin": "Could not verify PIN",
     "enterPin": "Enter your PIN",
+    "incorrectPasscode": "Incorrect household passcode",
     "incorrectPin": "Incorrect PIN",
-    "manage": "Manage",
+    "lockedOut": "Too many attempts. Try again in {{seconds}} seconds.",
+    "or": "or",
     "pinProtected": "PIN protected",
     "selectProfile": "Select profile for {{name}}",
+    "signInWithLinked": "This profile signs in with a linked account.",
     "wallDisplay": "Wall Display",
     "welcomeBack": "Welcome back!",
     "whoIsDoingChores": "Who's doing chores today?"
@@ -853,8 +895,16 @@
     "finishSetup": "Finish Setup",
     "finishTitle": "All set!",
     "getStarted": "Get Started",
-    "goToLogin": "Go to Login",
+    "goToDashboard": "Open the dashboard",
     "next": "Next",
+    "parentDefaultName": "Parent",
+    "parentDescription": "Create your parent profile. Your PIN unlocks your profile and the Manage screens; you can link Pocket ID, Google or another sign-in later.",
+    "parentNamePlaceholder": "Your name",
+    "parentPinConfirmPlaceholder": "Confirm PIN",
+    "parentPinFormat": "PIN must be 4–8 digits",
+    "parentPinMismatch": "PINs don't match",
+    "parentPinPlaceholder": "Choose a PIN (4–8 digits)",
+    "parentTitle": "Who manages the chores?",
     "settingUp": "Setting up...",
     "themeClassicBlue": "Classic Blue",
     "themeGalaxyPurple": "Galaxy Purple",

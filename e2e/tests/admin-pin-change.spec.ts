@@ -1,31 +1,29 @@
 import { test, expect } from '@playwright/test';
+import { authHeaders, loginAsAdmin } from './helpers/setup';
 
-test.describe('Admin PIN Change', () => {
-  test('can change admin PIN and verify', async ({ page }) => {
-    // Change PIN via API
-    const changeResp = await page.request.put('/api/admin/passcode', {
-      headers: { 'X-User-ID': '1' },
-      data: { old_passcode: '1234', new_passcode: '5678' },
+// Runs in its own project after the main suite: it changes a seeded parent's
+// PIN, which other specs rely on.
+test.describe('Parent PIN change', () => {
+  test('can change a parent PIN and sign in with it', async ({ page }) => {
+    const headers = await authHeaders(1);
+    const changeResp = await page.request.put('/api/users/1/pin', {
+      headers,
+      data: { current_pin: '1234', new_pin: '4680' },
     });
     expect(changeResp.ok()).toBeTruthy();
 
-    // Verify new PIN works
-    const verifyResp = await page.request.post('/api/admin/verify', {
-      data: { passcode: '5678' },
-    });
-    expect(verifyResp.ok()).toBeTruthy();
+    // The old PIN no longer works.
+    const oldResp = await page.request.post('/api/auth/login', { data: { user_id: 1, pin: '1234' } });
+    expect(oldResp.status()).toBe(401);
 
-    // Verify new PIN works via UI
-    await page.goto('/admin');
-    for (const digit of ['5', '6', '7', '8']) {
-      await page.getByRole('button', { name: digit, exact: true }).click();
-    }
+    // The new PIN works via the UI.
+    await loginAsAdmin(page, '4680');
     await expect(page).toHaveURL('/admin/dashboard');
 
-    // Restore original PIN
-    const restoreResp = await page.request.put('/api/admin/passcode', {
-      headers: { 'X-User-ID': '1' },
-      data: { old_passcode: '5678', new_passcode: '1234' },
+    // Restore the original PIN.
+    const restoreResp = await page.request.put('/api/users/1/pin', {
+      headers,
+      data: { current_pin: '4680', new_pin: '1234' },
     });
     expect(restoreResp.ok()).toBeTruthy();
   });

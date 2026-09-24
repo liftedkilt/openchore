@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { loginAsAdmin, apiGet } from './helpers/setup';
+import { loginAsAdmin, apiGet, authHeaders } from './helpers/setup';
 
 test.describe('Chore Creation', () => {
   test.describe.serial(() => {
@@ -68,7 +68,7 @@ test.describe('Chore Creation', () => {
 
       // Update the chore via API (simulates what the edit modal does) and verify photo_source persists
       const resp = await page.request.put(`/api/chores/${created!.id}`, {
-        headers: { 'X-User-ID': '1' },
+        headers: await authHeaders(1),
         data: {
           title: 'E2E Photo Source Test Updated',
           description: '',

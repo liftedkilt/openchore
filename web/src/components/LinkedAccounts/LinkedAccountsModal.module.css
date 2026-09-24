@@ -1,0 +1,104 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.hint {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.empty {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.provider {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.detail {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.linkButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.linkBtn,
+.unlinkBtn,
+.signOutAll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.linkBtn {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.linkBtn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.unlinkBtn {
+  flex-shrink: 0;
+  color: #f87171;
+  background: transparent;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.signOutAll {
+  margin-top: 0.5rem;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px dashed var(--border-subtle);
+}
+
+.signOutAll:hover {
+  color: var(--text-primary);
+}
+
+.error {
+  color: #f87171;
+  font-size: 0.85rem;
+  font-weight: 600;
+}

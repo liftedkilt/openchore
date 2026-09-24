@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { selectUser } from './helpers/setup';
+import { selectUser, authHeaders } from './helpers/setup';
 
 test.describe('Theme and Profile', () => {
   test('child can switch themes', async ({ page }) => {
@@ -29,7 +29,7 @@ test.describe('Theme and Profile', () => {
 
     // Verify theme is persisted via API
     const resp = await page.request.get('/api/users/3', {
-      headers: { 'X-User-ID': '3' },
+      headers: await authHeaders(3),
     });
     const user = await resp.json();
     // User should have a theme field

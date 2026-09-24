@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { api } from '../api';
+import { api, setBearerToken } from '../api';
 import type { User } from '../types';
 import styles from './PhotoUpload.module.css';
 import { Camera, Check, AlertCircle, Loader2 } from 'lucide-react';
@@ -12,6 +12,10 @@ export const PhotoUpload: React.FC = () => {
   const scheduleId = parseInt(searchParams.get('scheduleId') || '');
   const date = searchParams.get('date') || '';
   const userId = parseInt(searchParams.get('userId') || '');
+  // Short-lived token from the QR code: it can upload a photo and complete
+  // this one chore, nothing else. Without it, fall back to this device's own
+  // session (e.g. the link was opened on the same tablet).
+  const uploadToken = searchParams.get('t');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,16 +36,12 @@ export const PhotoUpload: React.FC = () => {
     setError(null);
 
     try {
-      // 1. Set temporary user ID for auth header if not already logged in on this device
-      // In a real app we'd use a signed token, but for family local app this is fine
-      if (!localStorage.getItem('openchore_user') && userId) {
-        localStorage.setItem('openchore_user', JSON.stringify({ id: userId }));
-      }
+      setBearerToken(uploadToken);
 
-      // 2. Upload photo
+      // 1. Upload photo
       const { url } = await api.chores.upload(file);
 
-      // 3. Complete chore
+      // 2. Complete chore
       await api.chores.complete(scheduleId, date, url);
       
       setDone(true);

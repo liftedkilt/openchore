@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Delete } from 'lucide-react';
 import styles from './PinPad.module.css';
@@ -35,15 +35,17 @@ export const PinPad: React.FC<PinPadProps> = ({ prompt, error, onSubmit, length 
   }, [resetKey]);
 
   const handleDigit = useCallback((digit: string) => {
-    setCode(prev => {
-      if (prev.length >= length) return prev;
-      const next = prev + digit;
-      if (next.length === length) {
-        onSubmit(next);
-      }
-      return next;
-    });
-  }, [length, onSubmit]);
+    setCode(prev => (prev.length >= length ? prev : prev + digit));
+  }, [length]);
+
+  // Submit from an effect rather than inside the state updater: updaters must
+  // be pure (React may run them twice), and submitting usually updates the
+  // parent's state.
+  const onSubmitRef = useRef(onSubmit);
+  onSubmitRef.current = onSubmit;
+  useEffect(() => {
+    if (code.length === length) onSubmitRef.current(code);
+  }, [code, length]);
 
   const handleDelete = useCallback(() => {
     setCode(prev => prev.slice(0, -1));

@@ -202,6 +202,7 @@
       "unknown": "Unbekannt"
     },
     "dashboard": {
+      "backToMyChores": "Zurück zu den Aufgaben von {{name}}",
       "quickAssign": "Schnell zuweisen",
       "reports": "Berichte",
       "tabAi": "KI",
@@ -266,12 +267,18 @@
       "categoryCore": "Haupt",
       "categoryRequired": "Pflicht",
       "childLoadError": "Die Aufgaben dieses Kindes konnten nicht geladen werden.",
+      "confirmUndo": "„{{title}}“ für {{name}} rückgängig machen? Die dafür erhaltenen Punkte werden abgezogen.",
+      "excuseButton": "Entschuldigen",
+      "excuseButtonTooltip": "Diese Aufgabe entschuldigen und Strafe erlassen",
+      "excusePrompt": "\"{{title}}\" für heute entschuldigen? Optionalen Grund eingeben (z. B. krank, Wetter, Reise):",
       "heading": "Übersicht - Kinder",
       "labelBonus": "Bonus",
       "labelCore": "Kern",
       "labelRequired": "Pflicht",
       "loadError": "Übersicht konnte nicht geladen werden. Bitte aktualisieren.",
       "loading": "Wird geladen...",
+      "markDone": "„{{title}}“ für {{name}} als erledigt markieren",
+      "markNotDone": "„{{title}}“ für {{name}} rückgängig machen",
       "noChildren": "Keine Kinder konfiguriert. Füge im Tab \"Personen\" ein Kind hinzu, um hier den Status zu sehen.",
       "noChoresScheduled": "Heute keine Aufgaben geplant",
       "noChoresScheduledDetail": "Für heute sind keine Aufgaben geplant.",
@@ -289,20 +296,11 @@
       "statusIdle": "{{points}} Pkt.",
       "statusOverdue": "Überfällig",
       "statusPending": "Ausstehend",
-      "excuseButton": "Entschuldigen",
-      "excuseButtonTooltip": "Diese Aufgabe entschuldigen und Strafe erlassen",
-      "excusePrompt": "\"{{title}}\" für heute entschuldigen? Optionalen Grund eingeben (z. B. krank, Wetter, Reise):",
       "streak_one": "{{count}} Tages-Streak",
       "streak_other": "{{count}} Tage-Streak",
       "subtitle": "Heutiger Fortschritt auf einen Blick — {{date}}",
-      "tapHint": "Tippe auf ein Kind, um seine heutigen Aufgaben zu sehen."
-    },
-    "passcode": {
-      "back": "Zurück",
-      "deleteAriaLabel": "Löschen",
-      "incorrectPasscode": "Falscher PIN",
-      "subtitle": "Gib deinen PIN ein",
-      "title": "Elternzugang"
+      "tapHint": "Tippe auf eine Person, um die heutigen Aufgaben zu sehen. Tippe auf den Kreis einer Aufgabe, um sie für sie zu erledigen.",
+      "toggleError": "„{{title}}“ konnte nicht aktualisiert werden: {{error}}"
     },
     "pointsTab": {
       "adjustButton": "Anpassen",
@@ -437,19 +435,11 @@
         "title": "Discord-Benachrichtigungen"
       },
       "pageTitle": "Einstellungen",
-      "pin": {
-        "confirmLabel": "Neue PIN bestätigen",
-        "confirmPlaceholder": "Erneut eingeben",
-        "currentLabel": "Aktuelle PIN",
-        "currentPlaceholder": "Aktuelle PIN eingeben",
-        "errorMismatch": "Die neuen PINs stimmen nicht überein",
-        "errorTooShort": "Die neue PIN muss mindestens 4 Ziffern haben",
-        "newLabel": "Neue PIN",
-        "newPlaceholder": "4+ Ziffern",
-        "saveButton": "PIN aktualisieren",
-        "saveError": "Fehlgeschlagen — überprüfe deine aktuelle PIN",
-        "saveSuccess": "PIN erfolgreich aktualisiert",
-        "title": "Admin-PIN ändern"
+      "signIn": {
+        "description": "Jedes Elternteil meldet sich mit einer PIN oder einem verknüpften Konto in seinem eigenen Profil an; danach erscheint auf dem Dashboard die Schaltfläche „Verwalten“. Deine PIN legst du über das Schlüsselsymbol auf deinem Dashboard fest.",
+        "noProviders": "Es sind keine Single-Sign-on-Anbieter (OIDC) eingerichtet. Füge sie unter auth.oidc in der config.yaml oder über die OIDC_*-Umgebungsvariablen hinzu.",
+        "providersConfigured": "Auf diesem Server eingerichtete Single-Sign-on-Anbieter:",
+        "title": "Anmeldung"
       },
       "webhooks": {
         "addButton": "Hinzufügen",
@@ -464,14 +454,16 @@
         "empty": "Keine Webhooks konfiguriert",
         "enableButton": "Aktivieren",
         "events": {
-          "adminPasscodeChanged": "Admin-Passcode geändert",
-          "adminPasscodeFailed": "Admin-Passcode fehlgeschlagen",
-          "adminPasscodeVerified": "Admin-Passcode verifiziert",
+          "adminPasscodeFailed": "Alter Admin-Passcode fehlgeschlagen",
+          "adminPasscodeVerified": "Alter Admin-Passcode verwendet",
           "completed": "Abgeschlossen",
           "dailyDone": "Tagesaufgaben geschafft!",
           "decay": "Verfallen",
           "expired": "Abgelaufen",
+          "identityLinked": "Konto verknüpft",
+          "identityUnlinked": "Konto getrennt",
           "missed": "Verpasst",
+          "oidcLogin": "Mit verknüpftem Konto angemeldet",
           "profilePinChanged": "Profil-PIN geändert",
           "profilePinCleared": "Profil-PIN gelöscht",
           "profilePinFailed": "Profil-PIN fehlgeschlagen",
@@ -528,6 +520,8 @@
     "usersTab": {
       "addPersonBtn": "Person hinzufügen",
       "ageDisplay": "Alter {{age}}",
+      "badgeLinked_one": "{{count}} verknüpftes Konto",
+      "badgeLinked_other": "{{count}} verknüpfte Konten",
       "badgePaused": "Pausiert",
       "badgePin": "PIN",
       "cancelBtn": "Abbrechen",
@@ -545,13 +539,20 @@
       "fieldAgePlaceholder": "Optional",
       "fieldName": "Name",
       "fieldNamePlaceholder": "Name",
+      "fieldPinHelp": "Sie kann später im eigenen Profil geändert werden.",
+      "fieldPinOptional": "PIN (optional)",
+      "fieldPinPlaceholder": "4–8 Ziffern",
+      "fieldPinRequired": "PIN (für Eltern erforderlich)",
       "fieldRole": "Rolle",
       "fieldTheme": "Theme",
       "formEditTitle": "Person bearbeiten",
       "formNewTitle": "Neue Person",
+      "linkedAccountsTitle": "Verknüpfte Konten",
       "loading": "Wird geladen...",
       "pauseAriaLabel": "Benutzer pausieren",
       "pauseTitle": "Pausieren (Urlaub/Krank-Modus)",
+      "pinFormat": "Die PIN muss aus 4–8 Ziffern bestehen",
+      "pinRequiredForParent": "Eltern brauchen eine PIN (oder ein verknüpftes Konto), um sich anzumelden.",
       "resetPinTitle": "Profil-PIN zurücksetzen",
       "roleAdmin": "Admin",
       "roleChild": "Kind",
@@ -577,6 +578,7 @@
   "common": {
     "back": "Zurück",
     "language": "Sprache",
+    "loading": "Wird geladen…",
     "modal": {},
     "pinPad": {
       "deleteAriaLabel": "Löschen"
@@ -686,7 +688,9 @@
       "changeTheme": "Theme ändern",
       "disableReadAloud": "Vorlesen deaktivieren",
       "enableReadAloud": "Vorlesen aktivieren",
+      "linkedAccounts": "Verknüpfte Konten",
       "logout": "Abmelden",
+      "manage": "Verwalten",
       "setPIN": "PIN festlegen"
     },
     "lineColors": {
@@ -781,6 +785,19 @@
       "quest": "Expedition"
     }
   },
+  "linkedAccounts": {
+    "confirmSignOutEverywhere": "Dieses Profil auf allen Geräten abmelden, auch auf diesem?",
+    "confirmUnlink": "{{provider}} trennen? Damit angemeldete Geräte werden abgemeldet.",
+    "introOther": "Konten, mit denen sich {{name}} anmelden kann. Neue Konten kann nur {{name}} im eigenen Profil verknüpfen.",
+    "introSelf": "Verknüpfe ein Konto, um dich damit statt (oder zusätzlich zu) deiner PIN anzumelden – praktisch auf dem eigenen Handy, wo du angemeldet bleibst.",
+    "link": "{{provider}} verknüpfen",
+    "linkFailed": "Das Konto konnte nicht verknüpft werden",
+    "linkedToast": "Konto verknüpft",
+    "noProviders": "Auf diesem Server sind keine Anmeldeanbieter eingerichtet.",
+    "signOutEverywhere": "Auf allen Geräten abmelden",
+    "title": "Verknüpfte Konten",
+    "unlink": "Trennen"
+  },
   "photo": {
     "invalidLinkBody": "Diesem Upload-Link fehlen Informationen.",
     "invalidLinkTitle": "Ungültiger Link",
@@ -795,13 +812,38 @@
     "uploadingFor": "Wird hochgeladen für {{name}}"
   },
   "profile": {
+    "authError": {
+      "exchangeFailed": "Die Anmeldung mit {{provider}} konnte nicht überprüft werden. Bitte versuche es erneut.",
+      "generic": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
+      "invalidState": "Der Anmeldelink ist abgelaufen. Bitte versuche es erneut.",
+      "linkedToOther": "Dieses Konto ist bereits mit einem anderen Profil verknüpft.",
+      "notLinked": "Dieses {{provider}}-Konto ist noch mit keinem Profil verknüpft. Melde dich mit deiner PIN an und verknüpfe es zuerst in deinem Profil.",
+      "providerError": "Die Anmeldung mit {{provider}} wurde abgebrochen oder ist fehlgeschlagen.",
+      "providerUnavailable": "{{provider}} ist gerade nicht erreichbar.",
+      "sessionRequired": "Melde dich in deinem Profil an, bevor du ein Konto verknüpfst.",
+      "wrongAccount": "Dieses {{provider}}-Konto gehört zu einem anderen Profil."
+    },
     "back": "Zurück",
+    "claim": {
+      "confirmPin": "PIN bestätigen",
+      "intro": "Elternprofile brauchen eine PIN. Wähle eine, um fortzufahren.",
+      "introLegacy": "Der gemeinsame Admin-Passcode wurde durch eine PIN pro Elternprofil ersetzt. Gib einmalig den alten Passcode ein und wähle deine eigene PIN.",
+      "legacyPasscode": "Alter Admin-Passcode",
+      "newPin": "Neue PIN (4–8 Ziffern)",
+      "pinFormat": "Die PIN muss aus 4–8 Ziffern bestehen",
+      "pinMismatch": "Die PINs stimmen nicht überein",
+      "submit": "PIN speichern und anmelden"
+    },
+    "continueWith": "Weiter mit {{provider}}",
     "couldNotVerifyPin": "PIN konnte nicht überprüft werden",
     "enterPin": "Gib deine PIN ein",
+    "incorrectPasscode": "Falscher Haushalts-Passcode",
     "incorrectPin": "Falsche PIN",
-    "manage": "Verwalten",
+    "lockedOut": "Zu viele Versuche. Bitte in {{seconds}} Sekunden erneut versuchen.",
+    "or": "oder",
     "pinProtected": "PIN-geschützt",
     "selectProfile": "Profil für {{name}} auswählen",
+    "signInWithLinked": "Dieses Profil meldet sich mit einem verknüpften Konto an.",
     "wallDisplay": "Wand-Display",
     "welcomeBack": "Willkommen zurück!",
     "whoIsDoingChores": "Wer erledigt heute Aufgaben?"
@@ -853,8 +895,16 @@
     "finishSetup": "Einrichtung abschließen",
     "finishTitle": "Alles fertig!",
     "getStarted": "Los geht's",
-    "goToLogin": "Zum Login",
+    "goToDashboard": "Zum Dashboard",
     "next": "Weiter",
+    "parentDefaultName": "Elternteil",
+    "parentDescription": "Lege dein Elternprofil an. Deine PIN entsperrt dein Profil und die Verwaltung; Pocket ID, Google oder eine andere Anmeldung kannst du später verknüpfen.",
+    "parentNamePlaceholder": "Dein Name",
+    "parentPinConfirmPlaceholder": "PIN bestätigen",
+    "parentPinFormat": "Die PIN muss aus 4–8 Ziffern bestehen",
+    "parentPinMismatch": "Die PINs stimmen nicht überein",
+    "parentPinPlaceholder": "PIN wählen (4–8 Ziffern)",
+    "parentTitle": "Wer verwaltet die Aufgaben?",
     "settingUp": "Wird eingerichtet...",
     "themeClassicBlue": "Klassisches Blau",
     "themeGalaxyPurple": "Galaktisches Lila",

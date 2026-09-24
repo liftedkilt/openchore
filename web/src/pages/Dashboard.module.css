@@ -120,6 +120,29 @@
   color: var(--accent-blue);
 }
 
+.manageBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 100px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-blue);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.manageBtn:hover {
+  border-color: var(--accent-blue);
+}
+
+@media (max-width: 480px) {
+  .manageBtn span {
+    display: none;
+  }
+}
+
 .logoutBtn {
   color: var(--text-secondary);
   padding: 0.5rem;

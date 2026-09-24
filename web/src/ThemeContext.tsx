@@ -17,14 +17,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [theme, setThemeState] = useState<Theme>('default');
 
   useEffect(() => {
-    // Admin users never get a theme — the admin UI always uses the default.
-    if (user?.role === 'admin') {
-      setThemeState('default');
-    } else if (user?.theme) {
-      setThemeState(user.theme as Theme);
-    } else if (!user) {
-      setThemeState('default');
-    }
+    setThemeState((user?.theme || 'default') as Theme);
   }, [user]);
 
   useEffect(() => {
@@ -32,8 +25,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [theme]);
 
   const setTheme = async (newTheme: Theme) => {
-    // Admin users cannot change their theme.
-    if (user?.role === 'admin') return;
     setThemeState(newTheme);
     if (user) {
       try {

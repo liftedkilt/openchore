@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { loginAsAdmin, selectUser, apiGet } from './helpers/setup';
+import { loginAsAdmin, selectUser, apiGet, authHeaders } from './helpers/setup';
 
 test.describe('Rewards', () => {
   test('admin can create a reward via API', async ({ page }) => {
     const createResp = await page.request.post('/api/rewards', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: { name: 'E2E Test Reward', icon: '🎯', cost: 25 },
     });
     expect(createResp.ok()).toBeTruthy();
@@ -20,7 +20,7 @@ test.describe('Rewards', () => {
   test('child can see and redeem a reward', async ({ page }) => {
     // Give Emma points
     await page.request.post('/api/points/adjust', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: { user_id: 3, amount: 200, note: 'E2E test points' },
     });
 
@@ -50,19 +50,19 @@ test.describe('Rewards', () => {
   test('admin can delete a reward via API', async ({ page }) => {
     // Create then delete
     const createResp = await page.request.post('/api/rewards', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: { name: 'E2E Delete Me Reward', icon: '🗑️', cost: 10 },
     });
     const reward = await createResp.json();
 
     const deleteResp = await page.request.delete(`/api/rewards/${reward.id}`, {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
     });
     expect(deleteResp.ok()).toBeTruthy();
 
     // Verify gone
     const rewards = await page.request.get('/api/rewards/all', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
     });
     const list = await rewards.json();
     const found = list.find((r: any) => r.name === 'E2E Delete Me Reward');

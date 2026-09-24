@@ -199,7 +199,37 @@ export interface User {
   line_color?: string;
   paused: boolean;
   has_pin: boolean;
+  // IDs of OIDC providers linked to this profile ("Continue with ...").
+  auth_providers: string[];
   created_at: string;
+}
+
+export interface SessionInfo {
+  method: 'tap' | 'pin' | 'oidc' | 'upload';
+  expires_at: string;
+  // Personal-device (OIDC) sessions persist and skip the kiosk idle logout.
+  persistent: boolean;
+  provider?: string;
+}
+
+export interface AuthSession {
+  user: User;
+  session: SessionInfo;
+}
+
+export interface AuthProvider {
+  id: string;
+  name: string;
+}
+
+export interface LinkedIdentity {
+  id: number;
+  user_id: number;
+  provider: string;
+  email?: string;
+  display_name?: string;
+  created_at: string;
+  last_login_at?: string;
 }
 
 export interface Chore {
@@ -372,7 +402,7 @@ export interface ScheduledChore {
   completed_at?: string;
   photo_url?: string;
   date: string;
-  completion_status?: 'approved' | 'pending' | 'rejected' | 'ai_rejected';
+  completion_status?: 'approved' | 'pending' | 'rejected' | 'ai_rejected' | 'excused';
   ai_feedback?: string;
   completed_by_name?: string;
   completed_by_sibling?: boolean;

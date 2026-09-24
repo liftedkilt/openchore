@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { loginAsAdmin, selectUser, apiGet, localDateStr } from './helpers/setup';
+import { loginAsAdmin, selectUser, apiGet, localDateStr, authHeaders } from './helpers/setup';
 
 test.describe('Points System', () => {
   test('admin can manually adjust points via API', async ({ page }) => {
@@ -9,7 +9,7 @@ test.describe('Points System', () => {
 
     // Adjust points via API
     const resp = await page.request.post('/api/points/adjust', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: { user_id: 3, amount: 50, note: 'E2E test adjustment' },
     });
     expect(resp.ok()).toBeTruthy();
@@ -29,7 +29,7 @@ test.describe('Points System', () => {
     if (!incomplete) return; // All done for today
 
     await page.request.post(`/api/schedules/${incomplete.schedule_id}/complete`, {
-      headers: { 'X-User-ID': '3' },
+      headers: await authHeaders(3),
       data: { completion_date: today },
     });
 
@@ -42,13 +42,13 @@ test.describe('Points System', () => {
   test('point transactions are recorded', async ({ page }) => {
     // Add points
     await page.request.post('/api/points/adjust', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: { user_id: 3, amount: 10, note: 'E2E log test' },
     });
 
     // Verify transaction exists in points data
     const pointsData = await page.request.get('/api/users/3/points', {
-      headers: { 'X-User-ID': '3' },
+      headers: await authHeaders(3),
     });
     const data = await pointsData.json();
     const transactions = data.transactions || [];

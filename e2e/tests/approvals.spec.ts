@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { loginAsAdmin, apiGet, localDateStr } from './helpers/setup';
+import { loginAsAdmin, apiGet, localDateStr, authHeaders } from './helpers/setup';
 
 test.describe('Approval Workflow', () => {
   test('chore requiring approval goes to pending queue', async ({ page }) => {
     // Create a chore that requires approval via API
     const createResp = await page.request.post('/api/chores', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: {
         title: 'E2E Approval Test',
         category: 'core',
@@ -19,7 +19,7 @@ test.describe('Approval Workflow', () => {
     const today = new Date();
     const dayOfWeek = today.getDay();
     await page.request.post(`/api/chores/${chore.id}/schedules`, {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: { assigned_to: 3, day_of_week: dayOfWeek },
     });
 
@@ -31,7 +31,7 @@ test.describe('Approval Workflow', () => {
     expect(scheduled).toBeTruthy();
 
     await page.request.post(`/api/schedules/${scheduled.schedule_id}/complete`, {
-      headers: { 'X-User-ID': '3' },
+      headers: await authHeaders(3),
       data: { completion_date: dateStr },
     });
 
@@ -58,7 +58,7 @@ test.describe('Approval Workflow', () => {
 
       // Verify approval went through - check that the button is gone or the list changed
       const pendingResp = await page.request.get('/api/completions/pending', {
-        headers: { 'X-User-ID': '1' },
+        headers: await authHeaders(1),
       });
       const pending = await pendingResp.json();
       const approvalChore = pending.find((p: any) => p.chore_title === 'E2E Approval Test');
@@ -69,12 +69,12 @@ test.describe('Approval Workflow', () => {
   test('empty approvals shows all caught up message', async ({ page }) => {
     // Approve everything first
     const pendingResp = await page.request.get('/api/completions/pending', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
     });
     const pending = await pendingResp.json();
     for (const p of pending) {
       await page.request.post(`/api/completions/${p.id}/approve`, {
-        headers: { 'X-User-ID': '1' },
+        headers: await authHeaders(1),
       });
     }
 

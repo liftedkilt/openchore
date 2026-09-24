@@ -4,9 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../AuthContext';
 import { api } from '../api';
 import styles from './SetupWizard.module.css';
-import { UserPlus, Check, ArrowRight, Sparkles, Trash2, Palette } from 'lucide-react';
+import { UserPlus, Check, ArrowRight, Sparkles, Trash2 } from 'lucide-react';
 
-type Step = 'welcome' | 'children' | 'themes' | 'chores' | 'finish';
+type Step = 'welcome' | 'parent' | 'children' | 'themes' | 'chores' | 'finish';
+
+const STEPS: Step[] = ['welcome', 'parent', 'children', 'themes', 'chores', 'finish'];
 
 const THEMES = [
   { id: 'default', nameKey: 'themeClassicBlue', color: '#3b82f6' },
@@ -32,8 +34,26 @@ export const SetupWizard: React.FC = () => {
   const [selectedPresets, setSelectedPresets] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [parentName, setParentName] = useState('');
+  const [parentPin, setParentPin] = useState('');
+  const [parentPinConfirm, setParentPinConfirm] = useState('');
+  const [parentError, setParentError] = useState('');
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { refresh } = useAuth();
+
+  const submitParent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!/^\d{4,8}$/.test(parentPin)) {
+      setParentError(t('setup.parentPinFormat'));
+      return;
+    }
+    if (parentPin !== parentPinConfirm) {
+      setParentError(t('setup.parentPinMismatch'));
+      return;
+    }
+    setParentError('');
+    setStep('children');
+  };
 
   const addChild = () => {
     if (!newName.trim()) return;
@@ -55,7 +75,8 @@ export const SetupWizard: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const result = await api.setup({
+      await api.setup({
+        parent: { name: parentName.trim() || t('setup.parentDefaultName'), pin: parentPin },
         children: children.map(c => ({ name: c.name, theme: c.theme })),
         chores: selectedPresets.map(idx => {
           const preset = CHORE_PRESETS[idx];
@@ -68,8 +89,8 @@ export const SetupWizard: React.FC = () => {
         }),
       });
 
-      // Store admin user for subsequent authenticated requests
-      setUser(result.admin);
+      // Setup signs the parent in (session cookie); pick it up.
+      await refresh();
 
       setStep('finish');
     } catch (err) {
@@ -88,10 +109,54 @@ export const SetupWizard: React.FC = () => {
             <div className={styles.iconCircle}><Sparkles size={48} /></div>
             <h1>{t('setup.welcomeTitle')}</h1>
             <p>{t('setup.welcomeDescription')}</p>
-            <button className={styles.primaryBtn} onClick={() => setStep('children')}>
+            <button className={styles.primaryBtn} onClick={() => setStep('parent')}>
               {t('setup.getStarted')} <ArrowRight size={20} />
             </button>
           </div>
+        );
+
+      case 'parent':
+        return (
+          <form className={styles.stepContent} onSubmit={submitParent}>
+            <h1>{t('setup.parentTitle')}</h1>
+            <p>{t('setup.parentDescription')}</p>
+            <div className={styles.fieldStack}>
+              <input
+                type="text"
+                placeholder={t('setup.parentNamePlaceholder')}
+                value={parentName}
+                onChange={e => setParentName(e.target.value)}
+                aria-label={t('setup.parentNamePlaceholder')}
+              />
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="new-password"
+                placeholder={t('setup.parentPinPlaceholder')}
+                value={parentPin}
+                onChange={e => setParentPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                aria-label={t('setup.parentPinPlaceholder')}
+                required
+              />
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="new-password"
+                placeholder={t('setup.parentPinConfirmPlaceholder')}
+                value={parentPinConfirm}
+                onChange={e => setParentPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                aria-label={t('setup.parentPinConfirmPlaceholder')}
+                required
+              />
+            </div>
+            {parentError && <p style={{ color: '#ef4444', fontSize: '0.9rem', marginTop: '0.5rem' }}>{parentError}</p>}
+            <div className={styles.navBtns}>
+              <button type="button" className={styles.secondaryBtn} onClick={() => setStep('welcome')}>{t('setup.back')}</button>
+              <button type="submit" className={styles.primaryBtn}>
+                {t('setup.next')} <ArrowRight size={20} />
+              </button>
+            </div>
+          </form>
         );
 
       case 'children':
@@ -125,6 +190,7 @@ export const SetupWizard: React.FC = () => {
             </div>
 
             <div className={styles.navBtns}>
+              <button className={styles.secondaryBtn} onClick={() => setStep('parent')}>{t('setup.back')}</button>
               <button
                 className={styles.primaryBtn}
                 disabled={children.length === 0}
@@ -215,8 +281,8 @@ export const SetupWizard: React.FC = () => {
             <div className={styles.iconCircle} style={{ backgroundColor: '#10b981' }}><Check size={48} color="white" /></div>
             <h1>{t('setup.finishTitle')}</h1>
             <p>{t('setup.finishDescription')}</p>
-            <button className={styles.primaryBtn} onClick={() => navigate('/login')}>
-              {t('setup.goToLogin')}
+            <button className={styles.primaryBtn} onClick={() => navigate('/admin/dashboard')}>
+              {t('setup.goToDashboard')}
             </button>
           </div>
         );
@@ -227,7 +293,7 @@ export const SetupWizard: React.FC = () => {
     <div className={styles.container}>
       <div className={styles.card}>
         <div className={styles.progress}>
-          <div className={styles.progressBar} style={{ width: `${(['welcome', 'children', 'themes', 'chores', 'finish'].indexOf(step) / 4) * 100}%` }} />
+          <div className={styles.progressBar} style={{ width: `${(STEPS.indexOf(step) / (STEPS.length - 1)) * 100}%` }} />
         </div>
         {renderStep()}
       </div>

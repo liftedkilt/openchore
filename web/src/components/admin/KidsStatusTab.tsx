@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Circle,
   ShieldCheck,
+  Loader2,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { localDateStr } from '../../utils';
@@ -102,9 +103,11 @@ export const KidsStatusTab: React.FC = () => {
         api.chores.listPending().catch(() => [] as PendingCompletion[]),
       ]);
 
+      // Kids first, then parents (who take part too and show up once they
+      // have chores of their own).
       const children = users
-        .filter((u: User) => u.role === 'child')
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .filter((u: User) => !u.paused || u.role === 'child')
+        .sort((a, b) => (a.role === b.role ? a.name.localeCompare(b.name) : a.role === 'child' ? -1 : 1));
 
       // Attribute pending approvals to the assignee (the kid the chore
       // belongs to), not the completer. Matching by name would collapse
@@ -148,7 +151,7 @@ export const KidsStatusTab: React.FC = () => {
         }),
       );
 
-      setKids(results);
+      setKids(results.filter(k => k.user.role === 'child' || k.chores.length > 0));
     } catch (e) {
       setError(t('admin.kidsStatusTab.loadError'));
     } finally {
@@ -167,6 +170,36 @@ export const KidsStatusTab: React.FC = () => {
       load();
     } catch (err) {
       console.error('Failed to excuse chore:', err);
+    }
+  };
+
+  // Parents can tick a chore off (or undo it) on someone's behalf — the
+  // assignee is credited, and no photo is needed since the parent vouches.
+  const [toggling, setToggling] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const handleToggle = async (e: React.MouseEvent, kid: KidStatus, chore: ScheduledChore) => {
+    e.stopPropagation();
+    const key = `${chore.schedule_id}-${chore.date}`;
+    if (toggling) return;
+    if (chore.completed && !window.confirm(t('admin.kidsStatusTab.confirmUndo', { title: chore.title, name: kid.user.name }))) {
+      return;
+    }
+    setToggling(key);
+    setActionError(null);
+    try {
+      if (chore.completed) {
+        await api.chores.uncomplete(chore.schedule_id, chore.date);
+      } else {
+        await api.chores.complete(chore.schedule_id, chore.date);
+      }
+      await load();
+    } catch (err) {
+      setActionError(t('admin.kidsStatusTab.toggleError', {
+        title: chore.title,
+        error: err instanceof Error ? err.message : String(err),
+      }));
+    } finally {
+      setToggling(null);
     }
   };
 
@@ -374,14 +407,31 @@ export const KidsStatusTab: React.FC = () => {
                                 const isExcused = c.completion_status === 'excused';
                                 return (
                                   <div key={c.schedule_id + '-' + c.date} className={styles.choreItem}>
-                                    {c.completed && !isExcused ? (
-                                      <Check size={14} className={clsx(styles.choreIcon, styles.choreIconDone)} />
-                                    ) : isExcused ? (
+                                    {isExcused ? (
                                       <ShieldCheck size={14} className={clsx(styles.choreIcon, styles.choreIconDone)} />
-                                    ) : isOverdue ? (
-                                      <AlertTriangle size={14} className={clsx(styles.choreIcon, styles.choreIconOverdue)} />
                                     ) : (
-                                      <Circle size={14} className={styles.choreIcon} />
+                                      <button
+                                        type="button"
+                                        className={styles.toggleBtn}
+                                        onClick={(e) => handleToggle(e, kid, c)}
+                                        disabled={toggling !== null}
+                                        aria-label={c.completed
+                                          ? t('admin.kidsStatusTab.markNotDone', { title: c.title, name: kid.user.name })
+                                          : t('admin.kidsStatusTab.markDone', { title: c.title, name: kid.user.name })}
+                                        title={c.completed
+                                          ? t('admin.kidsStatusTab.markNotDone', { title: c.title, name: kid.user.name })
+                                          : t('admin.kidsStatusTab.markDone', { title: c.title, name: kid.user.name })}
+                                      >
+                                        {toggling === `${c.schedule_id}-${c.date}` ? (
+                                          <Loader2 size={14} className={clsx(styles.choreIcon, styles.spin)} />
+                                        ) : c.completed ? (
+                                          <Check size={14} className={clsx(styles.choreIcon, styles.choreIconDone)} />
+                                        ) : isOverdue ? (
+                                          <AlertTriangle size={14} className={clsx(styles.choreIcon, styles.choreIconOverdue)} />
+                                        ) : (
+                                          <Circle size={14} className={styles.choreIcon} />
+                                        )}
+                                      </button>
                                     )}
                                     <span className={clsx(styles.choreTitle, c.completed && styles.choreTitleDone)}>
                                       {c.title}
@@ -431,6 +481,10 @@ export const KidsStatusTab: React.FC = () => {
           );
         })}
       </div>
+
+      {actionError && (
+        <div className={styles.error} role="alert" style={{ marginTop: '1rem' }}>{actionError}</div>
+      )}
 
       <p className={styles.refreshHint} style={{ marginTop: '1rem', textAlign: 'center' }}>
         {t('admin.kidsStatusTab.tapHint')}

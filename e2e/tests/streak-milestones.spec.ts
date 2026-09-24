@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { loginAsAdmin, selectUser, apiGet } from './helpers/setup';
+import { loginAsAdmin, selectUser, apiGet, authHeaders } from './helpers/setup';
 
 test.describe('Streak Milestones', () => {
   test('admin can create streak milestone', async ({ page }) => {
@@ -25,7 +25,7 @@ test.describe('Streak Milestones', () => {
   test('streak milestones CRUD via API', async ({ page }) => {
     // List existing
     const listResp = await page.request.get('/api/admin/streak-rewards', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
     });
     expect(listResp.ok()).toBeTruthy();
     const milestones = await listResp.json();
@@ -33,7 +33,7 @@ test.describe('Streak Milestones', () => {
 
     // Create new
     const createResp = await page.request.post('/api/admin/streak-rewards', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: { streak_days: 60, bonus_points: 100, label: 'E2E 60-Day Test!' },
     });
     expect(createResp.ok()).toBeTruthy();
@@ -42,7 +42,7 @@ test.describe('Streak Milestones', () => {
 
     // Delete
     const deleteResp = await page.request.delete(`/api/admin/streak-rewards/${created.id}`, {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
     });
     expect(deleteResp.ok()).toBeTruthy();
   });

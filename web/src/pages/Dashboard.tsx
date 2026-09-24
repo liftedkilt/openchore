@@ -5,8 +5,8 @@ import { useTheme } from '../ThemeContext';
 import { api, APIError } from '../api';
 import type { ScheduledChore, UserStreakData, PointsData, Reward, RedemptionHistory, Theme } from '../types';
 import styles from './Dashboard.module.css';
-import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Lock, KeyRound, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX, Undo2, Camera, Copy, Users, Target, PiggyBank, Plus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { CheckCircle, Clock, Calendar, Star, LogOut, LayoutDashboard, Link2, Lock, KeyRound, Flame, Trophy, Zap, Gift, ShoppingBag, Palette, ShieldCheck, CircleCheck, Sparkles, Swords, Scroll, Coins, Rocket, Orbit, Telescope, TreePine, Sprout, Leaf, X, Loader2, Volume2, VolumeX, Undo2, Camera, Copy, Users, Target, PiggyBank, Plus } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import confetti from 'canvas-confetti';
 import { localDateStr } from '../utils';
@@ -16,6 +16,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useThemeSound } from '../hooks/useThemeSound';
 import { useTextToSpeech } from '../hooks/useTextToSpeech';
 import PinSettingsModal from '../components/PinPad/PinSettingsModal';
+import LinkedAccountsModal from '../components/LinkedAccounts/LinkedAccountsModal';
 
 const QRCodeModal: React.FC<{
   chore: ScheduledChore;
@@ -29,8 +30,17 @@ const QRCodeModal: React.FC<{
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // The phone that scans the QR code isn't signed in; the link carries a
+  // short-lived token that can only upload a photo and complete this chore.
+  const [uploadToken, setUploadToken] = useState<string | null>(null);
 
   const alreadyCompleted = chore.completed;
+
+  useEffect(() => {
+    api.auth.uploadLink(chore.schedule_id)
+      .then(r => setUploadToken(r.token))
+      .catch(() => setUploadToken(null));
+  }, [chore.schedule_id]);
 
   // Poll for completion/photo status
   useEffect(() => {
@@ -51,7 +61,8 @@ const QRCodeModal: React.FC<{
   }, [chore, userId, alreadyCompleted, onComplete]);
 
   const origin = baseUrl || window.location.origin;
-  const uploadUrl = `${origin}/upload?scheduleId=${chore.schedule_id}&date=${chore.date}&userId=${userId}`;
+  const uploadUrl = `${origin}/upload?scheduleId=${chore.schedule_id}&date=${chore.date}&userId=${userId}` +
+    (uploadToken ? `&t=${encodeURIComponent(uploadToken)}` : '');
 
   const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -109,7 +120,9 @@ const QRCodeModal: React.FC<{
         <p>{t('dashboard.qr.scanOrUpload')}</p>
 
         <div className={styles.qrWrapper}>
-          <QRCodeSVG value={uploadUrl} size={256} marginSize={4} />
+          {uploadToken
+            ? <QRCodeSVG value={uploadUrl} size={256} marginSize={4} />
+            : <Loader2 className={styles.spinner} size={32} />}
         </div>
 
         <div className={styles.qrActions}>
@@ -163,7 +176,8 @@ const CATEGORY_ICON_MAP: Record<string, React.FC<{ size?: number }>> = {
 
 export const Dashboard: React.FC = () => {
   const { t } = useTranslation();
-  const { user, setUser } = useAuth();
+  const { user, setUser, signOut, isAdmin, refresh } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { theme, setTheme, config } = useTheme();
   const { playComplete, playAllDone } = useThemeSound();
   const { speak, stop } = useTextToSpeech();
@@ -196,6 +210,7 @@ export const Dashboard: React.FC = () => {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showPinSettings, setShowPinSettings] = useState(false);
+  const [showLinkedAccounts, setShowLinkedAccounts] = useState(false);
   const [qrChore, setQrChore] = useState<ScheduledChore | null>(null);
   const [aiFeedback, setAiFeedback] = useState<Record<number, { text: string; audioUrl?: string }>>({});
   const [systemBaseUrl, setSystemBaseUrl] = useState<string>('');
@@ -356,6 +371,23 @@ export const Dashboard: React.FC = () => {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // Back from linking an OIDC account (?linked=<provider> or ?auth_error=...).
+  useEffect(() => {
+    const linked = searchParams.get('linked');
+    const authError = searchParams.get('auth_error');
+    if (!linked && !authError) return;
+    if (linked) {
+      refresh();
+      showToast(t('linkedAccounts.linkedToast'));
+    } else if (authError === 'linked_to_other_profile') {
+      showToast(t('profile.authError.linkedToOther'));
+    } else {
+      showToast(t('linkedAccounts.linkFailed'));
+    }
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   // Look up the kid's active commitment for a given reward (personal or
   // shared share — at most one of either kind).
   const findCommitmentForReward = (rewardId: number) =>
@@ -491,9 +523,9 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     document.body.className = 'theme-default';
-    setUser(null);
+    await signOut();
     navigate('/login');
   };
 
@@ -1360,6 +1392,25 @@ export const Dashboard: React.FC = () => {
           >
             <KeyRound size={20} />
           </button>
+          <button
+            onClick={() => setShowLinkedAccounts(true)}
+            className={styles.themeBtn}
+            aria-label={t('dashboard.header.linkedAccounts')}
+            title={t('dashboard.header.linkedAccounts')}
+          >
+            <Link2 size={20} />
+          </button>
+          {isAdmin && (
+            <button
+              onClick={() => navigate('/admin/dashboard')}
+              className={styles.manageBtn}
+              aria-label={t('dashboard.header.manage')}
+              title={t('dashboard.header.manage')}
+            >
+              <ShieldCheck size={20} />
+              <span>{t('dashboard.header.manage')}</span>
+            </button>
+          )}
           <button onClick={logout} className={styles.logoutBtn} aria-label={t('dashboard.header.logout')}>
             <LogOut size={20} />
           </button>
@@ -1411,6 +1462,16 @@ export const Dashboard: React.FC = () => {
           hasPin={user.has_pin}
           onClose={() => setShowPinSettings(false)}
           onChanged={(hasPin) => setUser({ ...user, has_pin: hasPin })}
+        />
+      )}
+
+      {showLinkedAccounts && user && (
+        <LinkedAccountsModal
+          user={user}
+          self
+          onClose={() => setShowLinkedAccounts(false)}
+          onChanged={(providers) => setUser({ ...user, auth_providers: providers })}
+          onSignedOutEverywhere={logout}
         />
       )}
 

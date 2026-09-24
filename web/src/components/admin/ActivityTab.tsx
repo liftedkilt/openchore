@@ -16,7 +16,8 @@ export const ActivityTab: React.FC = () => {
     setLoading(true);
     try {
       const usrs = await api.users.list();
-      const children = usrs.filter((u: User) => u.role === 'child');
+      // Parents take part too, so everyone's activity is listed.
+      const children = usrs;
       setUsers(children);
 
       // Fetch transactions for all children

@@ -1,11 +1,25 @@
 import { type Page, expect } from '@playwright/test';
 
-/** Navigate to /admin, punch in the passcode, wait for admin dashboard. */
-export async function loginAsAdmin(page: Page, passcode = '1234') {
-  await page.goto('/admin');
-  for (const digit of passcode) {
+/** Seeded parent PINs (config/config.example.yaml). Kids have no PIN. */
+export const SEEDED_PINS: Record<number, string> = { 1: '1234', 2: '5678' };
+
+/** Enter a PIN on the on-screen PinPad. */
+export async function enterPin(page: Page, pin: string) {
+  for (const digit of pin) {
     await page.getByRole('button', { name: digit, exact: true }).click();
   }
+}
+
+/**
+ * Sign in as a parent from the profile picker (tap profile → PIN), then open
+ * the Manage screens from their dashboard.
+ */
+export async function loginAsAdmin(page: Page, pin = '1234', name = 'Alex') {
+  await page.goto('/login');
+  await page.getByRole('button', { name: `Select profile for ${name}` }).click();
+  await enterPin(page, pin);
+  await page.waitForURL('/');
+  await page.getByRole('button', { name: 'Manage' }).click();
   await page.waitForURL('/admin/dashboard');
 }
 
@@ -26,15 +40,40 @@ export async function selectUser(page: Page, name: string) {
   await page.waitForURL('/');
 }
 
-/** Set admin session directly (bypass PIN flow). */
-export async function setAdminSession(page: Page) {
-  await page.evaluate(() => sessionStorage.setItem('openchore_admin', 'true'));
+const API_ORIGIN = 'http://localhost:8080';
+const tokenCache = new Map<string, string>();
+
+/**
+ * A session token for userId, obtained by signing in through the API. It is
+ * fetched outside the browser so it never replaces the page's own session
+ * cookie. Pass it as a Bearer header with page.request.
+ */
+export async function apiToken(userId: number, pin = SEEDED_PINS[userId]): Promise<string> {
+  const key = `${userId}:${pin ?? ''}`;
+  const cached = tokenCache.get(key);
+  if (cached) return cached;
+  const resp = await fetch(`${API_ORIGIN}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(pin ? { user_id: userId, pin } : { user_id: userId }),
+  });
+  if (!resp.ok) {
+    throw new Error(`login as user ${userId} failed: ${resp.status} ${await resp.text()}`);
+  }
+  const body = await resp.json();
+  tokenCache.set(key, body.token);
+  return body.token;
+}
+
+/** Authorization headers for API calls made as userId (default: parent Alex). */
+export async function authHeaders(userId = 1, pin?: string): Promise<Record<string, string>> {
+  return { Authorization: `Bearer ${await apiToken(userId, pin ?? SEEDED_PINS[userId])}` };
 }
 
 /** Make an authenticated API request using the page's request context. */
 export async function apiGet(page: Page, path: string, userId = 1) {
   const resp = await page.request.get(`/api${path}`, {
-    headers: { 'X-User-ID': String(userId) },
+    headers: await authHeaders(userId),
   });
   expect(resp.ok()).toBeTruthy();
   return resp.json();

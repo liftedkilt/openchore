@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { selectUser } from './helpers/setup';
+import { selectUser, authHeaders } from './helpers/setup';
 
 /**
  * Regression cover for the goal-savings decay loophole.
@@ -14,8 +14,6 @@ import { selectUser } from './helpers/setup';
  * server is started with POINTS_DECAY_INTERVAL set (see playwright.config.ts).
  * If this spec times out waiting for a decay, check that override first.
  */
-
-const ADMIN = { 'X-User-ID': '1' };
 
 /** Yesterday's day-of-week index, matching the server's local clock. */
 function yesterdayDayOfWeek() {
@@ -32,8 +30,8 @@ function yesterdayDateStr() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-async function postJSON(page: Page, path: string, data: unknown, headers = ADMIN) {
-  const resp = await page.request.post(path, { headers, data });
+async function postJSON(page: Page, path: string, data: unknown, headers?: Record<string, string>) {
+  const resp = await page.request.post(path, { headers: headers ?? await authHeaders(1), data });
   expect(resp.ok(), `${path} -> ${resp.status()}`).toBeTruthy();
   return resp.status() === 204 ? null : resp.json();
 }
@@ -55,14 +53,14 @@ async function seedSaver(page: Page, label: string, opts: { chorePoints?: number
     page,
     `/api/rewards/${reward.id}/commit`,
     { auto_contribute_percent: 0 },
-    { 'X-User-ID': String(kid.id) },
+    await authHeaders(kid.id),
   );
   await postJSON(page, '/api/points/adjust', { user_id: kid.id, amount: 50, note: 'e2e allowance' });
   await postJSON(
     page,
     `/api/commitments/${commitment.id}/contribute`,
     { amount: 50 },
-    { 'X-User-ID': String(kid.id) },
+    await authHeaders(kid.id),
   );
 
   const chore = await postJSON(page, '/api/chores', {
@@ -80,7 +78,7 @@ async function seedSaver(page: Page, label: string, opts: { chorePoints?: number
 
 async function enableDecay(page: Page, kidId: number, rate: number) {
   const resp = await page.request.put(`/api/admin/users/${kidId}/decay`, {
-    headers: ADMIN,
+    headers: await authHeaders(1),
     data: { enabled: true, decay_rate: rate, decay_interval_hours: 24 },
   });
   expect(resp.ok()).toBeTruthy();
@@ -88,7 +86,7 @@ async function enableDecay(page: Page, kidId: number, rate: number) {
 
 async function getPoints(page: Page, kidId: number) {
   const resp = await page.request.get(`/api/users/${kidId}/points`, {
-    headers: { 'X-User-ID': String(kidId) },
+    headers: await authHeaders(kidId),
   });
   expect(resp.ok()).toBeTruthy();
   return resp.json();
@@ -135,7 +133,7 @@ test.describe('Points decay vs. goal savings', () => {
     // The goal survives, just lighter — it is not cancelled out from under them.
     const commitments = await (
       await page.request.get(`/api/users/${saver.kid.id}/commitments`, {
-        headers: { 'X-User-ID': String(saver.kid.id) },
+        headers: await authHeaders(saver.kid.id),
       })
     ).json();
     const active = commitments.find((c: any) => c.id === saver.commitment.id);
