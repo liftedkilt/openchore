@@ -1,28 +1,34 @@
 package api
 
 import (
+	"context"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/liftedkilt/openchore/internal/ai"
+	"github.com/liftedkilt/openchore/internal/discord"
+	"github.com/liftedkilt/openchore/internal/llm"
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/store"
+	"github.com/liftedkilt/openchore/internal/webhook"
 )
 
 type ReportsHandler struct {
 	store      *store.Store
-	summarizer *ai.Summarizer
+	dispatcher *webhook.Dispatcher
+	discord    *discord.Notifier
+	ai         *llm.Client // nil when AI_BASE_URL is unset
 }
 
-func NewReportsHandler(s *store.Store) *ReportsHandler {
-	return &ReportsHandler{store: s}
+func NewReportsHandler(s *store.Store, d *webhook.Dispatcher, dn *discord.Notifier) *ReportsHandler {
+	return &ReportsHandler{store: s, dispatcher: d, discord: dn}
 }
 
-// SetSummarizer sets the optional AI summarizer.
-func (h *ReportsHandler) SetSummarizer(summarizer *ai.Summarizer) {
-	h.summarizer = summarizer
+// SetAI wires in the optional AI client used for narrative summaries.
+func (h *ReportsHandler) SetAI(ai *llm.Client) {
+	h.ai = ai
 }
 
 // ReportsResponse is the full payload returned by GET /api/admin/reports.
@@ -271,21 +277,18 @@ func periodRange(period string, ref time.Time) (time.Time, time.Time) {
 	}
 }
 
-// GetAISummary generates an AI-powered weekly summary for a specific kid.
+// GetAISummary returns a narrative summary of one person's period. Summaries
+// of finished weeks are generated once and kept; anything else is written
+// on demand.
 func (h *ReportsHandler) GetAISummary(w http.ResponseWriter, r *http.Request) {
-	if h.summarizer == nil {
-		writeError(w, http.StatusServiceUnavailable, "AI services not available")
+	if h.ai == nil {
+		writeError(w, http.StatusServiceUnavailable, "AI is not configured")
 		return
 	}
 
-	userIDStr := r.URL.Query().Get("user_id")
-	if userIDStr == "" {
-		writeError(w, http.StatusBadRequest, "user_id is required")
-		return
-	}
-	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	userID, err := strconv.ParseInt(r.URL.Query().Get("user_id"), 10, 64)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid user_id")
+		writeError(w, http.StatusBadRequest, "user_id is required")
 		return
 	}
 
@@ -298,63 +301,76 @@ func (h *ReportsHandler) GetAISummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dateStr := r.URL.Query().Get("date")
-	var refDate time.Time
-	if dateStr != "" {
-		refDate, err = time.Parse(model.DateFormat, dateStr)
+	refDate := time.Now()
+	if dateStr := r.URL.Query().Get("date"); dateStr != "" {
+		refDate, err = time.ParseInLocation(model.DateFormat, dateStr, time.Local)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "invalid date format, use YYYY-MM-DD")
 			return
 		}
-	} else {
-		refDate = time.Now()
 	}
+	start, end := periodRange(period, refDate)
+	startStr, endStr := start.Format(model.DateFormat), end.Format(model.DateFormat)
 
-	startDate, endDate := periodRange(period, refDate)
-	startStr := startDate.Format(model.DateFormat)
-	endStr := endDate.Format(model.DateFormat)
-
-	// Get kid summaries and find the requested user
-	kidRows, err := h.store.ReportKidSummaries(r.Context(), startStr, endStr)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get kid summaries")
-		return
-	}
-
-	var kidRow *store.KidSummaryRow
-	for i := range kidRows {
-		if kidRows[i].UserID == userID {
-			kidRow = &kidRows[i]
-			break
+	// A finished week's summary never changes, so reuse it.
+	finishedWeek := period == "week" && endStr < time.Now().Format(model.DateFormat)
+	if finishedWeek {
+		if cached, err := h.store.GetWeeklySummary(r.Context(), userID, startStr); err == nil && cached != "" {
+			writeJSON(w, http.StatusOK, map[string]string{"summary": cached})
+			return
 		}
 	}
-	if kidRow == nil {
+
+	stats, err := h.summaryStats(r.Context(), userID, startStr, endStr)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get report data")
+		return
+	}
+	if stats == nil {
 		writeError(w, http.StatusNotFound, "no data for this user in the selected period")
 		return
 	}
 
-	// Get most missed chores for context
-	missedRows, err := h.store.ReportMostMissed(r.Context(), startStr, endStr)
+	summary, err := h.ai.WeeklySummary(r.Context(), *stats)
 	if err != nil {
-		missedRows = nil
+		writeError(w, http.StatusBadGateway, "AI summary generation failed: "+err.Error())
+		return
 	}
+	if finishedWeek {
+		if err := h.store.SaveWeeklySummary(r.Context(), userID, startStr, summary); err != nil {
+			log.Printf("ai: saving weekly summary for user %d: %v", userID, err)
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"summary": summary})
+}
 
-	missed := kidRow.TotalAssigned - kidRow.TotalCompleted
-	if missed < 0 {
-		missed = 0
+// summaryStats gathers what a summary is written from, or nil if the user
+// has no report row for the range.
+func (h *ReportsHandler) summaryStats(ctx context.Context, userID int64, startStr, endStr string) (*llm.WeeklyStats, error) {
+	kidRows, err := h.store.ReportKidSummaries(ctx, startStr, endStr)
+	if err != nil {
+		return nil, err
+	}
+	var kid *store.KidSummaryRow
+	for i := range kidRows {
+		if kidRows[i].UserID == userID {
+			kid = &kidRows[i]
+			break
+		}
+	}
+	if kid == nil {
+		return nil, nil
 	}
 	rate := 0.0
-	if kidRow.TotalAssigned > 0 {
-		rate = float64(kidRow.TotalCompleted) / float64(kidRow.TotalAssigned) * 100
+	if kid.TotalAssigned > 0 {
+		rate = float64(kid.TotalCompleted) / float64(kid.TotalAssigned) * 100
 	}
 
-	// Build top and missed chore lists from report data
 	var missedChores []string
+	missedRows, _ := h.store.ReportMostMissed(ctx, startStr, endStr)
 	for _, m := range missedRows {
-		// Check if this kid is in the comma-separated kids list
-		kids := strings.Split(m.Kids, ",")
-		for _, k := range kids {
-			if strings.TrimSpace(k) == kidRow.Name {
+		for _, k := range strings.Split(m.Kids, ",") {
+			if strings.TrimSpace(k) == kid.Name {
 				missedChores = append(missedChores, m.ChoreName)
 				break
 			}
@@ -364,22 +380,88 @@ func (h *ReportsHandler) GetAISummary(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	stats := ai.WeeklyStats{
-		KidName:        kidRow.Name,
-		CompletedCount: kidRow.TotalCompleted,
-		MissedCount:    missed,
-		TotalAssigned:  kidRow.TotalAssigned,
-		PointsEarned:   kidRow.PointsEarned,
-		CurrentStreak:  kidRow.CurrentStreak,
+	return &llm.WeeklyStats{
+		KidName:        kid.Name,
+		CompletedCount: kid.TotalCompleted,
+		MissedCount:    max(kid.TotalAssigned-kid.TotalCompleted, 0),
+		TotalAssigned:  kid.TotalAssigned,
+		PointsEarned:   kid.PointsEarned,
+		CurrentStreak:  kid.CurrentStreak,
 		CompletionRate: rate,
 		MissedChores:   missedChores,
-	}
+	}, nil
+}
 
-	summary, err := h.summarizer.WeeklySummary(r.Context(), stats)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "AI summary generation failed: "+err.Error())
+// StartWeeklySummaries writes each person's summary of last week once it is
+// over and shares it via webhooks and Discord. It only acts while AI is
+// configured and the ai_weekly_summary setting is on. Blocks until ctx ends.
+func (h *ReportsHandler) StartWeeklySummaries(ctx context.Context) {
+	if h.ai == nil {
 		return
 	}
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for {
+		h.WriteWeeklySummaries(ctx, time.Now())
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
 
-	writeJSON(w, http.StatusOK, map[string]string{"summary": summary})
+// WriteWeeklySummaries generates any missing summaries for the week before
+// now. It waits until Monday noon so late approvals for Sunday count.
+// StartWeeklySummaries calls it hourly.
+func (h *ReportsHandler) WriteWeeklySummaries(ctx context.Context, now time.Time) {
+	if on, _ := h.store.GetSetting(ctx, "ai_weekly_summary"); on != "true" {
+		return
+	}
+	thisWeek, _ := periodRange("week", now)
+	thisWeek = time.Date(thisWeek.Year(), thisWeek.Month(), thisWeek.Day(), 0, 0, 0, 0, now.Location())
+	if now.Before(thisWeek.Add(12 * time.Hour)) {
+		return
+	}
+	start, end := periodRange("week", thisWeek.AddDate(0, 0, -7))
+	startStr, endStr := start.Format(model.DateFormat), end.Format(model.DateFormat)
+
+	kids, err := h.store.ReportKidSummaries(ctx, startStr, endStr)
+	if err != nil {
+		log.Printf("ai: weekly summaries: %v", err)
+		return
+	}
+	for _, kid := range kids {
+		if ctx.Err() != nil {
+			return
+		}
+		if kid.TotalAssigned == 0 {
+			continue // nothing happened; nothing to summarize
+		}
+		if cached, err := h.store.GetWeeklySummary(ctx, kid.UserID, startStr); err != nil || cached != "" {
+			continue
+		}
+		stats, err := h.summaryStats(ctx, kid.UserID, startStr, endStr)
+		if err != nil || stats == nil {
+			continue
+		}
+		summary, err := h.ai.WeeklySummary(ctx, *stats)
+		if err != nil {
+			log.Printf("ai: weekly summary for %s failed: %v", kid.Name, err)
+			continue
+		}
+		if err := h.store.SaveWeeklySummary(ctx, kid.UserID, startStr, summary); err != nil {
+			log.Printf("ai: saving weekly summary for %s: %v", kid.Name, err)
+			continue
+		}
+		log.Printf("ai: wrote weekly summary for %s (week of %s)", kid.Name, startStr)
+		h.dispatcher.Fire(webhook.EventWeeklySummary, map[string]any{
+			"user_id":    kid.UserID,
+			"user_name":  kid.Name,
+			"week_start": startStr,
+			"week_end":   endStr,
+			"summary":    summary,
+		})
+		h.discord.NotifyWeeklySummary(kid.Name, startStr, summary)
+	}
 }

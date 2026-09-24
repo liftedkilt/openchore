@@ -17,7 +17,6 @@ const (
 	StatusPending    = "pending"
 	StatusApproved   = "approved"
 	StatusRejected   = "rejected"
-	StatusAIRejected = "ai_rejected"
 	StatusExcused    = "excused"
 )
 
@@ -115,7 +114,6 @@ type Chore struct {
 	PhotoSource        string    `json:"photo_source"`
 	Source             string    `json:"source"`
 	ExternalID         string    `json:"external_id,omitempty"`
-	TTSDescription     string    `json:"tts_description,omitempty"`
 	TTSAudioURL        string    `json:"tts_audio_url,omitempty"`
 	CreatedBy          int64     `json:"created_by"`
 	CreatedAt          time.Time `json:"created_at"`
@@ -145,14 +143,17 @@ type ChoreCompletion struct {
 	ID              int64      `json:"id"`
 	ChoreScheduleID int64     `json:"chore_schedule_id"`
 	CompletedBy     int64      `json:"completed_by"`
-	Status          string     `json:"status"` // approved, pending, rejected, ai_rejected
+	Status          string     `json:"status"` // approved, pending, rejected, excused
 	PhotoURL        string     `json:"photo_url,omitempty"`
 	ApprovedBy      *int64     `json:"approved_by,omitempty"`
 	ApprovedAt      *time.Time `json:"approved_at,omitempty"`
 	CompletedAt     time.Time  `json:"completed_at"`
 	CompletionDate  string     `json:"completion_date"`
+	// AIFeedback is the AI photo reviewer's note for the approving parent
+	// (or, on an excused completion, the excuse reason).
 	AIFeedback      string     `json:"ai_feedback,omitempty"`
 	AIConfidence    float64    `json:"ai_confidence,omitempty"`
+	AIComplete      *bool      `json:"ai_complete,omitempty"`
 	// UncompletedAt, when non-nil, marks a soft-deleted completion. The row
 	// is preserved (photo + AI metadata + approval) so a kid can un-check and
 	// re-check a chore without losing the approved state. Reader queries
@@ -381,12 +382,11 @@ type ScheduledChore struct {
 	AIFeedback         *string    `json:"ai_feedback,omitempty"`
 	CompletedByName    string     `json:"completed_by_name,omitempty"`
 	CompletedBySibling bool       `json:"completed_by_sibling,omitempty"`
-	TTSDescription     string     `json:"tts_description,omitempty"`
 	TTSAudioURL        string     `json:"tts_audio_url,omitempty"`
 	Date               string     `json:"date"`
 }
 
-// AIReviewResult holds the parsed response from an AI photo review.
+// AIReviewResult is an AI photo review: advice for a parent, never a verdict.
 type AIReviewResult struct {
 	Complete   bool    `json:"complete"`
 	Confidence float64 `json:"confidence"`

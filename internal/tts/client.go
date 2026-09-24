@@ -1,3 +1,5 @@
+// Package tts synthesizes chore read-aloud audio through any OpenAI-compatible
+// speech endpoint (Kokoro-FastAPI, OpenAI, ...).
 package tts
 
 import (
@@ -7,55 +9,65 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
-// Client is an HTTP client for an OpenAI-compatible TTS server (e.g. Kokoro-FastAPI).
+// DefaultVoice suits Kokoro, the self-hosted server the compose file ships.
+const DefaultVoice = "af_heart"
+
+// Client is an HTTP client for an OpenAI-compatible /audio/speech endpoint.
 type Client struct {
-	endpoint   string
+	baseURL    string
+	apiKey     string
+	model      string
 	httpClient *http.Client
 }
 
-// NewClient creates a new TTS client.
-// endpoint should be the base URL, e.g. "http://kokoro:8880".
-func NewClient(endpoint string) *Client {
+// NewClient creates a TTS client. baseURL includes the API version prefix,
+// e.g. "http://kokoro:8880/v1". apiKey may be empty; model defaults to
+// "kokoro".
+func NewClient(baseURL, apiKey, model string) *Client {
+	if model == "" {
+		model = "kokoro"
+	}
 	return &Client{
-		endpoint: endpoint,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		baseURL:    strings.TrimRight(baseURL, "/"),
+		apiKey:     apiKey,
+		model:      model,
+		httpClient: &http.Client{Timeout: 60 * time.Second},
 	}
 }
 
-// SpeechRequest is the OpenAI-compatible request body for /v1/audio/speech.
+// Model returns the configured model name.
+func (c *Client) Model() string { return c.model }
+
+// SpeechRequest is the OpenAI-compatible request body for /audio/speech.
 type SpeechRequest struct {
 	Model          string `json:"model"`
 	Input          string `json:"input"`
 	Voice          string `json:"voice"`
-	ResponseFormat string `json:"response_format,omitempty"` // mp3, wav, opus, flac
+	ResponseFormat string `json:"response_format,omitempty"`
 }
 
-// Synthesize sends text to the TTS server and returns audio bytes.
-// Uses the OpenAI-compatible /v1/audio/speech endpoint.
+// Synthesize turns text into MP3 audio.
 func (c *Client) Synthesize(ctx context.Context, text, voice string) ([]byte, error) {
 	if voice == "" {
-		voice = "af_heart"
+		voice = DefaultVoice
 	}
-	body, err := json.Marshal(SpeechRequest{
-		Model:          "kokoro",
-		Input:          text,
-		Voice:          voice,
-		ResponseFormat: "mp3",
-	})
+	body, err := json.Marshal(SpeechRequest{Model: c.model, Input: text, Voice: voice, ResponseFormat: "mp3"})
 	if err != nil {
 		return nil, fmt.Errorf("marshaling TTS request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint+"/v1/audio/speech", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/audio/speech", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("creating TTS request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -64,27 +76,12 @@ func (c *Client) Synthesize(ctx context.Context, text, voice string) ([]byte, er
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		errBody, _ := io.ReadAll(resp.Body)
+		errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		return nil, fmt.Errorf("TTS server returned status %d: %s", resp.StatusCode, string(errBody))
 	}
-
 	audio, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("reading TTS audio response: %w", err)
+		return nil, fmt.Errorf("reading TTS audio: %w", err)
 	}
 	return audio, nil
-}
-
-// Healthy checks if the TTS server is reachable.
-func (c *Client) Healthy(ctx context.Context) bool {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.endpoint+"/v1/audio/voices", nil)
-	if err != nil {
-		return false
-	}
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return false
-	}
-	resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
 }

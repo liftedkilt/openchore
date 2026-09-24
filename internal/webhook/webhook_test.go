@@ -1361,9 +1361,8 @@ func TestPointsDecayChecker_SetIntervalIgnoresNonPositive(t *testing.T) {
 }
 
 // TestPointsDecayChecker_NoDecayWithDuplicateCompletions verifies that decay
-// is NOT applied when a chore has both an ai_rejected and an approved
-// completion record (duplicate rows). This can happen when the
-// UncompleteChore call during an AI-rejection retry fails silently.
+// is NOT applied when a chore has both a rejected and an approved
+// completion record for the same day (duplicate rows from a retry).
 func TestPointsDecayChecker_NoDecayWithDuplicateCompletions(t *testing.T) {
 	env := setupTest(t)
 	ctx := context.Background()
@@ -1378,17 +1377,15 @@ func TestPointsDecayChecker_NoDecayWithDuplicateCompletions(t *testing.T) {
 	yesterday := time.Now().AddDate(0, 0, -1)
 	_, scheduleID := createChoreWithSchedule(t, env, parentID, childID, "required", int(yesterday.Weekday()), nil, 0)
 
-	// Simulate the duplicate-completion scenario: an ai_rejected record
-	// that was not cleaned up, plus a subsequent approved record.
+	// Simulate the duplicate-completion scenario: a rejected record that
+	// was not cleaned up, plus a subsequent approved record.
 	if err := env.store.CompleteChore(ctx, &model.ChoreCompletion{
 		ChoreScheduleID: scheduleID,
 		CompletedBy:     childID,
-		Status:          model.StatusAIRejected,
+		Status:          model.StatusRejected,
 		CompletionDate:  yesterday.Format(model.DateFormat),
-		AIFeedback:      "Doesn't look complete",
-		AIConfidence:    0.9,
 	}); err != nil {
-		t.Fatalf("CompleteChore (ai_rejected): %v", err)
+		t.Fatalf("CompleteChore (rejected): %v", err)
 	}
 	if err := env.store.CompleteChore(ctx, &model.ChoreCompletion{
 		ChoreScheduleID: scheduleID,

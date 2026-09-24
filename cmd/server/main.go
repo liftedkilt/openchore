@@ -12,10 +12,9 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	msqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"github.com/liftedkilt/openchore/internal/ai"
 	"github.com/liftedkilt/openchore/internal/api"
 	"github.com/liftedkilt/openchore/internal/config"
-	"github.com/liftedkilt/openchore/internal/aibackend"
+	"github.com/liftedkilt/openchore/internal/llm"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/tts"
 	"github.com/liftedkilt/openchore/internal/webhook"
@@ -110,8 +109,17 @@ func main() {
 
 	router, choreHandler, reportsHandler := api.NewRouter(s, dispatcher, api.Auth{Sessions: sessions, OIDC: oidcSvc})
 
-	// Initialize optional AI services in background (waits for sidecars to become ready)
-	go initAIServices(s, choreHandler, reportsHandler)
+	// Optional AI and read-aloud audio. Each is off unless its base URL is set.
+	aiClient, audio := configureAI(s)
+	choreHandler.SetAI(aiClient, audio)
+	reportsHandler.SetAI(aiClient)
+	go func() {
+		tts.CleanOrphans(context.Background(), s)
+		if audio != nil {
+			audio.Sync(context.Background(), false)
+		}
+	}()
+	go reportsHandler.StartWeeklySummaries(context.Background())
 
 	log.Printf("starting server on :%s", port)
 	if err := http.ListenAndServe(":"+port, router); err != nil {
@@ -119,96 +127,34 @@ func main() {
 	}
 }
 
-func initAIServices(s *store.Store, choreHandler *api.ChoreHandler, reportsHandler *api.ReportsHandler) {
-	aiEndpoint := os.Getenv("AI_ENDPOINT")
-	if aiEndpoint == "" {
-		aiEndpoint = os.Getenv("OLLAMA_ENDPOINT") // backward compat
-	}
-	if aiEndpoint == "" {
-		aiEndpoint = "http://litert:8080"
-	}
-
-	ttsEndpoint := os.Getenv("TTS_ENDPOINT")
-	if ttsEndpoint == "" {
-		ttsEndpoint = "http://kokoro:8880"
-	}
-
-	aiClient := aibackend.NewClient(aiEndpoint)
-
-	// Wait for the AI endpoint to become available. Retry forever so that a
-	// slow-to-start sidecar (or one started after the server) still wires up
-	// AI features — previously this gave up after 2 minutes and left the
-	// summarizer/reviewer permanently nil, which surfaced in the UI as
-	// "AI services may not be available" with no way to recover short of a
-	// server restart.
-	log.Printf("Waiting for AI endpoint at %s...", aiEndpoint)
-	for attempt := 1; ; attempt++ {
-		if aiClient.Healthy(context.Background()) {
-			break
+// configureAI builds the optional AI and text-to-speech clients from the
+// environment. Both speak the OpenAI API, so any compatible server works:
+// Ollama, llama.cpp's llama-server, LiteRT-LM, Kokoro-FastAPI, or a hosted
+// provider.
+func configureAI(s *store.Store) (*llm.Client, *tts.ChoreAudio) {
+	for _, legacy := range []string{"AI_ENDPOINT", "OLLAMA_ENDPOINT", "TTS_ENDPOINT"} {
+		if os.Getenv(legacy) != "" {
+			log.Printf("WARNING: %s is no longer used; set AI_BASE_URL / TTS_BASE_URL (with the /v1 suffix) instead — see docs/ai.md", legacy)
 		}
-		if attempt%12 == 0 {
-			log.Printf("Still waiting for AI endpoint at %s (attempt %d)", aiEndpoint, attempt)
-		}
-		time.Sleep(5 * time.Second)
 	}
 
-	aiModel := os.Getenv("AI_MODEL")
-	if aiModel == "" {
-		aiModel = "gemma4:e4b"
+	var aiClient *llm.Client
+	if base := os.Getenv("AI_BASE_URL"); base != "" {
+		model := os.Getenv("AI_MODEL")
+		if model == "" {
+			log.Printf("WARNING: AI_BASE_URL is set but AI_MODEL is not; AI features stay off")
+		} else {
+			aiClient = llm.New(base, os.Getenv("AI_API_KEY"), model)
+			log.Printf("ai: using model %s at %s", model, base)
+		}
 	}
 
-	// Auto-pull model if not present. Retry transient failures so a flaky
-	// pull doesn't permanently disable AI features.
-	for attempt := 1; ; attempt++ {
-		if aiClient.HasModel(context.Background(), aiModel) {
-			break
-		}
-		log.Printf("Model %s not found — pulling (this may take a few minutes on first run)...", aiModel)
-		if err := aiClient.Pull(context.Background(), aiModel); err != nil {
-			log.Printf("WARNING: failed to pull model %s (attempt %d): %v — retrying in 30s", aiModel, attempt, err)
-			time.Sleep(30 * time.Second)
-			continue
-		}
-		log.Printf("Model %s pulled successfully", aiModel)
-		break
+	var audio *tts.ChoreAudio
+	if base := os.Getenv("TTS_BASE_URL"); base != "" {
+		audio = tts.NewChoreAudio(tts.NewClient(base, os.Getenv("TTS_API_KEY"), os.Getenv("TTS_MODEL")), s)
+		log.Printf("tts: using %s", base)
 	}
-
-	reviewer := ai.NewReviewer(aiClient, aiModel)
-
-	// Wait for TTS sidecar (retry every 5s for up to 30s)
-	var ttsClient *tts.Client
-	ttsC := tts.NewClient(ttsEndpoint)
-	log.Printf("Checking for TTS service at %s...", ttsEndpoint)
-	for attempt := 1; attempt <= 6; attempt++ {
-		if ttsC.Healthy(context.Background()) {
-			ttsClient = ttsC
-			log.Printf("TTS audio service available at %s", ttsEndpoint)
-			break
-		}
-		if attempt == 6 {
-			log.Printf("TTS audio service not available at %s — will retry lazily on first use", ttsEndpoint)
-			break
-		}
-		time.Sleep(5 * time.Second)
-	}
-
-	ttsVoice, _ := s.GetSetting(context.Background(), "ai_tts_voice")
-	if ttsVoice == "" {
-		ttsVoice = "af_heart"
-	}
-	ttsGen := ai.NewTTSGenerator(aiClient, aiModel, ttsClient, ttsEndpoint, ttsVoice)
-
-	descGen := ai.NewDescriptionGenerator(aiClient, aiModel)
-	summarizer := ai.NewSummarizer(aiClient, aiModel)
-
-	// Start TTS sync loop — generates audio for all chores, cleans up orphans
-	syncer := ai.NewTTSSyncer(s, ttsGen)
-	go syncer.Start(context.Background(), 5*time.Minute)
-
-	choreHandler.SetAIServices(reviewer, ttsGen, syncer)
-	choreHandler.SetAIExtras(descGen, summarizer)
-	reportsHandler.SetSummarizer(summarizer)
-	log.Printf("AI services initialized (%s at %s, model=%s)", aiClient.ServerType(context.Background()), aiEndpoint, aiModel)
+	return aiClient, audio
 }
 
 func runMigrations(db *sql.DB) error {

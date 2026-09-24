@@ -5,98 +5,86 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/liftedkilt/openchore/internal/model"
 )
 
 func TestSynthesize(t *testing.T) {
-	var receivedReq SpeechRequest
+	var got SpeechRequest
+	var auth string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/audio/speech" {
 			t.Errorf("expected /v1/audio/speech, got %s", r.URL.Path)
 		}
-		if r.Method != http.MethodPost {
-			t.Errorf("expected POST, got %s", r.Method)
-		}
-		json.NewDecoder(r.Body).Decode(&receivedReq)
-
+		auth = r.Header.Get("Authorization")
+		_ = json.NewDecoder(r.Body).Decode(&got)
 		w.Header().Set("Content-Type", "audio/mpeg")
-		w.Write([]byte("fake-mp3-audio-data"))
+		_, _ = w.Write([]byte("fake-mp3"))
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL)
-	audio, err := client.Synthesize(context.Background(), "Hello world", "test-voice")
+	client := NewClient(server.URL+"/v1/", "sk-test", "tts-1")
+	audio, err := client.Synthesize(context.Background(), "Hello world", "alloy")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(audio) == 0 {
-		t.Error("expected non-empty audio data")
+	if string(audio) != "fake-mp3" {
+		t.Errorf("unexpected audio %q", audio)
 	}
-	if receivedReq.Input != "Hello world" {
-		t.Errorf("expected input 'Hello world', got %q", receivedReq.Input)
+	if got.Input != "Hello world" || got.Voice != "alloy" || got.Model != "tts-1" || got.ResponseFormat != "mp3" {
+		t.Errorf("unexpected request %+v", got)
 	}
-	if receivedReq.Voice != "test-voice" {
-		t.Errorf("expected voice 'test-voice', got %q", receivedReq.Voice)
-	}
-	if receivedReq.Model != "kokoro" {
-		t.Errorf("expected model 'kokoro', got %q", receivedReq.Model)
-	}
-	if receivedReq.ResponseFormat != "mp3" {
-		t.Errorf("expected response_format 'mp3', got %q", receivedReq.ResponseFormat)
+	if auth != "Bearer sk-test" {
+		t.Errorf("expected bearer auth, got %q", auth)
 	}
 }
 
-func TestSynthesizeDefaultVoice(t *testing.T) {
-	var receivedReq SpeechRequest
+func TestSynthesizeDefaults(t *testing.T) {
+	var got SpeechRequest
+	var auth string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewDecoder(r.Body).Decode(&receivedReq)
-		w.Write([]byte("audio"))
+		auth = r.Header.Get("Authorization")
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		_, _ = w.Write([]byte("x"))
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL)
-	_, err := client.Synthesize(context.Background(), "Hello", "")
-	if err != nil {
+	if _, err := NewClient(server.URL, "", "").Synthesize(context.Background(), "Hi", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if receivedReq.Voice != "af_heart" {
-		t.Errorf("expected default voice 'af_heart', got %q", receivedReq.Voice)
+	if got.Voice != DefaultVoice || got.Model != "kokoro" {
+		t.Errorf("expected Kokoro defaults, got %+v", got)
+	}
+	if auth != "" {
+		t.Errorf("expected no auth header without a key, got %q", auth)
 	}
 }
 
 func TestSynthesizeServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error":"voice not found"}`))
+		http.Error(w, "model not loaded", http.StatusInternalServerError)
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL)
-	_, err := client.Synthesize(context.Background(), "Hello", "bad-voice")
-	if err == nil {
-		t.Fatal("expected error for server error response")
+	_, err := NewClient(server.URL, "", "").Synthesize(context.Background(), "Hi", "")
+	if err == nil || !strings.Contains(err.Error(), "500") {
+		t.Fatalf("expected a 500 error, got %v", err)
 	}
 }
 
-func TestHealthy(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/audio/voices" {
-			t.Errorf("expected /v1/audio/voices, got %s", r.URL.Path)
+func TestSpokenText(t *testing.T) {
+	cases := []struct {
+		title, desc, want string
+	}{
+		{"Make bed", "", "Make bed"},
+		{"Make bed", "Pull the covers up.", "Make bed. Pull the covers up."},
+		{"Feed the cat!", "One scoop.", "Feed the cat! One scoop."},
+	}
+	for _, c := range cases {
+		if got := SpokenText(&model.Chore{Title: c.title, Description: c.desc}); got != c.want {
+			t.Errorf("SpokenText(%q, %q) = %q, want %q", c.title, c.desc, got, c.want)
 		}
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"voices":["af_heart"]}`))
-	}))
-	defer server.Close()
-
-	client := NewClient(server.URL)
-	if !client.Healthy(context.Background()) {
-		t.Error("expected healthy=true")
-	}
-}
-
-func TestHealthyUnreachable(t *testing.T) {
-	client := NewClient("http://localhost:1")
-	if client.Healthy(context.Background()) {
-		t.Error("expected healthy=false for unreachable server")
 	}
 }
