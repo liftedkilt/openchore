@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, ChevronRight, ChevronLeft, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
@@ -7,6 +7,7 @@ import { api } from '../../api';
 import { DAY_NAMES } from '../../types';
 import type { User } from '../../types';
 import { localDateStr, toggleInArray } from '../../utils';
+import { useAIStatus } from '../../hooks/useAIStatus';
 import styles from './CreateChoreWizard.module.css';
 
 interface ChoreData {
@@ -65,13 +66,9 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
-  // AI description generation
+  // AI description drafting (only offered when the server has AI configured)
+  const aiStatus = useAIStatus();
   const [generatingDesc, setGeneratingDesc] = useState(false);
-
-  // AI point suggestion
-  const [aiSuggestion, setAiSuggestion] = useState<{ points: number; estimated_minutes: number; reasoning: string } | null>(null);
-  const [suggestingPoints, setSuggestingPoints] = useState(false);
-  const suggestDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleGenerateDescription = async () => {
     if (!chore.title.trim()) return;
@@ -86,43 +83,6 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
     }
   };
 
-  const fetchPointSuggestion = useCallback(async (title: string, description: string, category: string) => {
-    if (!title.trim()) return;
-    setSuggestingPoints(true);
-    try {
-      const resp = await api.admin.suggestPoints(title.trim(), description.trim(), category);
-      setAiSuggestion(resp);
-    } catch {
-      setAiSuggestion(null);
-    } finally {
-      setSuggestingPoints(false);
-    }
-  }, []);
-
-  // Debounced auto-trigger for point suggestions when title+category are filled
-  useEffect(() => {
-    if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
-    if (!chore.title.trim() || !chore.category) {
-      setAiSuggestion(null);
-      return;
-    }
-    suggestDebounceRef.current = setTimeout(() => {
-      fetchPointSuggestion(chore.title, chore.description, chore.category);
-    }, 1000);
-    return () => {
-      if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
-    };
-  }, [chore.title, chore.description, chore.category, fetchPointSuggestion]);
-
-  const applyAiSuggestion = () => {
-    if (!aiSuggestion) return;
-    setChore(c => ({
-      ...c,
-      points: aiSuggestion.points,
-      estimatedMinutes: aiSuggestion.estimated_minutes,
-    }));
-  };
-
   const reset = () => {
     setStep(0);
     setChore({ ...defaultChoreData });
@@ -130,9 +90,7 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
     setSkipSchedule(false);
     setCreating(false);
     setError('');
-    setAiSuggestion(null);
     setGeneratingDesc(false);
-    setSuggestingPoints(false);
   };
 
   const handleClose = () => { reset(); onClose(); };
@@ -254,7 +212,7 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
       <div className={styles.formGroup}>
         <div className={styles.labelRow}>
           <label className={styles.label}>{t('admin.createChore.field.descriptionLabel')}</label>
-          {chore.title.trim() && (
+          {aiStatus.ai.configured && chore.title.trim() && (
             <button
               type="button"
               className={styles.aiBtn}
@@ -292,21 +250,6 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
           <input className={styles.input} type="number" min={0} value={chore.estimatedMinutes} onChange={e => setChore(c => ({ ...c, estimatedMinutes: parseInt(e.target.value) || 0 }))} />
         </div>
       </div>
-
-      {(suggestingPoints || aiSuggestion) && (
-        <div className={styles.aiSuggestionRow}>
-          {suggestingPoints ? (
-            <span className={styles.aiSuggestionText}><span className={styles.spinnerSmall} /> {t('admin.createChore.ai.suggesting')}</span>
-          ) : aiSuggestion && (
-            <>
-              <span className={styles.aiSuggestionText}>
-                <Sparkles size={12} /> {t('admin.createChore.ai.suggestion', { points: aiSuggestion.points, minutes: aiSuggestion.estimated_minutes })}
-              </span>
-              <button type="button" className={styles.aiApplyBtn} onClick={applyAiSuggestion}>{t('admin.createChore.ai.apply')}</button>
-            </>
-          )}
-        </div>
-      )}
 
       <div className={styles.checkRow}>
         <input type="checkbox" checked={chore.requiresApproval} onChange={e => setChore(c => ({ ...c, requiresApproval: e.target.checked }))} />

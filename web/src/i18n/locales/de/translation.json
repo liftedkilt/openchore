@@ -23,27 +23,23 @@
       "title": "Aktivitätsprotokoll",
       "undoTitle": "Dieses Ereignis rückgängig machen"
     },
-    "aiChoreChecker": {
-      "ariaGenerateAudio": "Audio generieren",
-      "ariaListenFeedback": "Feedback anhören",
-      "buttonTestReview": "Prüfung testen",
-      "buttonWorking": "Wird verarbeitet...",
-      "choosePhoto": "Foto auswählen...",
-      "confidence": "Sicherheit: {{value}}%",
-      "description": "Gib einen Aufgabennamen ein, mache ein Foto und sieh dir an, wie die KI es bewertet — inklusive Kokoro-TTS-Audio.",
-      "errorTestFailed": "Test fehlgeschlagen",
-      "errorTtsFailed": "TTS fehlgeschlagen: {{message}}",
-      "errorUnknown": "Unbekannter Fehler",
-      "heading": "KI-Aufgabenprüfer",
-      "labelChoreName": "Aufgabenname",
-      "labelPhoto": "Foto",
-      "photoPreviewAlt": "Vorschau",
+    "photoReviewTester": {
+      "heading": "Fotoprüfung ausprobieren",
+      "description": "Lade ein Foto hoch und sieh, wie das eingestellte Modell es bewertet. Es wird nichts gespeichert.",
+      "labelChoreName": "Name der Aufgabe",
       "placeholderChoreName": "z. B. Spielzeug aufräumen, Bett machen, Küche putzen",
-      "resultApproved": "Genehmigt",
-      "resultRejected": "Abgelehnt",
-      "stepAnalyzing": "KI analysiert Foto",
-      "stepGeneratingAudio": "Audio wird generiert",
-      "stepUploading": "Foto wird hochgeladen"
+      "labelPhoto": "Foto",
+      "choosePhoto": "Foto auswählen...",
+      "photoPreviewAlt": "Vorschau",
+      "buttonTest": "Foto prüfen",
+      "buttonWorking": "Wird geprüft...",
+      "errorTestFailed": "Prüfung fehlgeschlagen",
+      "looksDone": "Sieht erledigt aus",
+      "looksNotDone": "Sieht nicht erledigt aus",
+      "confidence": "Sicherheit: {{value}} %",
+      "wouldApprove": "Würde automatisch bestätigt",
+      "wouldWait": "Würde auf ein Elternteil warten",
+      "elapsed": "dauerte {{seconds}} s"
     },
     "apiTokens": {
       "addButton": "Hinzufügen",
@@ -76,7 +72,10 @@
       "rejectConfirm": "Möchtest du wirklich ablehnen?",
       "title": "Ausstehende Freigaben",
       "waitingForReview_one": "{{count}} Aufgabe wartet auf Prüfung",
-      "waitingForReview_other": "{{count}} Aufgaben warten auf Prüfung"
+      "waitingForReview_other": "{{count}} Aufgaben warten auf Prüfung",
+      "aiLooksDone": "KI: sieht erledigt aus",
+      "aiLooksNotDone": "KI: sieht nicht erledigt aus",
+      "aiConfidence": "({{value}} %)"
     },
     "choresTab": {
       "addChore": "Aufgabe hinzufügen",
@@ -98,11 +97,8 @@
     "createChore": {
       "ai": {
         "aiLabel": "KI",
-        "apply": "Übernehmen",
         "generateTitle": "Mit KI generieren",
-        "generating": "Wird generiert...",
-        "suggesting": "KI-Vorschlag wird geladen...",
-        "suggestion": "KI schlägt vor: {{points}} Pkt., ca. {{minutes}} Min."
+        "generating": "Wird generiert..."
       },
       "category": {
         "bonus": "Bonus",
@@ -205,7 +201,6 @@
       "backToMyChores": "Zurück zu den Aufgaben von {{name}}",
       "quickAssign": "Schnell zuweisen",
       "reports": "Berichte",
-      "tabAi": "KI",
       "tabApprovals": "Freigaben",
       "tabChores": "Aufgaben",
       "tabKids": "Kinder",
@@ -219,7 +214,6 @@
       "categoryBonus": "Bonus",
       "categoryCore": "Haupt",
       "categoryRequired": "Pflicht",
-      "generatingLabel": "Wird generiert…",
       "labelCategory": "Kategorie",
       "labelDescription": "Beschreibung",
       "labelIcon": "Symbol",
@@ -227,7 +221,6 @@
       "labelPenalty": "Abzug",
       "labelPhotoSource": "Fotoquelle",
       "labelPoints": "Punkte",
-      "labelTTSDescription": "Gesprochene Beschreibung (TTS-Prompt)",
       "labelTitle": "Titel",
       "modalTitle": "Bearbeiten: {{title}}",
       "photoSourceBoth": "Extern mit manuellem Fallback",
@@ -242,13 +235,9 @@
       "savedLabel": "Gespeichert",
       "savingLabel": "Wird gespeichert...",
       "sectionDetails": "Aufgabendetails",
-      "sectionTTS": "Kokoro TTS",
-      "suggestTextBtn": "Text vorschlagen",
-      "suggestTextTitle": "Neue gesprochene Beschreibung mit KI generieren",
-      "ttsClickPreview": "Klicken, um generiertes Audio vorzuhören",
-      "ttsDescriptionPlaceholder": "Was soll die TTS-Stimme für diese Aufgabe sagen?",
-      "ttsGenerateDescError": "Beschreibung konnte nicht generiert werden",
-      "ttsNoAudio": "Für diese Aufgabe wurde noch kein TTS-Audio generiert.",
+      "sectionTTS": "Vorlese-Audio",
+      "ttsClickPreview": "Liest Titel und Beschreibung vor",
+      "ttsNoAudio": "Noch kein Audio. Es wird automatisch aus Titel und Beschreibung aufgenommen.",
       "ttsPauseAriaLabel": "TTS-Audio pausieren",
       "ttsPauseTitle": "Pausieren",
       "ttsPlayAriaLabel": "TTS-Audio abspielen",
@@ -401,16 +390,23 @@
     },
     "settingsTab": {
       "ai": {
-        "description": "Verwende KI, um Fotos von erledigten Aufgaben automatisch zu prüfen. Wenn aktiviert, werden hochgeladene Fotos analysiert, bevor eine Aufgabe als erledigt markiert wird.",
-        "enableLabel": "KI-Fotoprüfung aktivieren",
+        "title": "KI",
+        "notConfigured": "Es ist kein KI-Dienst eingerichtet. Für Fotoprüfung, Aufgabenbeschreibungen, Wochenberichte oder aufgenommene Vorlesestimmen verweise den Server auf ein OpenAI-kompatibles Modell (AI_BASE_URL und AI_MODEL) oder einen Sprachdienst (TTS_BASE_URL). Ohne sie liest die Stimme des Geräts die Aufgaben vor.",
+        "description": "Verwendet {{model}}. Die KI berät nur – sie lehnt nie eine Aufgabe ab.",
+        "aiNotConfigured": "Nur ein Sprachdienst ist eingerichtet (TTS_BASE_URL). Setze AI_BASE_URL und AI_MODEL für Fotoprüfung und Berichte.",
+        "photoReviewLabel": "Fotos zur Bestätigung prüfen",
+        "photoReviewHelp": "Kommt eine bestätigungspflichtige Aufgabe mit Foto herein, fügt die KI unter Bestätigungen einen Hinweis hinzu.",
+        "autoApproveLabel": "Eindeutige Fälle automatisch bestätigen",
+        "thresholdLabel": "Sicherheit für automatische Bestätigung",
+        "thresholdHelp": "Wie sicher die KI sein muss, dass eine Aufgabe erledigt ist, bevor sie sie ohne dich bestätigt. Alles darunter wartet auf dich.",
+        "weeklySummaryLabel": "Wochenbericht schreiben",
+        "weeklySummaryHelp": "Fasst jeden Montag die vergangene Woche aller zusammen und teilt sie über Discord und den Webhook report.weekly_summary.",
+        "voiceLabel": "Vorlesestimme",
+        "voiceHelp": "Eine Stimme deines Sprachdiensts, z. B. af_heart für Kokoro oder alloy für OpenAI. Eine Änderung nimmt alle Aufgaben neu auf.",
         "saveButton": "KI-Einstellungen speichern",
-        "saveError": "KI-Einstellungen konnten nicht gespeichert werden",
+        "savingButton": "Speichern...",
         "saveSuccess": "KI-Einstellungen gespeichert",
-        "savingButton": "Wird gespeichert...",
-        "thresholdHelp": "Fotos mit einer Sicherheit über diesem Schwellenwert werden automatisch genehmigt. Niedrigere Werte sind großzügiger.",
-        "thresholdLabel": "Schwellenwert für Auto-Genehmigung (0 – 1)",
-        "title": "KI-Fotoprüfung",
-        "ttsLabel": "TTS-Beschreibungen für Aufgaben generieren"
+        "saveError": "KI-Einstellungen konnten nicht gespeichert werden"
       },
       "baseUrl": {
         "description": "Die öffentliche URL dieses Servers (z. B. ",
@@ -470,7 +466,8 @@
           "profilePinVerified": "Profil-PIN verifiziert",
           "redeemed": "Eingelöst",
           "streak": "Streak",
-          "uncompleted": "Zurückgesetzt"
+          "uncompleted": "Zurückgesetzt",
+          "weeklySummary": "Wochenbericht"
         },
         "form": {
           "cancelButton": "Abbrechen",
@@ -636,7 +633,6 @@
       "expiredAt": "Abgelaufen um {{time}}",
       "latePenalty": "Verspätet (-{{value}} Pkt.)",
       "lateZeroPts": "Verspätet (0 Pkt.)",
-      "listenToFeedback": "Feedback anhören",
       "markComplete": "Als erledigt markieren",
       "markIncomplete": "Als nicht erledigt markieren",
       "pts": "Pkt.",
@@ -730,7 +726,8 @@
       "titlePhotoNeeded": "Fotobeweis erforderlich",
       "uploadFailed": "Upload fehlgeschlagen",
       "uploading": "Wird hochgeladen...",
-      "waiting": "Warte auf Foto..."
+      "waiting": "Warte auf Foto...",
+      "skipPhoto": "Kein Foto? Trotzdem fertig – ein Erwachsener schaut es sich an"
     },
     "quickAssign": {
       "btnAssign": "Zuweisen",

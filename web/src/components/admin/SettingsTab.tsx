@@ -7,6 +7,8 @@ import { Plus, Trash2, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import clsx from 'clsx';
 import { ExportConfigSection } from './ExportConfigSection';
 import { APITokensSection } from './APITokensSection';
+import { PhotoReviewTester } from './PhotoReviewTester';
+import { useAIStatus } from '../../hooks/useAIStatus';
 
 export const SettingsTab: React.FC = () => {
   const { t } = useTranslation();
@@ -22,9 +24,13 @@ export const SettingsTab: React.FC = () => {
   const [discordMessage, setDiscordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // AI settings state
-  const [aiEnabled, setAiEnabled] = useState(false);
+  const aiStatus = useAIStatus();
+  const [aiPhotoReview, setAiPhotoReview] = useState(false);
+  const [aiAutoApprove, setAiAutoApprove] = useState(false);
   const [aiThreshold, setAiThreshold] = useState('0.85');
-  const [aiTtsEnabled, setAiTtsEnabled] = useState(false);
+  const [aiWeeklySummary, setAiWeeklySummary] = useState(false);
+  const [ttsVoice, setTtsVoice] = useState('');
+  const [savedTtsVoice, setSavedTtsVoice] = useState('');
   const [aiSaving, setAiSaving] = useState(false);
   const [aiMessage, setAiMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -46,6 +52,7 @@ export const SettingsTab: React.FC = () => {
     { id: 'daily.complete', label: t('admin.settingsTab.webhooks.events.dailyDone'), icon: '🌟' },
     { id: 'streak.milestone', label: t('admin.settingsTab.webhooks.events.streak'), icon: '🔥' },
     { id: 'points.decayed', label: t('admin.settingsTab.webhooks.events.decay'), icon: '📉' },
+    { id: 'report.weekly_summary', label: t('admin.settingsTab.webhooks.events.weeklySummary'), icon: '📝' },
     { id: 'auth.admin_passcode.verified', label: t('admin.settingsTab.webhooks.events.adminPasscodeVerified'), icon: '🔑' },
     { id: 'auth.admin_passcode.failed', label: t('admin.settingsTab.webhooks.events.adminPasscodeFailed'), icon: '🚫' },
     { id: 'auth.profile_pin.verified', label: t('admin.settingsTab.webhooks.events.profilePinVerified'), icon: '🔓' },
@@ -88,13 +95,16 @@ export const SettingsTab: React.FC = () => {
     api.admin.getSetting('discord_webhook_url')
       .then(data => setDiscordUrl(data.value || ''))
       .catch(() => {});
-    api.admin.getAISettings()
-      .then(settings => {
-        setAiEnabled(settings.ai_enabled === 'true');
-        setAiThreshold(settings.ai_auto_approve_threshold || '0.85');
-        setAiTtsEnabled(settings.ai_tts_enabled === 'true');
-      })
-      .catch(() => {});
+    const setting = (key: string) => api.admin.getSetting(key).then(d => d.value || '').catch(() => '');
+    Promise.all(['ai_photo_review', 'ai_auto_approve', 'ai_auto_approve_threshold', 'ai_weekly_summary', 'tts_voice'].map(setting))
+      .then(([photoReview, autoApprove, threshold, weeklySummary, voice]) => {
+        setAiPhotoReview(photoReview === 'true');
+        setAiAutoApprove(autoApprove === 'true');
+        setAiThreshold(threshold || '0.85');
+        setAiWeeklySummary(weeklySummary === 'true');
+        setTtsVoice(voice);
+        setSavedTtsVoice(voice);
+      });
   }, []);
 
   const handleSaveBaseUrl = async (e: React.FormEvent) => {
@@ -156,12 +166,16 @@ export const SettingsTab: React.FC = () => {
     setAiMessage(null);
     try {
       await Promise.all([
-        api.admin.setSetting('ai_enabled', aiEnabled ? 'true' : 'false'),
+        api.admin.setSetting('ai_photo_review', aiPhotoReview ? 'true' : 'false'),
+        api.admin.setSetting('ai_auto_approve', aiAutoApprove ? 'true' : 'false'),
         api.admin.setSetting('ai_auto_approve_threshold', aiThreshold),
-        api.admin.setSetting('ai_tts_enabled', aiTtsEnabled ? 'true' : 'false'),
+        api.admin.setSetting('ai_weekly_summary', aiWeeklySummary ? 'true' : 'false'),
+        api.admin.setSetting('tts_voice', ttsVoice.trim()),
       ]);
-      if (aiTtsEnabled) {
-        api.admin.triggerTTSSync().catch(() => {});
+      // A new voice means every chore's audio needs re-recording.
+      if (aiStatus.tts.configured && ttsVoice.trim() !== savedTtsVoice) {
+        api.admin.regenerateAllTTS().catch(() => {});
+        setSavedTtsVoice(ttsVoice.trim());
       }
       setAiMessage({ type: 'success', text: t('admin.settingsTab.ai.saveSuccess') });
     } catch {
@@ -272,58 +286,89 @@ export const SettingsTab: React.FC = () => {
         </div>
       </form>
 
-      <form className={styles.form} onSubmit={handleSaveAISettings}>
+      <div className={styles.form}>
         <div className={styles.formHeader}>
           <h3>{t('admin.settingsTab.ai.title')}</h3>
         </div>
-        <p className={styles.sectionDesc}>
-          {t('admin.settingsTab.ai.description')}
-        </p>
+        {!aiStatus.ai.configured && !aiStatus.tts.configured ? (
+          <p className={styles.sectionDesc}>{t('admin.settingsTab.ai.notConfigured')}</p>
+        ) : (
+          <form onSubmit={handleSaveAISettings}>
+            <p className={styles.sectionDesc}>
+              {aiStatus.ai.configured
+                ? t('admin.settingsTab.ai.description', { model: aiStatus.ai.model })
+                : t('admin.settingsTab.ai.aiNotConfigured')}
+            </p>
 
-        <div className={styles.formGrid}>
-          <label className={styles.checkboxLabel}>
-            <input type="checkbox" checked={aiEnabled} onChange={e => setAiEnabled(e.target.checked)} />
-            {t('admin.settingsTab.ai.enableLabel')}
-          </label>
+            <div className={styles.formGrid}>
+              {aiStatus.ai.configured && (
+                <>
+                  <label className={styles.checkboxLabel}>
+                    <input type="checkbox" checked={aiPhotoReview} onChange={e => setAiPhotoReview(e.target.checked)} />
+                    {t('admin.settingsTab.ai.photoReviewLabel')}
+                  </label>
+                  <span className={styles.helpText}>{t('admin.settingsTab.ai.photoReviewHelp')}</span>
 
-          <div className={styles.formGroup}>
-            <label className={styles.label}>{t('admin.settingsTab.ai.thresholdLabel')}</label>
-            <div className={styles.flexRow} style={{ gap: '0.75rem' }}>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={aiThreshold}
-                onChange={e => setAiThreshold(e.target.value)}
-                disabled={!aiEnabled}
-                style={{ flex: 1, accentColor: 'var(--accent-blue)' }}
-              />
-              <span style={{ fontSize: '0.9rem', fontWeight: 700, minWidth: '3ch', textAlign: 'right' }}>{aiThreshold}</span>
+                  <label className={styles.checkboxLabel}>
+                    <input type="checkbox" checked={aiAutoApprove} disabled={!aiPhotoReview} onChange={e => setAiAutoApprove(e.target.checked)} />
+                    {t('admin.settingsTab.ai.autoApproveLabel')}
+                  </label>
+
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>{t('admin.settingsTab.ai.thresholdLabel')}</label>
+                    <div className={styles.flexRow} style={{ gap: '0.75rem' }}>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="1"
+                        step="0.05"
+                        value={aiThreshold}
+                        onChange={e => setAiThreshold(e.target.value)}
+                        disabled={!aiPhotoReview || !aiAutoApprove}
+                        style={{ flex: 1, accentColor: 'var(--accent-blue)' }}
+                      />
+                      <span style={{ fontSize: '0.9rem', fontWeight: 700, minWidth: '3ch', textAlign: 'right' }}>{aiThreshold}</span>
+                    </div>
+                    <span className={styles.helpText}>{t('admin.settingsTab.ai.thresholdHelp')}</span>
+                  </div>
+
+                  <label className={styles.checkboxLabel}>
+                    <input type="checkbox" checked={aiWeeklySummary} onChange={e => setAiWeeklySummary(e.target.checked)} />
+                    {t('admin.settingsTab.ai.weeklySummaryLabel')}
+                  </label>
+                  <span className={styles.helpText}>{t('admin.settingsTab.ai.weeklySummaryHelp')}</span>
+                </>
+              )}
+
+              {aiStatus.tts.configured && (
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>{t('admin.settingsTab.ai.voiceLabel')}</label>
+                  <input
+                    className={styles.input}
+                    value={ttsVoice}
+                    onChange={e => setTtsVoice(e.target.value)}
+                    placeholder="af_heart"
+                  />
+                  <span className={styles.helpText}>{t('admin.settingsTab.ai.voiceHelp')}</span>
+                </div>
+              )}
             </div>
-            <span className={styles.helpText}>
-              {t('admin.settingsTab.ai.thresholdHelp')}
-            </span>
-          </div>
 
-          <label className={styles.checkboxLabel}>
-            <input type="checkbox" checked={aiTtsEnabled} onChange={e => setAiTtsEnabled(e.target.checked)} />
-            {t('admin.settingsTab.ai.ttsLabel')}
-          </label>
-        </div>
+            {aiMessage && (
+              <p className={clsx(styles.feedbackMsg, aiMessage.type === 'success' ? styles.feedbackMsgSuccess : styles.feedbackMsgError)}>
+                {aiMessage.text}
+              </p>
+            )}
 
-        {aiMessage && (
-          <p className={clsx(styles.feedbackMsg, aiMessage.type === 'success' ? styles.feedbackMsgSuccess : styles.feedbackMsgError)}>
-            {aiMessage.text}
-          </p>
+            <div className={styles.formActions}>
+              <button type="submit" className={styles.btnPrimary} disabled={aiSaving}>
+                <Save size={16} /> {aiSaving ? t('admin.settingsTab.ai.savingButton') : t('admin.settingsTab.ai.saveButton')}
+              </button>
+            </div>
+          </form>
         )}
-
-        <div className={styles.formActions}>
-          <button type="submit" className={styles.btnPrimary} disabled={aiSaving}>
-            <Save size={16} /> {aiSaving ? t('admin.settingsTab.ai.savingButton') : t('admin.settingsTab.ai.saveButton')}
-          </button>
-        </div>
-      </form>
+        {aiStatus.ai.configured && <PhotoReviewTester />}
+      </div>
 
       <div className={styles.form} style={{ marginTop: '1.5rem' }}>
         <div className={styles.formHeader}>

@@ -24,8 +24,7 @@ const QRCodeModal: React.FC<{
   baseUrl?: string;
   onClose: () => void;
   onComplete: () => void;
-  onAIReject?: (scheduleId: number, feedback: string, audioUrl?: string) => void;
-}> = ({ chore, userId, baseUrl, onClose, onComplete, onAIReject }) => {
+}> = ({ chore, userId, baseUrl, onClose, onComplete }) => {
   const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -78,17 +77,21 @@ const QRCodeModal: React.FC<{
       }
       onComplete();
     } catch (err: any) {
-      if (err instanceof APIError && err.status === 422 && err.data?.ai_review) {
-        // Close the modal and show feedback on the chore card
-        if (onAIReject) {
-          onAIReject(chore.schedule_id, err.data.ai_review.feedback, err.data.ai_review.feedback_audio);
-          onClose();
-        } else {
-          setUploadError(err.data.ai_review.feedback);
-        }
-      } else {
-        setUploadError(err.message || t('dashboard.qr.uploadFailed'));
-      }
+      setUploadError(err.message || t('dashboard.qr.uploadFailed'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // No photo handy (or none wanted): finish anyway and let a parent check.
+  const handleSkipPhoto = async () => {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      await api.chores.complete(chore.schedule_id, chore.date, undefined, { skipPhoto: true });
+      onComplete();
+    } catch (err: any) {
+      setUploadError(err.message || t('dashboard.qr.uploadFailed'));
     } finally {
       setUploading(false);
     }
@@ -144,6 +147,12 @@ const QRCodeModal: React.FC<{
             {copied ? t('dashboard.qr.copied') : t('dashboard.qr.copyLink')}
           </button>
         </div>
+
+        {!alreadyCompleted && (
+          <button className={styles.skipPhotoBtn} onClick={handleSkipPhoto} disabled={uploading}>
+            {t('dashboard.qr.skipPhoto')}
+          </button>
+        )}
 
         {uploadError && <p className={styles.qrError}>{uploadError}</p>}
 
@@ -212,7 +221,6 @@ export const Dashboard: React.FC = () => {
   const [showPinSettings, setShowPinSettings] = useState(false);
   const [showLinkedAccounts, setShowLinkedAccounts] = useState(false);
   const [qrChore, setQrChore] = useState<ScheduledChore | null>(null);
-  const [aiFeedback, setAiFeedback] = useState<Record<number, { text: string; audioUrl?: string }>>({});
   const [systemBaseUrl, setSystemBaseUrl] = useState<string>('');
   const navigate = useNavigate();
 
@@ -304,17 +312,12 @@ export const Dashboard: React.FC = () => {
         const needsPhoto = chore.requires_photo && photoSource === 'child';
         if (needsPhoto) {
           // Try to complete without a photo first — the backend will revive
-          // a prior soft-deleted approved completion (kept around so an
-          // accidental uncheck + recheck doesn't wipe the photo/AI feedback
-          // for today). If there's no prior completion, the backend returns
-          // 400 "photo required" and we fall through to the QR modal.
+          // a prior soft-deleted completion (kept around so an accidental
+          // uncheck + recheck doesn't wipe today's photo). If there's no
+          // prior completion, the backend returns 400 "photo required" and
+          // we fall through to the photo modal.
           try {
             await api.chores.complete(chore.schedule_id, chore.date);
-            setAiFeedback(prev => {
-              const next = { ...prev };
-              delete next[chore.schedule_id];
-              return next;
-            });
             onChoreFinished();
             return;
           } catch (e) {
@@ -327,24 +330,15 @@ export const Dashboard: React.FC = () => {
           }
         }
         await api.chores.complete(chore.schedule_id, chore.date);
-        // Clear any previous AI feedback for this chore on success
-        setAiFeedback(prev => {
-          const next = { ...prev };
-          delete next[chore.schedule_id];
-          return next;
-        });
         onChoreFinished();
         return; // onChoreFinished handles reload
       }
       await loadChores();
       await loadExtras();
     } catch (err) {
-      if (err instanceof APIError && err.status === 422 && err.data?.ai_review) {
-        setAiFeedback(prev => ({ ...prev, [chore.schedule_id]: { text: err.data.ai_review.feedback, audioUrl: err.data.ai_review.feedback_audio } }));
-        await loadChores();
-      } else if (err instanceof APIError && (err.status === 400 || err.status === 422)) {
+      if (err instanceof APIError && (err.status === 400 || err.status === 422)) {
         // Client-level validation errors are surfaced via more specific paths
-        // (photo modal, AI feedback). Log for diagnostics but don't toast.
+        // (e.g. the photo modal). Log for diagnostics but don't toast.
         console.error(err);
       } else {
         // 500s, network failures, etc. — surface to the user rather than
@@ -743,8 +737,7 @@ export const Dashboard: React.FC = () => {
             isLocked && styles.choreCardLocked,
             isExpired && styles.choreCardExpired,
             isPointsLocked && styles.choreCardPointsLocked,
-            isToggling && styles.choreCardToggling,
-            (aiFeedback[chore.schedule_id] || (chore.completion_status === 'ai_rejected' && chore.ai_feedback) || (chore.completed && chore.completion_status === 'approved' && chore.ai_feedback)) && styles.choreCardHasFeedback
+            isToggling && styles.choreCardToggling
           )}
           onTouchStart={canSwipe && !isToggling ? (e) => handleTouchStart(e, choreKey) : undefined}
           onTouchMove={canSwipe && !isToggling ? (e) => handleTouchMove(e, chore) : undefined}
@@ -760,7 +753,7 @@ export const Dashboard: React.FC = () => {
                 className={styles.ttsBtn}
                 onClick={(e) => {
                   e.stopPropagation();
-                  const ttsText = chore.tts_description || (chore.title + (chore.description ? '. ' + chore.description : ''));
+                  const ttsText = chore.title + (chore.description ? '. ' + chore.description : '');
                   if (chore.tts_audio_url) {
                     const audio = new Audio(chore.tts_audio_url);
                     audio.play().catch(() => speak(ttsText));
@@ -836,32 +829,6 @@ export const Dashboard: React.FC = () => {
           )}
         </div>
       </div>
-        {(() => {
-          const fb = aiFeedback[chore.schedule_id];
-          const isRejected = fb || (chore.completion_status === 'ai_rejected' && chore.ai_feedback);
-          const isApprovedByAI = !isRejected && chore.completed && chore.completion_status === 'approved' && chore.ai_feedback;
-          if (!isRejected && !isApprovedByAI) return null;
-          const feedbackText = fb?.text || chore.ai_feedback || '';
-          const feedbackAudioUrl = fb?.audioUrl;
-          return (
-            <div className={isRejected ? styles.aiFeedbackRejected : styles.aiFeedbackApproved}>
-              <span className={styles.aiFeedbackText}>{feedbackText}</span>
-              <button
-                className={styles.ttsBtn}
-                onClick={() => {
-                  if (feedbackAudioUrl) {
-                    new Audio(feedbackAudioUrl).play().catch(() => speak(feedbackText));
-                  } else {
-                    speak(feedbackText);
-                  }
-                }}
-                aria-label={t('dashboard.chore.listenToFeedback')}
-              >
-                <Volume2 size={16} />
-              </button>
-            </div>
-          );
-        })()}
       </div>
     );
   };
@@ -1482,18 +1449,9 @@ export const Dashboard: React.FC = () => {
           baseUrl={systemBaseUrl}
           onClose={() => setQrChore(null)}
           onComplete={qrChore.completed ? async () => {
-            setAiFeedback(prev => { const next = { ...prev }; delete next[qrChore.schedule_id]; return next; });
             setQrChore(null);
             await loadChores();
-          } : async () => {
-            setAiFeedback(prev => { const next = { ...prev }; delete next[qrChore.schedule_id]; return next; });
-            onChoreFinished();
-          }}
-          onAIReject={(scheduleId, feedback, audioUrl) => {
-            setAiFeedback(prev => ({ ...prev, [scheduleId]: { text: feedback, audioUrl } }));
-            setQrChore(null);
-            loadChores();
-          }}
+          } : onChoreFinished}
         />
       )}
 

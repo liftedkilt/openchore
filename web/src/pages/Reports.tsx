@@ -7,6 +7,7 @@ import { LineChart } from '../components/charts/LineChart';
 import styles from './Reports.module.css';
 import { ArrowLeft, ChevronLeft, ChevronRight, Users, TrendingUp, BarChart3, Coins, Calendar, AlertTriangle, Sparkles } from 'lucide-react';
 import clsx from 'clsx';
+import { useAIStatus } from '../hooks/useAIStatus';
 
 type Period = 'week' | 'month' | 'year';
 
@@ -126,6 +127,7 @@ export const Reports: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [aiSummaries, setAiSummaries] = useState<Record<number, string>>({});
   const [summaryLoading, setSummaryLoading] = useState<Record<number, boolean>>({});
+  const aiStatus = useAIStatus();
 
   const handleGenerateSummary = async (userId: number) => {
     setSummaryLoading(prev => ({ ...prev, [userId]: true }));
@@ -239,7 +241,7 @@ export const Reports: React.FC = () => {
                         {Math.round(kid.completion_rate)}%
                       </div>
                     </div>
-                    {aiSummaries[kid.user_id] ? (
+                    {!aiStatus.ai.configured ? null : aiSummaries[kid.user_id] ? (
                       <div className={styles.aiSummaryCard}>
                         <div className={styles.aiSummaryText}>{aiSummaries[kid.user_id]}</div>
                       </div>

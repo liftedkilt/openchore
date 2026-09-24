@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import styles from '../../pages/AdminDashboard.module.css';
-import { X, Check } from 'lucide-react';
+import { X, Check, Sparkles } from 'lucide-react';
+import type { PendingCompletion } from '../../types';
 
 export const ApprovalsTab: React.FC<{ onCountChange: (count: number) => void }> = ({ onCountChange }) => {
   const { t } = useTranslation();
-  const [pending, setPending] = useState<any[]>([]);
+  const [pending, setPending] = useState<PendingCompletion[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -59,6 +60,18 @@ export const ApprovalsTab: React.FC<{ onCountChange: (count: number) => void }> 
               {p.photo_url && (
                 <div className={styles.approvalPhoto}>
                   <img src={p.photo_url} alt={t('admin.approvalsTab.photoAlt')} onClick={() => window.open(p.photo_url, '_blank')} />
+                </div>
+              )}
+              {p.ai_feedback && p.ai_complete !== undefined && (
+                <div className={styles.approvalAINote}>
+                  <Sparkles size={14} />
+                  <span>
+                    <strong>{p.ai_complete ? t('admin.approvalsTab.aiLooksDone') : t('admin.approvalsTab.aiLooksNotDone')}</strong>
+                    {' '}
+                    {t('admin.approvalsTab.aiConfidence', { value: Math.round((p.ai_confidence ?? 0) * 100) })}
+                    {' — '}
+                    {p.ai_feedback}
+                  </span>
                 </div>
               )}
             </div>

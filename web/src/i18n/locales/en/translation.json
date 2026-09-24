@@ -23,27 +23,23 @@
       "title": "Activity Log",
       "undoTitle": "Undo this event"
     },
-    "aiChoreChecker": {
-      "ariaGenerateAudio": "Generate audio",
-      "ariaListenFeedback": "Listen to feedback",
-      "buttonTestReview": "Test Review",
-      "buttonWorking": "Working...",
-      "choosePhoto": "Choose photo...",
-      "confidence": "Confidence: {{value}}%",
-      "description": "Type a chore name, snap a photo, and see how the AI evaluates it — including Kokoro TTS audio.",
-      "errorTestFailed": "Test failed",
-      "errorTtsFailed": "TTS failed: {{message}}",
-      "errorUnknown": "Unknown error",
-      "heading": "AI Chore Checker",
-      "labelChoreName": "Chore Name",
-      "labelPhoto": "Photo",
-      "photoPreviewAlt": "Preview",
+    "photoReviewTester": {
+      "heading": "Try photo review",
+      "description": "Upload a photo and see what the configured model makes of it. Nothing is saved.",
+      "labelChoreName": "Chore name",
       "placeholderChoreName": "e.g. Pick Up Toys, Make Bed, Clean Kitchen",
-      "resultApproved": "Approved",
-      "resultRejected": "Rejected",
-      "stepAnalyzing": "AI analyzing photo",
-      "stepGeneratingAudio": "Generating audio",
-      "stepUploading": "Uploading photo"
+      "labelPhoto": "Photo",
+      "choosePhoto": "Choose photo...",
+      "photoPreviewAlt": "Preview",
+      "buttonTest": "Review photo",
+      "buttonWorking": "Reviewing...",
+      "errorTestFailed": "Review failed",
+      "looksDone": "Looks done",
+      "looksNotDone": "Doesn't look done",
+      "confidence": "Confidence: {{value}}%",
+      "wouldApprove": "Would be approved automatically",
+      "wouldWait": "Would wait for a parent",
+      "elapsed": "took {{seconds}}s"
     },
     "apiTokens": {
       "addButton": "Add",
@@ -76,7 +72,10 @@
       "rejectConfirm": "Are you sure you want to reject this completion?",
       "title": "Pending Approvals",
       "waitingForReview_one": "{{count}} chore waiting for review",
-      "waitingForReview_other": "{{count}} chores waiting for review"
+      "waitingForReview_other": "{{count}} chores waiting for review",
+      "aiLooksDone": "AI: looks done",
+      "aiLooksNotDone": "AI: doesn't look done",
+      "aiConfidence": "({{value}}%)"
     },
     "choresTab": {
       "addChore": "Add Chore",
@@ -98,11 +97,8 @@
     "createChore": {
       "ai": {
         "aiLabel": "AI",
-        "apply": "Apply",
         "generateTitle": "Generate with AI",
-        "generating": "Generating...",
-        "suggesting": "Getting AI suggestion...",
-        "suggestion": "AI suggests: {{points}} pts, ~{{minutes}} min"
+        "generating": "Generating..."
       },
       "category": {
         "bonus": "Bonus",
@@ -205,7 +201,6 @@
       "backToMyChores": "Back to {{name}}'s chores",
       "quickAssign": "Quick Assign",
       "reports": "Reports",
-      "tabAi": "AI",
       "tabApprovals": "Approvals",
       "tabChores": "Chores",
       "tabKids": "Kids",
@@ -219,7 +214,6 @@
       "categoryBonus": "Bonus",
       "categoryCore": "Core",
       "categoryRequired": "Required",
-      "generatingLabel": "Generating…",
       "labelCategory": "Category",
       "labelDescription": "Description",
       "labelIcon": "Icon",
@@ -227,7 +221,6 @@
       "labelPenalty": "Penalty",
       "labelPhotoSource": "Photo source",
       "labelPoints": "Points",
-      "labelTTSDescription": "Spoken description (TTS prompt)",
       "labelTitle": "Title",
       "modalTitle": "Edit: {{title}}",
       "photoSourceBoth": "External with manual fallback",
@@ -242,13 +235,9 @@
       "savedLabel": "Saved",
       "savingLabel": "Saving...",
       "sectionDetails": "Chore Details",
-      "sectionTTS": "Kokoro TTS",
-      "suggestTextBtn": "Suggest Text",
-      "suggestTextTitle": "Generate a new spoken description with AI",
-      "ttsClickPreview": "Click to preview generated audio",
-      "ttsDescriptionPlaceholder": "What should the TTS voice say for this chore?",
-      "ttsGenerateDescError": "Failed to generate description",
-      "ttsNoAudio": "No TTS audio has been generated for this chore yet.",
+      "sectionTTS": "Read-aloud audio",
+      "ttsClickPreview": "Reads the title and description aloud",
+      "ttsNoAudio": "No audio yet. It's recorded automatically from the title and description.",
       "ttsPauseAriaLabel": "Pause TTS audio",
       "ttsPauseTitle": "Pause",
       "ttsPlayAriaLabel": "Play TTS audio",
@@ -401,16 +390,23 @@
     },
     "settingsTab": {
       "ai": {
-        "description": "Use AI to automatically verify chore completion photos. When enabled, uploaded photos are analyzed before marking a chore complete.",
-        "enableLabel": "Enable AI photo review",
+        "title": "AI",
+        "notConfigured": "No AI service is set up. To use photo review, chore descriptions, weekly summaries or recorded read-aloud voices, point the server at an OpenAI-compatible model (AI_BASE_URL and AI_MODEL) or speech service (TTS_BASE_URL). Without them, chores are read aloud by the device's own voice.",
+        "description": "Using {{model}}. The AI only ever advises: it never rejects a chore.",
+        "aiNotConfigured": "Only a speech service is set up (TTS_BASE_URL). Set AI_BASE_URL and AI_MODEL to use photo review and summaries.",
+        "photoReviewLabel": "Review photos awaiting approval",
+        "photoReviewHelp": "When a chore that needs approval comes in with a photo, the AI adds a note to it in Approvals.",
+        "autoApproveLabel": "Approve clear passes automatically",
+        "thresholdLabel": "Auto-approve confidence",
+        "thresholdHelp": "How sure the AI must be that a chore is done before approving it without you. Anything less waits for you.",
+        "weeklySummaryLabel": "Write a weekly summary",
+        "weeklySummaryHelp": "Each Monday, summarise everyone's past week and share it through Discord and the report.weekly_summary webhook.",
+        "voiceLabel": "Read-aloud voice",
+        "voiceHelp": "A voice your speech service knows, e.g. af_heart for Kokoro or alloy for OpenAI. Changing it re-records every chore.",
         "saveButton": "Save AI Settings",
-        "saveError": "Failed to save AI settings",
-        "saveSuccess": "AI settings saved",
         "savingButton": "Saving...",
-        "thresholdHelp": "Photos with confidence above this threshold are auto-approved. Lower values are more lenient.",
-        "thresholdLabel": "Auto-Approve Threshold (0 – 1)",
-        "title": "AI Photo Review",
-        "ttsLabel": "Generate TTS descriptions for chores"
+        "saveSuccess": "AI settings saved",
+        "saveError": "Failed to save AI settings"
       },
       "baseUrl": {
         "description": "The public URL of this server (e.g. ",
@@ -470,7 +466,8 @@
           "profilePinVerified": "Profile PIN Verified",
           "redeemed": "Redeemed",
           "streak": "Streak",
-          "uncompleted": "Uncompleted"
+          "uncompleted": "Uncompleted",
+          "weeklySummary": "Weekly Summary"
         },
         "form": {
           "cancelButton": "Cancel",
@@ -636,7 +633,6 @@
       "expiredAt": "Expired at {{time}}",
       "latePenalty": "Late (-{{value}} pts)",
       "lateZeroPts": "Late (0 pts)",
-      "listenToFeedback": "Listen to feedback",
       "markComplete": "Mark complete",
       "markIncomplete": "Mark incomplete",
       "pts": "pts",
@@ -730,7 +726,8 @@
       "titlePhotoNeeded": "Photo Proof Needed",
       "uploadFailed": "Upload failed",
       "uploading": "Uploading...",
-      "waiting": "Waiting for photo..."
+      "waiting": "Waiting for photo...",
+      "skipPhoto": "No photo? Finish anyway and a grown-up will check it"
     },
     "quickAssign": {
       "btnAssign": "Assign",

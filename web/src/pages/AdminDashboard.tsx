@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import styles from './AdminDashboard.module.css';
-import { ArrowLeft, Plus, Users, ListChecks, Gift, Coins, Activity, Settings, Undo2, Camera, Home } from 'lucide-react';
+import { ArrowLeft, Plus, Users, ListChecks, Gift, Coins, Activity, Settings, Undo2, Home } from 'lucide-react';
 import clsx from 'clsx';
 import QuickAssign from '../components/QuickAssign/QuickAssign';
 import { ChoresTab } from '../components/admin/ChoresTab';
@@ -13,12 +13,11 @@ import { UsersTab } from '../components/admin/UsersTab';
 import { RewardsTab } from '../components/admin/RewardsTab';
 import { PointsTab } from '../components/admin/PointsTab';
 import { ActivityTab } from '../components/admin/ActivityTab';
-import { AIChoreChecker } from '../components/admin/AIChoreChecker';
 import { SettingsTab } from '../components/admin/SettingsTab';
 import { KidsStatusTab } from '../components/admin/KidsStatusTab';
 import { LanguageSelector } from '../components/LanguageSelector/LanguageSelector';
 
-type Tab = 'kids-status' | 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'ai' | 'settings';
+type Tab = 'kids-status' | 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'settings';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -73,9 +72,6 @@ export const AdminDashboard: React.FC = () => {
         <button className={clsx(styles.navItem, tab === 'users' && styles.navItemActive)} onClick={() => setTab('users')}>
           <Users size={16} /> {t('admin.dashboard.tabPeople')}
         </button>
-        <button className={clsx(styles.navItem, tab === 'ai' && styles.navItemActive)} onClick={() => setTab('ai')}>
-          <Camera size={16} /> {t('admin.dashboard.tabAi')}
-        </button>
         <button className={clsx(styles.navItem, tab === 'settings' && styles.navItemActive)} onClick={() => setTab('settings')}>
           <Settings size={16} />
         </button>
@@ -89,7 +85,6 @@ export const AdminDashboard: React.FC = () => {
         {tab === 'rewards' && <RewardsTab />}
         {tab === 'points' && <PointsTab />}
         {tab === 'activity' && <ActivityTab />}
-        {tab === 'ai' && <AIChoreChecker />}
         {tab === 'settings' && <SettingsTab />}
       </main>
 

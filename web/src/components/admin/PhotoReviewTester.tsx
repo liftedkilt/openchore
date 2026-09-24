@@ -1,25 +1,21 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
+import type { AIReviewResult } from '../../types';
 import styles from '../../pages/AdminDashboard.module.css';
-import { Check, Camera, Volume2, Loader2 } from 'lucide-react';
+import { Camera, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 
-export const AIChoreChecker: React.FC = () => {
+// Lets a parent try the configured model on a photo before trusting it with
+// the approval queue. Nothing is saved.
+export const PhotoReviewTester: React.FC = () => {
   const { t } = useTranslation();
   const [choreTitle, setChoreTitle] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [step, setStep] = useState<'idle' | 'uploading' | 'analyzing' | 'generating_audio' | 'done' | 'error'>('idle');
-  const [result, setResult] = useState<{
-    complete: boolean;
-    confidence: number;
-    feedback: string;
-    feedback_audio: string;
-  } | null>(null);
+  const [working, setWorking] = useState(false);
+  const [result, setResult] = useState<AIReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [playingAudio, setPlayingAudio] = useState(false);
-  const [retryingAudio, setRetryingAudio] = useState(false);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -27,7 +23,6 @@ export const AIChoreChecker: React.FC = () => {
     setPhotoFile(file);
     setResult(null);
     setError(null);
-    setStep('idle');
     const reader = new FileReader();
     reader.onload = () => setPhotoPreview(reader.result as string);
     reader.readAsDataURL(file);
@@ -36,156 +31,74 @@ export const AIChoreChecker: React.FC = () => {
   const handleTest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!choreTitle || !photoFile) return;
-
     setResult(null);
     setError(null);
-
+    setWorking(true);
     try {
-      setStep('uploading');
       const { url } = await api.chores.upload(photoFile);
-
-      setStep('analyzing');
-      const res = await api.admin.testAIReview(choreTitle, url);
-      setResult(res);
-
-      setStep('done');
-    } catch (err: any) {
-      setError(err.message || t('admin.aiChoreChecker.errorTestFailed'));
-      setStep('error');
-    }
-  };
-
-  const handlePlayAudio = () => {
-    if (!result?.feedback_audio) return;
-    setPlayingAudio(true);
-    const audio = new Audio(result.feedback_audio);
-    audio.onended = () => setPlayingAudio(false);
-    audio.onerror = () => setPlayingAudio(false);
-    audio.play().catch(() => setPlayingAudio(false));
-  };
-
-  const handleRetryAudio = async () => {
-    if (!result?.feedback) return;
-    setRetryingAudio(true);
-    try {
-      const { audio_url } = await api.admin.synthesizeTTS(result.feedback);
-      setResult({ ...result, feedback_audio: audio_url });
+      setResult(await api.admin.testAIReview(choreTitle, url));
     } catch (err: unknown) {
-      setError(t('admin.aiChoreChecker.errorTtsFailed', { message: err instanceof Error ? err.message : t('admin.aiChoreChecker.errorUnknown') }));
+      setError(err instanceof Error && err.message ? err.message : t('admin.photoReviewTester.errorTestFailed'));
     } finally {
-      setRetryingAudio(false);
+      setWorking(false);
     }
   };
-
-  const stepLabels = [
-    { key: 'uploading', label: t('admin.aiChoreChecker.stepUploading') },
-    { key: 'analyzing', label: t('admin.aiChoreChecker.stepAnalyzing') },
-    { key: 'generating_audio', label: t('admin.aiChoreChecker.stepGeneratingAudio') },
-  ];
-  const activeStepIndex = stepLabels.findIndex(s => s.key === step);
-  const isWorking = step === 'uploading' || step === 'analyzing' || step === 'generating_audio';
 
   return (
-    <div className={styles.form}>
-      <div className={styles.formHeader}>
-        <h3>{t('admin.aiChoreChecker.heading')}</h3>
+    <form onSubmit={handleTest} style={{ marginTop: '1rem' }}>
+      <h4>{t('admin.photoReviewTester.heading')}</h4>
+      <p className={styles.sectionDesc}>{t('admin.photoReviewTester.description')}</p>
+      <div className={styles.formGrid}>
+        <div className={styles.formGroup}>
+          <label className={styles.label}>{t('admin.photoReviewTester.labelChoreName')}</label>
+          <input
+            className={styles.input}
+            value={choreTitle}
+            onChange={e => setChoreTitle(e.target.value)}
+            placeholder={t('admin.photoReviewTester.placeholderChoreName')}
+            disabled={working}
+          />
+        </div>
+        <div className={styles.formGroup}>
+          <label className={styles.label}>{t('admin.photoReviewTester.labelPhoto')}</label>
+          <label className={styles.photoUploadLabel} style={{ cursor: working ? 'default' : 'pointer', opacity: working ? 0.5 : 1 }}>
+            <Camera size={16} />
+            {photoFile ? photoFile.name : t('admin.photoReviewTester.choosePhoto')}
+            <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} style={{ display: 'none' }} disabled={working} />
+          </label>
+        </div>
       </div>
-      <p className={styles.sectionDesc}>
-        {t('admin.aiChoreChecker.description')}
-      </p>
 
-      <form onSubmit={handleTest}>
-        <div className={styles.formGrid}>
-          <div className={styles.formGroup}>
-            <label className={styles.label}>{t('admin.aiChoreChecker.labelChoreName')}</label>
-            <input
-              className={styles.input}
-              value={choreTitle}
-              onChange={e => setChoreTitle(e.target.value)}
-              placeholder={t('admin.aiChoreChecker.placeholderChoreName')}
-              disabled={isWorking}
-            />
-          </div>
-
-          <div className={styles.formGroup}>
-            <label className={styles.label}>{t('admin.aiChoreChecker.labelPhoto')}</label>
-            <label className={styles.photoUploadLabel} style={{ cursor: isWorking ? 'default' : 'pointer', opacity: isWorking ? 0.5 : 1 }}>
-              <Camera size={16} />
-              {photoFile ? photoFile.name : t('admin.aiChoreChecker.choosePhoto')}
-              <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} style={{ display: 'none' }} disabled={isWorking} />
-            </label>
-          </div>
-        </div>
-
-        {photoPreview && (
-          <div className={styles.photoPreview}>
-            <img src={photoPreview} alt={t('admin.aiChoreChecker.photoPreviewAlt')} />
-          </div>
-        )}
-
-        <div className={styles.formActions}>
-          <button type="submit" className={styles.saveBtn} disabled={!choreTitle || !photoFile || isWorking}>
-            {isWorking ? <><Loader2 size={16} className={styles.spinning} /> {t('admin.aiChoreChecker.buttonWorking')}</> : t('admin.aiChoreChecker.buttonTestReview')}
-          </button>
-        </div>
-      </form>
-
-      {isWorking && (
-        <div style={{ marginTop: '1rem' }}>
-          {stepLabels.map((s, i) => {
-            const isActive = s.key === step;
-            const isDone = i < activeStepIndex || step === 'done';
-            return (
-              <div key={s.key} className={styles.stepItem} style={{
-                color: isActive ? 'var(--color-primary, #38bdf8)' : isDone ? 'var(--text-secondary)' : 'var(--text-tertiary, rgba(255,255,255,0.3))',
-              }}>
-                {isActive ? <Loader2 size={14} className={styles.spinning} /> : isDone ? <Check size={14} /> : <div style={{ width: 14, height: 14 }} />}
-                <span>{s.label}</span>
-              </div>
-            );
-          })}
+      {photoPreview && (
+        <div className={styles.photoPreview}>
+          <img src={photoPreview} alt={t('admin.photoReviewTester.photoPreviewAlt')} />
         </div>
       )}
 
-      {error && (
-        <div className={clsx(styles.statusBox, styles.statusBoxError)}>
-          {error}
-        </div>
-      )}
+      <div className={styles.formActions}>
+        <button type="submit" className={styles.btnSecondary} disabled={!choreTitle || !photoFile || working}>
+          {working ? <><Loader2 size={16} className={styles.spinning} /> {t('admin.photoReviewTester.buttonWorking')}</> : t('admin.photoReviewTester.buttonTest')}
+        </button>
+      </div>
 
-      {result && step === 'done' && (
+      {error && <div className={clsx(styles.statusBox, styles.statusBoxError)}>{error}</div>}
+
+      {result && (
         <div className={clsx(styles.statusBox, result.complete ? styles.statusBoxSuccess : styles.statusBoxReject)}>
           <div className={styles.flexRow} style={{ marginBottom: '0.5rem', fontWeight: 600 }}>
-            <span style={{ fontSize: '1.2rem' }}>{result.complete ? '✅' : '❌'}</span>
-            <span>{result.complete ? t('admin.aiChoreChecker.resultApproved') : t('admin.aiChoreChecker.resultRejected')}</span>
+            <span>{result.complete ? t('admin.photoReviewTester.looksDone') : t('admin.photoReviewTester.looksNotDone')}</span>
             <span style={{ marginLeft: 'auto', fontWeight: 400, opacity: 0.7 }}>
-              {t('admin.aiChoreChecker.confidence', { value: (result.confidence * 100).toFixed(0) })}
+              {t('admin.photoReviewTester.confidence', { value: Math.round(result.confidence * 100) })}
             </span>
           </div>
-          <div className={styles.flexRow}>
-            <span style={{ flex: 1 }}>{result.feedback}</span>
-            {result.feedback_audio ? (
-              <button
-                onClick={handlePlayAudio}
-                disabled={playingAudio}
-                className={styles.audioPlayBtn}
-                aria-label={t('admin.aiChoreChecker.ariaListenFeedback')}
-              >
-                {playingAudio ? <Loader2 size={16} className={styles.spinning} /> : <Volume2 size={16} />}
-              </button>
-            ) : (
-              <button
-                onClick={handleRetryAudio}
-                disabled={retryingAudio}
-                className={styles.audioPlayBtn}
-                aria-label={t('admin.aiChoreChecker.ariaGenerateAudio')}
-              >
-                {retryingAudio ? <Loader2 size={16} className={styles.spinning} /> : <Volume2 size={16} />}
-              </button>
-            )}
+          <div>{result.feedback}</div>
+          <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', opacity: 0.7 }}>
+            {result.would_approve ? t('admin.photoReviewTester.wouldApprove') : t('admin.photoReviewTester.wouldWait')}
+            {' · '}
+            {t('admin.photoReviewTester.elapsed', { seconds: (result.elapsed_ms / 1000).toFixed(1) })}
           </div>
         </div>
       )}
-    </div>
+    </form>
   );
 };

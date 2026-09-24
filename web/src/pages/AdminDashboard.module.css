@@ -942,6 +942,25 @@ select.input {
   font-weight: 700;
 }
 
+.approvalAINote {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(168, 85, 247, 0.08);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.approvalAINote svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  color: var(--accent-purple, #a855f7);
+}
+
 .approvalPhoto {
   width: 100%;
   border-radius: 12px;

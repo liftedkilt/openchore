@@ -1,4 +1,4 @@
-import type { User, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardAssignment, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from './types';
+import type { User, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardAssignment, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult } from './types';
 
 const API_BASE = '/api';
 
@@ -187,10 +187,10 @@ export const api = {
       body: JSON.stringify(data),
     }),
     delete: (id: number) => fetchWithAuth(`/chores/${id}`, { method: 'DELETE' }),
-    complete: (scheduleId: number, date: string, photoUrl?: string) =>
+    complete: (scheduleId: number, date: string, photoUrl?: string, opts?: { skipPhoto?: boolean }) =>
       fetchWithAuth(`/schedules/${scheduleId}/complete`, {
         method: 'POST',
-        body: JSON.stringify({ completion_date: date, photo_url: photoUrl }),
+        body: JSON.stringify({ completion_date: date, photo_url: photoUrl, skip_photo: opts?.skipPhoto || undefined }),
       }),
     uncomplete: (scheduleId: number, date: string) =>
       fetchWithAuth(`/schedules/${scheduleId}/complete?date=${date}`, {
@@ -227,18 +227,8 @@ export const api = {
       }),
     deleteSchedule: (choreId: number, scheduleId: number) =>
       fetchWithAuth(`/chores/${choreId}/schedules/${scheduleId}`, { method: 'DELETE' }),
-    regenerateTTS: (choreId: number, description?: string) =>
-      fetchWithAuth<{ tts_description: string; tts_audio_url: string }>(
-        `/chores/${choreId}/tts/regenerate`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ description: description ?? '' }),
-        },
-      ),
-    generateTTSDescription: (choreId: number) =>
-      fetchWithAuth<{ description: string }>(`/chores/${choreId}/tts/generate-description`, {
-        method: 'POST',
-      }),
+    regenerateTTS: (choreId: number) =>
+      fetchWithAuth<{ tts_audio_url: string }>(`/chores/${choreId}/tts/regenerate`, { method: 'POST' }),
   },
   points: {
     getForUser: (userId: number) => fetchWithAuth<PointsData>(`/users/${userId}/points`),
@@ -319,35 +309,21 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ value }),
     }),
+    aiStatus: () => fetchWithAuth<AIStatus>('/admin/ai/status'),
     testAIReview: (choreTitle: string, photoUrl: string) =>
-      fetchWithAuth<{ complete: boolean; confidence: number; feedback: string; feedback_audio: string }>('/admin/ai/test', {
+      fetchWithAuth<AIReviewResult>('/admin/ai/test', {
         method: 'POST',
         body: JSON.stringify({ chore_title: choreTitle, photo_url: photoUrl }),
       }),
-    synthesizeTTS: (text: string) =>
-      fetchWithAuth<{ audio_url: string }>('/admin/ai/tts', {
-        method: 'POST',
-        body: JSON.stringify({ text }),
-      }),
-    triggerTTSSync: () =>
-      fetchWithAuth<{ status: string }>('/admin/ai/tts-sync', { method: 'POST' }),
     generateDescription: (title: string, category: string) =>
       fetchWithAuth<{ description: string }>('/admin/ai/generate-description', {
         method: 'POST',
         body: JSON.stringify({ title, category }),
       }),
-    suggestPoints: (title: string, description: string, category: string) =>
-      fetchWithAuth<{ points: number; estimated_minutes: number; reasoning: string }>('/admin/ai/suggest-points', {
-        method: 'POST',
-        body: JSON.stringify({ title, description, category }),
-      }),
+    regenerateAllTTS: () =>
+      fetchWithAuth<{ status: string }>('/admin/tts/regenerate', { method: 'POST' }),
     getAISummary: (userId: number, period: string, date: string) =>
       fetchWithAuth<{ summary: string }>(`/admin/reports/ai-summary?user_id=${userId}&period=${period}&date=${date}`),
-    getAISettings: () => Promise.all([
-      fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_enabled').catch(() => ({ key: 'ai_enabled', value: 'false' })),
-      fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_auto_approve_threshold').catch(() => ({ key: 'ai_auto_approve_threshold', value: '0.85' })),
-      fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_tts_enabled').catch(() => ({ key: 'ai_tts_enabled', value: 'false' })),
-    ]).then(settings => Object.fromEntries(settings.map(s => [s.key, s.value]))),
     exportConfig: async (sections: string[]) => {
       const resp = await fetch(`${API_BASE}/admin/export-config?sections=${sections.join(',')}`, { credentials: 'same-origin' });
       if (!resp.ok) throw new Error('export failed');
