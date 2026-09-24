@@ -6,6 +6,7 @@ import i18n from '../i18n';
 import { ChoreRow } from './ChoreRow';
 import { TabBar } from './TabBar';
 import { SkinScope } from './Scopes';
+import { Avatar } from './primitives';
 
 beforeAll(async () => {
   await i18n.changeLanguage('en');
@@ -67,5 +68,21 @@ describe('SkinScope', () => {
     const el = container.firstElementChild!;
     expect(el.getAttribute('data-theme')).toBe('tint');
     expect(el.getAttribute('data-person')).toBe('mint');
+  });
+});
+
+describe('Avatar', () => {
+  it('shows the initial, and a picture on top when given one', () => {
+    const { container, rerender } = render(<Avatar name="lily" color="mint" />);
+    const el = container.firstElementChild!;
+    expect(el.textContent).toBe('L');
+    expect(el.querySelector('img')).toBeNull();
+    rerender(<Avatar name="lily" color="mint" src="/a.svg" />);
+    const img = container.querySelector('img')!;
+    expect(img.getAttribute('src')).toBe('/a.svg');
+    expect(img.getAttribute('alt')).toBe('');
+    expect(el.className).toContain('oc-avatar--img');
+    fireEvent.error(img);
+    expect(container.querySelector('img')).toBeNull();
   });
 });
