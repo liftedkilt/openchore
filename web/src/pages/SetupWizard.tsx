@@ -11,10 +11,9 @@ type Step = 'welcome' | 'parent' | 'children' | 'themes' | 'chores' | 'finish';
 const STEPS: Step[] = ['welcome', 'parent', 'children', 'themes', 'chores', 'finish'];
 
 const THEMES = [
-  { id: 'default', nameKey: 'themeClassicBlue', color: '#3b82f6' },
-  { id: 'quest', nameKey: 'themeQuestAdventure', color: '#f59e0b' },
-  { id: 'galaxy', nameKey: 'themeGalaxyPurple', color: '#8b5cf6' },
-  { id: 'forest', nameKey: 'themeNatureForest', color: '#10b981' },
+  { id: 'sunroom', nameKey: 'themeClassicBlue', color: '#3b82f6' },
+  { id: 'blocks', nameKey: 'themeQuestAdventure', color: '#f59e0b' },
+  { id: 'tint', nameKey: 'themeGalaxyPurple', color: '#8b5cf6' },
 ];
 
 const CHORE_PRESETS = [
@@ -57,7 +56,7 @@ export const SetupWizard: React.FC = () => {
 
   const addChild = () => {
     if (!newName.trim()) return;
-    setChildren([...children, { name: newName, theme: 'default' }]);
+    setChildren([...children, { name: newName, theme: 'sunroom' }]);
     setNewName('');
   };
 

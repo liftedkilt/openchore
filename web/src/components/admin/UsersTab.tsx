@@ -83,7 +83,7 @@ const UserForm: React.FC<{
   const [name, setName] = useState(user?.name || '');
   const [role, setRole] = useState<'admin' | 'child'>(user?.role || 'child');
   const [age, setAge] = useState(user?.age?.toString() || '');
-  const [userTheme, setUserTheme] = useState<Theme>(user?.theme || 'default');
+  const [userTheme, setUserTheme] = useState<Theme>(user?.theme || 'sunroom');
   const [pin, setPin] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -174,10 +174,9 @@ const UserForm: React.FC<{
         <div className={styles.formGroup}>
           <label className={styles.label}>{t('admin.usersTab.fieldTheme')}</label>
           <select className={styles.input} value={userTheme} onChange={e => setUserTheme(e.target.value as Theme)}>
-            <option value="default">{t('admin.usersTab.themeDefault')}</option>
-            <option value="quest">{t('admin.usersTab.themeQuest')}</option>
-            <option value="galaxy">{t('admin.usersTab.themeGalaxy')}</option>
-            <option value="forest">{t('admin.usersTab.themeForest')}</option>
+            <option value="sunroom">{t('admin.usersTab.themeDefault')}</option>
+            <option value="blocks">{t('admin.usersTab.themeQuest')}</option>
+            <option value="tint">{t('admin.usersTab.themeGalaxy')}</option>
           </select>
         </div>
       </div>

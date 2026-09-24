@@ -1572,10 +1572,9 @@ export const Dashboard: React.FC = () => {
 };
 
 const THEME_OPTIONS: { id: Theme; nameKey: string; icon: string; preview: string }[] = [
-  { id: 'default', nameKey: 'dashboard.themes.classic', icon: '🌊', preview: '#38bdf8' },
-  { id: 'quest', nameKey: 'dashboard.themes.quest', icon: '⚔️', preview: '#fbbf24' },
-  { id: 'galaxy', nameKey: 'dashboard.themes.galaxy', icon: '🚀', preview: '#a855f7' },
-  { id: 'forest', nameKey: 'dashboard.themes.forest', icon: '🌲', preview: '#4ade80' },
+  { id: 'sunroom', nameKey: 'dashboard.themes.classic', icon: '🌊', preview: '#38bdf8' },
+  { id: 'blocks', nameKey: 'dashboard.themes.quest', icon: '⚔️', preview: '#fbbf24' },
+  { id: 'tint', nameKey: 'dashboard.themes.galaxy', icon: '🚀', preview: '#a855f7' },
 ];
 
 const ThemePicker: React.FC<{ current: Theme; onSelect: (t: Theme) => void }> = ({ current, onSelect }) => {

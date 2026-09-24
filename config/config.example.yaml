@@ -6,25 +6,36 @@
 # Admins (parents) manage the household and can also be assigned chores,
 # earn points and redeem rewards. Every admin needs a PIN (4-8 digits) or a
 # linked OIDC account to sign in. Kids may have a PIN too, or none at all.
+#
+# theme: the person's skin: sunroom, blocks or tint. Leave it empty to let
+#   the app pick by age (Blocks under 8, Sunroom otherwise). Legacy names
+#   (default, quest, galaxy, forest) are still accepted and mapped.
+# color: the person's colour: coral, mint, butter, sky, rose, leaf, lilac or
+#   sand. Leave it empty to get the next colour nobody has yet.
 users:
   - name: Alex
     role: admin
     pin: "1234"
+    color: sky
   - name: Jamie
     role: admin
     pin: "5678"
+    color: rose
   - name: Emma
     role: child
     age: 11
-    theme: default
+    theme: sunroom
+    color: coral
   - name: Lily
     role: child
     age: 9
-    theme: default
+    theme: tint
+    color: mint
   - name: Noah
     role: child
     age: 7
-    theme: default
+    theme: blocks
+    color: butter
 
 chores:
   # === Required daily chores ===

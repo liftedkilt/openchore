@@ -58,8 +58,8 @@
   --progress-done-glow: 0 0 12px rgba(34, 197, 94, 0.3);
 }
 
-/* ==================== GALAXY THEME ==================== */
-body.theme-galaxy {
+/* ==================== GALAXY THEME (skin: tint; replaced in phase 2) ==================== */
+body.theme-tint {
   --bg-primary: #020617;
   --bg-secondary: #0f0a2a;
   --text-secondary: #7c83a8;
@@ -100,8 +100,8 @@ body.theme-galaxy {
   --bg-pattern-opacity: 1;
 }
 
-/* ==================== QUEST THEME ==================== */
-body.theme-quest {
+/* ==================== QUEST THEME (skin: blocks; replaced in phase 2) ==================== */
+body.theme-blocks {
   --bg-primary: #1a1611;
   --bg-secondary: #2a2419;
   --text-secondary: #a8977a;
@@ -136,40 +136,6 @@ body.theme-quest {
     radial-gradient(ellipse 200px 200px at 15% 20%, rgba(139, 92, 42, 0.06), transparent),
     radial-gradient(ellipse 180px 180px at 80% 75%, rgba(139, 92, 42, 0.05), transparent),
     radial-gradient(ellipse 150px 150px at 50% 50%, rgba(139, 92, 42, 0.03), transparent);
-  --bg-pattern-opacity: 1;
-}
-
-/* ==================== FOREST THEME ==================== */
-body.theme-forest {
-  --bg-primary: #071a0e;
-  --bg-secondary: #0d2818;
-  --text-secondary: #7aad8a;
-  --accent-blue: #4ade80;
-  --accent-green: #10b981;
-  --accent-pink: #fcd34d;
-  --accent-purple: #86efac;
-  --status-required: #d97706;
-  --status-core: #22c55e;
-  --status-bonus: #84cc16;
-
-  --progress-gradient: linear-gradient(90deg, #064e3b, #10b981, #4ade80);
-  --progress-glow: 0 0 10px rgba(16, 185, 129, 0.3);
-  --progress-done-gradient: linear-gradient(90deg, #4ade80, #84cc16);
-  --progress-done-glow: 0 0 14px rgba(74, 222, 128, 0.4);
-
-  --bg-pattern:
-    radial-gradient(ellipse 3px 8px at 8% 15%, rgba(74, 222, 128, 0.08), transparent),
-    radial-gradient(ellipse 4px 6px at 22% 40%, rgba(34, 197, 94, 0.06), transparent),
-    radial-gradient(ellipse 3px 9px at 35% 70%, rgba(132, 204, 22, 0.07), transparent),
-    radial-gradient(ellipse 5px 7px at 50% 20%, rgba(74, 222, 128, 0.05), transparent),
-    radial-gradient(ellipse 3px 8px at 65% 55%, rgba(16, 185, 129, 0.06), transparent),
-    radial-gradient(ellipse 4px 6px at 78% 35%, rgba(74, 222, 128, 0.07), transparent),
-    radial-gradient(ellipse 3px 9px at 92% 75%, rgba(34, 197, 94, 0.05), transparent),
-    radial-gradient(ellipse 4px 7px at 15% 85%, rgba(132, 204, 22, 0.06), transparent),
-    radial-gradient(ellipse 3px 6px at 42% 10%, rgba(16, 185, 129, 0.05), transparent),
-    radial-gradient(ellipse 5px 8px at 88% 50%, rgba(74, 222, 128, 0.04), transparent),
-    radial-gradient(ellipse 250px 200px at 25% 60%, rgba(16, 185, 129, 0.04), transparent),
-    radial-gradient(ellipse 200px 250px at 70% 30%, rgba(74, 222, 128, 0.03), transparent);
   --bg-pattern-opacity: 1;
 }
 

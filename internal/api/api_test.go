@@ -1405,12 +1405,12 @@ func TestUserThemeUpdate(t *testing.T) {
 
 	// Kid updates own theme
 	resp := env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/theme", kidID), map[string]any{
-		"theme": "galaxy",
+		"theme": "tint",
 	}, childHeaders(kidID), http.StatusOK)
 	var user map[string]any
 	decodeBody(t, resp, &user)
-	if user["theme"] != "galaxy" {
-		t.Fatalf("expected galaxy theme, got %v", user["theme"])
+	if user["theme"] != "tint" {
+		t.Fatalf("expected tint theme, got %v", user["theme"])
 	}
 }
 
@@ -1423,7 +1423,7 @@ func TestUserThemeUpdateForbiddenForOthers(t *testing.T) {
 
 	// Kid2 tries to update Kid1's theme
 	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/theme", kid1), map[string]any{
-		"theme": "quest",
+		"theme": "blocks",
 	}, childHeaders(kid2), http.StatusForbidden)
 }
 
@@ -2473,8 +2473,8 @@ func TestSetupCreatesAdminAndChildren(t *testing.T) {
 	resp := env.expectStatus(t, "POST", "/api/setup", map[string]any{
 		"parent": map[string]any{"name": "Robin", "pin": "2468"},
 		"children": []map[string]any{
-			{"name": "Alice", "theme": "galaxy"},
-			{"name": "Bob", "theme": "forest"},
+			{"name": "Alice", "theme": "tint"},
+			{"name": "Bob", "theme": "blocks"},
 		},
 		"chores": []map[string]any{
 			{"title": "Feed cats", "icon": "cat", "category": "required", "points_value": 5},

@@ -1,4 +1,10 @@
-export type Theme = 'default' | 'quest' | 'galaxy' | 'forest';
+// A person's skin (users.theme). An empty theme resolves by age on the client.
+export type Theme = 'sunroom' | 'blocks' | 'tint';
+
+// A person's colour key (users.color). Each theme defines its own shade.
+export type PersonColor = 'coral' | 'mint' | 'butter' | 'sky' | 'rose' | 'leaf' | 'lilac' | 'sand';
+
+export const PERSON_COLORS: readonly PersonColor[] = ['coral', 'mint', 'butter', 'sky', 'rose', 'leaf', 'lilac', 'sand'];
 
 export interface CategoryLabels {
   required: string;
@@ -30,7 +36,7 @@ export interface ThemeConfig {
 }
 
 export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
-  default: {
+  sunroom: {
     labels: { required: 'Essentials', core: 'Dailies', bonus: 'Bonus' },
     categoryIcons: { required: 'shield-check', core: 'circle-check', bonus: 'sparkles' },
     greetings: {
@@ -66,7 +72,7 @@ export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
       },
     },
   },
-  quest: {
+  blocks: {
     labels: { required: 'Main Quest', core: 'Side Quest', bonus: 'Loot' },
     categoryIcons: { required: 'swords', core: 'scroll', bonus: 'coins' },
     greetings: {
@@ -105,7 +111,7 @@ export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
       },
     },
   },
-  galaxy: {
+  tint: {
     labels: { required: 'Critical Mission', core: 'Star Tasks', bonus: 'Discovery' },
     categoryIcons: { required: 'rocket', core: 'orbit', bonus: 'telescope' },
     greetings: {
@@ -144,44 +150,6 @@ export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
       },
     },
   },
-  forest: {
-    labels: { required: 'Roots', core: 'Branches', bonus: 'Leaves' },
-    categoryIcons: { required: 'tree-pine', core: 'sprout', bonus: 'leaf' },
-    greetings: {
-      morning: 'The forest stirs',
-      afternoon: 'The sun is high',
-      evening: 'Twilight falls',
-    },
-    messages: {
-      choreComplete: 'The forest grows!',
-      allDone: 'Forest cleared!',
-      empty: 'The grove is peaceful today.',
-      streakLabel: 'Growth Ring',
-    },
-    confettiColors: ['#4ade80', '#22c55e', '#84cc16', '#fcd34d'],
-    sounds: {
-      complete: {
-        notes: [
-          { freq: 784, duration: 0.1, delay: 0 },
-          { freq: 988, duration: 0.08, delay: 0.08 },
-          { freq: 1175, duration: 0.06, delay: 0.14 },
-        ],
-        waveform: 'sine',
-        gain: 0.08,
-      },
-      allDone: {
-        notes: [
-          { freq: 523, duration: 0.15, delay: 0 },
-          { freq: 659, duration: 0.12, delay: 0.12 },
-          { freq: 784, duration: 0.1, delay: 0.22 },
-          { freq: 988, duration: 0.12, delay: 0.3 },
-          { freq: 1175, duration: 0.25, delay: 0.4 },
-        ],
-        waveform: 'sine',
-        gain: 0.08,
-      },
-    },
-  },
 };
 
 // Backward compat alias
@@ -197,6 +165,7 @@ export interface User {
   age?: number;
   theme: Theme;
   line_color?: string;
+  color?: PersonColor;
   paused: boolean;
   has_pin: boolean;
   // IDs of OIDC providers linked to this profile ("Continue with ...").
