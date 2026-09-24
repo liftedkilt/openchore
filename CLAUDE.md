@@ -14,7 +14,7 @@ Family chore-tracking PWA: Go API + React/TypeScript frontend, SQLite storage, o
 - `internal/api/` — chi handlers, middleware, auth; integration tests in `api_test.go`.
 - `internal/store/` — SQLite DAO (one method per query, `context.Context`-aware).
 - `internal/webhook/` — async dispatcher, HMAC-SHA256 signing, expiry/decay checkers.
-- `internal/config/` — YAML loader; **seeds only when DB is empty**.
+- `internal/config/` — YAML loader; **seeds only when DB is empty** (except `auth:`, read every start).
 - `internal/ai/`, `internal/aibackend/`, `internal/tts/`, `internal/discord/` — optional integrations.
 - `migrations/` — numbered `*_up.sql` / `*_down.sql` pairs.
 - `config/config.example.yaml` — dev seed data.
@@ -38,12 +38,14 @@ Family chore-tracking PWA: Go API + React/TypeScript frontend, SQLite storage, o
 - **Seed data:** edit `config/config.example.yaml`; the seeder only runs on an empty DB, so `make dev` (which wipes) is the way to re-seed.
 - **Points:** every points change must write a row to `point_transactions`.
 - **Bonus chores:** do not award bonus points unless all `required` and `core` chores for the day are complete.
-- **Auth:** `X-User-ID` header (and optional `Bearer` token); admin gated by PIN. No sessions. Middleware: `RequireUser`, `RequireUserOrToken`, `RequireAdmin`.
+- **Auth:** server-issued HMAC-signed sessions (`openchore_session` cookie or `Bearer ocs1.…`) from `POST /api/auth/login` (tap/PIN), OIDC (`internal/api/oidc.go`) or setup; API tokens (`Bearer <hex>`) act as admin. `X-User-ID` is **not** trusted. Admin is a role on a profile; every admin needs a PIN or linked identity. Middleware: `RequireSession`, `RequireUserOrToken`, `RequireAdmin`. See `docs/authentication.md`.
+- **Parents take part:** don't filter by `role = 'child'` for chores/points/rewards/streaks; role only gates management.
 - **Errors:** respond with JSON `{"error": "..."}` via `writeError(w, status, msg)`. Log with stdlib `log.Printf`.
 - **Background work:** long-running goroutines are started from `cmd/server/main.go` and must accept a `context.Context` for shutdown.
 
 ## Testing
-- Go: real DB + `httptest`, no mocks. Add cases alongside `internal/api/api_test.go`.
+- Go: real DB + `httptest`, no mocks. Add cases alongside `internal/api/api_test.go`; auth/OIDC cases (with a fake IdP) live in `auth_test.go`. Use `sessionHeaders(id)` / `adminHeaders()` to mint sessions.
+- E2E API calls: `authHeaders(userId)` from `e2e/tests/helpers/setup.ts` (signs in via the API); parents sign in with `loginAsAdmin(page)`.
 - E2E: Playwright (Chromium). Two projects — keep the `admin-pin-change` project's dependency ordering intact.
 - Frontend unit: Vitest (see `web/src/**/*.test.ts`).
 
