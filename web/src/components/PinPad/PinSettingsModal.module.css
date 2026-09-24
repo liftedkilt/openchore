@@ -1,13 +1,11 @@
-/* The body carries its own surface so it reads correctly in any scope,
-   whatever the modal frame around it looks like. */
+/* Modal draws its card in the tokens of the scope that opened it, so the
+   body needs no surface of its own. */
 .body {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-5) var(--space-4);
-  border-radius: var(--oc-radius-lg);
-  background: var(--surface);
+  padding: var(--space-2) 0;
   color: var(--ink);
   font-family: var(--font-text);
 }

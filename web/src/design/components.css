@@ -5,7 +5,7 @@
    ============================================================ */
 
 /* ---------- scopes ---------- */
-.oc-scope { position: relative; isolation: isolate; background: var(--surface); color: var(--ink); font-family: var(--font-text); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+.oc-scope { position: relative; isolation: isolate; color-scheme: var(--color-scheme, normal); background: var(--surface); color: var(--ink); font-family: var(--font-text); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 .oc-scope--door { filter: var(--door-filter, none); }
 /* Tint's glow in the person's colour. Clipped to the scope, behind content. */
 .oc-glow { display: var(--show-glow); position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }

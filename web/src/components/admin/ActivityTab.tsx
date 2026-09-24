@@ -1,13 +1,29 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
+import { Undo2 } from 'lucide-react';
 import { api } from '../../api';
 import type { User, PointTransaction } from '../../types';
-import styles from '../../pages/AdminDashboard.module.css';
-import { Star, Gift, Coins, Flame, Undo2, Activity } from 'lucide-react';
-import clsx from 'clsx';
+import { Avatar, Icon, type IconName } from '../../design';
+import { personColor } from './pickers';
+import ui from './ui.module.css';
+import styles from './ActivityTab.module.css';
+
+const REASON_ICON: Partial<Record<PointTransaction['reason'], IconName>> = {
+  chore_complete: 'check',
+  chore_uncomplete: 'back',
+  reward_redeem: 'gift',
+  streak_bonus: 'flame',
+  admin_adjust: 'star',
+  expiry_penalty: 'clock',
+  missed_chore: 'clock',
+  points_decay: 'moon',
+  commit_to_goal: 'rocket',
+  goal_break: 'rocket',
+};
 
 export const ActivityTab: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [users, setUsers] = useState<User[]>([]);
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,16 +31,14 @@ export const ActivityTab: React.FC = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const usrs = await api.users.list();
       // Parents take part too, so everyone's activity is listed.
-      const children = usrs;
-      setUsers(children);
+      const usrs = await api.users.list();
+      setUsers(usrs);
 
-      // Fetch transactions for all children
       const allTxns = await Promise.all(
-        children.map(async (u: User) => {
+        usrs.map(async (u: User) => {
           const data = await api.points.getForUser(u.id);
-          return data.transactions.map(t => ({ ...t, user_id: u.id }));
+          return data.transactions.map(tx => ({ ...tx, user_id: u.id }));
         })
       );
       // Flatten and sort by date descending
@@ -38,12 +52,9 @@ export const ActivityTab: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const getUserName = (id: number) => users.find(u => u.id === id)?.name || `User ${id}`;
-
   const formatTime = (dateStr: string) => {
     const d = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
+    const diffMs = Date.now() - d.getTime();
     const diffMin = Math.floor(diffMs / 60000);
     const diffHr = Math.floor(diffMs / 3600000);
 
@@ -51,79 +62,80 @@ export const ActivityTab: React.FC = () => {
     if (diffMin < 60) return t('admin.activityTab.minutesAgo', { count: diffMin });
     if (diffHr < 24) return t('admin.activityTab.hoursAgo', { count: diffHr });
 
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
-      d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return d.toLocaleDateString(i18n.language, { month: 'short', day: 'numeric' }) + ' ' +
+      d.toLocaleTimeString(i18n.language, { hour: 'numeric', minute: '2-digit' });
   };
 
   const getReasonLabel = (reason: string) => {
-    switch (reason) {
-      case 'chore_complete': return t('admin.activityTab.reason.chore_complete');
-      case 'chore_uncomplete': return t('admin.activityTab.reason.chore_uncomplete');
-      case 'reward_redeem': return t('admin.activityTab.reason.reward_redeem');
-      case 'streak_bonus': return t('admin.activityTab.reason.streak_bonus');
-      case 'admin_adjust': return t('admin.activityTab.reason.admin_adjust');
-      case 'expiry_penalty': return t('admin.activityTab.reason.expiry_penalty');
-      case 'points_decay': return t('admin.activityTab.reason.points_decay');
-      case 'missed_chore': return t('admin.activityTab.reason.missed_chore');
-      default: return reason;
-    }
-  };
-
-  const getReasonIcon = (reason: string) => {
-    switch (reason) {
-      case 'chore_complete': return <Star size={14} style={{ color: '#22c55e' }} />;
-      case 'chore_uncomplete': return <Undo2 size={14} style={{ color: '#ef4444' }} />;
-      case 'reward_redeem': return <Gift size={14} style={{ color: '#a78bfa' }} />;
-      case 'streak_bonus': return <Flame size={14} style={{ color: '#f59e0b' }} />;
-      case 'admin_adjust': return <Coins size={14} style={{ color: '#38bdf8' }} />;
-      default: return <Activity size={14} />;
-    }
+    const key = `admin.activityTab.reason.${reason}`;
+    return i18n.exists(key) ? t(key) : reason;
   };
 
   const handleUndo = async (txn: PointTransaction) => {
     if (txn.reason === 'reward_redeem' && txn.reference_id) {
       await api.rewards.undoRedemption(txn.reference_id);
     } else {
+      // An adjustment, so the undo is itself a point_transactions row.
       const note = `Undo: ${txn.note || getReasonLabel(txn.reason)}`;
       await api.points.adjust(txn.user_id, -txn.amount, note);
     }
     load();
   };
 
-  if (loading) return <p className={styles.emptyText}>{t('admin.activityTab.loading')}</p>;
+  if (loading) return <p className={ui.emptyInline}>{t('admin.activityTab.loading')}</p>;
 
   return (
-    <div>
-      <h2 className={styles.sectionTitle}>{t('admin.activityTab.title')}</h2>
-      <p className={styles.sectionSubtitle}>{t('admin.activityTab.eventCount', { count: transactions.length })}</p>
-
-      <div className={styles.activityList}>
-        {transactions.length === 0 && <p className={styles.emptyText}>{t('admin.activityTab.empty')}</p>}
-        {transactions.map(txn => (
-          <div key={`${txn.user_id}-${txn.id}`} className={styles.activityItem}>
-            <div className={styles.activityIcon}>{getReasonIcon(txn.reason)}</div>
-            <div className={styles.activityInfo}>
-              <div className={styles.activityMain}>
-                <span className={styles.activityUser}>{getUserName(txn.user_id)}</span>
-                <span className={styles.activityReason}>{getReasonLabel(txn.reason)}</span>
-              </div>
-              {txn.note && <div className={styles.activityNote}>{txn.note}</div>}
-              <div className={styles.activityTime}>{formatTime(txn.created_at)}</div>
-            </div>
-            <div className={clsx(styles.activityAmount, txn.amount > 0 ? styles.activityAmountPos : styles.activityAmountNeg)}>
-              {txn.amount > 0 ? '+' : ''}{txn.amount}
-            </div>
-            <button
-              className={clsx(styles.iconBtn, styles.iconBtnSm)}
-              title={t('admin.activityTab.undoTitle')}
-              aria-label={t('admin.activityTab.undoTitle')}
-              onClick={() => handleUndo(txn)}
-            >
-              <Undo2 size={14} />
-            </button>
-          </div>
-        ))}
+    <div className={ui.page}>
+      <div className={ui.pageHead}>
+        <div>
+          <h2 className={ui.pageTitle}>{t('admin.activityTab.title')}</h2>
+          <p className={ui.pageSub}>{t('admin.activityTab.eventCount', { count: transactions.length })}</p>
+        </div>
       </div>
+
+      {transactions.length === 0 ? (
+        <div className={ui.empty}>
+          <Icon name="clock" />
+          <p>{t('admin.activityTab.empty')}</p>
+        </div>
+      ) : (
+        <ul className={clsx(ui.list, styles.list)}>
+          {transactions.map(txn => {
+            const user = users.find(u => u.id === txn.user_id);
+            const name = user?.name ?? `User ${txn.user_id}`;
+            return (
+              <li key={`${txn.user_id}-${txn.id}`} className={ui.row}>
+                <span className={styles.avatar}>
+                  <Avatar name={name} color={personColor(user)} size="sm" />
+                  <span className={styles.reasonIcon} aria-hidden>
+                    <Icon name={REASON_ICON[txn.reason] ?? 'star'} />
+                  </span>
+                </span>
+                <div className={ui.rowMain}>
+                  <span className={styles.line}>
+                    <span className={styles.user}>{name}</span>
+                    <span className={styles.reason}>{getReasonLabel(txn.reason)}</span>
+                  </span>
+                  {txn.note && <span className={ui.rowDesc}>{txn.note}</span>}
+                  <span className={styles.time}>{formatTime(txn.created_at)}</span>
+                </div>
+                <span className={clsx(styles.amount, txn.amount < 0 && styles.amountNeg)}>
+                  {txn.amount > 0 ? '+' : txn.amount < 0 ? '−' : ''}{Math.abs(txn.amount)}
+                </span>
+                <button
+                  type="button"
+                  className={ui.iconBtn}
+                  title={t('admin.activityTab.undoTitle')}
+                  aria-label={t('admin.activityTab.undoTitle')}
+                  onClick={() => handleUndo(txn)}
+                >
+                  <Undo2 aria-hidden />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 };

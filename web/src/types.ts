@@ -334,6 +334,12 @@ export interface PendingCompletion {
   photo_url: string;
   completion_date: string;
   completed_at: string;
+  // Who clicked "complete" (child_name is their name).
+  completed_by?: number;
+  category?: 'required' | 'core' | 'bonus';
+  icon?: string;
+  points_value?: number;
+  ai_feedback?: string;
 }
 
 export interface UserDecayConfig {

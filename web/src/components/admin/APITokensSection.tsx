@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
+import { Trash2, Copy, KeyRound, X } from 'lucide-react';
 import { api } from '../../api';
 import type { APIToken } from '../../types';
-import styles from '../../pages/AdminDashboard.module.css';
-import { Plus, Trash2, Check, Copy, Key, AlertTriangle } from 'lucide-react';
-import clsx from 'clsx';
+import { Icon } from '../../design';
+import ui from './ui.module.css';
+import styles from './SettingsTab.module.css';
+import local from './APITokensSection.module.css';
 
 export const APITokensSection: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [tokens, setTokens] = useState<APIToken[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [tokenName, setTokenName] = useState('');
@@ -48,8 +51,6 @@ export const APITokensSection: React.FC = () => {
   const handleCopy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     } catch {
       // Fallback for older browsers
       const textarea = document.createElement('textarea');
@@ -58,126 +59,112 @@ export const APITokensSection: React.FC = () => {
       textarea.select();
       document.execCommand('copy');
       document.body.removeChild(textarea);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
+  const date = (s: string) => new Date(s).toLocaleDateString(i18n.language);
   const activeTokens = tokens.filter(tok => !tok.revoked);
   const revokedTokens = tokens.filter(tok => tok.revoked);
 
   return (
-    <div className={styles.form} style={{ marginTop: '1.5rem' }}>
-      <div className={styles.formHeader}>
-        <h3>{t('admin.apiTokens.heading')}</h3>
-        <button className={styles.btnSmall} onClick={() => { setShowForm(f => !f); setNewToken(null); }}>
-          <Plus size={14} /> {t('admin.apiTokens.addButton')}
+    <section className={clsx(ui.card, ui.section)}>
+      <div className={ui.sectionHead}>
+        <h3 className={ui.sectionTitle}><KeyRound aria-hidden className={local.titleIcon} /> {t('admin.apiTokens.heading')}</h3>
+        <button
+          type="button"
+          className={ui.btnGhost}
+          aria-expanded={showForm}
+          onClick={() => { setShowForm(f => !f); setNewToken(null); }}
+        >
+          {showForm ? <X aria-hidden /> : <Icon name="plus" />}
+          {showForm ? t('admin.apiTokens.cancel') : t('admin.apiTokens.addButton')}
         </button>
       </div>
-      <p className={styles.sectionDesc}>
-        {t('admin.apiTokens.description')}
-      </p>
+      <p className={ui.sectionDesc}>{t('admin.apiTokens.description')}</p>
 
-      {/* New token reveal banner */}
+      {/* New token reveal */}
       {newToken && (
-        <div className={styles.tokenRevealBox}>
-          <div className={styles.flexRow} style={{ marginBottom: '0.5rem' }}>
-            <AlertTriangle size={16} style={{ color: '#f59e0b' }} />
-            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f59e0b' }}>
-              {t('admin.apiTokens.copyNowWarning')}
-            </span>
-          </div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-            {t('admin.apiTokens.tokenFor', { name: newToken.name })}
-          </p>
-          <div className={styles.flexRow}>
-            <code className={styles.tokenCode}>
-              {newToken.token}
-            </code>
-            <button
-              className={styles.btnSmall}
-              onClick={() => handleCopy(newToken.token)}
-              style={{ flexShrink: 0 }}
-            >
-              {copied ? <><Check size={14} /> {t('admin.apiTokens.copied')}</> : <><Copy size={14} /> {t('admin.apiTokens.copy')}</>}
+        <div className={local.reveal} role="status">
+          <p className={ui.msgWaiting}><Icon name="lock" /> {t('admin.apiTokens.copyNowWarning')}</p>
+          <p className={ui.help}>{t('admin.apiTokens.tokenFor', { name: newToken.name })}</p>
+          <div className={local.tokenRow}>
+            <code className={local.token}>{newToken.token}</code>
+            <button type="button" className={ui.btn} onClick={() => handleCopy(newToken.token)}>
+              {copied ? <><Icon name="check" /> {t('admin.apiTokens.copied')}</> : <><Copy aria-hidden /> {t('admin.apiTokens.copy')}</>}
             </button>
           </div>
-          <button onClick={() => setNewToken(null)} className={styles.dismissBtn}>
-            {t('admin.apiTokens.dismiss')}
-          </button>
+          <div>
+            <button type="button" className={ui.btnGhost} onClick={() => setNewToken(null)}>
+              {t('admin.apiTokens.dismiss')}
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Create form */}
       {showForm && (
-        <form onSubmit={handleCreate} style={{ marginBottom: '1rem' }}>
-          <div className={styles.formGrid}>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>{t('admin.apiTokens.tokenNameLabel')}</label>
-              <input
-                className={styles.input}
-                value={tokenName}
-                onChange={e => setTokenName(e.target.value)}
-                placeholder={t('admin.apiTokens.tokenNamePlaceholder')}
-                required
-                autoFocus
-              />
-            </div>
-          </div>
-          <div className={styles.formActions}>
-            <button type="submit" className={styles.btnPrimary} disabled={creating || !tokenName.trim()}>
-              <Key size={14} /> {creating ? t('admin.apiTokens.creating') : t('admin.apiTokens.createToken')}
+        <form onSubmit={handleCreate} className={ui.inset}>
+          <label className={ui.field}>
+            <span className={ui.label}>{t('admin.apiTokens.tokenNameLabel')}</span>
+            <input
+              className={ui.input}
+              value={tokenName}
+              onChange={e => setTokenName(e.target.value)}
+              placeholder={t('admin.apiTokens.tokenNamePlaceholder')}
+              required
+              autoFocus
+            />
+          </label>
+          <div className={ui.actionsEnd}>
+            <button type="submit" className={ui.btnPrimary} disabled={creating || !tokenName.trim()}>
+              <Icon name="check" /> {creating ? t('admin.apiTokens.creating') : t('admin.apiTokens.createToken')}
             </button>
-            <button type="button" className={styles.btnSecondary} onClick={() => setShowForm(false)}>{t('admin.apiTokens.cancel')}</button>
           </div>
         </form>
       )}
 
-      {/* Token list */}
       {activeTokens.length === 0 && revokedTokens.length === 0 && !showForm && (
-        <p className={styles.emptyTextItalic}>{t('admin.apiTokens.noTokens')}</p>
+        <p className={ui.emptyInline}>{t('admin.apiTokens.noTokens')}</p>
       )}
 
-      {activeTokens.map(tok => (
-        <div key={tok.id} className={styles.listItem} style={{ marginBottom: '0.5rem' }}>
-          <div className={styles.listItemContentRow}>
-            <Key size={16} style={{ color: 'var(--accent-blue)', flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className={styles.tokenName}>{tok.name}</div>
-              <div className={styles.tokenMeta}>
-                <span>{t('admin.apiTokens.created', { date: new Date(tok.created_at).toLocaleDateString() })}</span>
-                {tok.last_used_at && <span>{t('admin.apiTokens.lastUsed', { date: new Date(tok.last_used_at).toLocaleDateString() })}</span>}
-                {!tok.last_used_at && <span style={{ fontStyle: 'italic' }}>{t('admin.apiTokens.neverUsed')}</span>}
+      {activeTokens.length > 0 && (
+        <div className={styles.subList}>
+          {activeTokens.map(tok => (
+            <div key={tok.id} className={local.tokenItem}>
+              <div className={ui.rowMain}>
+                <span className={ui.rowTitle}>{tok.name}</span>
+                <span className={ui.rowMeta}>
+                  <span>{t('admin.apiTokens.created', { date: date(tok.created_at) })}</span>
+                  <span>{tok.last_used_at ? t('admin.apiTokens.lastUsed', { date: date(tok.last_used_at) }) : t('admin.apiTokens.neverUsed')}</span>
+                </span>
               </div>
+              <button type="button" className={ui.btnDanger} onClick={() => handleRevoke(tok.id)}>
+                <Trash2 aria-hidden /> {t('admin.apiTokens.revoke')}
+              </button>
             </div>
-            <button className={clsx(styles.btnSmall, styles.btnDanger)} onClick={() => handleRevoke(tok.id)}>
-              <Trash2 size={14} /> {t('admin.apiTokens.revoke')}
-            </button>
-          </div>
+          ))}
         </div>
-      ))}
+      )}
 
       {revokedTokens.length > 0 && (
         <>
-          <div className={styles.revokedLabel}>
-            {t('admin.apiTokens.revokedLabel')}
-          </div>
-          {revokedTokens.map(tok => (
-            <div key={tok.id} className={styles.listItem} style={{ marginBottom: '0.5rem', opacity: 0.5 }}>
-              <div className={styles.listItemContentRow}>
-                <Key size={16} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className={styles.tokenName} style={{ textDecoration: 'line-through' }}>{tok.name}</div>
-                  <div className={styles.tokenMeta}>
-                    <span>{t('admin.apiTokens.created', { date: new Date(tok.created_at).toLocaleDateString() })}</span>
-                    <span style={{ color: '#ef4444', fontWeight: 600 }}>{t('admin.apiTokens.revokedStatus')}</span>
-                  </div>
+          <h4 className={ui.eyebrow}>{t('admin.apiTokens.revokedLabel')}</h4>
+          <div className={clsx(styles.subList, ui.rowMuted)}>
+            {revokedTokens.map(tok => (
+              <div key={tok.id} className={local.tokenItem}>
+                <div className={ui.rowMain}>
+                  <span className={clsx(ui.rowTitle, local.struck)}>{tok.name}</span>
+                  <span className={ui.rowMeta}>
+                    <span>{t('admin.apiTokens.created', { date: date(tok.created_at) })}</span>
+                    <span className={ui.badgeOutline}>{t('admin.apiTokens.revokedStatus')}</span>
+                  </span>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </>
       )}
-    </div>
+    </section>
   );
 };
