@@ -10,9 +10,11 @@ test.describe('Screenshots', () => {
   const dir = 'screenshots';
 
   test('01 - Profile Selection', async ({ page }) => {
-    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.setViewportSize({ width: 1180, height: 820 });
     await page.goto('/login');
     await expect(profileButton(page, 'Emma')).toBeVisible({ timeout: 10_000 });
+    // Wait for every kid's door to load its day (progress and what's left).
+    await expect(page.getByText(/\d+ to go|All done/)).toHaveCount(3, { timeout: 10_000 });
     await page.screenshot({ path: `${dir}/01-profile-selection.png`, fullPage: false });
   });
 
