@@ -19,8 +19,10 @@ test.describe('Ambient Dashboard', () => {
   test('shows current time', async ({ page }) => {
     await page.goto('/ambient');
 
-    // Should show a time display (HH:MM format)
-    await expect(page.getByText(/\d{1,2}:\d{2}/)).toBeVisible({ timeout: 5_000 });
+    // Should show a time display (HH:MM format). Chore rows can show times
+    // too ("Before 9:00 AM"), so look at the clock itself.
+    await expect(page.getByTestId('wall-clock')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId('wall-clock')).toHaveText(/\d{1,2}:\d{2}/);
   });
 
   test('clicking anywhere navigates to login', async ({ page }) => {
