@@ -1187,6 +1187,7 @@
     "nextUp": "Next up",
     "opensAt": "From {{time}}",
     "dueBy": "Before {{time}}",
+    "late": "Was due {{time}}",
     "familyToday": "The family today",
     "chartTitle": "Today so far",
     "chartDesc": "How much of their day each person has done, hour by hour. Now: {{summary}}.",
