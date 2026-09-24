@@ -12,6 +12,8 @@
    grown-up tools, wall display). Never a personal skin. House Dark shares
    every dial; only its tokens differ. */
 :root, [data-theme="house"], [data-theme="house-dark"] {
+  /* Native controls (date pickers, scrollbars, checkboxes) follow the ground. */
+  --color-scheme: light;
   --font-display: "Onest Variable", Onest, system-ui, sans-serif;
   --font-text: "Onest Variable", Onest, system-ui, sans-serif;
   --display-weight: 600;
@@ -46,9 +48,11 @@
    so a cream Sunroom or white Blocks door doesn't glare at night. */
 [data-theme="house-dark"] {
   --door-filter: brightness(0.86) saturate(0.9);
+  --color-scheme: dark;
 }
 
 [data-theme="sunroom"] {
+  --color-scheme: light;
   --font-display: "Fraunces Variable", Fraunces, Georgia, serif;
   --font-text: "Figtree Variable", Figtree, system-ui, sans-serif;
   --display-weight: 500;
@@ -78,6 +82,7 @@
 }
 
 [data-theme="blocks"] {
+  --color-scheme: light;
   --font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
   --font-text: "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
   --display-weight: 800;
@@ -107,6 +112,7 @@
 }
 
 [data-theme="tint"] {
+  --color-scheme: dark;
   --font-display: "Instrument Sans Variable", "Instrument Sans", system-ui, sans-serif;
   --font-text: "Instrument Sans Variable", "Instrument Sans", system-ui, sans-serif;
   --display-weight: 600;
