@@ -12,7 +12,7 @@ test.describe('Screenshots', () => {
   test('01 - Profile Selection', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.goto('/login');
-    await expect(page.getByText('Emma')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Emma', { exact: true })).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: `${dir}/01-profile-selection.png`, fullPage: false });
   });
 
