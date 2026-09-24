@@ -94,8 +94,7 @@ export const KidApp: React.FC = () => {
   const { bonusOpen, requiredDone } = gates(todayChores);
   const viewOf = useCallback((c: ScheduledChore): ChoreView => choreView(c, {
     now, today: data.today, bonusOpen, requiredDone, t,
-    aiFeedback: data.aiFeedback[c.schedule_id],
-  }), [now, data.today, bonusOpen, requiredDone, t, data.aiFeedback]);
+  }), [now, data.today, bonusOpen, requiredDone, t]);
 
   // The whole day done: the skin's fanfare (not on first load).
   const doneCount = todayChores.filter(isDone).length;
@@ -153,16 +152,9 @@ export const KidApp: React.FC = () => {
     const c = photoChore;
     setPhotoChore(null);
     if (!c) return;
-    data.clearFeedback(c.schedule_id);
     await data.refreshAll();
     if (!c.completed) celebrate(c);
   }, [photoChore, data, celebrate]);
-
-  const onAIReject = useCallback((scheduleId: number, feedback: string, audioUrl?: string) => {
-    data.setFeedback(scheduleId, { text: feedback, audioUrl });
-    setPhotoChore(null);
-    data.reloadChores();
-  }, [data]);
 
   const setTtsPref = (on: boolean) => {
     if (!user) return;
@@ -263,7 +255,6 @@ export const KidApp: React.FC = () => {
           baseUrl={baseUrl}
           onClose={() => setPhotoChore(null)}
           onComplete={onPhotoDone}
-          onAIReject={onAIReject}
         />
       )}
 

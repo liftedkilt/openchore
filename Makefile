@@ -18,19 +18,19 @@ dev:
 	rm -f openchore.db openchore.db-shm openchore.db-wal
 	make -j 2 api ui
 
-# Run both API and UI with AI sidecars (LiteRT + Kokoro)
+# Run both API and UI with the local AI services (llama.cpp + Kokoro)
 dev-ai: ai-up
 	@test -f config/config.yaml || (cp config/config.example.yaml config/config.yaml && echo "Created config/config.yaml from example")
 	rm -f openchore.db openchore.db-shm openchore.db-wal
-	OLLAMA_ENDPOINT=http://localhost:11434 TTS_ENDPOINT=http://localhost:8880 make -j 2 api ui
+	AI_BASE_URL=http://localhost:8081/v1 AI_MODEL=gemma-4-e4b TTS_BASE_URL=http://localhost:8880/v1 make -j 2 api ui
 
-# Start AI sidecars (LiteRT + Kokoro) with ports published for local dev
+# Start the local AI services with ports published for local dev
 ai-up:
-	docker compose -f compose.yaml -f compose.dev-ai.yaml --profile ai up -d litert kokoro
+	docker compose -f compose.yaml -f compose.dev-ai.yaml --profile ai --profile tts up -d llama kokoro
 
-# Stop AI sidecars
+# Stop the local AI services
 ai-down:
-	docker compose -f compose.yaml -f compose.dev-ai.yaml --profile ai down
+	docker compose -f compose.yaml -f compose.dev-ai.yaml --profile ai --profile tts down
 
 # Install dependencies for both
 install:
@@ -68,9 +68,9 @@ help:
 	@echo "  api     - Run the API server (Go)"
 	@echo "  ui      - Run the UI (Vite)"
 	@echo "  dev     - Run both API and UI concurrently (fresh DB, auto-seeded from config)"
-	@echo "  dev-ai  - Same as dev but with AI sidecars (LiteRT + Kokoro)"
-	@echo "  ai-up   - Start AI sidecars in Docker"
-	@echo "  ai-down - Stop AI sidecars"
+	@echo "  dev-ai  - Same as dev but with local AI (llama.cpp + Kokoro in Docker)"
+	@echo "  ai-up   - Start the local AI services in Docker"
+	@echo "  ai-down - Stop the local AI services"
 	@echo "  install - Install dependencies for both API and UI"
 	@echo "  build   - Build both API and UI"
 	@echo "  test              - Run Go tests"

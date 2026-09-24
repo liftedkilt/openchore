@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { QRCodeSVG } from 'qrcode.react';
-import { api, APIError } from '../../api';
+import { api } from '../../api';
 import type { ScheduledChore } from '../../types';
 import { Icon } from '../../design';
 import { Sheet } from './Sheet';
@@ -15,14 +15,13 @@ interface PhotoSheetProps {
   onClose: () => void;
   /** The photo arrived and the chore is finished (or the proof attached). */
   onComplete: () => void;
-  onAIReject: (scheduleId: number, feedback: string, audioUrl?: string) => void;
 }
 
 /**
  * Photo proof for a chore: scan a QR code with another device, or take the
  * photo on this one. Polls until the photo (and completion) lands.
  */
-export function PhotoSheet({ chore, userId, baseUrl, onClose, onComplete, onAIReject }: PhotoSheetProps) {
+export function PhotoSheet({ chore, userId, baseUrl, onClose, onComplete }: PhotoSheetProps) {
   const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -71,12 +70,7 @@ export function PhotoSheet({ chore, userId, baseUrl, onClose, onComplete, onAIRe
       }
       onComplete();
     } catch (err) {
-      if (err instanceof APIError && err.status === 422 && err.data?.ai_review) {
-        // Close and show the feedback on the chore itself.
-        onAIReject(chore.schedule_id, err.data.ai_review.feedback, err.data.ai_review.feedback_audio);
-      } else {
-        setUploadError((err as Error)?.message || t('kid.photo.uploadFailed'));
-      }
+      setUploadError((err as Error)?.message || t('kid.photo.uploadFailed'));
     } finally {
       setUploading(false);
     }

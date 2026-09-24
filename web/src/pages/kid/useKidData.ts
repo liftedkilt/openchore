@@ -1,6 +1,6 @@
 // Data and actions behind a person's own screens (Today, Week, Rewards).
 // The business rules live on the server; this keeps the old dashboard's
-// client behaviour: double-tap guards, photo flow fallbacks, AI feedback,
+// client behaviour: double-tap guards, photo flow fallbacks,
 // optimistic auto-save and the same error toasts.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,8 +9,6 @@ import type {
   PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
 } from '../../types';
 import { localDateStr } from '../../utils';
-
-export interface AIFeedback { text: string; audioUrl?: string }
 
 export interface ToggleResult {
   /** The chore was finished (show the celebration). */
@@ -31,7 +29,6 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   const [redemptions, setRedemptions] = useState<RedemptionHistory[]>([]);
   const [people, setPeople] = useState<User[]>([]);
   const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
-  const [aiFeedback, setAiFeedback] = useState<Record<number, AIFeedback>>({});
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -114,19 +111,6 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
     await Promise.all([reloadChores(), loadExtras()]);
   }, [reloadChores, loadExtras]);
 
-  const clearFeedback = useCallback((scheduleId: number) => {
-    setAiFeedback(prev => {
-      if (!(scheduleId in prev)) return prev;
-      const next = { ...prev };
-      delete next[scheduleId];
-      return next;
-    });
-  }, []);
-
-  const setFeedback = useCallback((scheduleId: number, fb: AIFeedback) => {
-    setAiFeedback(prev => ({ ...prev, [scheduleId]: fb }));
-  }, []);
-
   const togglingRef = useRef(togglingIds);
   togglingRef.current = togglingIds;
 
@@ -152,7 +136,9 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
       const needsPhoto = chore.requires_photo && (chore.photo_source || 'child') === 'child';
       try {
         // With a photo required this may still succeed: the server revives an
-        // earlier approved completion from today (photo and AI review kept).
+        // earlier completion from today (kept so an accidental uncheck and
+        // recheck doesn't lose the photo). Otherwise it answers 400 "photo
+        // required" and the photo sheet opens.
         await api.chores.complete(chore.schedule_id, chore.date);
       } catch (e) {
         if (needsPhoto && e instanceof APIError && e.status === 400) {
@@ -161,15 +147,11 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
         }
         throw e;
       }
-      clearFeedback(chore.schedule_id);
       await refreshAll();
       return { finished: true };
     } catch (err) {
-      if (err instanceof APIError && err.status === 422 && err.data?.ai_review) {
-        setFeedback(chore.schedule_id, { text: err.data.ai_review.feedback, audioUrl: err.data.ai_review.feedback_audio });
-        await reloadChores();
-      } else if (err instanceof APIError && (err.status === 400 || err.status === 422)) {
-        // Validation errors surface through the photo sheet or AI feedback.
+      if (err instanceof APIError && (err.status === 400 || err.status === 422)) {
+        // Validation errors surface through more specific paths (the photo sheet).
         console.error(err);
       } else {
         console.error(err);
@@ -184,7 +166,7 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
         return next;
       });
     }
-  }, [today, refreshAll, reloadChores, clearFeedback, setFeedback, showToast, t]);
+  }, [today, refreshAll, showToast, t]);
 
   // --- Rewards and goals ---
 
@@ -311,8 +293,8 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
 
   return {
     today, chores, weekChores, streak, points, rewards, redemptions, people,
-    togglingIds, aiFeedback, toast, showToast,
-    reloadChores, refreshAll, loadRewards, clearFeedback, setFeedback, toggle,
+    togglingIds, toast, showToast,
+    reloadChores, refreshAll, loadRewards, toggle,
     commitmentFor, redeem, redeemingId, redeemedId, saveToward, savingTowardId,
     contribute, setAutoContribute, breakCommitment, busyGoals,
   };

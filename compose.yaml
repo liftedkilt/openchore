@@ -9,8 +9,14 @@ services:
     environment:
       - TZ=America/Los_Angeles
       - CONFIG_PATH=/app/config/config.yaml
-      - AI_ENDPOINT=${AI_ENDPOINT:-${OLLAMA_ENDPOINT:-http://litert:8080}}  # OLLAMA_ENDPOINT still accepted for backward compat
-      - TTS_ENDPOINT=${TTS_ENDPOINT:-http://kokoro:8880}
+      # Optional AI and read-aloud audio: both are off unless a base URL is
+      # set. Any OpenAI-compatible server works; see docs/ai.md.
+      - AI_BASE_URL=${AI_BASE_URL:-}
+      - AI_API_KEY=${AI_API_KEY:-}
+      - AI_MODEL=${AI_MODEL:-}
+      - TTS_BASE_URL=${TTS_BASE_URL:-}
+      - TTS_API_KEY=${TTS_API_KEY:-}
+      - TTS_MODEL=${TTS_MODEL:-}
     volumes:
       - openchore-data:/data
       - ./config:/app/config:ro
@@ -36,57 +42,43 @@ services:
       api:
         condition: service_healthy
 
-  # Optional: AI photo review via LiteRT (recommended) or Ollama.
-  # Enable with: docker compose --profile ai up
-  #
-  # LiteRT is 15x faster and uses 3x less RAM than Ollama for Gemma 4.
-  # Ollama is provided as an alternative for users who prefer it.
-
-  # Default: LiteRT-LM — Gemma 4 E4B vision + text (~3.1GB RAM, ~5s per review)
-  litert:
-    image: ghcr.io/liftedkilt/openchore/litert:latest
-    build:
-      context: ./litert
-      dockerfile: Containerfile
-    container_name: openchore-litert
+  # Optional: a local vision model for photo review, chore descriptions and
+  # weekly summaries — Gemma 4 E4B on llama.cpp's server (~5 GB download on
+  # first start, ~6 GB RAM). Enable with `docker compose --profile ai up -d`
+  # and, in .env:
+  #   AI_BASE_URL=http://llama:8080/v1
+  #   AI_MODEL=gemma-4-e4b
+  # Prefer Ollama, LM Studio or a hosted API? Point AI_BASE_URL there instead.
+  llama:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: openchore-llama
     restart: unless-stopped
     profiles:
       - ai
+    command: ["-hf", "ggml-org/gemma-4-E4B-it-GGUF:Q4_0", "--host", "0.0.0.0", "--port", "8080", "--ctx-size", "8192"]
+    environment:
+      - LLAMA_CACHE=/models
     volumes:
-      - litert-model:/app/model
+      - llama-models:/models
     expose:
       - "8080"
     deploy:
       resources:
         limits:
-          memory: 4G
+          memory: 7G
 
-  # Alternative: Ollama — heavier but supports model hot-swapping (~7.3GB RAM, ~75s per review)
-  ollama:
-    image: ollama/ollama:latest
-    container_name: openchore-ollama
-    restart: unless-stopped
-    profiles:
-      - ollama
-    volumes:
-      - ollama-models:/root/.ollama
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    expose:
-      - "11434"
-
-  # Optional: Text-to-speech via Kokoro (~2GB RAM)
-  # Kokoro-82M: high-quality TTS (4.5 MOS), OpenAI-compatible API, CPU-friendly
+  # Optional: read-aloud audio via Kokoro (~2 GB RAM). Enable with
+  # `docker compose --profile tts up -d` and, in .env:
+  #   TTS_BASE_URL=http://kokoro:8880/v1
+  # Without it, chores are read aloud by the browser's built-in voice.
   kokoro:
     image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.2.4
     container_name: openchore-kokoro
     restart: unless-stopped
     profiles:
-      - ai
+      - tts
     volumes:
       - kokoro-data:/app/api/src/voices/v1_0
-    environment:
-      - KOKORO_DEFAULT_VOICE=${KOKORO_VOICE:-af_heart}
     expose:
       - "8880"
     deploy:
@@ -96,6 +88,5 @@ services:
 
 volumes:
   openchore-data:
-  litert-model:
-  ollama-models:
+  llama-models:
   kokoro-data:

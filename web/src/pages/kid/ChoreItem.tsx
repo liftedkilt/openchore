@@ -25,8 +25,7 @@ export const choreDomId = (c: ScheduledChore) => `chore-${c.schedule_id}-${c.dat
 
 /**
  * One chore on a person's screen: the design's ChoreRow, plus what the old
- * card also carried — the description, the photo AI's feedback, a camera
- * for adding photo proof, and swipe right to finish / left to undo.
+ * card also carried — the description, a camera for adding photo proof, and swipe right to finish / left to undo.
  */
 export function ChoreItem({ chore, view, busy, tts, onToggle, onPhoto, onSpeak }: ChoreItemProps) {
   const { t } = useTranslation();
@@ -38,7 +37,8 @@ export function ChoreItem({ chore, view, busy, tts, onToggle, onPhoto, onSpeak }
   const done = view.state === 'done' || view.state === 'waiting';
 
   const readAloud = () => {
-    const text = chore.tts_description || (chore.title + (chore.description ? `. ${chore.description}` : ''));
+    // The recorded clip reads the same title and description.
+    const text = chore.title + (chore.description ? `. ${chore.description}` : '');
     onSpeak?.(text, chore.tts_audio_url);
   };
 
@@ -114,20 +114,6 @@ export function ChoreItem({ chore, view, busy, tts, onToggle, onPhoto, onSpeak }
       {readOnly ? <fieldset disabled className={s.readonly}>{row}</fieldset> : row}
       {chore.description && view.state !== 'done' && (
         <p className={s.caption}>{chore.description}</p>
-      )}
-      {view.note && (
-        <div className={s.note} data-kind={view.note.kind} role={view.note.kind === 'rejected' ? 'alert' : undefined}>
-          <Icon name={view.note.kind === 'rejected' ? 'camera' : 'spark'} />
-          <span className={s.noteText}>{view.note.text}</span>
-          <button
-            type="button"
-            className={s.noteListen}
-            onClick={() => onSpeak?.(view.note!.text, view.note!.audioUrl)}
-            aria-label={t('kid.chore.listenToFeedback')}
-          >
-            <Icon name="sound" />
-          </button>
-        </div>
       )}
     </div>
   );

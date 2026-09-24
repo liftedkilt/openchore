@@ -18,8 +18,6 @@ export interface ChoreViewContext {
   bonusOpen: boolean;
   /** Every Must do chore today is done (Every day points pay out). */
   requiredDone: boolean;
-  /** AI feedback the client just received for this chore (422 on complete). */
-  aiFeedback?: { text: string; audioUrl?: string };
   t: TFunction;
   lang?: string;
 }
@@ -41,8 +39,6 @@ export interface ChoreView {
   retry: boolean;
   /** Done, but a photo still has to be added from another device. */
   needsPhotoProof: boolean;
-  /** Feedback on the photo, shown under the row. */
-  note?: { kind: 'rejected' | 'approved'; text: string; audioUrl?: string };
 }
 
 /** "HH:MM" today as a Date. */
@@ -77,12 +73,6 @@ export function choreView(c: ScheduledChore, ctx: ChoreViewContext): ChoreView {
   const base: ChoreView = {
     cat, state: 'todo', urgent: false, photo, canToggle: isToday, retry: false, needsPhotoProof: false,
   };
-
-  const feedback = ctx.aiFeedback?.text || (c.completion_status === 'ai_rejected' ? c.ai_feedback : undefined);
-  if (feedback) base.note = { kind: 'rejected', text: feedback, audioUrl: ctx.aiFeedback?.audioUrl };
-  else if (c.completed && c.completion_status === 'approved' && c.ai_feedback) {
-    base.note = { kind: 'approved', text: c.ai_feedback };
-  }
 
   const doneAt = c.completed_at ? new Date(c.completed_at) : null;
   const doneAtLine = doneAt && !Number.isNaN(doneAt.getTime())
@@ -156,9 +146,6 @@ export function choreView(c: ScheduledChore, ctx: ChoreViewContext): ChoreView {
   }
 
   // --- To do ---
-  if (feedback) {
-    return { ...base, urgent: true, meta: t('kid.chore.photoRejected'), points: c.points_value };
-  }
   if (c.due_by) {
     const due = atTime(c.due_by, now);
     const left = (due.getTime() - now.getTime()) / 60000;

@@ -5,14 +5,14 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"strconv"
-	"strings"
+	"sync"
 	"time"
 
-	"github.com/liftedkilt/openchore/internal/ai"
 	"github.com/liftedkilt/openchore/internal/discord"
+	"github.com/liftedkilt/openchore/internal/llm"
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/store"
+	"github.com/liftedkilt/openchore/internal/tts"
 	"github.com/liftedkilt/openchore/internal/webhook"
 )
 
@@ -20,28 +20,26 @@ type ChoreHandler struct {
 	store      *store.Store
 	dispatcher *webhook.Dispatcher
 	discord    *discord.Notifier
-	reviewer   *ai.Reviewer
-	ttsGen     *ai.TTSGenerator
-	ttsSyncer  *ai.TTSSyncer
-	descGen    *ai.DescriptionGenerator
-	summarizer *ai.Summarizer
+	ai         *llm.Client     // nil when AI_BASE_URL is unset
+	audio      *tts.ChoreAudio // nil when TTS_BASE_URL is unset
+	reviews    sync.WaitGroup  // in-flight background photo reviews
 }
 
 func NewChoreHandler(s *store.Store, d *webhook.Dispatcher, dn *discord.Notifier) *ChoreHandler {
 	return &ChoreHandler{store: s, dispatcher: d, discord: dn}
 }
 
-// SetAIServices sets the optional AI reviewer and TTS generator.
-func (h *ChoreHandler) SetAIServices(reviewer *ai.Reviewer, ttsGen *ai.TTSGenerator, syncer *ai.TTSSyncer) {
-	h.reviewer = reviewer
-	h.ttsGen = ttsGen
-	h.ttsSyncer = syncer
+// SetAI wires in the optional AI client and read-aloud audio. Either may be
+// nil. Call before serving requests.
+func (h *ChoreHandler) SetAI(ai *llm.Client, audio *tts.ChoreAudio) {
+	h.ai = ai
+	h.audio = audio
 }
 
-// SetAIExtras sets the optional AI description generator and summarizer.
-func (h *ChoreHandler) SetAIExtras(descGen *ai.DescriptionGenerator, summarizer *ai.Summarizer) {
-	h.descGen = descGen
-	h.summarizer = summarizer
+// WaitForReviews blocks until background photo reviews finish (for tests
+// and shutdown).
+func (h *ChoreHandler) WaitForReviews() {
+	h.reviews.Wait()
 }
 
 func (h *ChoreHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -137,25 +135,8 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate TTS description + audio in background if AI TTS is enabled
-	if h.ttsGen != nil {
-		ttsEnabled, _ := h.store.GetSetting(r.Context(), "ai_tts_enabled")
-		if ttsEnabled == "true" {
-			go func() {
-				ctx := context.Background()
-				desc, audioURL, err := h.ttsGen.GenerateAndSynthesize(ctx, chore.Title, chore.Description, chore.ID)
-				if err != nil {
-					log.Printf("ai: TTS generation failed for chore %d: %v", chore.ID, err)
-					return
-				}
-				if desc != "" {
-					_ = h.store.UpdateChoreTTSDescription(ctx, chore.ID, desc)
-				}
-				if audioURL != "" {
-					_ = h.store.UpdateChoreTTSAudioURL(ctx, chore.ID, audioURL)
-				}
-			}()
-		}
+	if h.audio != nil {
+		h.audio.GenerateAsync(*chore)
 	}
 
 	writeJSON(w, http.StatusCreated, chore)
@@ -182,6 +163,7 @@ func (h *ChoreHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	spokenBefore := tts.SpokenText(existing)
 	if req.Title != "" {
 		existing.Title = req.Title
 	}
@@ -225,6 +207,9 @@ func (h *ChoreHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to update chore")
 		return
 	}
+	if h.audio != nil && (existing.TTSAudioURL == "" || tts.SpokenText(existing) != spokenBefore) {
+		h.audio.GenerateAsync(*existing)
+	}
 	writeJSON(w, http.StatusOK, existing)
 }
 
@@ -238,6 +223,7 @@ func (h *ChoreHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to delete chore")
 		return
 	}
+	tts.Remove(id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -370,6 +356,9 @@ type completeChoreRequest struct {
 	CompletedBy    int64  `json:"completed_by"`
 	CompletionDate string `json:"completion_date"`
 	PhotoURL       string `json:"photo_url"`
+	// SkipPhoto finishes a photo chore without one; it then waits for a
+	// parent to approve instead.
+	SkipPhoto bool `json:"skip_photo"`
 }
 
 func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
@@ -457,15 +446,26 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	if existing != nil {
 		if existing.UncompletedAt != nil {
 			// Soft-deleted prior completion exists. Approved + pending rows
-			// are revived in place so the kid keeps the photo / AI feedback /
+			// are revived in place so the kid keeps the photo / AI note /
 			// approval metadata and doesn't have to retake a photo after an
-			// accidental uncheck. ai_rejected and rejected rows should not
-			// be revivable — treat them as fresh retry targets by hard-deleting
-			// and falling through to the normal complete flow.
+			// accidental uncheck. Rejected rows are not revivable — treat
+			// them as fresh retry targets by hard-deleting and falling
+			// through to the normal complete flow.
 			if existing.Status == model.StatusApproved || existing.Status == model.StatusPending {
 				if err := h.store.ReviveCompletionAndReverseDebits(r.Context(), existing.ID); err != nil {
 					writeError(w, http.StatusInternalServerError, "failed to revive completion")
 					return
+				}
+				// A kid who skipped the photo may be re-checking with one now.
+				if req.PhotoURL != "" && req.PhotoURL != existing.PhotoURL {
+					if err := h.store.UpdateCompletionPhoto(r.Context(), existing.ID, req.PhotoURL); err != nil {
+						writeError(w, http.StatusInternalServerError, "failed to attach photo")
+						return
+					}
+					existing.PhotoURL = req.PhotoURL
+					if existing.Status == model.StatusPending && (user == nil || user.Role != "admin") {
+						h.queueReview(existing.ID)
+					}
 				}
 				if user != nil && user.Role == "admin" && existing.Status == model.StatusPending {
 					existing.Status = model.StatusApproved
@@ -522,16 +522,8 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 				writeJSON(w, http.StatusCreated, existing)
 				return
 			}
-			// ai_rejected / rejected soft-deleted: hard-delete the row so the
-			// retry flow that follows can create a fresh completion.
-			if err := h.store.UncompleteChore(r.Context(), scheduleID, req.CompletionDate); err != nil {
-				writeError(w, http.StatusInternalServerError, "failed to clear previous attempt")
-				return
-			}
-		} else if existing.Status == model.StatusAIRejected {
-			// Allow retry — delete the rejected attempt so we don't end up
-			// with duplicate rows (one ai_rejected + one approved) which
-			// confuses the points-decay checker.
+			// Rejected soft-deleted: hard-delete the row so the retry flow
+			// that follows can create a fresh completion.
 			if err := h.store.UncompleteChore(r.Context(), scheduleID, req.CompletionDate); err != nil {
 				writeError(w, http.StatusInternalServerError, "failed to clear previous attempt")
 				return
@@ -545,8 +537,8 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	// Fetch chore details to check category and requirements
 	chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
 
-	// For "child" photo source, require photo at completion time.
-	// For "external" or "both", photo can be attached later.
+	// For "child" photo source the kid takes the photo at completion time.
+	// For "external" or "both", a photo can be attached later.
 	photoSource := model.PhotoSourceChild
 	if chore != nil {
 		photoSource = chore.PhotoSource
@@ -555,84 +547,16 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// A parent marking a chore done on someone's behalf vouches for it and
-	// doesn't need to supply the photo.
-	if chore != nil && chore.RequiresPhoto && req.PhotoURL == "" && photoSource == model.PhotoSourceChild && !actingForOther {
+	// doesn't need to supply the photo. Anyone else can skip the photo
+	// explicitly, and the chore then waits for a parent.
+	missingPhoto := chore != nil && chore.RequiresPhoto && req.PhotoURL == "" && photoSource == model.PhotoSourceChild && !actingForOther
+	if missingPhoto && !req.SkipPhoto {
 		writeError(w, http.StatusBadRequest, "a photo is required to complete this chore")
 		return
 	}
 
-	// AI photo review (if enabled and photo provided)
-	var aiFeedback string
-	var aiConfidence float64
-	if req.PhotoURL != "" && h.reviewer != nil {
-		aiEnabled, _ := h.store.GetSetting(r.Context(), "ai_enabled")
-		photoPath, pathErr := resolveUploadPath(req.PhotoURL)
-		if pathErr != nil {
-			log.Printf("ai: skipping review: %v", pathErr)
-		}
-		if aiEnabled == "true" && pathErr == nil {
-			thresholdStr, _ := h.store.GetSetting(r.Context(), "ai_auto_approve_threshold")
-			threshold := 0.85
-			if t, err := strconv.ParseFloat(thresholdStr, 64); err == nil && t > 0 {
-				threshold = t
-			}
-
-			choreDesc := ""
-			if chore != nil {
-				choreDesc = chore.Description
-			}
-			result, err := h.reviewer.ReviewPhoto(r.Context(), chore.Title, choreDesc, photoPath)
-			if err != nil {
-				log.Printf("ai: review failed (proceeding without): %v", err)
-				// Fall through to normal flow if AI is unavailable
-			} else {
-				aiFeedback = result.Feedback
-				aiConfidence = result.Confidence
-
-				// Reject only if the model is confident the chore is NOT done.
-				// If complete=true, always approve. If complete=false but confidence
-				// is below the threshold, give the kid the benefit of the doubt.
-				if !result.Complete && result.Confidence >= threshold {
-					// AI says not complete — save as ai_rejected with feedback
-					rejection := &model.ChoreCompletion{
-						ChoreScheduleID: scheduleID,
-						CompletedBy:     completedBy,
-						Status:          model.StatusAIRejected,
-						PhotoURL:        req.PhotoURL,
-						CompletionDate:  req.CompletionDate,
-						AIFeedback:      result.Feedback,
-						AIConfidence:    result.Confidence,
-					}
-					_ = h.store.CompleteChore(r.Context(), rejection)
-
-					// Synthesize feedback audio in background if TTS available
-					var feedbackAudioURL string
-					if h.ttsGen != nil {
-						ttsEnabled, _ := h.store.GetSetting(r.Context(), "ai_tts_enabled")
-						if ttsEnabled == "true" {
-							if url, err := h.ttsGen.SynthesizeFeedback(r.Context(), result.Feedback, rejection.ID); err == nil {
-								feedbackAudioURL = url
-							}
-						}
-					}
-
-					writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
-						"error": result.Feedback,
-						"ai_review": map[string]any{
-							"complete":       result.Complete,
-							"confidence":     result.Confidence,
-							"feedback":       result.Feedback,
-							"feedback_audio": feedbackAudioURL,
-						},
-					})
-					return
-				}
-			}
-		}
-	}
-
 	status := model.StatusApproved
-	if chore != nil && chore.RequiresApproval && (user == nil || user.Role != "admin") {
+	if chore != nil && (chore.RequiresApproval || missingPhoto) && (user == nil || user.Role != "admin") {
 		status = model.StatusPending
 	}
 
@@ -650,8 +574,6 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		Status:          status,
 		PhotoURL:        req.PhotoURL,
 		CompletionDate:  req.CompletionDate,
-		AIFeedback:      aiFeedback,
-		AIConfidence:    aiConfidence,
 		ApprovedBy:      approvedBy,
 		ApprovedAt:      approvedAt,
 	}
@@ -690,6 +612,10 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.CompleteChoreAndCreditPoints(r.Context(), completion, pts, expiryPenalty); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to complete chore")
 		return
+	}
+
+	if status == model.StatusPending && completion.PhotoURL != "" {
+		h.queueReview(completion.ID)
 	}
 
 	if status == model.StatusApproved {
@@ -923,70 +849,68 @@ func (h *ChoreHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	admin := UserFromContext(r.Context())
-	// Calculate and award points atomically with approval
-	schedule, _ := h.store.GetSchedule(r.Context(), completion.ChoreScheduleID)
-	var pts int
-	if schedule != nil {
-		pts, _ = h.store.GetChorePointsForSchedule(r.Context(), schedule.ID)
-		chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
-
-		// Core logic
-		if chore != nil && chore.Category == model.CategoryCore {
-			if !h.shouldAwardCorePoints(r.Context(), completion.CompletedBy, completion.CompletionDate) {
-				pts = 0
-			}
+	if err := h.approveCompletion(r.Context(), completion, &admin.ID); err != nil {
+		if errors.Is(err, store.ErrNotPending) {
+			writeError(w, http.StatusBadRequest, "completion is not pending")
+			return
 		}
-
-		// Bonus logic
-		if chore != nil && chore.Category == model.CategoryBonus {
-			if !h.shouldAwardBonusPoints(r.Context(), completion.CompletedBy, completion.CompletionDate) {
-				pts = 0
-			}
-		}
-	}
-
-	if err := h.store.ApproveCompletionAndCreditPoints(r.Context(), id, admin.ID, pts); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to approve")
 		return
 	}
+	w.WriteHeader(http.StatusNoContent)
+}
 
+// approveCompletion approves a pending completion and awards its points,
+// then re-opens any core/bonus gates it unlocks and updates the streak.
+// approverID is nil for an automatic (AI) approval. Returns
+// store.ErrNotPending if someone else approved or rejected it first.
+func (h *ChoreHandler) approveCompletion(ctx context.Context, completion *model.ChoreCompletion, approverID *int64) error {
+	schedule, _ := h.store.GetSchedule(ctx, completion.ChoreScheduleID)
+	var chore *model.Chore
+	var pts int
 	if schedule != nil {
-		chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
+		pts, _ = h.store.GetChorePointsForSchedule(ctx, schedule.ID)
+		chore, _ = h.store.GetChore(ctx, schedule.ChoreID)
 
-		// Approving a required completion can be the event that opens the core gate.
-		if chore != nil && chore.Category == model.CategoryRequired {
-			h.creditPendingCorePoints(r.Context(), completion.CompletedBy, completion.CompletionDate)
+		// Core points only count once required chores are done; bonus
+		// points once required and core are done.
+		if chore != nil && chore.Category == model.CategoryCore &&
+			!h.shouldAwardCorePoints(ctx, completion.CompletedBy, completion.CompletionDate) {
+			pts = 0
 		}
-
-		// Approving a required/core completion can be the event that opens
-		// the bonus gate. Retroactively credit any approved bonus completions
-		// for this user/date that were originally capped at 0.
-		if chore != nil && (chore.Category == model.CategoryRequired || chore.Category == model.CategoryCore) {
-			h.creditPendingBonusPoints(r.Context(), completion.CompletedBy, completion.CompletionDate)
+		if chore != nil && chore.Category == model.CategoryBonus &&
+			!h.shouldAwardBonusPoints(ctx, completion.CompletedBy, completion.CompletionDate) {
+			pts = 0
 		}
 	}
 
-	// Recalculate streak
-	if err := h.store.RecalculateStreak(r.Context(), completion.CompletedBy, completion.CompletionDate); err != nil {
+	if err := h.store.ApproveCompletionAndCreditPoints(ctx, completion.ID, approverID, pts); err != nil {
+		return err
+	}
+
+	// Approving a required completion can open the core gate, and a
+	// required/core one the bonus gate: credit anything capped at 0.
+	if chore != nil && chore.Category == model.CategoryRequired {
+		h.creditPendingCorePoints(ctx, completion.CompletedBy, completion.CompletionDate)
+	}
+	if chore != nil && (chore.Category == model.CategoryRequired || chore.Category == model.CategoryCore) {
+		h.creditPendingBonusPoints(ctx, completion.CompletedBy, completion.CompletionDate)
+	}
+
+	if err := h.store.RecalculateStreak(ctx, completion.CompletedBy, completion.CompletionDate); err != nil {
 		log.Printf("error recalculating streak for user %d: %v", completion.CompletedBy, err)
 	}
 
-	// Discord notification for approval
-	{
-		userName := ""
-		if u, _ := h.store.GetUser(r.Context(), completion.CompletedBy); u != nil {
-			userName = u.Name
-		}
-		choreTitle := ""
-		if schedule != nil {
-			if c, _ := h.store.GetChore(r.Context(), schedule.ChoreID); c != nil {
-				choreTitle = c.Title
-			}
-		}
-		h.discord.NotifyApproved(userName, choreTitle)
+	userName := ""
+	if u, _ := h.store.GetUser(ctx, completion.CompletedBy); u != nil {
+		userName = u.Name
 	}
-
-	w.WriteHeader(http.StatusNoContent)
+	choreTitle := ""
+	if chore != nil {
+		choreTitle = chore.Title
+	}
+	h.discord.NotifyApproved(userName, choreTitle)
+	return nil
 }
 
 func (h *ChoreHandler) Reject(w http.ResponseWriter, r *http.Request) {
@@ -1064,273 +988,11 @@ func (h *ChoreHandler) AttachPhoto(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to attach photo")
 		return
 	}
+	h.queueReview(id)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id":        id,
 		"photo_url": req.PhotoURL,
-	})
-}
-
-// TestAIReview lets admins test the AI photo review with a dummy chore name and photo.
-func (h *ChoreHandler) TestAIReview(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		ChoreTitle string `json:"chore_title"`
-		PhotoURL   string `json:"photo_url"`
-	}
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if req.ChoreTitle == "" || req.PhotoURL == "" {
-		writeError(w, http.StatusBadRequest, "chore_title and photo_url are required")
-		return
-	}
-
-	if h.reviewer == nil {
-		writeError(w, http.StatusServiceUnavailable, "AI services not available")
-		return
-	}
-
-	photoPath, err := resolveUploadPath(req.PhotoURL)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid photo_url")
-		return
-	}
-
-	t0 := time.Now()
-	result, err := h.reviewer.ReviewPhoto(r.Context(), req.ChoreTitle, "", photoPath)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "AI review failed: "+err.Error())
-		return
-	}
-	log.Printf("ai: photo review took %s", time.Since(t0))
-
-	// Synthesize feedback audio if TTS is available
-	var feedbackAudioURL string
-	if h.ttsGen != nil {
-		ttsEnabled, _ := h.store.GetSetting(r.Context(), "ai_tts_enabled")
-		if ttsEnabled == "true" {
-			t1 := time.Now()
-			url, err := h.ttsGen.SynthesizeFeedback(r.Context(), result.Feedback, 0)
-			if err != nil {
-				log.Printf("ai: TTS synthesis failed for chore checker (%s): %v", time.Since(t1), err)
-			} else {
-				feedbackAudioURL = url
-				log.Printf("ai: TTS synthesis took %s", time.Since(t1))
-			}
-		} else {
-			log.Printf("ai: TTS disabled in settings (ai_tts_enabled=%q)", ttsEnabled)
-		}
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"complete":       result.Complete,
-		"confidence":     result.Confidence,
-		"feedback":       result.Feedback,
-		"feedback_audio": feedbackAudioURL,
-	})
-}
-
-// SynthesizeTTS lets the admin retry TTS audio synthesis for given feedback text.
-func (h *ChoreHandler) SynthesizeTTS(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Text string `json:"text"`
-	}
-	if err := decodeJSON(r, &req); err != nil || req.Text == "" {
-		writeError(w, http.StatusBadRequest, "text is required")
-		return
-	}
-
-	if h.ttsGen == nil {
-		writeError(w, http.StatusServiceUnavailable, "AI services not available")
-		return
-	}
-
-	url, err := h.ttsGen.SynthesizeFeedback(r.Context(), req.Text, 0)
-	if err != nil {
-		log.Printf("ai: TTS synthesis failed: %v", err)
-		writeError(w, http.StatusServiceUnavailable, "TTS synthesis failed: "+err.Error())
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{"audio_url": url})
-}
-
-// TriggerTTSSync triggers an immediate TTS sync for all chores.
-func (h *ChoreHandler) TriggerTTSSync(w http.ResponseWriter, r *http.Request) {
-	if h.ttsSyncer == nil {
-		writeError(w, http.StatusServiceUnavailable, "TTS sync not available")
-		return
-	}
-	h.ttsSyncer.Trigger()
-	writeJSON(w, http.StatusOK, map[string]any{"status": "sync triggered"})
-}
-
-// RegenerateChoreTTS re-synthesizes the TTS audio for a specific chore. The
-// admin can supply a custom spoken description; if empty, the chore's current
-// tts_description is used. The new description (if any) is persisted and the
-// chore_{id}.mp3 file is overwritten.
-func (h *ChoreHandler) RegenerateChoreTTS(w http.ResponseWriter, r *http.Request) {
-	id, err := urlParamInt64(r, "id")
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid chore id")
-		return
-	}
-
-	var req struct {
-		Description string `json:"description"`
-	}
-	// Body is optional; tolerate missing/empty bodies.
-	_ = decodeJSON(r, &req)
-
-	chore, err := h.store.GetChore(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get chore")
-		return
-	}
-	if chore == nil {
-		writeError(w, http.StatusNotFound, "chore not found")
-		return
-	}
-
-	if h.ttsGen == nil {
-		writeError(w, http.StatusServiceUnavailable, "AI services not available")
-		return
-	}
-	if !h.ttsGen.TTSAvailable() {
-		writeError(w, http.StatusServiceUnavailable, "TTS service not available")
-		return
-	}
-
-	desc := strings.TrimSpace(req.Description)
-	if desc == "" {
-		desc = chore.TTSDescription
-	}
-	if desc == "" {
-		writeError(w, http.StatusBadRequest, "no description provided and chore has no existing tts_description")
-		return
-	}
-
-	audioURL, err := h.ttsGen.SynthesizeAudio(r.Context(), desc, chore.ID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to synthesize audio: "+err.Error())
-		return
-	}
-	if audioURL == "" {
-		writeError(w, http.StatusServiceUnavailable, "TTS audio synthesis unavailable")
-		return
-	}
-
-	if err := h.store.UpdateChoreTTSDescription(r.Context(), chore.ID, desc); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to save description")
-		return
-	}
-	if err := h.store.UpdateChoreTTSAudioURL(r.Context(), chore.ID, audioURL); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to save audio URL")
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"tts_description": desc,
-		"tts_audio_url":   audioURL,
-	})
-}
-
-// GenerateChoreTTSDescription uses the configured LLM to produce a fresh
-// kid-friendly spoken description for a chore. The generated text is
-// returned but NOT persisted; the admin can review and edit before saving
-// via RegenerateChoreTTS.
-func (h *ChoreHandler) GenerateChoreTTSDescription(w http.ResponseWriter, r *http.Request) {
-	id, err := urlParamInt64(r, "id")
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid chore id")
-		return
-	}
-
-	chore, err := h.store.GetChore(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get chore")
-		return
-	}
-	if chore == nil {
-		writeError(w, http.StatusNotFound, "chore not found")
-		return
-	}
-
-	if h.ttsGen == nil {
-		writeError(w, http.StatusServiceUnavailable, "AI services not available")
-		return
-	}
-
-	desc, err := h.ttsGen.GenerateDescription(r.Context(), chore.Title, chore.Description)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to generate description: "+err.Error())
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{"description": desc})
-}
-
-// GenerateDescription lets admins generate a chore description using AI.
-func (h *ChoreHandler) GenerateDescription(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Title    string `json:"title"`
-		Category string `json:"category"`
-	}
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if req.Title == "" {
-		writeError(w, http.StatusBadRequest, "title is required")
-		return
-	}
-
-	if h.descGen == nil {
-		writeError(w, http.StatusServiceUnavailable, "AI services not available")
-		return
-	}
-
-	desc, err := h.descGen.GenerateDescription(r.Context(), req.Title, req.Category)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "AI generation failed: "+err.Error())
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{"description": desc})
-}
-
-// SuggestPoints lets admins get AI-recommended point values for a chore.
-func (h *ChoreHandler) SuggestPoints(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		Category    string `json:"category"`
-	}
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if req.Title == "" {
-		writeError(w, http.StatusBadRequest, "title is required")
-		return
-	}
-
-	if h.descGen == nil {
-		writeError(w, http.StatusServiceUnavailable, "AI services not available")
-		return
-	}
-
-	points, minutes, reasoning, err := h.descGen.SuggestPoints(r.Context(), req.Title, req.Description, req.Category)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "AI suggestion failed: "+err.Error())
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"points":            points,
-		"estimated_minutes": minutes,
-		"reasoning":         reasoning,
 	})
 }
 

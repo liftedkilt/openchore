@@ -31,6 +31,7 @@ type testEnv struct {
 	db      *sql.DB
 	store   *store.Store
 	chores  *api.ChoreHandler
+	reports *api.ReportsHandler
 }
 
 func setupTest(t *testing.T) *testEnv {
@@ -62,7 +63,7 @@ func setupTest(t *testing.T) *testEnv {
 	d := webhook.NewDispatcher(s)
 	sessions := api.NewSessionManager(testSessionSecret)
 	oidcSvc := api.NewOIDCService(s, sessions, d, nil)
-	router, chores, _ := api.NewRouter(s, d, api.Auth{Sessions: sessions, OIDC: oidcSvc})
+	router, chores, reports := api.NewRouter(s, d, api.Auth{Sessions: sessions, OIDC: oidcSvc})
 	server := httptest.NewServer(router)
 
 	t.Cleanup(func() {
@@ -70,7 +71,7 @@ func setupTest(t *testing.T) *testEnv {
 		db.Close()
 	})
 
-	return &testEnv{server: server, db: db, store: s, chores: chores}
+	return &testEnv{server: server, db: db, store: s, chores: chores, reports: reports}
 }
 
 func (e *testEnv) request(t *testing.T, method, path string, body any, headers map[string]string) *http.Response {
@@ -3102,18 +3103,38 @@ func TestRequiresPhotoChoreCompletion(t *testing.T) {
 		"day_of_week": int(time.Now().Weekday()),
 	}, adminHeaders())
 
-	// Try to complete without photo
-	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
-		"completed_by":    kidID,
-		"completion_date": time.Now().Format(model.DateFormat),
-	}, childHeaders(kidID), http.StatusBadRequest)
-
-	// Complete with photo should work
-	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+	// Completing with a photo is approved straight away (no approval needed)
+	resp := env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
 		"completed_by":    kidID,
 		"completion_date": time.Now().Format(model.DateFormat),
 		"photo_url":       "/uploads/test.png",
 	}, childHeaders(kidID), http.StatusCreated)
+	var cc map[string]any
+	decodeBody(t, resp, &cc)
+	if cc["status"] != model.StatusApproved {
+		t.Fatalf("expected approved with a photo, got %v", cc["status"])
+	}
+
+	// Without a photo it is refused unless the kid skips the photo, in
+	// which case it waits for a parent
+	yesterday := time.Now().AddDate(0, 0, -1).Format(model.DateFormat)
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to":   kidID,
+		"specific_date": yesterday,
+	}, adminHeaders())
+	env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": yesterday,
+	}, childHeaders(kidID), http.StatusBadRequest)
+	resp = env.expectStatus(t, "POST", "/api/schedules/2/complete", map[string]any{
+		"completed_by":    kidID,
+		"completion_date": yesterday,
+		"skip_photo":      true,
+	}, childHeaders(kidID), http.StatusCreated)
+	decodeBody(t, resp, &cc)
+	if cc["status"] != model.StatusPending {
+		t.Fatalf("expected pending without a photo, got %v", cc["status"])
+	}
 }
 
 func TestListSchedulesInvalidChoreID(t *testing.T) {
@@ -3406,49 +3427,6 @@ func TestOneOffScheduleInWeeklyView(t *testing.T) {
 
 // =================== AI VERIFICATION TESTS ===================
 
-func TestCompleteChoreAIRejectedAllowsRetry(t *testing.T) {
-	env := setupTest(t)
-	env.createAdmin(t)
-	kidID := env.createChild(t, "Kid")
-
-	// Create chore
-	env.request(t, "POST", "/api/chores", map[string]any{
-		"title":    "Clean Room",
-		"category": "core",
-	}, adminHeaders())
-
-	// Schedule for Wednesday (day 3)
-	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
-		"assigned_to": kidID,
-		"day_of_week": 3,
-	}, adminHeaders())
-
-	// Insert an ai_rejected completion directly into the DB to simulate AI rejection
-	_, err := env.db.Exec(
-		`INSERT INTO chore_completions (chore_schedule_id, completed_by, status, photo_url, completion_date, ai_feedback, ai_confidence)
-		 VALUES (?, ?, 'ai_rejected', '/uploads/test.jpg', '2026-03-11', 'The room still has toys on the floor.', 0.3)`,
-		1, kidID)
-	if err != nil {
-		t.Fatalf("failed to insert ai_rejected completion: %v", err)
-	}
-
-	// Retry the completion — should succeed because ai_rejected allows retry
-	resp := env.request(t, "POST", "/api/schedules/1/complete", map[string]any{
-		"completed_by":    kidID,
-		"completion_date": "2026-03-11",
-	}, adminHeaders())
-	if resp.StatusCode != http.StatusCreated {
-		t.Fatalf("expected 201 for retry after ai_rejected, got %d", resp.StatusCode)
-	}
-
-	// Verify the completion is now approved (since no AI reviewer is configured in test)
-	var completion map[string]any
-	decodeBody(t, resp, &completion)
-	if completion["status"] != "approved" {
-		t.Errorf("expected status=approved for retry, got %v", completion["status"])
-	}
-}
-
 func TestCompleteChoreNormalRejectDoesNotAllowRetry(t *testing.T) {
 	env := setupTest(t)
 	env.createAdmin(t)
@@ -3470,7 +3448,7 @@ func TestCompleteChoreNormalRejectDoesNotAllowRetry(t *testing.T) {
 		"completion_date": "2026-03-11",
 	}, adminHeaders(), http.StatusCreated)
 
-	// Try to complete again — should conflict (status is approved, not ai_rejected)
+	// Try to complete again — should conflict (status is approved)
 	resp := env.request(t, "POST", "/api/schedules/1/complete", map[string]any{
 		"completed_by":    kidID,
 		"completion_date": "2026-03-11",
@@ -3496,10 +3474,10 @@ func TestScheduledChoresIncludeAIFeedback(t *testing.T) {
 		"day_of_week": 3,
 	}, adminHeaders())
 
-	// Insert an ai_rejected completion with feedback
+	// Insert a pending completion carrying an AI reviewer's note
 	_, err := env.db.Exec(
 		`INSERT INTO chore_completions (chore_schedule_id, completed_by, status, photo_url, completion_date, ai_feedback, ai_confidence)
-		 VALUES (?, ?, 'ai_rejected', '/uploads/bed.jpg', '2026-03-11', 'Almost there! Straighten the pillows.', 0.4)`,
+		 VALUES (?, ?, 'pending', '/uploads/bed.jpg', '2026-03-11', 'Almost there! Straighten the pillows.', 0.4)`,
 		1, kidID)
 	if err != nil {
 		t.Fatalf("failed to insert completion: %v", err)
@@ -3518,14 +3496,12 @@ func TestScheduledChoresIncludeAIFeedback(t *testing.T) {
 
 	chore := chores[0]
 
-	// ai_rejected should NOT be "completed" from the kid's perspective
-	if chore["completed"] != false {
-		t.Error("expected completed=false for ai_rejected chore")
+	// A pending chore is done from the kid's side, waiting on a parent
+	if chore["completed"] != true {
+		t.Error("expected completed=true for a pending chore")
 	}
-
-	// completion_status should be present
-	if chore["completion_status"] != "ai_rejected" {
-		t.Errorf("expected completion_status=ai_rejected, got %v", chore["completion_status"])
+	if chore["completion_status"] != "pending" {
+		t.Errorf("expected completion_status=pending, got %v", chore["completion_status"])
 	}
 
 	// ai_feedback should be present
@@ -3534,7 +3510,7 @@ func TestScheduledChoresIncludeAIFeedback(t *testing.T) {
 	}
 }
 
-func TestScheduledChoresIncludeTTSDescription(t *testing.T) {
+func TestScheduledChoresIncludeTTSAudioURL(t *testing.T) {
 	env := setupTest(t)
 	env.createAdmin(t)
 	kidID := env.createChild(t, "Kid")
@@ -3545,11 +3521,10 @@ func TestScheduledChoresIncludeTTSDescription(t *testing.T) {
 		"category": "required",
 	}, adminHeaders())
 
-	// Set TTS description directly in DB (simulating AI TTS generation)
-	_, err := env.db.Exec(`UPDATE chores SET tts_description = ? WHERE id = 1`,
-		"Time to feed the kitty! Give them fresh food and water.")
+	// Set the audio URL directly in the DB (as TTS generation would)
+	_, err := env.db.Exec(`UPDATE chores SET tts_audio_url = ? WHERE id = 1`, "/tts/chore_1.mp3?v=1")
 	if err != nil {
-		t.Fatalf("failed to set tts_description: %v", err)
+		t.Fatalf("failed to set tts_audio_url: %v", err)
 	}
 
 	// Schedule for Wednesday (day 3)
@@ -3569,13 +3544,13 @@ func TestScheduledChoresIncludeTTSDescription(t *testing.T) {
 		t.Fatalf("expected 1 chore, got %d", len(chores))
 	}
 
-	// TTS description should be included in the scheduled chore response
-	if chores[0]["tts_description"] != "Time to feed the kitty! Give them fresh food and water." {
-		t.Errorf("expected tts_description to be set, got %v", chores[0]["tts_description"])
+	// The audio URL should be included in the scheduled chore response
+	if chores[0]["tts_audio_url"] != "/tts/chore_1.mp3?v=1" {
+		t.Errorf("expected tts_audio_url to be set, got %v", chores[0]["tts_audio_url"])
 	}
 }
 
-func TestChoreGetIncludesTTSDescription(t *testing.T) {
+func TestChoreGetIncludesTTSAudioURL(t *testing.T) {
 	env := setupTest(t)
 	env.createAdmin(t)
 
@@ -3585,19 +3560,16 @@ func TestChoreGetIncludesTTSDescription(t *testing.T) {
 		"category": "required",
 	}, adminHeaders(), http.StatusCreated)
 
-	// Set TTS description directly in DB (simulating AI TTS generation)
-	_, err := env.db.Exec(`UPDATE chores SET tts_description = ? WHERE id = 1`,
-		"Brush those pearly whites!")
+	_, err := env.db.Exec(`UPDATE chores SET tts_audio_url = ? WHERE id = 1`, "/tts/chore_1.mp3?v=1")
 	if err != nil {
-		t.Fatalf("failed to set tts_description: %v", err)
+		t.Fatalf("failed to set tts_audio_url: %v", err)
 	}
 
-	// Get chore via API should include tts_description
 	resp := env.expectStatus(t, "GET", "/api/chores/1", nil, adminHeaders(), http.StatusOK)
 	var chore map[string]any
 	decodeBody(t, resp, &chore)
-	if chore["tts_description"] != "Brush those pearly whites!" {
-		t.Errorf("expected tts_description on get, got %v", chore["tts_description"])
+	if chore["tts_audio_url"] != "/tts/chore_1.mp3?v=1" {
+		t.Errorf("expected tts_audio_url on get, got %v", chore["tts_audio_url"])
 	}
 }
 

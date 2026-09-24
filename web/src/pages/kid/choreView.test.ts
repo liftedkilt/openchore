@@ -82,13 +82,16 @@ describe('choreView', () => {
     expect(choreView({ ...b, completed: true, completion_status: 'approved' }, { ...ctx, bonusOpen: false }).state).toBe('done');
   });
 
-  it('carries photo checks and AI feedback', () => {
+  it('carries photo checks; the AI photo note is for grown-ups only', () => {
     const photo = choreView(chore({ requires_photo: true, photo_source: 'child' }), ctx);
     expect(photo).toMatchObject({ photo: true, meta: 'Photo check' });
-    const rejected = choreView(chore({ requires_photo: true, completion_status: 'ai_rejected', ai_feedback: 'The bed is still messy' }), ctx);
-    expect(rejected).toMatchObject({ urgent: true, note: { kind: 'rejected', text: 'The bed is still messy' } });
+    // Finished without a photo (or with one the AI doubts): it waits for a grown-up.
+    const waiting = choreView(chore({ requires_photo: true, completed: true, completion_status: 'pending', ai_feedback: 'The bed is still messy' }), ctx);
+    expect(waiting).toMatchObject({ state: 'waiting', urgent: false });
+    expect(waiting).not.toHaveProperty('note');
     const approved = choreView(chore({ completed: true, completion_status: 'approved', ai_feedback: 'Looks great' }), ctx);
-    expect(approved.note).toEqual({ kind: 'approved', text: 'Looks great' });
+    expect(approved.state).toBe('done');
+    expect(approved).not.toHaveProperty('note');
     const proof = choreView(chore({ completed: true, completion_status: 'approved', requires_photo: true, photo_source: 'external' }), ctx);
     expect(proof.needsPhotoProof).toBe(true);
   });
