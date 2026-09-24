@@ -1,0 +1,148 @@
+/* ============================================================
+   Theme dials. A theme is its colour/shadow tokens (tokens.css)
+   plus these values. Components read dials only and never test
+   which theme they are in, so nested themes never leak.
+
+   Font families are the names registered by @fontsource-variable:
+   "Onest Variable", "Fraunces Variable", "Figtree Variable",
+   "Bricolage Grotesque Variable", "Instrument Sans Variable".
+   ============================================================ */
+
+/* House: the neutral frame for shared screens (picker, family views,
+   grown-up tools, wall display). Never a personal skin. House Dark shares
+   every dial; only its tokens differ. */
+:root, [data-theme="house"], [data-theme="house-dark"] {
+  --font-display: "Onest Variable", Onest, system-ui, sans-serif;
+  --font-text: "Onest Variable", Onest, system-ui, sans-serif;
+  --display-weight: 600;
+  --display-axes: normal;
+  --display-tracking: -0.03em;
+  --display-italic: normal;
+  --hero-size: 34px; --hero-line: 38px;
+  --title-weight: 600;
+  --label-case: uppercase;
+  --outline-w: 0px;
+  --icon-stroke: 1.75;
+  --r-row: 18px; --r-well: 12px; --r-btn: 999px; --r-chip: 999px;
+  --r-avatar: 50%;
+  --row-pad: 12px 14px 12px 12px; --row-gap: 8px; --row-divider: 0px;
+  --row-meta: initial;
+  --well-size: 40px;
+  --check-size: 30px; --check-bw: 2px; --check-ring: var(--ink-muted); --check-bg: transparent;
+  --done-press: 0px; --done-shadow: var(--lift); --done-strike: none; --row-done-bg: var(--surface-raised);
+  --locked-bw: 1.5px;
+  --mark-stroke: 0; --mark-empty: var(--surface-sunk);
+  --show-arc: none; --show-shapes: flex; --show-ring: none; --show-glow: none;
+  --tab-inset: 24px; --tab-bottom: 26px; --tab-h: 62px; --tab-r: 999px; --tab-dir: row; --tab-top-bw: 0px;
+  --tab-bg: var(--surface-raised); --tab-active-bg: var(--ink); --tab-active-ink: var(--surface); --tab-active-bw: 0px;
+  --tab-label: inline; --tab-dot: none; --tab-shadow: var(--lift);
+  --cele-rays: none; --cele-confetti: none; --cele-ring: none;
+  --stamp-bg: var(--surface-raised); --stamp-rotate: 0deg; --stamp-bw: 0px; --stamp-shadow: var(--lift-lg);
+  /* A skin's door inside the House frame. Skins never set this, so a door
+     inherits it from the frame around it. */
+  --door-filter: none;
+}
+/* House Dark only differs in tokens, plus dimming the skin doors inside it
+   so a cream Sunroom or white Blocks door doesn't glare at night. */
+[data-theme="house-dark"] {
+  --door-filter: brightness(0.86) saturate(0.9);
+}
+
+[data-theme="sunroom"] {
+  --font-display: "Fraunces Variable", Fraunces, Georgia, serif;
+  --font-text: "Figtree Variable", Figtree, system-ui, sans-serif;
+  --display-weight: 500;
+  --display-axes: "SOFT" 100;
+  --display-tracking: -0.02em;
+  --display-italic: italic;
+  --hero-size: 34px; --hero-line: 38px;
+  --title-weight: 600;
+  --label-case: uppercase;
+  --outline-w: 0px;
+  --icon-stroke: 1.75;
+  --r-row: 20px; --r-well: 14px; --r-btn: 999px; --r-chip: 999px;
+  --r-avatar: initial;              /* unset: each avatar uses its own blob */
+  --row-pad: 12px 14px 12px 12px; --row-gap: 8px; --row-divider: 0px;
+  --row-meta: initial;              /* unset: ink-muted */
+  --well-size: 42px;
+  --check-size: 30px; --check-bw: 2px; --check-ring: var(--ink-muted); --check-bg: transparent;
+  --done-press: 0px; --done-shadow: var(--lift); --done-strike: none; --row-done-bg: var(--surface-raised);
+  --locked-bw: 1.5px;
+  --mark-stroke: 0; --mark-empty: var(--surface-sunk);
+  --show-arc: block; --show-shapes: none; --show-ring: none; --show-glow: none;
+  --tab-inset: 24px; --tab-bottom: 26px; --tab-h: 62px; --tab-r: 999px; --tab-dir: row; --tab-top-bw: 0px;
+  --tab-active-bg: var(--ink); --tab-active-ink: var(--surface); --tab-active-bw: 0px;
+  --tab-bg: var(--surface-raised); --tab-label: inline; --tab-dot: none; --tab-shadow: var(--lift);
+  --cele-rays: block; --cele-confetti: none; --cele-ring: none;
+  --stamp-bg: var(--surface-raised); --stamp-rotate: 0deg; --stamp-bw: 0px; --stamp-shadow: var(--lift-lg);
+}
+
+[data-theme="blocks"] {
+  --font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
+  --font-text: "Bricolage Grotesque Variable", "Bricolage Grotesque", system-ui, sans-serif;
+  --display-weight: 800;
+  --display-axes: normal;
+  --display-tracking: -0.04em;
+  --display-italic: normal;
+  --hero-size: 46px; --hero-line: 44px;
+  --title-weight: 750;
+  --label-case: uppercase;
+  --outline-w: 2.5px;
+  --icon-stroke: 2;
+  --r-row: 22px; --r-well: 14px; --r-btn: 16px; --r-chip: 14px;
+  --r-avatar: 30%;
+  --row-pad: 12px 12px 12px 12px; --row-gap: 12px; --row-divider: 0px;
+  --row-meta: currentColor;
+  --well-size: 44px;
+  --check-size: 48px; --check-bw: 2.5px; --check-ring: var(--line); --check-bg: var(--surface-raised);
+  --done-press: 4px; --done-shadow: none; --done-strike: line-through; --row-done-bg: var(--surface-raised);
+  --locked-bw: 2.5px;
+  --mark-stroke: 2; --mark-empty: var(--surface-raised);
+  --show-arc: none; --show-shapes: flex; --show-ring: none; --show-glow: none;
+  --tab-inset: 0px; --tab-bottom: 0px; --tab-h: 84px; --tab-r: 0px; --tab-dir: column; --tab-top-bw: 2.5px;
+  --tab-active-bg: var(--chip); --tab-active-ink: var(--ink); --tab-active-bw: 2px;
+  --tab-bg: var(--surface-raised); --tab-label: block; --tab-dot: none; --tab-shadow: none;
+  --cele-rays: none; --cele-confetti: block; --cele-ring: none;
+  --stamp-bg: var(--surface-raised); --stamp-rotate: -5deg; --stamp-bw: 3px; --stamp-shadow: var(--lift-lg);
+}
+
+[data-theme="tint"] {
+  --font-display: "Instrument Sans Variable", "Instrument Sans", system-ui, sans-serif;
+  --font-text: "Instrument Sans Variable", "Instrument Sans", system-ui, sans-serif;
+  --display-weight: 600;
+  --display-axes: normal;
+  --display-tracking: -0.03em;
+  --display-italic: normal;
+  --hero-size: 28px; --hero-line: 32px;
+  --title-weight: 500;
+  --label-case: uppercase;
+  --outline-w: 0px;
+  --icon-stroke: 1.75;
+  --r-row: 0px; --r-well: 12px; --r-btn: 999px; --r-chip: 999px;
+  --r-avatar: 50%;
+  --row-pad: 10px 0 10px 0; --row-gap: 0px; --row-divider: 1px;
+  --row-meta: initial;
+  --well-size: 38px;
+  --check-size: 26px; --check-bw: 2px; --check-ring: var(--ink-muted); --check-bg: transparent;
+  --done-press: 0px; --done-shadow: none; --done-strike: none; --row-done-bg: var(--surface);
+  --locked-bw: 0px;
+  --mark-stroke: 0; --mark-empty: var(--surface-sunk);
+  --show-arc: none; --show-shapes: none; --show-ring: block; --show-glow: block;
+  --tab-inset: 0px; --tab-bottom: 0px; --tab-h: 86px; --tab-r: 0px; --tab-dir: column; --tab-top-bw: 0px;
+  --tab-active-bg: transparent; --tab-active-ink: var(--ink); --tab-active-bw: 0px;
+  --tab-bg: var(--surface); --tab-label: none; --tab-dot: block; --tab-shadow: none;
+  --cele-rays: none; --cele-confetti: none; --cele-ring: block;
+  --stamp-bg: transparent; --stamp-rotate: 0deg; --stamp-bw: 0px; --stamp-shadow: none;
+}
+
+/* A person's own colour. On a Tint screen that belongs to one person
+   (data-theme and data-person on the same element), it leads. */
+[data-person="coral"]  { --you: var(--person-coral); }
+[data-person="mint"]   { --you: var(--person-mint); }
+[data-person="butter"] { --you: var(--person-butter); }
+[data-person="sky"]    { --you: var(--person-sky); }
+[data-person="rose"]   { --you: var(--person-rose); }
+[data-person="leaf"]   { --you: var(--person-leaf); }
+[data-person="lilac"]  { --you: var(--person-lilac); }
+[data-person="sand"]   { --you: var(--person-sand); }
+[data-theme="tint"][data-person] { --accent: var(--you); --highlight: var(--you); --done: var(--you); }

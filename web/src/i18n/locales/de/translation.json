@@ -785,6 +785,66 @@
       "quest": "Expedition"
     }
   },
+  "design": {
+    "avatar": {
+      "noName": "Jemand"
+    },
+    "category": {
+      "essential": "Pflicht",
+      "daily": "Jeden Tag",
+      "bonus": "Bonus"
+    },
+    "celebration": {
+      "back": "Zurück zu meiner Liste",
+      "headline": "Super <em>gemacht!</em>",
+      "next": "Weiter: {{title}}",
+      "points": "+{{count}}",
+      "pointsLabel_one": "{{count}} Punkt verdient",
+      "pointsLabel_other": "{{count}} Punkte verdient",
+      "streak_one": "{{count}} in Folge",
+      "streak_other": "{{count}} in Folge"
+    },
+    "chore": {
+      "locked": "Geht auf, wenn alles andere erledigt ist",
+      "lockedLabel": "Gesperrt",
+      "markComplete": "Als erledigt markieren",
+      "markIncomplete": "Als nicht erledigt markieren",
+      "photo": "Fotokontrolle",
+      "points_one": "{{count}} Pkt.",
+      "points_other": "{{count}} Pkt.",
+      "readAloud": "Vorlesen: {{title}}",
+      "waiting": "Wartet auf einen Erwachsenen"
+    },
+    "family": {
+      "count": "{{done}}/{{total}}",
+      "label": "{{name}}: {{done}} von {{total}} erledigt"
+    },
+    "greeting": {
+      "afternoon": "Guten Tag",
+      "evening": "Guten Abend",
+      "hi": "Hallo",
+      "morning": "Guten Morgen"
+    },
+    "points": {
+      "label_one": "{{count}} Punkt",
+      "label_other": "{{count}} Punkte"
+    },
+    "progress": {
+      "count": "{{done}} von {{total}}",
+      "doneToday": "heute erledigt",
+      "from": "7 Uhr",
+      "label": "{{done}} von {{total}} heute erledigt",
+      "of": " von {{total}}",
+      "slash": "/{{total}}",
+      "to": "21 Uhr"
+    },
+    "tabs": {
+      "label": "Hauptmenü",
+      "rewards": "Belohnungen",
+      "today": "Heute",
+      "week": "Woche"
+    }
+  },
   "linkedAccounts": {
     "confirmSignOutEverywhere": "Dieses Profil auf allen Geräten abmelden, auch auf diesem?",
     "confirmUnlink": "{{provider}} trennen? Damit angemeldete Geräte werden abgemeldet.",
