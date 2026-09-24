@@ -13,6 +13,7 @@ import {
 import { LineChart, type LineSeries, type Tick } from '../components/charts/LineChart';
 import { personColorVar } from '../components/charts/personColor';
 import { CAT_ORDER, nextRows, type NextRow } from './AmbientDashboard.data';
+import { isChoreDone } from '../choreRules';
 import styles from './AmbientDashboard.module.css';
 
 interface PersonDay {
@@ -97,7 +98,7 @@ async function loadPerson(user: User, today: string): Promise<PersonDay> {
     fetchPublicUserData<UserStreakData>(`/users/${user.id}/streak`),
     fetchPublicUserData<PointsData>(`/users/${user.id}/points`),
   ]);
-  const done = chores.filter((c) => c.completed);
+  const done = chores.filter(isChoreDone);
   const doneAt = done
     .map((c) => (c.completed_at ? new Date(c.completed_at) : null))
     .filter((d): d is Date => !!d && !isNaN(d.getTime()))
@@ -235,10 +236,11 @@ function Door({ p, now, fmtTime }: { p: PersonDay; now: Date; fmtTime: (d: Date)
   const items: DayProgressItem[] = useMemo(() => {
     const times = [...p.doneAt];
     return [...p.chores]
-      .sort((a, b) => Number(b.completed) - Number(a.completed) || CAT_ORDER[catFromCategory(a.category)] - CAT_ORDER[catFromCategory(b.category)])
+      .sort((a, b) => Number(isChoreDone(b)) - Number(isChoreDone(a)) || CAT_ORDER[catFromCategory(a.category)] - CAT_ORDER[catFromCategory(b.category)])
       .map((c) => {
-        const at = c.completed ? times.shift() : undefined;
-        return { cat: catFromCategory(c.category), done: c.completed, at: at ? dayFraction(at) : undefined };
+        const done = isChoreDone(c);
+        const at = done ? times.shift() : undefined;
+        return { cat: catFromCategory(c.category), done, at: at ? dayFraction(at) : undefined };
       });
   }, [p.chores, p.doneAt]);
 

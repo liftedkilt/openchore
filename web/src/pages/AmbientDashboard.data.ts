@@ -3,6 +3,7 @@
 // can be unit-tested without the page.
 import type { ScheduledChore } from '../types';
 import { catFromCategory, type Cat, type ChoreState } from '../design';
+import { dayGates, isChoreDone } from '../choreRules';
 
 export const CAT_ORDER: Record<Cat, number> = { essential: 0, daily: 1, bonus: 2 };
 
@@ -31,10 +32,6 @@ export function atToday(hhmm: string | undefined, now: Date): Date | null {
   return d;
 }
 
-/** Bonus only opens once every available Must do and Every day chore is done. */
-export function bonusOpen(chores: ScheduledChore[]): boolean {
-  return chores.every((c) => c.category === 'bonus' || c.completed || !c.available);
-}
 
 const HOUR = 60 * 60 * 1000;
 
@@ -44,14 +41,16 @@ const HOUR = 60 * 60 * 1000;
  * 2. what is late but can still be done (expired without the `block` penalty),
  * 3. what opens later today, with its "From …" time,
  * 4. locked bonus chores.
- * Done chores and expired chores that can no longer be completed are left out.
+ * Done chores (see isChoreDone: a rejected chore is not done) and expired
+ * chores that can no longer be completed are left out. Bonus locks by the
+ * same dayGates rule as the kid's Today screen.
  * Within a group: Must do, Every day, Bonus, then by time.
  */
 export function nextRows(chores: ScheduledChore[], now: Date): NextRow[] {
-  const open = bonusOpen(chores);
+  const open = dayGates(chores).bonusOpen;
   const rows: (NextRow & { group: number; sortAt: number })[] = [];
   for (const c of chores) {
-    if (c.completed) continue;
+    if (isChoreDone(c)) continue;
     if (c.expired && c.expiry_penalty === 'block') continue;
     const cat = catFromCategory(c.category);
     const locked = cat === 'bonus' && !open;

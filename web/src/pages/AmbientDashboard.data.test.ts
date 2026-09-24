@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ScheduledChore } from '../types';
-import { atToday, bonusOpen, nextRows } from './AmbientDashboard.data';
+import { atToday, nextRows } from './AmbientDashboard.data';
 
 let id = 0;
 function chore(title: string, category: ScheduledChore['category'], extra: Partial<ScheduledChore> = {}): ScheduledChore {
@@ -19,14 +19,6 @@ describe('atToday', () => {
     expect(atToday('19:30', at(16))?.getHours()).toBe(19);
     expect(atToday(undefined, at(16))).toBeNull();
     expect(atToday('soon', at(16))).toBeNull();
-  });
-});
-
-describe('bonusOpen', () => {
-  it('opens once every available Must do and Every day chore is done', () => {
-    expect(bonusOpen([chore('A', 'required', { completed: true }), chore('B', 'bonus')])).toBe(true);
-    expect(bonusOpen([chore('A', 'core'), chore('B', 'bonus')])).toBe(false);
-    expect(bonusOpen([chore('Later', 'required', { available: false }), chore('B', 'bonus')])).toBe(true);
   });
 });
 
@@ -83,5 +75,18 @@ describe('nextRows', () => {
 
     const open = nextRows([chore('Done', 'required', { completed: true }), chore('Bonus', 'bonus')], at(16));
     expect(open[0].state).toBe('todo');
+
+    // A chore that hasn't opened yet doesn't hold the gate (dayGates).
+    const later = nextRows([chore('Later', 'required', { available: false, available_at: '19:00' }), chore('Bonus', 'bonus')], at(16));
+    expect(later.find((r) => r.chore.title === 'Bonus')?.state).toBe('todo');
+  });
+
+  it('treats a rejected chore as not done: listed again, and bonus stays locked', () => {
+    const rows = nextRows([
+      chore('Rejected', 'core', { completed: true, completion_status: 'rejected' }),
+      chore('Bonus', 'bonus'),
+    ], at(16));
+    expect(titles(rows)).toEqual(['Rejected', 'Bonus']);
+    expect(rows[1].state).toBe('locked');
   });
 });
