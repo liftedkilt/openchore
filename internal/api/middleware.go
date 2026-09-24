@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -87,6 +89,65 @@ func RequireSession(s *store.Store, sm *SessionManager) func(http.Handler) http.
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// CheckOrigin rejects state-changing requests made by a browser on another
+// site. Sessions ride on a SameSite=Lax cookie, which stops other *sites* but
+// not sibling subdomains (in a homelab, other-app.home.lan is "same-site"
+// with chores.home.lan). Requests carrying an Authorization header don't use
+// the cookie and aren't subject to the check, and neither are requests
+// without an Origin header (non-browser clients).
+//
+// A request passes when the Origin's hostname matches the Host header, the
+// X-Forwarded-Host header, or the configured public URL. Ports are ignored so
+// the Vite dev proxy (which rewrites Host) keeps working.
+func CheckOrigin(publicURL string) func(http.Handler) http.Handler {
+	publicHost := ""
+	if u, err := url.Parse(publicURL); err == nil {
+		publicHost = u.Hostname()
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case http.MethodGet, http.MethodHead, http.MethodOptions:
+				next.ServeHTTP(w, r)
+				return
+			}
+			origin := r.Header.Get("Origin")
+			if origin == "" || r.Header.Get("Authorization") != "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			u, err := url.Parse(origin)
+			originHost := ""
+			if err == nil {
+				originHost = u.Hostname()
+			}
+			allowed := originHost != "" && (strings.EqualFold(originHost, hostOnly(r.Host)) ||
+				strings.EqualFold(originHost, publicHost))
+			if !allowed {
+				for _, fh := range strings.Split(r.Header.Get("X-Forwarded-Host"), ",") {
+					if fh = strings.TrimSpace(fh); fh != "" && strings.EqualFold(originHost, hostOnly(fh)) {
+						allowed = true
+						break
+					}
+				}
+			}
+			if !allowed {
+				writeError(w, http.StatusForbidden, "cross-origin request blocked; set auth.public_url if OpenChore is behind a proxy that rewrites Host")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// hostOnly strips an optional port from a Host header value.
+func hostOnly(hostport string) string {
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		return h
+	}
+	return strings.Trim(hostport, "[]")
 }
 
 // SessionClaimsFromContext returns the claims of the session that

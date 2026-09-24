@@ -67,12 +67,20 @@ func (s *Store) GetUser(ctx context.Context, id int64) (*model.User, error) {
 	}
 	u.Paused = paused == 1
 	u.HasPin = u.PinHash != ""
-	providers, err := s.listIdentityProviders(ctx)
+	rows, err := s.db.QueryContext(ctx, `SELECT provider FROM user_identities WHERE user_id = ? ORDER BY provider`, u.ID)
 	if err != nil {
 		return nil, err
 	}
-	u.AuthProviders = nonNilStrings(providers[u.ID])
-	return u, nil
+	defer rows.Close()
+	u.AuthProviders = []string{}
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, err
+		}
+		u.AuthProviders = append(u.AuthProviders, p)
+	}
+	return u, rows.Err()
 }
 
 func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {

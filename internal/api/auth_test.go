@@ -769,3 +769,28 @@ func TestOIDCAdminCannotUnlinkOnlyCredential(t *testing.T) {
 	decodeBody(t, resp, &ids)
 	b.expect("DELETE", fmt.Sprintf("/api/users/%d/identities/%d", parentID, int(ids[0]["id"].(float64))), nil, http.StatusConflict)
 }
+
+func TestCrossOriginCookieWritesBlocked(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kid := env.createChild(t, "Kid")
+	cookie := sessionCookie(t, env.login(t, kid, "", http.StatusOK))
+	host := strings.TrimPrefix(env.server.URL, "http://")
+
+	withOrigin := func(origin string) map[string]string {
+		h := cookieHeaders(cookie)
+		h["Origin"] = origin
+		return h
+	}
+	// A sibling app on another subdomain can't write with the kid's cookie...
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/theme", kid), map[string]any{"theme": "galaxy"},
+		withOrigin("http://evil.home.lan"), http.StatusForbidden)
+	// ...but the app itself (same host, any port) can.
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/theme", kid), map[string]any{"theme": "galaxy"},
+		withOrigin("http://"+strings.Split(host, ":")[0]+":5173"), http.StatusOK)
+	// Reads and non-browser clients are unaffected.
+	env.expectStatus(t, "GET", "/api/auth/me", nil, withOrigin("http://evil.home.lan"), http.StatusOK)
+	h := sessionHeaders(kid)
+	h["Origin"] = "http://evil.home.lan"
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/theme", kid), map[string]any{"theme": "forest"}, h, http.StatusOK)
+}
