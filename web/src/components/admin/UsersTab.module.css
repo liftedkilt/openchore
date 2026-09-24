@@ -1,0 +1,23 @@
+.item {
+  display: flex;
+  flex-direction: column;
+}
+
+.actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Phones: the action buttons drop under the name. */
+@media (max-width: 560px) {
+  .item .actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    padding-left: calc(40px + var(--space-3) - 10px);
+    box-sizing: border-box;
+  }
+}
+
+.decay {
+  padding: 0 var(--space-4) var(--space-4);
+}

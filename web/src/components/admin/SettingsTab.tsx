@@ -1,32 +1,64 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
+import { Trash2, X } from 'lucide-react';
 import { api } from '../../api';
 import type { AuthProvider, Webhook, WebhookDelivery } from '../../types';
-import styles from '../../pages/AdminDashboard.module.css';
-import { Plus, Trash2, Save, ChevronDown, ChevronUp } from 'lucide-react';
-import clsx from 'clsx';
+import { Icon } from '../../design';
 import { ExportConfigSection } from './ExportConfigSection';
 import { APITokensSection } from './APITokensSection';
+import ui from './ui.module.css';
+import styles from './SettingsTab.module.css';
+
+type Msg = { type: 'success' | 'error'; text: string } | null;
+
+/** A saved / failed line under a settings form. */
+export const FormMessage: React.FC<{ msg: Msg }> = ({ msg }) => {
+  if (!msg) return null;
+  return msg.type === 'success'
+    ? <p className={ui.msg} role="status"><Icon name="check" /> {msg.text}</p>
+    : <p className={ui.msgError} role="alert">{msg.text}</p>;
+};
+
+const WEBHOOK_EVENT_IDS: { id: string; key: string }[] = [
+  { id: 'chore.completed', key: 'completed' },
+  { id: 'chore.uncompleted', key: 'uncompleted' },
+  { id: 'chore.expired', key: 'expired' },
+  { id: 'chore.missed', key: 'missed' },
+  { id: 'reward.redeemed', key: 'redeemed' },
+  { id: 'daily.complete', key: 'dailyDone' },
+  { id: 'streak.milestone', key: 'streak' },
+  { id: 'points.decayed', key: 'decay' },
+  { id: 'auth.admin_passcode.verified', key: 'adminPasscodeVerified' },
+  { id: 'auth.admin_passcode.failed', key: 'adminPasscodeFailed' },
+  { id: 'auth.profile_pin.verified', key: 'profilePinVerified' },
+  { id: 'auth.profile_pin.failed', key: 'profilePinFailed' },
+  { id: 'auth.profile_pin.changed', key: 'profilePinChanged' },
+  { id: 'auth.profile_pin.cleared', key: 'profilePinCleared' },
+  { id: 'auth.oidc.login', key: 'oidcLogin' },
+  { id: 'auth.identity.linked', key: 'identityLinked' },
+  { id: 'auth.identity.unlinked', key: 'identityUnlinked' },
+];
 
 export const SettingsTab: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [providers, setProviders] = useState<AuthProvider[]>([]);
   const [baseUrl, setBaseUrl] = useState('');
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<Msg>(null);
 
   // Discord state
   const [discordUrl, setDiscordUrl] = useState('');
   const [discordSaving, setDiscordSaving] = useState(false);
-  const [discordMessage, setDiscordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [discordMessage, setDiscordMessage] = useState<Msg>(null);
 
   // AI settings state
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiThreshold, setAiThreshold] = useState('0.85');
   const [aiTtsEnabled, setAiTtsEnabled] = useState(false);
   const [aiSaving, setAiSaving] = useState(false);
-  const [aiMessage, setAiMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [aiMessage, setAiMessage] = useState<Msg>(null);
 
   // Webhooks state
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
@@ -37,27 +69,12 @@ export const SettingsTab: React.FC = () => {
   const [expandedWebhook, setExpandedWebhook] = useState<number | null>(null);
   const [deliveries, setDeliveries] = useState<WebhookDelivery[]>([]);
 
-  const WEBHOOK_EVENTS = [
-    { id: 'chore.completed', label: t('admin.settingsTab.webhooks.events.completed'), icon: '✅' },
-    { id: 'chore.uncompleted', label: t('admin.settingsTab.webhooks.events.uncompleted'), icon: '↩️' },
-    { id: 'chore.expired', label: t('admin.settingsTab.webhooks.events.expired'), icon: '⏰' },
-    { id: 'chore.missed', label: t('admin.settingsTab.webhooks.events.missed'), icon: '❌' },
-    { id: 'reward.redeemed', label: t('admin.settingsTab.webhooks.events.redeemed'), icon: '🎁' },
-    { id: 'daily.complete', label: t('admin.settingsTab.webhooks.events.dailyDone'), icon: '🌟' },
-    { id: 'streak.milestone', label: t('admin.settingsTab.webhooks.events.streak'), icon: '🔥' },
-    { id: 'points.decayed', label: t('admin.settingsTab.webhooks.events.decay'), icon: '📉' },
-    { id: 'auth.admin_passcode.verified', label: t('admin.settingsTab.webhooks.events.adminPasscodeVerified'), icon: '🔑' },
-    { id: 'auth.admin_passcode.failed', label: t('admin.settingsTab.webhooks.events.adminPasscodeFailed'), icon: '🚫' },
-    { id: 'auth.profile_pin.verified', label: t('admin.settingsTab.webhooks.events.profilePinVerified'), icon: '🔓' },
-    { id: 'auth.profile_pin.failed', label: t('admin.settingsTab.webhooks.events.profilePinFailed'), icon: '⚠️' },
-    { id: 'auth.profile_pin.changed', label: t('admin.settingsTab.webhooks.events.profilePinChanged'), icon: '🔢' },
-    { id: 'auth.profile_pin.cleared', label: t('admin.settingsTab.webhooks.events.profilePinCleared'), icon: '🗑️' },
-    { id: 'auth.oidc.login', label: t('admin.settingsTab.webhooks.events.oidcLogin'), icon: '🪪' },
-    { id: 'auth.identity.linked', label: t('admin.settingsTab.webhooks.events.identityLinked'), icon: '🔗' },
-    { id: 'auth.identity.unlinked', label: t('admin.settingsTab.webhooks.events.identityUnlinked'), icon: '⛓️‍💥' },
-  ];
+  const eventLabel = (id: string) => {
+    const ev = WEBHOOK_EVENT_IDS.find(e => e.id === id.trim());
+    return ev ? t(`admin.settingsTab.webhooks.events.${ev.key}`) : id.trim();
+  };
 
-  const allEventsSelected = webhookSelectedEvents.size === 0 || webhookSelectedEvents.size === WEBHOOK_EVENTS.length;
+  const allEventsSelected = webhookSelectedEvents.size === 0 || webhookSelectedEvents.size === WEBHOOK_EVENT_IDS.length;
   const toggleEvent = (id: string) => {
     setWebhookSelectedEvents(prev => {
       const next = new Set(prev);
@@ -77,11 +94,8 @@ export const SettingsTab: React.FC = () => {
   useEffect(() => { loadWebhooks(); }, [loadWebhooks]);
   useEffect(() => { api.auth.providers().then(setProviders).catch(() => setProviders([])); }, []);
 
-  // Load initial settings
+  // There's no bulk settings API, so fetch each setting we show.
   useEffect(() => {
-    // We don't have a bulk settings API, so we fetch what we need
-    // For now, let's just assume we can fetch specific settings if needed
-    // or add a new endpoint. Since we're here, let's add a quick fetch for base_url.
     api.admin.getSetting('base_url')
       .then(data => setBaseUrl(data.value || ''))
       .catch(() => {});
@@ -210,254 +224,240 @@ export const SettingsTab: React.FC = () => {
   };
 
   return (
-    <div>
-      <h2 className={styles.sectionTitle}>{t('admin.settingsTab.pageTitle')}</h2>
-
-      <form className={styles.form} onSubmit={handleSaveBaseUrl}>
-        <div className={styles.formHeader}>
-          <h3>{t('admin.settingsTab.baseUrl.title')}</h3>
+    <div className={ui.page}>
+      <div className={ui.pageHead}>
+        <div>
+          <h2 className={ui.pageTitle}>{t('admin.settingsTab.pageTitle')}</h2>
+          <p className={ui.pageSub}>{t('admin.settingsTab.subtitle')}</p>
         </div>
-        <p className={styles.sectionDesc}>
-          {t('admin.settingsTab.baseUrl.description')} <code>https://chores.example.com</code>). {t('admin.settingsTab.baseUrl.descriptionSuffix')}
-        </p>
-        <div className={styles.formGroup}>
-          <input
-            className={styles.input}
-            value={baseUrl}
-            onChange={e => setBaseUrl(e.target.value)}
-            placeholder={t('admin.settingsTab.baseUrl.placeholder')}
-          />
-        </div>
-        {message && (
-          <p className={clsx(styles.feedbackMsg, message.type === 'success' ? styles.feedbackMsgSuccess : styles.feedbackMsgError)}>
-            {message.text}
-          </p>
-        )}
-        <div className={styles.formActions}>
-          <button type="submit" className={styles.btnPrimary} disabled={saving}>
-            <Save size={16} /> {t('admin.settingsTab.baseUrl.saveButton')}
-          </button>
-        </div>
-      </form>
-
-      <form className={styles.form} onSubmit={handleSaveDiscordUrl}>
-        <div className={styles.formHeader}>
-          <h3>{t('admin.settingsTab.discord.title')}</h3>
-        </div>
-        <p className={styles.sectionDesc}>
-          {t('admin.settingsTab.discord.description')}
-        </p>
-        <div className={styles.formGroup}>
-          <input
-            className={styles.input}
-            value={discordUrl}
-            onChange={e => setDiscordUrl(e.target.value)}
-            placeholder={t('admin.settingsTab.discord.placeholder')}
-          />
-        </div>
-        {discordMessage && (
-          <p className={clsx(styles.feedbackMsg, discordMessage.type === 'success' ? styles.feedbackMsgSuccess : styles.feedbackMsgError)} style={{ marginTop: '0.25rem', marginBottom: '0.25rem' }}>
-            {discordMessage.text}
-          </p>
-        )}
-        <div className={styles.formActions}>
-          <button type="submit" className={styles.btnPrimary} disabled={discordSaving}>
-            <Save size={16} /> {t('admin.settingsTab.discord.saveButton')}
-          </button>
-          {discordUrl && (
-            <button type="button" className={styles.btnSecondary} disabled={discordSaving} onClick={handleTestDiscord}>
-              {t('admin.settingsTab.discord.testButton')}
-            </button>
-          )}
-        </div>
-      </form>
-
-      <form className={styles.form} onSubmit={handleSaveAISettings}>
-        <div className={styles.formHeader}>
-          <h3>{t('admin.settingsTab.ai.title')}</h3>
-        </div>
-        <p className={styles.sectionDesc}>
-          {t('admin.settingsTab.ai.description')}
-        </p>
-
-        <div className={styles.formGrid}>
-          <label className={styles.checkboxLabel}>
-            <input type="checkbox" checked={aiEnabled} onChange={e => setAiEnabled(e.target.checked)} />
-            {t('admin.settingsTab.ai.enableLabel')}
-          </label>
-
-          <div className={styles.formGroup}>
-            <label className={styles.label}>{t('admin.settingsTab.ai.thresholdLabel')}</label>
-            <div className={styles.flexRow} style={{ gap: '0.75rem' }}>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={aiThreshold}
-                onChange={e => setAiThreshold(e.target.value)}
-                disabled={!aiEnabled}
-                style={{ flex: 1, accentColor: 'var(--accent-blue)' }}
-              />
-              <span style={{ fontSize: '0.9rem', fontWeight: 700, minWidth: '3ch', textAlign: 'right' }}>{aiThreshold}</span>
-            </div>
-            <span className={styles.helpText}>
-              {t('admin.settingsTab.ai.thresholdHelp')}
-            </span>
-          </div>
-
-          <label className={styles.checkboxLabel}>
-            <input type="checkbox" checked={aiTtsEnabled} onChange={e => setAiTtsEnabled(e.target.checked)} />
-            {t('admin.settingsTab.ai.ttsLabel')}
-          </label>
-        </div>
-
-        {aiMessage && (
-          <p className={clsx(styles.feedbackMsg, aiMessage.type === 'success' ? styles.feedbackMsgSuccess : styles.feedbackMsgError)}>
-            {aiMessage.text}
-          </p>
-        )}
-
-        <div className={styles.formActions}>
-          <button type="submit" className={styles.btnPrimary} disabled={aiSaving}>
-            <Save size={16} /> {aiSaving ? t('admin.settingsTab.ai.savingButton') : t('admin.settingsTab.ai.saveButton')}
-          </button>
-        </div>
-      </form>
-
-      <div className={styles.form} style={{ marginTop: '1.5rem' }}>
-        <div className={styles.formHeader}>
-          <h3>{t('admin.settingsTab.signIn.title')}</h3>
-        </div>
-        <p className={styles.sectionDesc}>{t('admin.settingsTab.signIn.description')}</p>
-        {providers.length > 0 ? (
-          <>
-            <p className={styles.sectionDesc}>{t('admin.settingsTab.signIn.providersConfigured')}</p>
-            <ul className={styles.sectionDesc}>
-              {providers.map(p => <li key={p.id}><strong>{p.name}</strong> <code>{p.id}</code></li>)}
-            </ul>
-          </>
-        ) : (
-          <p className={styles.sectionDesc}>{t('admin.settingsTab.signIn.noProviders')}</p>
-        )}
       </div>
 
-      {/* Export Config Section */}
-      <ExportConfigSection />
+      <div className={styles.columns}>
+        <div className={ui.cardStack}>
+          <form className={clsx(ui.card, ui.section)} onSubmit={handleSaveBaseUrl}>
+            <h3 className={ui.sectionTitle}>{t('admin.settingsTab.baseUrl.title')}</h3>
+            <p className={ui.sectionDesc}>
+              {t('admin.settingsTab.baseUrl.description')}<code>https://chores.example.com</code>{t('admin.settingsTab.baseUrl.descriptionSuffix')}
+            </p>
+            <input
+              className={ui.input}
+              value={baseUrl}
+              onChange={e => setBaseUrl(e.target.value)}
+              placeholder={t('admin.settingsTab.baseUrl.placeholder')}
+              aria-label={t('admin.settingsTab.baseUrl.title')}
+            />
+            <FormMessage msg={message} />
+            <div className={ui.actionsEnd}>
+              <button type="submit" className={ui.btnPrimary} disabled={saving}>
+                <Icon name="check" /> {t('admin.settingsTab.baseUrl.saveButton')}
+              </button>
+            </div>
+          </form>
 
-      {/* Webhooks Section */}
-      <div className={styles.form} style={{ marginTop: '1.5rem' }}>
-        <div className={styles.formHeader}>
-          <h3>{t('admin.settingsTab.webhooks.title')}</h3>
-          <button className={styles.btnSmall} onClick={() => setShowWebhookForm(f => !f)}>
-            <Plus size={14} /> {t('admin.settingsTab.webhooks.addButton')}
-          </button>
+          <form className={clsx(ui.card, ui.section)} onSubmit={handleSaveDiscordUrl}>
+            <h3 className={ui.sectionTitle}>{t('admin.settingsTab.discord.title')}</h3>
+            <p className={ui.sectionDesc}>{t('admin.settingsTab.discord.description')}</p>
+            <input
+              className={ui.input}
+              value={discordUrl}
+              onChange={e => setDiscordUrl(e.target.value)}
+              placeholder={t('admin.settingsTab.discord.placeholder')}
+              aria-label={t('admin.settingsTab.discord.title')}
+            />
+            <FormMessage msg={discordMessage} />
+            <div className={ui.actionsEnd}>
+              {discordUrl && (
+                <button type="button" className={ui.btnGhost} disabled={discordSaving} onClick={handleTestDiscord}>
+                  {t('admin.settingsTab.discord.testButton')}
+                </button>
+              )}
+              <button type="submit" className={ui.btnPrimary} disabled={discordSaving}>
+                <Icon name="check" /> {t('admin.settingsTab.discord.saveButton')}
+              </button>
+            </div>
+          </form>
+
+          <form className={clsx(ui.card, ui.section)} onSubmit={handleSaveAISettings}>
+            <h3 className={ui.sectionTitle}><Icon name="camera" /> {t('admin.settingsTab.ai.title')}</h3>
+            <p className={ui.sectionDesc}>{t('admin.settingsTab.ai.description')}</p>
+
+            <label className={ui.check}>
+              <input type="checkbox" checked={aiEnabled} onChange={e => setAiEnabled(e.target.checked)} />
+              <span className={ui.checkLabel}>{t('admin.settingsTab.ai.enableLabel')}</span>
+            </label>
+
+            <label className={ui.field}>
+              <span className={ui.label}>{t('admin.settingsTab.ai.thresholdLabel')}</span>
+              <span className={styles.rangeRow}>
+                <input
+                  type="range"
+                  className={ui.range}
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={aiThreshold}
+                  onChange={e => setAiThreshold(e.target.value)}
+                  disabled={!aiEnabled}
+                />
+                <output className={styles.rangeValue}>{Number(aiThreshold).toFixed(2)}</output>
+              </span>
+              <span className={ui.help}>{t('admin.settingsTab.ai.thresholdHelp')}</span>
+            </label>
+
+            <label className={ui.check}>
+              <input type="checkbox" checked={aiTtsEnabled} onChange={e => setAiTtsEnabled(e.target.checked)} />
+              <span className={ui.checkLabel}>{t('admin.settingsTab.ai.ttsLabel')}</span>
+            </label>
+
+            <FormMessage msg={aiMessage} />
+
+            <div className={ui.actionsEnd}>
+              <button type="submit" className={ui.btnPrimary} disabled={aiSaving}>
+                <Icon name="check" /> {aiSaving ? t('admin.settingsTab.ai.savingButton') : t('admin.settingsTab.ai.saveButton')}
+              </button>
+            </div>
+          </form>
         </div>
-        <p className={styles.sectionDesc}>
-          {t('admin.settingsTab.webhooks.description')}
-        </p>
 
-        {showWebhookForm && (
-          <form onSubmit={handleCreateWebhook} style={{ marginBottom: '1rem' }}>
-            <div className={styles.formGrid}>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>{t('admin.settingsTab.webhooks.form.urlLabel')}</label>
-                <input className={styles.input} value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} placeholder={t('admin.settingsTab.webhooks.form.urlPlaceholder')} required />
-              </div>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>{t('admin.settingsTab.webhooks.form.secretLabel')}</label>
-                <input className={styles.input} value={webhookSecret} onChange={e => setWebhookSecret(e.target.value)} placeholder={t('admin.settingsTab.webhooks.form.secretPlaceholder')} />
-              </div>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>{t('admin.settingsTab.webhooks.form.eventsLabel')} {allEventsSelected && <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>({t('admin.settingsTab.webhooks.form.eventsAll')})</span>}</label>
-                <div className={styles.chipRow} style={{ gap: '0.4rem', marginTop: '0.3rem' }}>
-                  {WEBHOOK_EVENTS.map(ev => {
-                    const selected = webhookSelectedEvents.has(ev.id) || allEventsSelected;
-                    return (
+        <div className={ui.cardStack}>
+          <section className={clsx(ui.card, ui.section)}>
+            <h3 className={ui.sectionTitle}><Icon name="lock" /> {t('admin.settingsTab.signIn.title')}</h3>
+            <p className={ui.sectionDesc}>{t('admin.settingsTab.signIn.description')}</p>
+            {providers.length > 0 ? (
+              <>
+                <p className={ui.sectionDesc}>{t('admin.settingsTab.signIn.providersConfigured')}</p>
+                <ul className={styles.providers}>
+                  {providers.map(p => (
+                    <li key={p.id}>
+                      <span className={ui.rowTitle}>{p.name}</span>
+                      <code className={ui.code}>{p.id}</code>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className={ui.sectionDesc}>{t('admin.settingsTab.signIn.noProviders')}</p>
+            )}
+          </section>
+
+          <section className={clsx(ui.card, ui.section)}>
+            <div className={ui.sectionHead}>
+              <h3 className={ui.sectionTitle}>{t('admin.settingsTab.webhooks.title')}</h3>
+              <button type="button" className={ui.btnGhost} aria-expanded={showWebhookForm} onClick={() => setShowWebhookForm(f => !f)}>
+                {showWebhookForm ? <X aria-hidden /> : <Icon name="plus" />}
+                {showWebhookForm ? t('admin.settingsTab.webhooks.form.cancelButton') : t('admin.settingsTab.webhooks.addButton')}
+              </button>
+            </div>
+            <p className={ui.sectionDesc}>{t('admin.settingsTab.webhooks.description')}</p>
+
+            {showWebhookForm && (
+              <form onSubmit={handleCreateWebhook} className={ui.inset}>
+                <label className={ui.field}>
+                  <span className={ui.label}>{t('admin.settingsTab.webhooks.form.urlLabel')}</span>
+                  <input className={ui.input} value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} placeholder={t('admin.settingsTab.webhooks.form.urlPlaceholder')} required />
+                </label>
+                <label className={ui.field}>
+                  <span className={ui.label}>{t('admin.settingsTab.webhooks.form.secretLabel')}</span>
+                  <input className={ui.input} value={webhookSecret} onChange={e => setWebhookSecret(e.target.value)} placeholder={t('admin.settingsTab.webhooks.form.secretPlaceholder')} />
+                </label>
+                <div className={ui.field}>
+                  <span className={ui.label}>
+                    {t('admin.settingsTab.webhooks.form.eventsLabel')}
+                    {allEventsSelected && <span className={styles.labelNote}> ({t('admin.settingsTab.webhooks.form.eventsAll')})</span>}
+                  </span>
+                  <div className={ui.chips}>
+                    {WEBHOOK_EVENT_IDS.map(ev => (
                       <button
                         key={ev.id}
                         type="button"
                         onClick={() => toggleEvent(ev.id)}
-                        className={clsx(styles.webhookEventChip, selected && styles.webhookEventChipActive)}
+                        className={styles.eventChip}
+                        aria-pressed={webhookSelectedEvents.has(ev.id) || allEventsSelected}
                       >
-                        <span>{ev.icon}</span> {ev.label}
+                        {t(`admin.settingsTab.webhooks.events.${ev.key}`)}
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            <div className={styles.formActions}>
-              <button type="submit" className={styles.btnPrimary}><Save size={14} /> {t('admin.settingsTab.webhooks.form.createButton')}</button>
-              <button type="button" className={styles.btnSecondary} onClick={() => setShowWebhookForm(false)}>{t('admin.settingsTab.webhooks.form.cancelButton')}</button>
-            </div>
-          </form>
-        )}
-
-        {webhooks.length === 0 && !showWebhookForm && (
-          <p className={styles.emptyTextItalic}>{t('admin.settingsTab.webhooks.empty')}</p>
-        )}
-
-        {webhooks.map(wh => (
-          <div key={wh.id} className={styles.listItem} style={{ marginBottom: '0.5rem' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className={styles.flexRow}>
-                <span className={clsx(styles.statusDot, wh.active ? styles.statusDotActive : styles.statusDotInactive)} />
-                <span className={styles.webhookUrlText}>
-                  {wh.url}
-                </span>
-              </div>
-              <div className={styles.webhookMeta}>
-                {wh.events === '*' ? (
-                  <span>{t('admin.settingsTab.webhooks.allEvents')}</span>
-                ) : (
-                  wh.events.split(',').map(e => {
-                    const ev = WEBHOOK_EVENTS.find(we => we.id === e.trim());
-                    return <span key={e} className={styles.webhookEventTag}>{ev ? `${ev.icon} ${ev.label}` : e.trim()}</span>;
-                  })
-                )}
-                {wh.secret && <span>• {t('admin.settingsTab.webhooks.signed')}</span>}
-              </div>
-            </div>
-            <div className={styles.btnGroup}>
-              <button className={styles.btnSmall} onClick={() => handleExpandWebhook(wh.id)}>
-                {expandedWebhook === wh.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              </button>
-              <button className={styles.btnSmall} onClick={() => handleToggleWebhook(wh)}>
-                {wh.active ? t('admin.settingsTab.webhooks.disableButton') : t('admin.settingsTab.webhooks.enableButton')}
-              </button>
-              <button className={clsx(styles.btnSmall, styles.btnDanger)} aria-label={t('admin.settingsTab.webhooks.deleteAriaLabel')} onClick={() => handleDeleteWebhook(wh.id)}>
-                <Trash2 size={14} />
-              </button>
-            </div>
-            {expandedWebhook === wh.id && (
-              <div style={{ width: '100%', marginTop: '0.5rem' }}>
-                <h4 className={styles.deliveryHeader}>{t('admin.settingsTab.webhooks.deliveries.title')}</h4>
-                {deliveries.length === 0 ? (
-                  <p className={styles.emptyTextItalic} style={{ fontSize: '0.8rem' }}>{t('admin.settingsTab.webhooks.deliveries.empty')}</p>
-                ) : (
-                  <div className={styles.deliveryList}>
-                    {deliveries.map(d => (
-                      <div key={d.id} className={styles.deliveryItem}>
-                        <span className={clsx(styles.statusDot, d.status_code && d.status_code >= 200 && d.status_code < 300 ? styles.statusDotActive : styles.statusDotError)} />
-                        <span style={{ fontWeight: 600 }}>{d.event}</span>
-                        <span style={{ color: 'var(--text-secondary)' }}>{d.status_code || 'err'}</span>
-                        <span style={{ color: 'var(--text-secondary)', marginLeft: 'auto' }}>
-                          {new Date(d.created_at).toLocaleString()}
-                        </span>
-                      </div>
                     ))}
                   </div>
-                )}
+                </div>
+                <div className={ui.actionsEnd}>
+                  <button type="button" className={ui.btnGhost} onClick={() => setShowWebhookForm(false)}>{t('admin.settingsTab.webhooks.form.cancelButton')}</button>
+                  <button type="submit" className={ui.btnPrimary}><Icon name="check" /> {t('admin.settingsTab.webhooks.form.createButton')}</button>
+                </div>
+              </form>
+            )}
+
+            {webhooks.length === 0 && !showWebhookForm && (
+              <p className={ui.emptyInline}>{t('admin.settingsTab.webhooks.empty')}</p>
+            )}
+
+            {webhooks.length > 0 && (
+              <div className={styles.subList}>
+                {webhooks.map(wh => (
+                  <div key={wh.id} className={styles.webhook}>
+                    <div className={styles.webhookRow}>
+                      <span className={wh.active ? ui.dot : ui.dotOff} aria-hidden />
+                      <div className={ui.rowMain}>
+                        <span className={styles.url}>{wh.url}</span>
+                        <span className={ui.rowMeta}>
+                          <span>{wh.active ? t('admin.settingsTab.webhooks.active') : t('admin.settingsTab.webhooks.inactive')}</span>
+                          {wh.events === '*' ? (
+                            <span>{t('admin.settingsTab.webhooks.allEvents')}</span>
+                          ) : (
+                            <span>{wh.events.split(',').map(eventLabel).join(', ')}</span>
+                          )}
+                          {wh.secret && <span><Icon name="lock" /> {t('admin.settingsTab.webhooks.signed')}</span>}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={styles.webhookActions}>
+                      <button
+                        type="button"
+                        className={ui.btnGhost}
+                        aria-expanded={expandedWebhook === wh.id}
+                        onClick={() => handleExpandWebhook(wh.id)}
+                      >
+                        <Icon name="chev" className={clsx(styles.caret, expandedWebhook === wh.id && styles.caretOpen)} />
+                        {t('admin.settingsTab.webhooks.deliveries.title')}
+                      </button>
+                      <button type="button" className={ui.btnGhost} onClick={() => handleToggleWebhook(wh)}>
+                        {wh.active ? t('admin.settingsTab.webhooks.disableButton') : t('admin.settingsTab.webhooks.enableButton')}
+                      </button>
+                      <button type="button" className={clsx(ui.iconBtn, ui.iconBtnDanger)} aria-label={t('admin.settingsTab.webhooks.deleteAriaLabel')} title={t('admin.settingsTab.webhooks.deleteAriaLabel')} onClick={() => handleDeleteWebhook(wh.id)}>
+                        <Trash2 aria-hidden />
+                      </button>
+                    </div>
+                    {expandedWebhook === wh.id && (
+                      <div className={styles.deliveries}>
+                        {deliveries.length === 0 ? (
+                          <p className={ui.emptyInline}>{t('admin.settingsTab.webhooks.deliveries.empty')}</p>
+                        ) : (
+                          <ul className={styles.deliveryList}>
+                            {deliveries.map(d => {
+                              const ok = !!d.status_code && d.status_code >= 200 && d.status_code < 300;
+                              return (
+                                <li key={d.id} className={styles.delivery}>
+                                  <span className={ok ? ui.dot : ui.dotError} aria-hidden />
+                                  <span className={styles.deliveryEvent}>{d.event}</span>
+                                  <span className={ok ? styles.deliveryStatus : styles.deliveryStatusError}>{d.status_code || 'err'}</span>
+                                  <span className={styles.deliveryTime}>{new Date(d.created_at).toLocaleString(i18n.language)}</span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
-          </div>
-        ))}
+          </section>
 
+          <APITokensSection />
+
+          <ExportConfigSection />
+        </div>
       </div>
-
-      {/* API Tokens Section */}
-      <APITokensSection />
     </div>
   );
 };

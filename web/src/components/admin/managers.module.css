@@ -1,0 +1,107 @@
+/* Schedules and triggers inside the chore editor. */
+
+.manager {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.titleIcon {
+  width: 20px;
+  height: 20px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.list > * + * {
+  border-top: 1px solid var(--line);
+}
+
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-height: 56px;
+  padding: 6px 6px 6px var(--space-3);
+  box-sizing: border-box;
+}
+
+.itemEnd {
+  margin-left: auto;
+}
+
+.when {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.meta {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.metaDue {
+  color: var(--urgent);
+  font-weight: 600;
+}
+
+.days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.day {
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.day[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.suffixed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.suffixed input {
+  max-width: 110px;
+}
+
+.url {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface-sunk);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  cursor: copy;
+  overflow-wrap: anywhere;
+  text-align: left;
+}

@@ -1,0 +1,111 @@
+.item {
+  display: flex;
+  flex-direction: column;
+}
+
+.assignToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 10px 0 6px;
+  margin: -6px 0 -10px -6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.assignToggle:hover {
+  background: var(--surface-sunk);
+}
+
+.assignToggle > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.stack {
+  display: inline-flex;
+}
+
+.stack > :global(.oc-avatar) {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+  box-shadow: 0 0 0 2px var(--surface-raised);
+}
+
+.stack > :global(.oc-avatar) + :global(.oc-avatar) {
+  margin-left: -6px;
+}
+
+.caret {
+  transform: rotate(90deg);
+}
+
+.caretOpen {
+  transform: rotate(-90deg);
+}
+
+.assignWrap {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.assign {
+  gap: 0;
+}
+
+.assignRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px var(--space-3);
+  padding: 4px 0;
+}
+
+.assignRow + .assignRow {
+  border-top: 1px solid var(--line);
+}
+
+.assignCost {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.assignCost input {
+  width: 130px;
+}
+
+.streakBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: none;
+  min-width: 88px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--surface-sunk);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.streakBadge svg {
+  width: 16px;
+  height: 16px;
+  color: var(--star);
+}

@@ -1,18 +1,15 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
+import { Download } from 'lucide-react';
 import { api } from '../../api';
-import styles from '../../pages/AdminDashboard.module.css';
-import { Save } from 'lucide-react';
+import ui from './ui.module.css';
 
-const EXPORT_SECTIONS = [
-  { id: 'users', label: 'Users' },
-  { id: 'chores', label: 'Chores & Schedules' },
-  { id: 'rewards', label: 'Rewards' },
-  { id: 'streak_rewards', label: 'Streak Rewards' },
-  { id: 'settings', label: 'Settings' },
-];
+const EXPORT_SECTIONS = ['users', 'chores', 'rewards', 'streak_rewards', 'settings'] as const;
 
 export const ExportConfigSection: React.FC = () => {
-  const [selected, setSelected] = useState<Set<string>>(new Set(EXPORT_SECTIONS.map(s => s.id)));
+  const { t } = useTranslation();
+  const [selected, setSelected] = useState<Set<string>>(new Set(EXPORT_SECTIONS));
   const [exporting, setExporting] = useState(false);
 
   const toggle = (id: string) => {
@@ -42,26 +39,25 @@ export const ExportConfigSection: React.FC = () => {
   };
 
   return (
-    <div className={styles.form} style={{ marginTop: '1.5rem' }}>
-      <div className={styles.formHeader}>
-        <h3>Export Configuration</h3>
-      </div>
-      <p className={styles.sectionDesc}>
-        Download a <code>config.yaml</code> reflecting the current database state. Use this to bootstrap a fresh instance.
+    <section className={clsx(ui.card, ui.section)}>
+      <h3 className={ui.sectionTitle}>{t('admin.exportConfig.title')}</h3>
+      <p className={ui.sectionDesc}>
+        {t('admin.exportConfig.descriptionBefore')}<code>config.yaml</code>{t('admin.exportConfig.descriptionAfter')}
       </p>
-      <div className={styles.chipRow} style={{ marginBottom: '1rem' }}>
-        {EXPORT_SECTIONS.map(s => (
-          <label key={s.id} className={styles.chipLabel}>
-            <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} />
-            {s.label}
+      <fieldset className={ui.chips} style={{ border: 0, padding: 0, margin: 0 }}>
+        <legend className={ui.srOnlyText}>{t('admin.exportConfig.sectionsLabel')}</legend>
+        {EXPORT_SECTIONS.map(id => (
+          <label key={id} className={ui.checkChip}>
+            <input type="checkbox" checked={selected.has(id)} onChange={() => toggle(id)} />
+            {t(`admin.exportConfig.sections.${id}`)}
           </label>
         ))}
-      </div>
-      <div className={styles.formActions}>
-        <button className={styles.btnPrimary} onClick={handleExport} disabled={exporting || selected.size === 0}>
-          <Save size={16} /> {exporting ? 'Exporting...' : 'Download config.yaml'}
+      </fieldset>
+      <div className={ui.actionsEnd}>
+        <button type="button" className={ui.btnPrimary} onClick={handleExport} disabled={exporting || selected.size === 0}>
+          <Download aria-hidden /> {exporting ? t('admin.exportConfig.exporting') : t('admin.exportConfig.download')}
         </button>
       </div>
-    </div>
+    </section>
   );
 };

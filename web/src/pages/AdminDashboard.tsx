@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
+import { Settings, BarChart3 } from 'lucide-react';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
+import { HouseScope, Icon, type IconName } from '../design';
 import styles from './AdminDashboard.module.css';
-import { ArrowLeft, Plus, Users, ListChecks, Gift, Coins, Activity, Settings, Undo2, Camera, Home } from 'lucide-react';
-import clsx from 'clsx';
 import QuickAssign from '../components/QuickAssign/QuickAssign';
 import { ChoresTab } from '../components/admin/ChoresTab';
 import { ApprovalsTab } from '../components/admin/ApprovalsTab';
@@ -18,71 +19,93 @@ import { SettingsTab } from '../components/admin/SettingsTab';
 import { KidsStatusTab } from '../components/admin/KidsStatusTab';
 import { LanguageSelector } from '../components/LanguageSelector/LanguageSelector';
 
-type Tab = 'kids-status' | 'chores' | 'approvals' | 'users' | 'rewards' | 'points' | 'activity' | 'ai' | 'settings';
+type Tab = 'kids-status' | 'approvals' | 'chores' | 'rewards' | 'points' | 'activity' | 'users' | 'ai' | 'settings';
+
+const TABS: { id: Tab; label: string; icon?: IconName }[] = [
+  { id: 'kids-status', label: 'admin.dashboard.tabKids', icon: 'home' },
+  { id: 'approvals', label: 'admin.dashboard.tabApprovals', icon: 'check' },
+  { id: 'chores', label: 'admin.dashboard.tabChores', icon: 'broom' },
+  { id: 'rewards', label: 'admin.dashboard.tabRewards', icon: 'gift' },
+  { id: 'points', label: 'admin.dashboard.tabPoints', icon: 'star' },
+  { id: 'activity', label: 'admin.dashboard.tabLog', icon: 'clock' },
+  { id: 'users', label: 'admin.dashboard.tabPeople', icon: 'people' },
+  { id: 'ai', label: 'admin.dashboard.tabAi', icon: 'camera' },
+  // Settings stays last (e2e: `nav button` last).
+  { id: 'settings', label: 'admin.dashboard.tabSettings' },
+];
+
+/** The four overlapping dots of the House logo, one per person colour. */
+const LogoMark: React.FC = () => (
+  <span className={styles.logo} aria-hidden>
+    <i data-person="coral" /><i data-person="mint" /><i data-person="butter" /><i data-person="sky" />
+  </span>
+);
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [tab, setTab] = useState<Tab>('kids-status');
   const [pendingCount, setPendingCount] = useState(0);
   const [quickAssignOpen, setQuickAssignOpen] = useState(false);
 
-  // Fetch pending count periodically
-  useEffect(() => {
-    const fetchCount = () => api.chores.listPending().then(p => setPendingCount(p.length)).catch(() => {});
-    fetchCount();
-    const interval = setInterval(fetchCount, 30000);
-    return () => clearInterval(interval);
+  const refreshCount = useCallback(() => {
+    api.chores.listPending().then(p => setPendingCount(p.length)).catch(() => {});
   }, []);
 
+  // Keep the approvals badge fresh.
+  useEffect(() => {
+    refreshCount();
+    const interval = setInterval(refreshCount, 30000);
+    return () => clearInterval(interval);
+  }, [refreshCount]);
+
+  const backLabel = t('admin.dashboard.backToMyChores', { name: user?.name ?? '' });
+
   return (
-    <div className={styles.wrapper}>
+    // Personal (OIDC) sessions follow the system setting; the shared tablet
+    // (tap/PIN) follows the evening schedule.
+    <HouseScope mode="auto" persistent={!!session?.persistent} className={styles.shell}>
       <header className={styles.header}>
-        <button className={styles.backBtn} onClick={() => navigate('/')} aria-label={t('admin.dashboard.backToMyChores', { name: user?.name ?? '' })} title={t('admin.dashboard.backToMyChores', { name: user?.name ?? '' })}>
-          <ArrowLeft size={18} />
-        </button>
-        <h1 className={styles.title}>{t('admin.dashboard.title')}</h1>
-        <LanguageSelector />
-        <button className={styles.btnSmall} style={{ marginLeft: 'auto' }} onClick={() => navigate('/admin/reports')}>
-          {t('admin.dashboard.reports')}
-        </button>
+        <div className={styles.headerInner}>
+          <button type="button" className={styles.back} onClick={() => navigate('/')} aria-label={backLabel} title={backLabel}>
+            <Icon name="back" />
+          </button>
+          <div className={styles.brand}>
+            <LogoMark />
+            <h1 className={styles.title}>{t('admin.dashboard.title')}</h1>
+          </div>
+          <div className={styles.headerActions}>
+            <LanguageSelector className={styles.lang} />
+            <button type="button" className={styles.reports} onClick={() => navigate('/admin/reports')}>
+              <BarChart3 aria-hidden />
+              <span>{t('admin.dashboard.reports')}</span>
+            </button>
+          </div>
+        </div>
+        <nav className={styles.nav} aria-label={t('admin.dashboard.navLabel')}>
+          <div className={styles.navInner}>
+            {TABS.map(({ id, label, icon }) => (
+              <button
+                key={id}
+                type="button"
+                className={clsx(styles.tab, tab === id && styles.tabOn)}
+                aria-current={tab === id ? 'page' : undefined}
+                onClick={() => setTab(id)}
+              >
+                {icon ? <Icon name={icon} /> : <Settings aria-hidden />}
+                <span>{t(label)}</span>
+                {id === 'approvals' && pendingCount > 0 && (
+                  <span className={styles.count}>{pendingCount}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </nav>
       </header>
 
-      <nav className={styles.nav}>
-        <button className={clsx(styles.navItem, tab === 'kids-status' && styles.navItemActive)} onClick={() => setTab('kids-status')}>
-          <Home size={16} /> {t('admin.dashboard.tabKids')}
-        </button>
-        <button className={clsx(styles.navItem, tab === 'chores' && styles.navItemActive)} onClick={() => setTab('chores')}>
-          <ListChecks size={16} /> {t('admin.dashboard.tabChores')}
-        </button>
-        <button className={clsx(styles.navItem, tab === 'approvals' && styles.navItemActive)} onClick={() => setTab('approvals')}>
-          <Activity size={16} />
-          {t('admin.dashboard.tabApprovals')}
-          {pendingCount > 0 && <span className={styles.navBadge}>{pendingCount}</span>}
-        </button>
-        <button className={clsx(styles.navItem, tab === 'rewards' && styles.navItemActive)} onClick={() => setTab('rewards')}>
-          <Gift size={16} /> {t('admin.dashboard.tabRewards')}
-        </button>
-        <button className={clsx(styles.navItem, tab === 'points' && styles.navItemActive)} onClick={() => setTab('points')}>
-          <Coins size={16} /> {t('admin.dashboard.tabPoints')}
-        </button>
-        <button className={clsx(styles.navItem, tab === 'activity' && styles.navItemActive)} onClick={() => setTab('activity')}>
-          <Undo2 size={16} /> {t('admin.dashboard.tabLog')}
-        </button>
-        <button className={clsx(styles.navItem, tab === 'users' && styles.navItemActive)} onClick={() => setTab('users')}>
-          <Users size={16} /> {t('admin.dashboard.tabPeople')}
-        </button>
-        <button className={clsx(styles.navItem, tab === 'ai' && styles.navItemActive)} onClick={() => setTab('ai')}>
-          <Camera size={16} /> {t('admin.dashboard.tabAi')}
-        </button>
-        <button className={clsx(styles.navItem, tab === 'settings' && styles.navItemActive)} onClick={() => setTab('settings')}>
-          <Settings size={16} />
-        </button>
-      </nav>
-
       <main className={styles.content}>
-        {tab === 'kids-status' && <KidsStatusTab />}
+        {tab === 'kids-status' && <KidsStatusTab onPendingChange={setPendingCount} />}
         {tab === 'chores' && <ChoresTab />}
         {tab === 'approvals' && <ApprovalsTab onCountChange={setPendingCount} />}
         {tab === 'users' && <UsersTab />}
@@ -93,11 +116,17 @@ export const AdminDashboard: React.FC = () => {
         {tab === 'settings' && <SettingsTab />}
       </main>
 
-      <button className={styles.fab} onClick={() => setQuickAssignOpen(true)} title={t('admin.dashboard.quickAssign')}>
-        <Plus size={24} />
+      <button
+        type="button"
+        className={styles.fab}
+        onClick={() => setQuickAssignOpen(true)}
+        title={t('admin.dashboard.quickAssign')}
+        aria-label={t('admin.dashboard.quickAssign')}
+      >
+        <Icon name="plus" />
       </button>
 
-      <QuickAssign isOpen={quickAssignOpen} onClose={() => setQuickAssignOpen(false)} />
-    </div>
+      <QuickAssign isOpen={quickAssignOpen} onClose={() => { setQuickAssignOpen(false); refreshCount(); }} />
+    </HouseScope>
   );
 };

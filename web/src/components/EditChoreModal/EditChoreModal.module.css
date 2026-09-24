@@ -1,33 +1,32 @@
-/* Sections */
-.section {
-  margin-bottom: 1.5rem;
-}
+/* Chore editor. Shared field rules come from styles/forms.module.css. */
 
-.sectionHeader {
+.section {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .sectionTitle {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-secondary, #94a3b8);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 650;
+  color: var(--ink);
 }
 
 .divider {
-  border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  margin: 1.5rem 0;
+  height: 1px;
+  margin: var(--space-5) 0;
+  border: 0;
+  background: var(--line);
 }
 
 /* Form fields — shared base rules come from styles/forms.module.css via composes */
 .formGrid {
   composes: formGrid from '../../styles/forms.module.css';
-  gap: 0.75rem;
 }
 
 .formRow {
@@ -36,7 +35,6 @@
 
 .formGroup {
   composes: formGroup from '../../styles/forms.module.css';
-  gap: 0.35rem;
 }
 
 .label {
@@ -45,120 +43,97 @@
 
 .input {
   composes: input from '../../styles/forms.module.css';
-  padding: 0.65rem 0.85rem;
-  min-height: 44px;
-  font-size: 0.85rem;
 }
 
 .checkRow {
   composes: checkRow from '../../styles/forms.module.css';
-  gap: 0.6rem;
-  min-height: 40px;
-}
-
-.checkRow input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
 }
 
 .checkLabel {
   composes: checkLabel from '../../styles/forms.module.css';
-  font-size: 0.85rem;
 }
 
-/* Save button */
 .saveRow {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  gap: var(--space-2) var(--space-3);
 }
 
 .btnPrimary {
   composes: btnPrimary from '../../styles/forms.module.css';
-  padding: 0.6rem 1.25rem;
-  min-height: 44px;
-  font-size: 0.85rem;
 }
 
-/* Status messages */
+.btnSecondary {
+  composes: btnPrimary from '../../styles/forms.module.css';
+  background: var(--surface-sunk);
+  color: var(--ink);
+  box-shadow: none;
+}
+
 .saved {
-  color: var(--accent-green);
-  font-size: 0.8rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.saved svg {
+  width: 16px;
+  height: 16px;
 }
 
 .error {
-  color: var(--status-required);
-  font-size: 0.8rem;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--urgent);
 }
 
-/* Secondary button for TTS section */
-.btnSecondary {
-  composes: btnPrimary from '../../styles/forms.module.css';
-  padding: 0.6rem 1rem;
-  min-height: 44px;
-  font-size: 0.85rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-primary, #e2e8f0);
-}
-
-.btnSecondary:hover {
-  background: rgba(255, 255, 255, 0.14);
-  opacity: 1;
-}
-
-/* Textarea used for the TTS spoken description */
-.textarea {
-  composes: input from '../../styles/forms.module.css';
-  padding: 0.65rem 0.85rem;
-  font-size: 0.85rem;
-  resize: vertical;
-  min-height: 80px;
-  font-family: inherit;
-  line-height: 1.4;
-}
-
-/* TTS audio player row */
 .ttsPlayerRow {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 0.85rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-md);
-  background: rgba(0, 0, 0, 0.2);
+  gap: var(--space-3);
 }
 
 .ttsPlayBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
-  border: none;
-  background: var(--accent-blue, #38bdf8);
-  color: var(--bg-primary);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--lift);
   cursor: pointer;
-  flex-shrink: 0;
 }
 
-.ttsPlayBtn:hover {
-  opacity: 0.9;
+.ttsPlayBtn svg {
+  width: 20px;
+  height: 20px;
 }
 
 .ttsHint {
-  font-size: 0.8rem;
-  color: var(--text-secondary, #94a3b8);
-}
-
-/* Spinner animation for the regenerate button */
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-muted);
 }
 
 .spin {
-  animation: spin 1s linear infinite;
+  animation: edit-spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
+@keyframes edit-spin {
+  to { transform: rotate(360deg); }
 }

@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Trash2 } from 'lucide-react';
 import { api } from '../../api';
 import type { Chore, User } from '../../types';
-import styles from '../../pages/AdminDashboard.module.css';
-import { Plus, Trash2, Edit2, Clock, Star, Activity } from 'lucide-react';
-import clsx from 'clsx';
+import { CategoryHeader, Icon, catFromCategory } from '../../design';
 import CreateChoreWizard from '../CreateChoreWizard/CreateChoreWizard';
 import EditChoreModal from '../EditChoreModal/EditChoreModal';
 import { ScheduleManager } from './ScheduleManager';
 import { TriggerManager } from './TriggerManager';
+import { CHORE_CATEGORIES, IconWell } from './pickers';
+import ui from './ui.module.css';
 
 export const ChoresTab: React.FC = () => {
   const { t } = useTranslation();
@@ -25,22 +26,21 @@ export const ChoresTab: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleDelete = async (id: number, name: string) => {
-    if (!confirm(t('admin.choresTab.confirmDelete', { name }))) return;
-    await api.chores.delete(id);
+  const handleDelete = async (chore: Chore) => {
+    if (!confirm(t('admin.choresTab.confirmDelete', { name: chore.title }))) return;
+    await api.chores.delete(chore.id);
     load();
   };
 
-  const handleEdit = (chore: Chore) => {
-    setEditingChore(chore);
-  };
-
   return (
-    <div>
-      <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitle}>{t('admin.choresTab.heading')}</h2>
-        <button className={styles.addBtn} onClick={() => setWizardOpen(true)}>
-          <Plus size={18} /> {t('admin.choresTab.addChore')}
+    <div className={ui.page}>
+      <div className={ui.pageHead}>
+        <div>
+          <h2 className={ui.pageTitle}>{t('admin.choresTab.heading')}</h2>
+          <p className={ui.pageSub}>{t('admin.choresTab.subtitle', { count: chores.length })}</p>
+        </div>
+        <button type="button" className={ui.btnPrimary} onClick={() => setWizardOpen(true)}>
+          <Icon name="plus" /> {t('admin.choresTab.addChore')}
         </button>
       </div>
 
@@ -67,35 +67,65 @@ export const ChoresTab: React.FC = () => {
         users={users}
       />
 
-      <div className={styles.list}>
-        {chores.map(chore => (
-          <div key={chore.id} className={styles.listItem}>
-            <div className={styles.listItemMain} onClick={() => handleEdit(chore)}>
-              <div className={styles.listItemInfo}>
-                <div className={styles.listItemHeader}>
-                  <span className={clsx(styles.badge, styles[`badge_${chore.category}`])}>{chore.category}</span>
-                  <h3 className={styles.listItemTitle}>{chore.title}</h3>
+      {chores.length === 0 && (
+        <div className={ui.empty}>
+          <Icon name="broom" />
+          <p>{t('admin.choresTab.empty')}</p>
+        </div>
+      )}
+
+      {CHORE_CATEGORIES.map(category => {
+        const items = chores.filter(c => c.category === category);
+        if (items.length === 0) return null;
+        const cat = catFromCategory(category);
+        return (
+          <section key={category} className={ui.section}>
+            <CategoryHeader cat={cat} as="h3" count={items.length} className={ui.catHead} />
+            <div className={ui.list}>
+              {items.map(chore => (
+                <div key={chore.id} className={ui.row}>
+                  <button
+                    type="button"
+                    className={ui.rowButton}
+                    onClick={() => setEditingChore(chore)}
+                    title={t('admin.choresTab.editTitle')}
+                  >
+                    <IconWell icon={chore.icon} cat={cat} />
+                    <span className={ui.rowMain}>
+                      <span className={ui.rowTitle}>{chore.title}</span>
+                      {chore.description && <span className={ui.rowDesc}>{chore.description}</span>}
+                      <span className={ui.rowMeta}>
+                        <span><Icon name="star" /> {t('admin.choresTab.points', { count: chore.points_value })}</span>
+                        {chore.estimated_minutes ? (
+                          <span><Icon name="clock" /> {t('admin.choresTab.minutes', { count: chore.estimated_minutes })}</span>
+                        ) : null}
+                        {chore.requires_approval && (
+                          <span title={t('admin.choresTab.requiresApprovalTitle')}><Icon name="check" /> {t('admin.choresTab.requiresApprovalLabel')}</span>
+                        )}
+                        {chore.requires_photo && (
+                          <span title={t('admin.choresTab.requiresPhotoTitle')}><Icon name="camera" /> {t('admin.choresTab.requiresPhotoLabel')}</span>
+                        )}
+                      </span>
+                    </span>
+                    <Icon name="chev" />
+                  </button>
+                  <div className={ui.rowActions}>
+                    <button
+                      type="button"
+                      className={`${ui.iconBtn} ${ui.iconBtnDanger}`}
+                      title={t('admin.choresTab.deleteTitle')}
+                      aria-label={t('admin.choresTab.deleteAriaLabel', { name: chore.title })}
+                      onClick={() => handleDelete(chore)}
+                    >
+                      <Trash2 aria-hidden />
+                    </button>
+                  </div>
                 </div>
-                {chore.description && <p className={styles.listItemDesc}>{chore.description}</p>}
-                <div className={styles.listItemMeta}>
-                  <span><Star size={12} /> {t('admin.choresTab.points', { count: chore.points_value })}</span>
-                  {chore.estimated_minutes && <span><Clock size={12} /> {t('admin.choresTab.minutes', { count: chore.estimated_minutes })}</span>}
-                  {chore.requires_approval && <span title={t('admin.choresTab.requiresApprovalTitle')}><Activity size={12} /> {t('admin.choresTab.requiresApprovalLabel')}</span>}
-                  {chore.requires_photo && <span title={t('admin.choresTab.requiresPhotoTitle')}><Clock size={12} /> {t('admin.choresTab.requiresPhotoLabel')}</span>}
-                </div>
-              </div>
-              <div className={styles.listItemActions}>
-                <button className={styles.iconBtn} title={t('admin.choresTab.editTitle')} aria-label={t('admin.choresTab.editAriaLabel')} onClick={(e) => { e.stopPropagation(); handleEdit(chore); }}>
-                  <Edit2 size={16} />
-                </button>
-                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} title={t('admin.choresTab.deleteTitle')} aria-label={t('admin.choresTab.deleteAriaLabel')} onClick={(e) => { e.stopPropagation(); handleDelete(chore.id, chore.name); }}>
-                  <Trash2 size={16} />
-                </button>
-              </div>
+              ))}
             </div>
-          </div>
-        ))}
-      </div>
+          </section>
+        );
+      })}
     </div>
   );
 };
