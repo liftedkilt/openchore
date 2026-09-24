@@ -1,250 +1,166 @@
-.container {
+/* The wall display: a shared, always-on House screen. Read from across a
+   room on a 10–13" landscape tablet. Calm: no animation of its own. */
+.wall {
+  box-sizing: border-box;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 2rem 3rem;
-  background: radial-gradient(ellipse at top, var(--bg-secondary) 0%, var(--bg-primary) 60%);
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
   cursor: none;
   user-select: none;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
-/* Push content to center only when it fits; otherwise start from top */
-.container::before {
-  content: '';
-  flex: 1;
-}
-.container::after {
-  content: '';
-  flex: 1;
-}
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-5); }
+.brand { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+.logo { display: flex; }
+.logo i { width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 2px var(--surface); }
+.logo i + i { margin-left: -5px; }
+.date { font-size: 17px; font-weight: 600; color: var(--ink-muted); }
 
-.header {
-  text-align: center;
-  margin-bottom: 2rem;
-  flex-shrink: 0;
+.hello { flex: none; display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-5); }
+.helloText { min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.greeting {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  font-size: 44px;
+  line-height: 48px;
 }
-
+.startBtn {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--ink-muted);
+  cursor: inherit;
+  text-align: left;
+}
+.startBtn:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 4px; border-radius: var(--oc-radius-sm); }
 .clock {
-  font-size: 3.5rem;
-  font-weight: 200;
-  letter-spacing: 0.02em;
-  color: var(--text-primary);
-  line-height: 1;
+  flex: none;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  letter-spacing: -0.04em;
+  font-size: 88px;
+  line-height: 80px;
+  font-variant-numeric: tabular-nums;
 }
 
-.date {
-  font-size: 1.1rem;
-  color: var(--text-secondary);
-  margin-top: 0.4rem;
-  font-weight: 500;
-}
-
-/* --- Card Grid (vertical cards) --- */
-.grid {
+/* One door per person, each in their own skin. */
+.doors {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1.5rem;
-  width: 100%;
-  max-width: 1100px;
-  margin-bottom: 2rem;
-  flex-shrink: 0;
+  grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: var(--space-4);
 }
-
-.card {
+.door {
+  container-type: size;
+  --hero-k: 1;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 1.5rem 1rem 1rem;
-  background: rgba(30, 41, 59, 0.5);
-  border-radius: 20px;
-  border: 2px solid rgba(255, 255, 255, 0.04);
-  transition: border-color 0.5s ease, box-shadow 0.5s ease;
-  position: relative;
-}
-
-.cardDone {
-  border-color: rgba(34, 197, 94, 0.25);
-  box-shadow: 0 0 30px rgba(34, 197, 94, 0.08);
-}
-
-.cardLeader {
-  border-color: rgba(56, 189, 248, 0.2);
-}
-
-/* --- Avatar (centered, scales with container) --- */
-.avatarWrap {
-  position: relative;
-  width: 130px;
-  height: 130px;
-  margin-bottom: 0.75rem;
-  flex-shrink: 0;
-}
-
-.progressRing {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.avatarInner {
-  position: absolute;
-  /* inset by strokeWidth (5px scaled to container) ~= 4.6% per side */
-  top: 4.6%;
-  left: 4.6%;
-  width: 90.8%;
-  height: 90.8%;
-  border-radius: 50%;
+  align-items: stretch;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  border-radius: 28px;
   overflow: hidden;
-  background: var(--bg-primary);
+  border: var(--outline-w) solid var(--line);
+  box-shadow: var(--lift);
 }
-
-.avatarImg {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.avatarPlaceholder {
-  width: 100%;
-  height: 100%;
-  background: var(--border-subtle);
-}
-
-/* --- Card Text --- */
+.door :global(.oc-glow)::before { top: -250px; }
+.doorHead { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.door .avatar, .photo { width: 56px; height: 56px; font-size: 26px; }
+.photo { border-radius: var(--r-avatar, 50%); object-fit: cover; }
 .name {
-  font-size: 1.2rem;
-  font-weight: 700;
-  margin-bottom: 0.15rem;
-  text-align: center;
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-variation-settings: var(--display-axes);
+  letter-spacing: var(--display-tracking);
+  font-size: 28px;
+  line-height: 32px;
+  overflow-wrap: anywhere;
+}
+.meta, .meta2 { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 6px; font-weight: 600; color: var(--ink-muted); }
+.meta { margin-top: 2px; font-size: 16px; }
+.meta2 { margin-top: 2px; font-size: 14px; }
+.allDone { color: var(--ink); }
+.stars, .streak { display: inline-flex; align-items: center; gap: 4px; }
+.stars svg, .streak svg { width: 16px; height: 16px; color: var(--star); fill: var(--star); stroke-width: 1.5; }
+
+/* The person's DayProgress, fitted to the door. */
+.hero { flex: none; height: calc(116px * var(--hero-k)); display: flex; align-items: center; justify-content: center; margin: 0 calc(-1 * var(--space-4)); }
+.heroFit { flex: none; transform: scale(calc(var(--hero-s) * var(--hero-k))); }
+.heroFit :global(.oc-prog__shapes) { flex-wrap: wrap; justify-content: center; }
+
+/* What's left: rows that don't fit whole are hidden (useFitRows). */
+.next { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.next[hidden] { display: none; }
+.rows { flex: 1 1 0; min-height: 0; overflow: hidden; }
+.rows > [hidden] { display: none; }
+
+.label { margin: 0; font-size: var(--type-label-size); line-height: var(--type-label-line); font-weight: var(--type-label-weight); letter-spacing: var(--type-label-tracking); text-transform: var(--label-case); color: var(--ink-muted); }
+
+/* The family strip and their day, hour by hour. */
+.family {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border-radius: 22px;
+  background: var(--surface-raised);
+  box-shadow: var(--lift);
+}
+.familyWide { grid-template-columns: minmax(0, 1fr); }
+.members { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: var(--space-1); }
+.memberGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); column-gap: var(--space-5); max-height: 144px; overflow: hidden; }
+.memberGrid :global(.oc-member__n) { width: 72px; }
+.chart { min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+
+/* Wide doors (three or fewer people): a bigger hero. */
+@container (min-width: 300px) {
+  .hero, .heroFit { --hero-k: 1.15; }
+}
+/* Short doors (big families, two or three rows of doors): keep the person
+   and their count, drop the hero and then the avatar. */
+@container (max-height: 300px) {
+  .hero { display: none; }
+}
+@container (max-height: 170px) {
+  .door .avatar, .door .photo, .meta2, .next { display: none; }
 }
 
-.completionCount {
-  font-size: 2.2rem;
-  font-weight: 200;
-  line-height: 1.1;
-  color: var(--text-primary);
+/* Landscape tablets and up: one screen, no scrolling. */
+@media (min-width: 900px) {
+  .wall { height: 100vh; height: 100dvh; overflow: hidden; }
 }
 
-.completionLabel {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
+/* Short landscape screens: tighter frame. */
+@media (max-height: 820px) and (min-width: 900px) {
+  .wall { padding: var(--space-4) var(--space-6); gap: var(--space-3); }
+  .clock { font-size: 76px; line-height: 70px; }
+  .greeting { font-size: 38px; line-height: 44px; }
 }
 
-.statsRow {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 0.8rem;
-}
-
-.streak {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  color: var(--status-bonus);
-  font-weight: 700;
-}
-
-.points {
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.colorDot {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  opacity: 0.7;
-}
-
-/* --- Timeline Chart Panel --- */
-.chartPanel {
-  width: 100%;
-  max-width: 1100px;
-  padding: 1.25rem 1.5rem;
-  background: rgba(30, 41, 59, 0.5);
-  border-radius: 20px;
-  border: 2px solid rgba(255, 255, 255, 0.04);
-  flex-shrink: 0;
-}
-
-.chartTitle {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.3);
-  margin-bottom: 0.5rem;
-}
-
-.chartSvg {
-  width: 100%;
-  height: auto;
-}
-
-/* Landscape iPad */
-@media (orientation: landscape) {
-  .container {
-    padding: 1.5rem 3rem;
-  }
-  .header {
-    margin-bottom: 1.5rem;
-  }
-}
-
-/* Small screens (phones) */
-@media (max-width: 600px) {
-  .container {
-    padding: 1.5rem 1rem;
-  }
-  .clock {
-    font-size: 2.5rem;
-  }
-  .header {
-    margin-bottom: 1rem;
-  }
-  .grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-  }
-  .card {
-    padding: 1rem 0.5rem 0.75rem;
-    border-radius: 16px;
-  }
-  .avatarWrap {
-    width: 80px;
-    height: 80px;
-    margin-bottom: 0.5rem;
-  }
-  .name {
-    font-size: 1rem;
-  }
-  .completionCount {
-    font-size: 1.6rem;
-  }
-  .completionLabel {
-    font-size: 0.65rem;
-    margin-bottom: 0.35rem;
-  }
-  .statsRow {
-    font-size: 0.7rem;
-    gap: 0.5rem;
-  }
-  .chartPanel {
-    padding: 0.75rem 1rem;
-    border-radius: 16px;
-  }
+/* Portrait and phones: a scrolling stack. */
+@media (max-width: 899px) {
+  .wall { padding: var(--space-4); }
+  .hello { flex-direction: column-reverse; align-items: flex-start; gap: var(--space-2); }
+  .greeting { font-size: 30px; line-height: 36px; }
+  .clock { font-size: 64px; line-height: 64px; }
+  .doors { grid-auto-rows: auto; }
+  .door { container-type: inline-size; }
+  .next, .rows { flex: none; }
+  .door { min-height: 360px; }
+  .family { grid-template-columns: 1fr; }
 }

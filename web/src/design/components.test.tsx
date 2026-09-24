@@ -31,6 +31,15 @@ describe('ChoreRow', () => {
     expect(screen.getByText('Waiting for a grown-up')).toBeTruthy();
   });
 
+  it('renders read-only rows without any buttons', () => {
+    const { container } = render(
+      <><ChoreRow title="Feed the cats" readAloud readOnly /><ChoreRow cat="bonus" title="Water the garden" state="locked" readOnly /></>,
+    );
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(container.querySelectorAll('.oc-chore__ring')).toHaveLength(2);
+    expect(screen.getByText('Opens when everything else is done')).toBeTruthy();
+  });
+
   it('disables the check on a locked bonus and explains the lock', () => {
     const onToggle = vi.fn();
     render(<ChoreRow cat="bonus" title="Water the garden" state="locked" onToggle={onToggle} />);

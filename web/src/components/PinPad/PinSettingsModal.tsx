@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, APIError } from '../../api';
 import Modal from '../Modal/Modal';
+import { Button, Icon } from '../../design';
 import PinPad from './PinPad';
 import styles from './PinSettingsModal.module.css';
 
@@ -114,8 +115,8 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
         {step === 'menu' && (
           <div className={styles.menu}>
             <p className={styles.hint}>{t('common.pinSettings.menuHint')}</p>
-            <button className={styles.menuBtn} onClick={startChange}>{t('common.pinSettings.btnChange')}</button>
-            <button className={`${styles.menuBtn} ${styles.danger}`} onClick={startRemove}>{t('common.pinSettings.btnRemove')}</button>
+            <Button block onClick={startChange}>{t('common.pinSettings.btnChange')}</Button>
+            <Button variant="quiet" block className={styles.danger} onClick={startRemove}>{t('common.pinSettings.btnRemove')}</Button>
           </div>
         )}
 
@@ -153,12 +154,13 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
 
         {step === 'done' && (
           <div className={styles.done}>
-            <p className={styles.doneText}>{successMsg}</p>
-            <button className={styles.menuBtn} onClick={onClose}>{t('common.pinSettings.btnDone')}</button>
+            <span className={styles.doneMark} aria-hidden><Icon name="check" /></span>
+            <p className={styles.doneText} role="status">{successMsg}</p>
+            <Button block onClick={onClose}>{t('common.pinSettings.btnDone')}</Button>
           </div>
         )}
 
-        {saving && step !== 'done' && <p className={styles.saving}>{t('common.pinSettings.saving')}</p>}
+        {saving && step !== 'done' && <p className={styles.saving} role="status">{t('common.pinSettings.saving')}</p>}
       </div>
     </Modal>
   );

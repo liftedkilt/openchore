@@ -1,70 +1,66 @@
+/* Modal draws its card in the tokens of the scope that opened it, so the
+   body needs no surface of its own. */
 .body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  color: var(--ink);
+  font-family: var(--font-text);
 }
 
-.menu {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  width: 100%;
-  max-width: 280px;
-  padding: 0.5rem 0 0.25rem;
-}
-
-.hint {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  text-align: center;
-  margin-bottom: 0.5rem;
-}
-
-.menuBtn {
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 0.95rem;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.menuBtn:hover {
-  background: rgba(56, 189, 248, 0.1);
-  border-color: rgba(56, 189, 248, 0.25);
-}
-
-.danger {
-  color: #f87171;
-}
-
-.danger:hover {
-  background: rgba(248, 113, 113, 0.08);
-  border-color: rgba(248, 113, 113, 0.3);
-}
-
-.saving {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  margin-top: 0.5rem;
-}
-
+.menu,
 .done {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem 0;
+  gap: var(--space-3);
   width: 100%;
-  max-width: 280px;
+  max-width: 300px;
+}
+
+.hint {
+  margin: 0 0 var(--space-2);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  font-weight: 500;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+.danger {
+  color: var(--urgent);
+}
+
+.doneMark {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--done);
+  color: var(--on-done);
+  border: var(--outline-w) solid var(--line);
+}
+
+.doneMark :global(.oc-icon) {
+  width: 28px;
+  height: 28px;
+  stroke-width: 2.75;
 }
 
 .doneText {
-  color: var(--accent-green, #34d399);
-  font-size: 1rem;
+  margin: 0;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.saving {
+  margin: var(--space-2) 0 0;
+  font-size: var(--type-meta-size);
   font-weight: 600;
+  color: var(--ink-muted);
 }

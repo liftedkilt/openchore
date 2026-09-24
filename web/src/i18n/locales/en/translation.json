@@ -665,14 +665,6 @@
       "updateBtn": "Update"
     }
   },
-  "ambient": {
-    "choresDone": "chores done",
-    "ptsToday_one": "{{count}} pts today",
-    "ptsToday_other": "{{count}} pts today",
-    "streakDays_one": "{{count}}d",
-    "streakDays_other": "{{count}}d",
-    "todaysProgress": "Today's Progress"
-  },
   "common": {
     "back": "Back",
     "language": "Language",
@@ -943,6 +935,58 @@
       "week": "Week"
     }
   },
+  "entry": {
+    "picker": {
+      "allDone": "All done",
+      "dateTime": "{{date}} · {{time}}",
+      "doorsLabel": "Who's here",
+      "familyToday": "The family today",
+      "grownUps": "Grown-ups",
+      "grownUpsHint": "PIN or linked account",
+      "hello": {
+        "afternoon": "Good afternoon.",
+        "evening": "Good evening.",
+        "morning": "Good morning."
+      },
+      "nothingToday": "Nothing today",
+      "paused": "Taking a break",
+      "toGo_one": "{{count}} to go",
+      "toGo_other": "{{count}} to go",
+      "wallDisplay": "Wall display",
+      "whosHere": "Who's here?"
+    },
+    "pinPad": {
+      "progress_one": "{{count}} of {{total}} digits entered",
+      "progress_other": "{{count}} of {{total}} digits entered"
+    },
+    "setup": {
+      "color": "Colour",
+      "colors": {
+        "butter": "Butter",
+        "coral": "Coral",
+        "leaf": "Leaf",
+        "lilac": "Lilac",
+        "mint": "Mint",
+        "rose": "Rose",
+        "sand": "Sand",
+        "sky": "Sky"
+      },
+      "looksDescription": "Each kid gets a skin for their own screens and a colour that follows them everywhere. They can change both later.",
+      "looksTitle": "Pick their look",
+      "progress": "Setup progress",
+      "remove": "Remove {{name}}",
+      "skin": "Skin",
+      "skins": {
+        "blocks": "Blocks",
+        "sunroom": "Sunroom",
+        "tint": "Tint"
+      },
+      "stepOf": "Step {{step}} of {{total}}",
+      "suggestFrom": "Suggested from {{age}}",
+      "suggestUnder": "Suggested under {{age}}",
+      "yourColor": "Your colour"
+    }
+  },
   "linkedAccounts": {
     "confirmSignOutEverywhere": "Sign this profile out on every device, including this one?",
     "confirmUnlink": "Unlink {{provider}}? Devices signed in with it will be signed out.",
@@ -1001,44 +1045,47 @@
     "or": "or",
     "pinProtected": "PIN protected",
     "selectProfile": "Select profile for {{name}}",
-    "signInWithLinked": "This profile signs in with a linked account.",
-    "wallDisplay": "Wall Display",
-    "welcomeBack": "Welcome back!",
-    "whoIsDoingChores": "Who's doing chores today?"
+    "signInWithLinked": "This profile signs in with a linked account."
   },
   "reports": {
     "aiSummary": "AI Summary",
-    "barChart": {
-      "noData": "No data"
-    },
-    "bestWorstDays": "Best / Worst Days",
-    "categoryBreakdown": "Category Breakdown",
-    "completionTrend": "Completion Trend",
+    "back": "Back to Manage",
+    "bestWorstDays": "Best and hardest days",
+    "byPerson": "Done, by person",
+    "categoryBreakdown": "By category",
+    "completionTrend": "Done over time",
+    "daysSummary": "Best: {{best}} ({{bestRate}}). Hardest: {{worst}} ({{worstRate}}).",
     "doneCount": "{{completed}}/{{assigned}} done",
     "failedToGenerateSummary": "Failed to generate summary.",
     "failedToLoadReports": "Failed to load reports",
-    "generating": "Generating...",
-    "kidScorecards": "Kid Scorecards",
-    "lineChart": {
-      "noData": "No data",
-      "seriesFallback": "Series {{index}}"
-    },
-    "loadingReports": "Loading reports...",
-    "mostMissedChores": "Most Missed Chores",
+    "generating": "Writing a summary…",
+    "loadingReports": "Loading reports…",
+    "missedTimes_one": "{{count}}×",
+    "missedTimes_other": "{{count}}×",
+    "mostMissedChores": "Most missed chores",
+    "next": "Next period",
     "noData": "No data",
     "noDataForPeriod": "No data for this period",
     "noMissedChores": "No missed chores!",
+    "periodLabel": "Period",
     "period_month": "Month",
     "period_week": "Week",
     "period_year": "Year",
-    "pointsDecayed": "-{{count}} decay",
-    "pointsEarned": "{{count}} pts",
-    "pointsFlow": "Points Flow",
-    "pointsSpent": "-{{count}} spent",
+    "pointsDecayed_one": "−{{count}} decay",
+    "pointsDecayed_other": "−{{count}} decay",
+    "pointsEarned_one": "{{count}} pt",
+    "pointsEarned_other": "{{count}} pts",
+    "pointsFlow": "Points",
+    "pointsSpent_one": "−{{count}} spent",
+    "pointsSpent_other": "−{{count}} spent",
+    "previous": "Previous period",
+    "scorecards": "Everyone",
     "seriesAssigned": "Assigned",
     "seriesCompleted": "Completed",
-    "streakDays": "{{count}}d streak",
-    "title": "Reports"
+    "streakDays_one": "{{count}} day in a row",
+    "streakDays_other": "{{count}} days in a row",
+    "title": "Reports",
+    "trendDesc": "Chores done and assigned each day from {{from}} to {{to}}: {{done}} of {{assigned}} done."
   },
   "setup": {
     "addButton": "Add",
@@ -1064,12 +1111,6 @@
     "parentPinPlaceholder": "Choose a PIN (4–8 digits)",
     "parentTitle": "Who manages the chores?",
     "settingUp": "Setting up...",
-    "themeClassicBlue": "Classic Blue",
-    "themeGalaxyPurple": "Galaxy Purple",
-    "themeNatureForest": "Nature Forest",
-    "themeQuestAdventure": "Quest Adventure",
-    "themesDescription": "Each child can have their own favorite theme.",
-    "themesTitle": "Pick their style",
     "welcomeDescription": "Let's get your family set up in just a few minutes.",
     "welcomeTitle": "Welcome to OpenChore!"
   },
@@ -1077,5 +1118,28 @@
     "greeting": "Hi, {{name}}",
     "points_one": "{{count}} point",
     "points_other": "{{count}} points"
+  },
+  "wall": {
+    "greeting": {
+      "morning": "Good morning.",
+      "afternoon": "Good afternoon.",
+      "evening": "Good evening."
+    },
+    "tapToStart": "Tap anywhere to start",
+    "toGo_one": "{{count}} to go",
+    "toGo_other": "{{count}} to go",
+    "allDone": "All done",
+    "nothingToday": "Nothing today",
+    "ptsToday_one": "+{{count}} pt today",
+    "ptsToday_other": "+{{count}} pts today",
+    "streak_one": "{{count}} day in a row",
+    "streak_other": "{{count}} days in a row",
+    "nextUp": "Next up",
+    "opensAt": "From {{time}}",
+    "dueBy": "Before {{time}}",
+    "familyToday": "The family today",
+    "chartTitle": "Today so far",
+    "chartDesc": "How much of their day each person has done, hour by hour. Now: {{summary}}.",
+    "chartPerson": "{{name}} {{pct}}%"
   }
 }

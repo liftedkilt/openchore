@@ -1,377 +1,538 @@
-.container {
+/* The family picker (/login). House frame; each door in its person's skin.
+   Tokens and dials only: nothing here tests which theme it is in. */
+
+.screen {
   min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+}
+
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-6);
+  box-sizing: border-box;
+}
+
+@media (min-width: 720px) {
+  .page { padding: 34px 44px var(--space-6); }
+}
+
+/* ---------- Top ---------- */
+.top {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  background: radial-gradient(circle at top right, #1e293b, #0f172a);
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
 }
 
-.title {
-  font-size: 2.5rem;
-  font-weight: 800;
-  margin-bottom: 0.5rem;
-  background: linear-gradient(to right, var(--accent-blue), var(--accent-purple));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.date {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink-muted);
 }
 
-.subtitle {
-  color: var(--text-secondary);
-  font-size: 1.2rem;
-  margin-bottom: 3rem;
+.hello {
+  margin: var(--space-5) 0 0;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-variation-settings: var(--display-axes);
+  letter-spacing: var(--display-tracking);
+  font-size: 30px;
+  line-height: 34px;
+  color: var(--ink);
 }
 
-.grid {
+.hello span { color: var(--ink-muted); }
+
+@media (min-width: 720px) {
+  .hello { font-size: 44px; line-height: 48px; }
+}
+
+.banner {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--oc-radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--lift);
+  border-left: 4px solid var(--urgent);
+  font-size: 15px;
+  line-height: 21px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* ---------- Doors ---------- */
+.doors {
+  list-style: none;
+  margin: var(--space-5) 0 0;
+  padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 2rem;
-  width: 100%;
-  max-width: 800px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
 }
 
-.card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 2rem;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
-  border: 2px solid transparent;
-  transition: var(--transition);
-  animation: fadeIn 0.4s ease-out backwards;
+@media (min-width: 720px) {
+  .doors {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+  }
 }
 
-.card:hover {
-  transform: translateY(-8px) scale(1.05);
-  border-color: var(--accent-blue);
-  box-shadow: 0 20px 25px -5px rgba(56, 189, 248, 0.2);
-}
-
-.avatarWrapper {
+.doorSlot {
   position: relative;
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  background: var(--bg-primary);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 1rem;
-  overflow: visible;
-  border: 4px solid var(--border-subtle);
+  min-width: 0;
+  border-radius: 28px;
+  container-type: inline-size;
 }
 
-.avatarWrapper > img,
-.avatarWrapper > .placeholder {
-  border-radius: 50%;
-  overflow: hidden;
+/* The focus ring sits in the House frame, outside the skin, so it holds
+   contrast against the frame whatever the door's skin. */
+.doorSlot:has(.doorBtn:focus-visible),
+.doorSlot:has(.parentBtn:focus-visible) {
+  outline: 3px solid var(--ink);
+  outline-offset: 4px;
 }
 
-.lockBadge {
-  position: absolute;
-  bottom: 4px;
-  right: 4px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--accent-blue);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--bg-secondary);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-}
-
-.adminLock {
-  color: var(--accent-blue);
-  margin-left: 0.25rem;
-}
-
-.avatar {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.placeholder {
-  color: var(--border-subtle);
-}
-
-.name {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin-bottom: 0.25rem;
-  color: var(--text-primary);
-}
-
-.role {
-  font-size: 0.875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
-}
-
-/* --- Admin Section --- */
-.adminSection {
-  margin-top: 2rem;
-  width: 100%;
-  max-width: 800px;
-}
-
-.adminRow {
-  display: flex;
-  justify-content: center;
-  gap: 1rem;
-}
-
-.adminCard {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.6rem 1.25rem;
-  background: var(--bg-secondary);
-  border-radius: 100px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  transition: var(--transition);
-}
-
-.adminCard:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(30, 41, 59, 0.9);
-}
-
-.adminAvatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: var(--bg-primary);
-}
-
-.adminAvatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.adminName {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-/* --- Bottom Buttons --- */
-.pinPrompt {
+.door {
+  flex: 1;
+  min-width: 0;
+  min-height: 300px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 100%;
-  max-width: 360px;
-  animation: fadeIn 0.25s ease-out;
+  padding: var(--space-5) var(--space-3) var(--space-4);
+  overflow: hidden;
+  border-radius: 28px;
+  border: var(--outline-w) solid var(--line);
+  box-shadow: var(--lift);
+  text-align: center;
 }
 
-.pinAvatar {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  overflow: hidden;
-  margin-bottom: 1rem;
-  background: var(--bg-primary);
+@media (min-width: 720px) {
+  .door { min-height: 440px; padding-top: 30px; }
+}
+
+.door :global(.oc-glow)::before { top: -250px; }
+
+.doorName {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 4px solid var(--border-subtle);
+  gap: var(--space-2);
+  max-width: 100%;
+  margin: 14px 0 0;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-variation-settings: var(--display-axes);
+  letter-spacing: var(--display-tracking);
+  font-size: 24px;
+  line-height: 30px;
+  color: var(--ink);
 }
 
-.pinAvatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+@media (min-width: 720px) {
+  .doorName { font-size: 28px; line-height: 32px; }
 }
 
-.pinName {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  color: var(--text-primary);
+/* The name is the button; its ::after stretches over the whole door (the
+   nearest positioned ancestor) so the door is one big target. */
+.doorBtn {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.backBtn {
+.doorBtn::after {
+  content: "";
   position: absolute;
-  top: 1.5rem;
-  left: 1.5rem;
+  inset: 0;
+  z-index: 1;
+}
+
+.doorBtn:focus-visible { outline: none; }
+.doorBtn:disabled { cursor: progress; }
+
+.lock {
+  display: inline-flex;
+  color: var(--ink-muted);
+}
+
+.lock :global(.oc-icon) { width: 18px; height: 18px; }
+
+.doorMeta {
+  position: relative;
+  min-height: 18px;
+  margin: var(--space-1) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px 6px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.allDone { color: var(--ink); }
+
+.balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.balance :global(.oc-icon) {
+  width: 15px;
+  height: 15px;
+  color: var(--star);
+  stroke-width: 1.5;
+}
+
+/* Each skin's hero has its own footprint (sun arc, shape row, ring), drawn at
+   312px wide and scaled to the door. */
+.heroZone {
+  --hero-scale: 0.5;
+  position: relative;
+  margin: auto calc(-1 * var(--space-3)) 0;
+  width: calc(100% + 2 * var(--space-3));
+  height: calc(230px * var(--hero-scale));
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  font-weight: 600;
-  padding: 0.5rem 1rem;
-  border-radius: 12px;
+  justify-content: center;
+}
+
+.hero {
+  flex: none;
+  width: 312px;
+  transform: scale(var(--hero-scale));
+}
+
+.heroShapes :global(.oc-prog__shapes) { flex-wrap: wrap; justify-content: center; row-gap: 8px; }
+.heroShapes :global(.oc-prog__shapes b) { margin-left: 0; }
+
+@container (min-width: 200px) { .heroZone { --hero-scale: 0.6; } }
+@container (min-width: 230px) { .heroZone { --hero-scale: 0.72; } }
+@container (min-width: 250px) { .heroZone { --hero-scale: 0.8; } }
+
+/* ---------- Grown-ups door ---------- */
+.grown {
+  flex-direction: column;
+  align-items: center;
+  min-height: 300px;
+  box-sizing: border-box;
+  padding: var(--space-5) var(--space-3) var(--space-4);
+  border: 1.5px dashed var(--line);
+  text-align: center;
+}
+
+@media (min-width: 720px) {
+  .grown { min-height: 440px; padding-top: 30px; }
+}
+
+.stack { display: flex; }
+
+.stack > * + * {
+  margin-left: -18px;
+}
+
+.stack :global(.oc-avatar) + :global(.oc-avatar),
+.stack > * + * :global(.oc-avatar) {
+  box-shadow: 0 0 0 4px var(--surface);
+}
+
+@container (max-width: 199px) {
+  .stack :global(.oc-avatar--lg) { width: 64px; height: 64px; font-size: 30px; }
+  .stack > * + * { margin-left: -14px; }
+}
+
+.grownName { font-size: 22px; }
+
+@media (min-width: 720px) {
+  .grownName { font-size: 24px; }
+}
+
+.grownName :global(.oc-icon) { width: 20px; height: 20px; }
+
+.parents {
+  margin-top: auto;
+  padding-top: var(--space-4);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.parentBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--space-3) 0 10px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface-raised);
+  box-shadow: var(--lift);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.parentBtn:focus-visible { outline: none; }
+.parentBtn:disabled { cursor: progress; }
+
+.parentName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parentBtn > :global(.oc-icon) { width: 18px; height: 18px; color: var(--ink-muted); }
+
+/* ---------- Photo avatars ---------- */
+.photo {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.photo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  object-fit: cover;
+  border-radius: var(--r-avatar, var(--blob, 50%));
+  border: var(--outline-w) solid var(--line);
+}
+
+/* ---------- Family strip ---------- */
+.family {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-5);
+  border-radius: 22px;
+  background: var(--surface-raised);
+  box-shadow: var(--lift);
+}
+
+.familyTitle {
+  margin: var(--space-2) 0;
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: var(--label-case);
+  color: var(--ink-muted);
+}
+
+.family :global(.oc-member__n) { width: auto; min-width: 3em; }
+.family :global(.oc-member__c) { width: auto; min-width: 34px; }
+
+@media (min-width: 900px) {
+  .family {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 28px;
+    padding: 6px var(--space-5);
+  }
+  .familyTitle { flex: none; max-width: 7em; }
+  .family :global(.oc-member) { flex: 1 1 180px; min-width: 0; }
+}
+
+/* ---------- Foot ---------- */
+.foot {
+  margin-top: var(--space-5);
+  display: flex;
+  justify-content: center;
+}
+
+.wall {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--oc-radius-pill);
   background: transparent;
-  border: none;
+  color: var(--ink-muted);
+  font-family: var(--font-text);
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
 }
 
-.backBtn:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+.wall :global(.oc-icon) { width: 20px; height: 20px; }
+.wall:hover { color: var(--ink); }
+.wall:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }
+
+/* ---------- Signing in ---------- */
+.signIn {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-4) var(--space-8);
+  box-sizing: border-box;
 }
 
-.bottomBtns {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 2rem;
-}
-
-.settingsBtn {
-  display: flex;
+.back {
+  display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 1rem;
-  border-radius: 100px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--bg-secondary);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  gap: var(--space-1);
+  min-height: 44px;
+  padding: 0 var(--space-3) 0 var(--space-1);
+  margin-left: calc(-1 * var(--space-1));
+  border: 0;
+  border-radius: var(--oc-radius-pill);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
-.settingsBtn:hover {
-  border-color: var(--accent-blue);
-  color: var(--accent-blue);
-}
+.back:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }
 
-/* --- Sign-in steps --- */
-.stepHint {
-  color: var(--text-secondary);
-  text-align: center;
-  margin-bottom: 1rem;
-  line-height: 1.5;
-}
-
-.oidcButtons {
+.signInBody {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  width: 100%;
-  margin-top: 1rem;
-}
-
-.oidcBtn {
-  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  padding: 0.85rem 1.25rem;
-  border-radius: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  text-decoration: none;
-  transition: var(--transition);
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+  text-align: center;
 }
 
-.oidcBtn:hover {
-  border-color: var(--accent-blue);
-  color: var(--accent-blue);
+.signInName {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-variation-settings: var(--display-axes);
+  letter-spacing: var(--display-tracking);
+  font-size: var(--hero-size);
+  line-height: var(--hero-line);
+  color: var(--ink);
+}
+
+.hint {
+  margin: 0;
+  font-size: 15px;
+  line-height: 21px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.error {
+  margin: 0;
+  font-size: 15px;
+  line-height: 21px;
+  font-weight: 700;
+  color: var(--urgent);
+}
+
+.oidc {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .divider {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  gap: var(--space-3);
+  margin: var(--space-1) 0;
+  font-size: var(--type-meta-size);
+  font-weight: 600;
+  color: var(--ink-muted);
 }
 
 .divider::before,
 .divider::after {
-  content: '';
+  content: "";
   flex: 1;
   height: 1px;
-  background: var(--border-subtle);
+  background: var(--line);
 }
 
-.claimForm {
+.oidcBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 52px;
+  padding: 0 var(--space-4) 0 var(--space-5);
+  box-sizing: border-box;
+  border-radius: var(--r-btn);
+  border: var(--outline-w) solid var(--line);
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: var(--lift);
+  font-family: var(--font-text);
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.oidcBtn :global(.oc-icon) { width: 18px; height: 18px; }
+.oidcBtn:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 3px; }
+
+.claim {
+  width: 100%;
+  max-width: 320px;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  width: 100%;
+  gap: var(--space-3);
+  text-align: left;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-secondary);
+  gap: 6px;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-line);
+  font-weight: 700;
+  color: var(--ink);
 }
 
 .field input {
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 1.1rem;
-  letter-spacing: 0.2em;
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  box-sizing: border-box;
+  border-radius: var(--oc-radius-md);
+  border: 1.5px solid var(--ink-muted);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 16px;
 }
 
-.primaryBtn {
-  margin-top: 0.5rem;
-  padding: 0.85rem 1.25rem;
-  border-radius: 14px;
-  font-weight: 700;
-  color: white;
-  background: var(--accent-blue);
-  border: none;
-}
-
-.primaryBtn:disabled {
-  opacity: 0.6;
-}
-
-.errorText {
-  margin-top: 0.75rem;
-  color: var(--accent-red, #f87171);
-  text-align: center;
-  font-weight: 600;
-}
-
-.errorBanner {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  max-width: 560px;
-  margin-bottom: 2rem;
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
-  color: #fecaca;
-  background: rgba(248, 113, 113, 0.12);
-  border: 1px solid rgba(248, 113, 113, 0.35);
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* --- Narrow mobile --- */
-@media (max-width: 480px) {
-  .grid {
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 1rem;
-  }
-
-  .card {
-    padding: 1.25rem;
-  }
-}
+.field input:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }

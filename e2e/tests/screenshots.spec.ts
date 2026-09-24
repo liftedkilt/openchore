@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { selectUser, loginAsAdmin } from './helpers/setup';
+import { selectUser, loginAsAdmin, profileButton } from './helpers/setup';
 
 /**
  * Screenshot capture suite — generates wiki screenshots from seeded e2e data.
@@ -12,7 +12,7 @@ test.describe('Screenshots', () => {
   test('01 - Profile Selection', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.goto('/login');
-    await expect(page.getByText('Emma')).toBeVisible({ timeout: 10_000 });
+    await expect(profileButton(page, 'Emma')).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: `${dir}/01-profile-selection.png`, fullPage: false });
   });
 
@@ -76,7 +76,8 @@ test.describe('Screenshots', () => {
   });
 
   test('09 - Ambient Dashboard', async ({ page }) => {
-    await page.setViewportSize({ width: 1920, height: 1080 });
+    // The wall display's target: a 10–13" landscape tablet.
+    await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/ambient');
     await expect(page.getByText('Emma').first()).toBeVisible({ timeout: 10_000 });
     // Wait for chart to render

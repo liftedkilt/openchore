@@ -18,14 +18,6 @@
   color: var(--ink);
   font-family: var(--font-text);
   -webkit-font-smoothing: antialiased;
-  /* legacy: remove after redesign. Dialog content that still reads the old
-     palette (PIN settings, linked accounts) stays legible on the new card. */
-  --bg-primary: var(--surface-raised);
-  --bg-secondary: var(--surface);
-  --text-primary: var(--ink);
-  --text-secondary: var(--ink-muted);
-  --border-subtle: var(--line);
-  --accent-blue: var(--accent);
 }
 
 .card {

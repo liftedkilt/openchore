@@ -359,7 +359,7 @@ export const api = {
       return resp.blob();
     },
   },
-  setup: (data: { parent: { name: string; pin: string }; children: { name: string; theme: string }[]; chores: { title: string; icon: string; category: string; points_value: number }[] }) =>
+  setup: (data: { parent: { name: string; pin: string; color?: string }; children: { name: string; theme: string; color?: string }[]; chores: { title: string; icon: string; category: string; points_value: number }[] }) =>
     fetchPublic<{ admin: User; children: User[] }>('/setup', {
       method: 'POST',
       body: JSON.stringify(data),

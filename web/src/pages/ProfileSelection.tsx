@@ -1,12 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
 import { api, APIError } from '../api';
 import { useAuth } from '../AuthContext';
 import type { AuthProvider, User } from '../types';
-import styles from './ProfileSelection.module.css';
-import { UserCircle, Monitor, Lock, ArrowLeft, LogIn, AlertCircle } from 'lucide-react';
+import {
+  Avatar, blobFor, Button, DayProgress, FamilyMember, HouseScope, Icon, SkinScope,
+  resolveSkin, salutationFor, useMinuteClock, type AvatarSize, type Skin,
+} from '../design';
+import { BrandMark } from '../components/BrandMark/BrandMark';
 import PinPad from '../components/PinPad/PinPad';
+import {
+  dayFraction, orderFamily, stripMembers, useFamilyToday, type PersonToday,
+} from './ProfileSelection.data';
+import styles from './ProfileSelection.module.css';
 
 // What the tapped profile needs before it can sign in.
 type Step =
@@ -25,8 +33,142 @@ const AUTH_ERROR_KEYS: Record<string, string> = {
   linked_to_other_profile: 'profile.authError.linkedToOther',
 };
 
-export const ProfileSelection: React.FC = () => {
+const isLocked = (u: User) => u.has_pin || u.auth_providers.length > 0;
+
+/** A person's avatar: their photo when they have one, else their initial. */
+function PersonAvatar({ user, size = 'md', className }: { user: User; size?: AvatarSize; className?: string }) {
+  const [broken, setBroken] = useState(false);
+  const avatar = <Avatar name={user.name} color={user.color} size={size} className={className} />;
+  if (!user.avatar_url || broken) return avatar;
+  return (
+    <span className={styles.photo} style={{ '--blob': blobFor(user.name) } as React.CSSProperties}>
+      {avatar}
+      <img src={user.avatar_url} alt="" onError={() => setBroken(true)} />
+    </span>
+  );
+}
+
+/* ---------------- Doors ---------------- */
+
+// Hero sizing is layout, not theme: each skin's hero has its own footprint.
+const HERO_CLASS: Record<Skin, string> = {
+  sunroom: styles.heroArc,
+  blocks: styles.heroShapes,
+  tint: styles.heroRing,
+};
+
+function DoorMeta({ user, today }: { user: User; today?: PersonToday }) {
   const { t } = useTranslation();
+  let left: string | null = null;
+  let allDone = false;
+  if (user.paused) left = t('entry.picker.paused');
+  else if (today && today.total === 0) left = t('entry.picker.nothingToday');
+  else if (today && today.done >= today.total) { left = t('entry.picker.allDone'); allDone = true; }
+  else if (today) left = t('entry.picker.toGo', { count: today.total - today.done });
+  const balance = today?.balance;
+  if (left == null && balance == null) return <p className={styles.doorMeta} />;
+  return (
+    <p className={styles.doorMeta}>
+      {left != null && <span className={clsx(allDone && styles.allDone)}>{left}</span>}
+      {left != null && balance != null && <span aria-hidden>·</span>}
+      {balance != null && (
+        <span className={styles.balance} role="img" aria-label={t('design.points.label', { count: balance })}>
+          <Icon name="star" fill />
+          {balance}
+        </span>
+      )}
+    </p>
+  );
+}
+
+interface DoorProps {
+  user: User;
+  today?: PersonToday;
+  now: number;
+  disabled: boolean;
+  onSelect: (u: User) => void;
+}
+
+/** One person's door: drawn in their own skin inside the House frame. */
+function Door({ user, today, now, disabled, onSelect }: DoorProps) {
+  const { t } = useTranslation();
+  const skin = resolveSkin(user.theme, user.age);
+  return (
+    <li className={styles.doorSlot}>
+      <SkinScope skin={skin} color={user.color} door className={styles.door}>
+        <PersonAvatar user={user} size="lg" />
+        <h2 className={styles.doorName}>
+          <button
+            type="button"
+            className={styles.doorBtn}
+            onClick={() => onSelect(user)}
+            disabled={disabled}
+            aria-label={t('profile.selectProfile', { name: user.name })}
+          >
+            {user.name}
+          </button>
+          {isLocked(user) && (
+            <span className={styles.lock} role="img" aria-label={t('profile.pinProtected')}>
+              <Icon name="lock" />
+            </span>
+          )}
+        </h2>
+        <DoorMeta user={user} today={today} />
+        {!user.paused && today && today.total > 0 && (
+          <div className={styles.heroZone}>
+            <div className={clsx(styles.hero, HERO_CLASS[skin])}>
+              <DayProgress items={today.items} now={now} />
+            </div>
+          </div>
+        )}
+      </SkinScope>
+    </li>
+  );
+}
+
+interface GrownUpsDoorProps {
+  parents: User[];
+  disabled: boolean;
+  onSelect: (u: User) => void;
+}
+
+/** The grown-ups share one House-styled door; each parent signs in from it. */
+function GrownUpsDoor({ parents, disabled, onSelect }: GrownUpsDoorProps) {
+  const { t } = useTranslation();
+  return (
+    <li className={clsx(styles.doorSlot, styles.grown)}>
+      <span className={styles.stack} aria-hidden>
+        {parents.slice(0, 3).map((p) => <PersonAvatar key={p.id} user={p} size="lg" />)}
+      </span>
+      <h2 className={clsx(styles.doorName, styles.grownName)}>
+        <Icon name="lock" />
+        {t('entry.picker.grownUps')}
+      </h2>
+      <p className={styles.doorMeta}>{t('entry.picker.grownUpsHint')}</p>
+      <div className={styles.parents}>
+        {parents.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            className={styles.parentBtn}
+            onClick={() => onSelect(p)}
+            disabled={disabled}
+            aria-label={t('profile.selectProfile', { name: p.name })}
+          >
+            <PersonAvatar user={p} size="sm" />
+            <span className={styles.parentName}>{p.name}</span>
+            <Icon name="chev" />
+          </button>
+        ))}
+      </div>
+    </li>
+  );
+}
+
+/* ---------------- Page ---------------- */
+
+export const ProfileSelection: React.FC = () => {
+  const { t, i18n } = useTranslation();
   const [users, setUsers] = useState<User[]>([]);
   const [providers, setProviders] = useState<AuthProvider[]>([]);
   const [pendingUser, setPendingUser] = useState<User | null>(null);
@@ -36,17 +178,18 @@ export const ProfileSelection: React.FC = () => {
   const [legacyPasscode, setLegacyPasscode] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const { signIn } = useAuth();
+  const { signIn, session } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const clock = useMinuteClock();
+  const today = useFamilyToday(users);
+  // A personal (OIDC) session follows the system setting; a shared device
+  // (or no session yet) follows the evening schedule.
+  const persistent = session?.persistent ?? false;
 
   // Errors bounced back from an OIDC provider (/login?auth_error=...).
   const authError = searchParams.get('auth_error');
   const authErrorProvider = searchParams.get('provider');
-
-  useEffect(() => {
-    document.body.className = 'theme-default';
-  }, []);
 
   useEffect(() => {
     api.users.list().then(data => {
@@ -138,37 +281,21 @@ export const ProfileSelection: React.FC = () => {
     });
   };
 
+  const { kids, parents } = useMemo(() => orderFamily(users), [users]);
+
   if (users.length === 0) return null; // Let the redirect handle it
 
+  /* ----- Signing in as one person ----- */
   if (pendingUser && step) {
-    const oidcButtons = pendingUser.auth_providers.length > 0 && (
-      <div className={styles.oidcButtons}>
-        {step.kind === 'pin' && <div className={styles.divider}><span>{t('profile.or')}</span></div>}
-        {pendingUser.auth_providers.map(id => (
-          <a
-            key={id}
-            className={styles.oidcBtn}
-            href={api.auth.oidcLoginURL(id, pendingUser.id)}
-          >
-            <LogIn size={18} />
-            {t('profile.continueWith', { provider: providerName(id) })}
-          </a>
-        ))}
-      </div>
-    );
-
-    return (
-      <div className={styles.container}>
-        <button className={styles.backBtn} onClick={reset}>
-          <ArrowLeft size={20} /> {t('profile.back')}
+    const content = (
+      <div className={styles.signIn}>
+        <button type="button" className={styles.back} onClick={reset}>
+          <Icon name="back" />
+          {t('profile.back')}
         </button>
-        <div className={styles.pinPrompt}>
-          <div className={styles.pinAvatar}>
-            {pendingUser.avatar_url
-              ? <img src={pendingUser.avatar_url} alt={pendingUser.name} />
-              : <UserCircle size={80} className={styles.placeholder} />}
-          </div>
-          <h1 className={styles.pinName}>{pendingUser.name}</h1>
+        <div className={styles.signInBody}>
+          <PersonAvatar user={pendingUser} size="lg" />
+          <h1 className={styles.signInName}>{pendingUser.name}</h1>
 
           {step.kind === 'pin' && (
             <PinPad
@@ -179,18 +306,28 @@ export const ProfileSelection: React.FC = () => {
           )}
 
           {step.kind === 'oidc' && (
-            <p className={styles.stepHint}>{t('profile.signInWithLinked')}</p>
+            <p className={styles.hint}>{t('profile.signInWithLinked')}</p>
           )}
 
-          {oidcButtons}
+          {pendingUser.auth_providers.length > 0 && (
+            <div className={styles.oidc}>
+              {step.kind === 'pin' && <div className={styles.divider}><span>{t('profile.or')}</span></div>}
+              {pendingUser.auth_providers.map(id => (
+                <a key={id} className={styles.oidcBtn} href={api.auth.oidcLoginURL(id, pendingUser.id)}>
+                  {t('profile.continueWith', { provider: providerName(id) })}
+                  <Icon name="chev" />
+                </a>
+              ))}
+            </div>
+          )}
 
           {step.kind !== 'pin' && error && (
-            <p className={styles.errorText} role="alert">{error}</p>
+            <p className={styles.error} role="alert">{error}</p>
           )}
 
           {step.kind === 'claim' && (
-            <form className={styles.claimForm} onSubmit={handleClaim}>
-              <p className={styles.stepHint}>
+            <form className={styles.claim} onSubmit={handleClaim}>
+              <p className={styles.hint}>
                 {step.legacyPasscode ? t('profile.claim.introLegacy') : t('profile.claim.intro')}
               </p>
               {step.legacyPasscode && (
@@ -227,90 +364,93 @@ export const ProfileSelection: React.FC = () => {
                   required
                 />
               </label>
-              <button type="submit" className={styles.primaryBtn} disabled={busy}>
+              <Button type="submit" block disabled={busy}>
                 {t('profile.claim.submit')}
-              </button>
+              </Button>
             </form>
           )}
         </div>
       </div>
     );
+
+    // A kid signs in inside their own skin; grown-ups in the House frame.
+    return pendingUser.role === 'child' ? (
+      <SkinScope
+        skin={resolveSkin(pendingUser.theme, pendingUser.age)}
+        color={pendingUser.color}
+        className={styles.screen}
+      >
+        {content}
+      </SkinScope>
+    ) : (
+      <HouseScope persistent={persistent} className={styles.screen}>{content}</HouseScope>
+    );
   }
 
-  // Show kids first, then parents
-  const sorted = [...users].sort((a, b) => {
-    if (a.role !== b.role) return a.role === 'child' ? -1 : 1;
-    return a.name.localeCompare(b.name);
+  /* ----- Who's here? ----- */
+  const now = dayFraction(clock);
+  const locale = i18n.resolvedLanguage || undefined;
+  const dateLabel = t('entry.picker.dateTime', {
+    date: clock.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' }),
+    time: clock.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }),
   });
-
-  const kids = sorted.filter(u => u.role === 'child');
-  const admins = sorted.filter(u => u.role === 'admin');
-  const isLocked = (u: User) => u.has_pin || u.auth_providers.length > 0;
+  const strip = stripMembers([...kids, ...parents], today);
 
   return (
-    <div className={styles.container}>
-      <h1 className={styles.title}>{t('profile.welcomeBack')}</h1>
-      <p className={styles.subtitle}>{t('profile.whoIsDoingChores')}</p>
+    <HouseScope persistent={persistent} className={styles.screen}>
+      <div className={styles.page}>
+        <header className={styles.top}>
+          <BrandMark />
+          <time className={styles.date} dateTime={clock.toISOString()}>{dateLabel}</time>
+        </header>
 
-      {authError && (
-        <div className={styles.errorBanner} role="alert">
-          <AlertCircle size={18} />
-          <span>
+        <h1 className={styles.hello}>
+          {t(`entry.picker.hello.${salutationFor(clock)}`)}{' '}
+          <span>{t('entry.picker.whosHere')}</span>
+        </h1>
+
+        {authError && (
+          <p className={styles.banner} role="alert">
             {t(AUTH_ERROR_KEYS[authError] ?? 'profile.authError.generic', {
               provider: authErrorProvider ? providerName(authErrorProvider) : '',
             })}
-          </span>
-        </div>
-      )}
-      {!pendingUser && error && (
-        <div className={styles.errorBanner} role="alert">
-          <AlertCircle size={18} />
-          <span>{error}</span>
-        </div>
-      )}
+          </p>
+        )}
+        {error && (
+          <p className={styles.banner} role="alert">{error}</p>
+        )}
 
-      <div className={styles.grid}>
-        {kids.map(u => (
-          <button key={u.id} className={styles.card} onClick={() => handleSelect(u)} disabled={busy} aria-label={t('profile.selectProfile', { name: u.name })}>
-            <div className={styles.avatarWrapper}>
-              {u.avatar_url ? (
-                <img src={u.avatar_url} alt={u.name} className={styles.avatar} />
-              ) : (
-                <UserCircle size={80} className={styles.placeholder} />
-              )}
-              {isLocked(u) && (
-                <div className={styles.lockBadge} aria-label={t('profile.pinProtected')}>
-                  <Lock size={14} />
-                </div>
-              )}
-            </div>
-            <span className={styles.name}>{u.name}</span>
-          </button>
-        ))}
-      </div>
+        <ul className={styles.doors} aria-label={t('entry.picker.doorsLabel')}>
+          {kids.map(u => (
+            <Door key={u.id} user={u} today={today[u.id]} now={now} disabled={busy} onSelect={handleSelect} />
+          ))}
+          {parents.length > 0 && (
+            <GrownUpsDoor parents={parents} disabled={busy} onSelect={handleSelect} />
+          )}
+        </ul>
 
-      {admins.length > 0 && (
-        <div className={styles.adminSection}>
-          <div className={styles.adminRow}>
-            {admins.map(u => (
-              <button key={u.id} className={styles.adminCard} onClick={() => handleSelect(u)} disabled={busy} aria-label={t('profile.selectProfile', { name: u.name })}>
-                <div className={styles.adminAvatar}>
-                  {u.avatar_url ? <img src={u.avatar_url} alt={u.name} /> : <UserCircle size={32} />}
-                </div>
-                <span className={styles.adminName}>{u.name}</span>
-                {isLocked(u) && <Lock size={12} className={styles.adminLock} />}
-              </button>
+        {strip.length > 0 && (
+          <section className={styles.family} aria-labelledby="family-today">
+            <h2 id="family-today" className={styles.familyTitle}>{t('entry.picker.familyToday')}</h2>
+            {strip.map(u => (
+              <FamilyMember
+                key={u.id}
+                name={u.name}
+                color={u.color}
+                done={today[u.id].done}
+                total={today[u.id].total}
+              />
             ))}
-          </div>
-        </div>
-      )}
+          </section>
+        )}
 
-      <div className={styles.bottomBtns}>
-        <button className={styles.settingsBtn} onClick={() => navigate('/ambient')}>
-          <Monitor size={18} />
-          <span>{t('profile.wallDisplay')}</span>
-        </button>
+        <footer className={styles.foot}>
+          <button type="button" className={styles.wall} onClick={() => navigate('/ambient')}>
+            <Icon name="screen" />
+            {t('entry.picker.wallDisplay')}
+          </button>
+        </footer>
       </div>
-    </div>
+    </HouseScope>
   );
 };
