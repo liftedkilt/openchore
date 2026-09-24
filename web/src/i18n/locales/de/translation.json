@@ -602,128 +602,6 @@
     "save": "Speichern"
   },
   "dashboard": {
-    "avatarPicker": {
-      "preview": "Avatar-Vorschau",
-      "save": "Speichern",
-      "shuffle": "Zufällig",
-      "title": "Wähle dein Aussehen"
-    },
-    "avatarStyles": {
-      "adventure": "Abenteuer",
-      "bigEars": "Große Ohren",
-      "classic": "Klassisch",
-      "doodle": "Kritzelei",
-      "emoji": "Emoji",
-      "glass": "Glas",
-      "lorelei": "Lorelei",
-      "pixel": "Pixel",
-      "robots": "Roboter",
-      "shapes": "Formen",
-      "sketch": "Skizze",
-      "thumbs": "Daumen"
-    },
-    "chore": {
-      "completedBy": "Erledigt von {{name}}",
-      "expired": "Abgelaufen",
-      "expiredAt": "Abgelaufen um {{time}}",
-      "latePenalty": "Verspätet (-{{value}} Pkt.)",
-      "lateZeroPts": "Verspätet (0 Pkt.)",
-      "listenToFeedback": "Feedback anhören",
-      "markComplete": "Als erledigt markieren",
-      "markIncomplete": "Als nicht erledigt markieren",
-      "pts": "Pkt.",
-      "ptsPending": "Pkt. ausstehend",
-      "readAloud": "{{title}} vorlesen",
-      "swipeDone": "Erledigt!",
-      "swipeUndo": "Rückgängig",
-      "uploadPhotoProof": "Fotobeweis hochladen"
-    },
-    "daily": {
-      "comingUpLater": "Heute noch"
-    },
-    "errors": {
-      "alreadyHasGoal": "Du hast bereits ein persönliches Ziel — schließe es zuerst ab oder ändere es",
-      "breakPersonalConfirm": "Sparen beenden? Deine gesparten Punkte gehen zurück auf dein verfügbares Guthaben.",
-      "breakSharedConfirm": "Dieses Familienziel verlassen? Dein Beitrag geht zurück auf dein verfügbares Guthaben.",
-      "couldNotCancelGoal": "Ziel konnte nicht abgebrochen werden — bitte erneut versuchen",
-      "couldNotSave": "Konnte nicht gespeichert werden — bitte erneut versuchen",
-      "couldNotStartSaving": "Sparen konnte nicht gestartet werden — bitte erneut versuchen",
-      "couldntSave": "Konnte nicht gespeichert werden — bitte erneut versuchen",
-      "enterPoints": "Gib eine Anzahl an Punkten ein, die hinzugefügt werden soll",
-      "goalCancelled": "Ziel abgebrochen — Punkte sind wieder in deinem Guthaben",
-      "leftFamilyGoal": "Familienziel verlassen — dein Anteil ist zurück",
-      "notEnoughPoints": "Du hast nur {{balance}} verfügbar",
-      "redemptionFailed": "Einlösen fehlgeschlagen — bitte erneut versuchen",
-      "savedMore": "{{amount}} mehr gespart!"
-    },
-    "goal": {
-      "addPointsPlaceholder": "Punkte hinzufügen (max. {{max}})",
-      "autoSave": "Automatisch sparen",
-      "familyGoal": "Familienziel",
-      "fullyFunded": "Vollständig finanziert 🎉",
-      "leaveGoal": "Ziel verlassen",
-      "ready": "Bereit!",
-      "redeemNow": "Jetzt einlösen",
-      "save": "Sparen",
-      "savingToward": "Sparen für",
-      "stopSaving": "Sparen beenden",
-      "tapRedeem": "Zum Einlösen tippen 🎉",
-      "tapToRedeem": "Zum Einlösen tippen 🎉",
-      "toGo": "Noch {{remaining}}",
-      "you": "Du",
-      "youContrib": "du: {{amount}}"
-    },
-    "header": {
-      "changeAvatar": "Avatar ändern",
-      "changeLineColor": "Linienfarbe ändern",
-      "changePIN": "PIN ändern",
-      "changeTheme": "Theme ändern",
-      "disableReadAloud": "Vorlesen deaktivieren",
-      "enableReadAloud": "Vorlesen aktivieren",
-      "linkedAccounts": "Verknüpfte Konten",
-      "logout": "Abmelden",
-      "manage": "Verwalten",
-      "setPIN": "PIN festlegen"
-    },
-    "lineColors": {
-      "cyan": "Cyan",
-      "green": "Grün",
-      "indigo": "Indigo",
-      "lavender": "Lavendel",
-      "magenta": "Magenta",
-      "mint": "Mint",
-      "orange": "Orange",
-      "pink": "Pink",
-      "red": "Rot",
-      "sky": "Himmelblau",
-      "white": "Weiß",
-      "yellow": "Gelb"
-    },
-    "nav": {
-      "rewards": "Belohnungen",
-      "today": "Heute",
-      "week": "Woche"
-    },
-    "paused": {
-      "text": "Genieße deine Auszeit. Deine Aufgaben sind pausiert und während deiner Abwesenheit werden keine Punkte abgezogen.",
-      "title": "Du machst gerade Pause!"
-    },
-    "progress": {
-      "ofComplete": "{{completed}} von {{available}} erledigt"
-    },
-    "qr": {
-      "copied": "Kopiert!",
-      "copyLink": "Link kopieren",
-      "helpAddPhoto": "Lade ein Foto hoch, um einen Nachweis für diese Aufgabe hinzuzufügen.",
-      "helpComplete": "Deine Aufgabe wird automatisch abgeschlossen, sobald du das Foto hochlädst.",
-      "scanOrUpload": "Scanne diesen Code mit einem anderen Gerät oder lade direkt von diesem Gerät hoch.",
-      "takePhoto": "Foto auf diesem Gerät aufnehmen",
-      "titleAddPhoto": "Fotobeweis hinzufügen",
-      "titlePhotoNeeded": "Fotobeweis erforderlich",
-      "uploadFailed": "Upload fehlgeschlagen",
-      "uploading": "Wird hochgeladen...",
-      "waiting": "Warte auf Foto..."
-    },
     "quickAssign": {
       "btnAssign": "Zuweisen",
       "btnAssigning": "Wird zugewiesen...",
@@ -739,42 +617,6 @@
       "labelWhen": "Wann",
       "labelWho": "Wer",
       "title": "Schnell zuweisen"
-    },
-    "rewards": {
-      "costPts": "Pkt.",
-      "familyBadge": "Familie",
-      "familyGoalBtn": "Familienziel",
-      "goalBadge": "Ziel",
-      "gone": "Weg",
-      "joinGoal": "Ziel beitreten",
-      "needMore": "Noch {{amount}}",
-      "noRewardsHint": "Bitte ein Elternteil, einige Belohnungen hinzuzufügen!",
-      "noRewardsTitle": "Noch keine Belohnungen",
-      "redeem": "Einlösen",
-      "redeemed": "Eingelöst!",
-      "redeeming": "...",
-      "redemptionCost": "-{{points}} Pkt.",
-      "redemptionTitle": "Letzte Einlösungen",
-      "saveToward": "Dafür sparen",
-      "savingToward": "...",
-      "spendable": "verfügbar",
-      "spendableWithSaved": "verfügbar · {{committed}} gespart",
-      "stockLeft": "übrig"
-    },
-    "stats": {
-      "balance": "Guthaben",
-      "pending": "Ausstehend",
-      "today": "Heute"
-    },
-    "streak": {
-      "daysToMilestone_one": "{{count}} Tag bis",
-      "daysToMilestone_other": "{{count}} Tage bis"
-    },
-    "themes": {
-      "classic": "Klassisch",
-      "forest": "Wald",
-      "galaxy": "Galaxie",
-      "quest": "Expedition"
     }
   },
   "design": {
@@ -889,6 +731,227 @@
       "yourColor": "Deine Farbe"
     }
   },
+  "kid": {
+    "chore": {
+      "about": "Etwa {{time}}",
+      "before": "Bis {{time}}",
+      "closed": "Verpasst. Jetzt geschlossen",
+      "closedAt": "Verpasst. Um {{time}} geschlossen",
+      "closedLabel": "Geschlossen",
+      "done": "Erledigt",
+      "doneAt": "Erledigt um {{time}}",
+      "doneBy": "Erledigt von {{name}}",
+      "excused": "Heute entschuldigt",
+      "from": "Ab {{time}}",
+      "lateNoPoints": "Zu spät. Jetzt keine Punkte",
+      "latePenalty_one": "Zu spät. Kostet {{count}} Pkt.",
+      "latePenalty_other": "Zu spät. Kostet {{count}} Pkt.",
+      "later": "Später heute",
+      "left": "Noch {{time}}",
+      "listenToFeedback": "Rückmeldung anhören",
+      "notDone": "Nicht erledigt",
+      "opensAt": "Ab {{time}}",
+      "opensAtLabel": "Ab {{time}}",
+      "opensIn": "In {{time}}",
+      "photoRejected": "Foto nicht angenommen. Versuch es noch mal",
+      "pointsPending_one": "Erledigt. {{count}} Pkt. nach den Pflichten",
+      "pointsPending_other": "Erledigt. {{count}} Pkt. nach den Pflichten",
+      "readonlyDone": "Erledigt",
+      "readonlyTodo": "Nicht erledigt",
+      "rejected": "Nicht angenommen. Versuch es noch mal",
+      "uploadPhotoProof": "Foto als Nachweis hinzufügen"
+    },
+    "colors": {
+      "butter": "Butter",
+      "coral": "Koralle",
+      "leaf": "Blatt",
+      "lilac": "Flieder",
+      "mint": "Minze",
+      "rose": "Rosa",
+      "sand": "Sand",
+      "sky": "Himmel"
+    },
+    "errors": {
+      "alreadyHasGoal": "Du hast schon ein Sparziel. Schließ es erst ab oder hör damit auf",
+      "couldNotCancelGoal": "Das Sparziel ließ sich nicht beenden. Versuch es noch mal",
+      "couldNotSave": "Speichern hat nicht geklappt. Versuch es noch mal",
+      "couldNotStartSaving": "Sparen ließ sich nicht starten. Versuch es noch mal",
+      "couldntSave": "Speichern hat nicht geklappt. Versuch es noch mal",
+      "enterPoints": "Gib ein, wie viele Punkte dazukommen",
+      "notEnoughPoints": "Du hast nur {{balance}} zum Ausgeben",
+      "redemptionFailed": "Das hat nicht geklappt. Versuch es noch mal"
+    },
+    "goal": {
+      "addPlaceholder": "Punkte dazu (bis {{max}})",
+      "addPoints": "Punkte dazu",
+      "amounts": "{{saved}} / {{target}} Pkt.",
+      "autoSave": "Automatisch sparen",
+      "autoSaveHint": "Ein Teil der Punkte jeder Aufgabe kommt hierher",
+      "familyGoal": "Familienziel",
+      "fullyFunded": "Alles gespart",
+      "joinedToast": "Du machst beim Familienziel mit: {{name}}",
+      "leave": "Ziel verlassen",
+      "leaveConfirm": "Dieses Familienziel verlassen? Dein Anteil kommt zu dir zurück.",
+      "leftToast": "Du hast das Familienziel verlassen. Dein Anteil ist zurück",
+      "pace_days_one": "Etwa {{count}} Tag in deinem Tempo",
+      "pace_days_other": "Etwa {{count}} Tage in deinem Tempo",
+      "pace_weeks_one": "Etwa {{count}} Woche in deinem Tempo",
+      "pace_weeks_other": "Etwa {{count}} Wochen in deinem Tempo",
+      "ready": "Bereit!",
+      "redeemNow": "Jetzt einlösen",
+      "save": "Sparen",
+      "savedMore_one": "{{count}} Punkt mehr gespart",
+      "savedMore_other": "{{count}} Punkte mehr gespart",
+      "saverAmount_one": "{{count}} Pkt.",
+      "saverAmount_other": "{{count}} Pkt.",
+      "savers": "Wer spart mit",
+      "savingToast": "Du sparst jetzt für {{name}}",
+      "savingToward": "Du sparst für",
+      "stop": "Aufhören zu sparen",
+      "stopConfirm": "Aufhören zu sparen? Deine gesparten Punkte kommen zu dir zurück.",
+      "stoppedToast": "Sparziel beendet. Deine Punkte sind zurück",
+      "title": "Sparziele",
+      "toGo_one": "Noch {{count}}",
+      "toGo_other": "Noch {{count}}",
+      "you": "Du"
+    },
+    "me": {
+      "changePicture": "Bild ändern",
+      "changePin": "PIN ändern",
+      "color": "Deine Farbe",
+      "language": "Sprache",
+      "linkedAccounts": "Verknüpfte Konten",
+      "manage": "Verwalten",
+      "manageHint": "Aufgaben, Personen und Belohnungen",
+      "open": "{{name}}: Einstellungen",
+      "pictureStyle": "Stil {{n}}",
+      "pictureStyles": "Bildstile",
+      "pictureTitle": "Dein Bild",
+      "readAloud": "Aufgaben vorlesen",
+      "readAloudHint": "Jede Aufgabe bekommt einen Lautsprecher",
+      "savePicture": "Dieses Bild nehmen",
+      "setPin": "PIN festlegen",
+      "settings": "Einstellungen",
+      "shuffle": "Mischen",
+      "signOut": "Abmelden",
+      "skin": "Dein Look",
+      "title": "Ich"
+    },
+    "paused": {
+      "text": "Genieß die freie Zeit. Deine Aufgaben ruhen, und solange du weg bist, gehen keine Punkte verloren.",
+      "title": "Du hast Pause"
+    },
+    "photo": {
+      "copied": "Link kopiert",
+      "copyLink": "Link kopieren",
+      "helpAdd": "Füge ein Foto hinzu, das zeigt, dass die Aufgabe erledigt ist.",
+      "helpComplete": "Die Aufgabe ist erledigt, sobald das Foto ankommt.",
+      "preparing": "Code wird erstellt",
+      "qrLabel": "Code, der die Fotoseite auf einem anderen Gerät öffnet",
+      "scanOrUpload": "Scanne den Code mit einem Handy oder mach das Foto hier.",
+      "takePhoto": "Foto hier machen",
+      "titleAdd": "Foto hinzufügen",
+      "titleNeeded": "Mach ein Foto",
+      "uploadFailed": "Das Foto wurde nicht hochgeladen. Versuch es noch mal",
+      "uploading": "Wird hochgeladen",
+      "waiting": "Warte auf das Foto"
+    },
+    "rewards": {
+      "cost_one": "{{count}} Pkt.",
+      "cost_other": "{{count}} Pkt.",
+      "emptyText": "Frag einen Erwachsenen, ob er welche anlegt.",
+      "emptyTitle": "Noch keine Belohnungen",
+      "familyGoal": "Familienziel",
+      "familyTag": "Familie",
+      "goalTag": "Ziel",
+      "gone": "Alle weg",
+      "history": "Deine Belohnungen",
+      "join": "Mitmachen",
+      "more": "Noch {{count}}",
+      "progress": "{{saved}}/{{target}}",
+      "redeem": "Einlösen",
+      "redeemed": "Eingelöst!",
+      "redeemedToast": "Viel Spaß! {{name}} gehört dir",
+      "redeeming": "Einen Moment",
+      "saveToward": "Dafür sparen",
+      "shop": "Belohnungen",
+      "spendableSaved_one": "Punkt zum Ausgeben · {{saved}} gespart",
+      "spendableSaved_other": "Punkte zum Ausgeben · {{saved}} gespart",
+      "spendable_one": "Punkt zum Ausgeben",
+      "spendable_other": "Punkte zum Ausgeben",
+      "spent_one": "−{{count}} Pkt.",
+      "spent_other": "−{{count}} Pkt.",
+      "stock_one": "Noch {{count}}",
+      "stock_other": "Noch {{count}}",
+      "title": "Belohnungen"
+    },
+    "sheet": {
+      "back": "Zurück",
+      "close": "Schließen"
+    },
+    "skins": {
+      "blocks": {
+        "hint": "Kräftig und bunt",
+        "name": "Blocks"
+      },
+      "sunroom": {
+        "hint": "Warm und weich",
+        "name": "Sunroom"
+      },
+      "tint": {
+        "hint": "Ruhig und dunkel",
+        "name": "Tint"
+      }
+    },
+    "time": {
+      "hoursMinutes": "{{h}} Std. {{m}} Min.",
+      "hours_one": "{{count}} Std.",
+      "hours_other": "{{count}} Std.",
+      "minutes_one": "{{count}} Min.",
+      "minutes_other": "{{count}} Min."
+    },
+    "today": {
+      "allDone": "Alles erledigt für heute",
+      "bonusCount": "+{{count}}",
+      "earned_one": "+{{count}} Pkt. heute",
+      "earned_other": "+{{count}} Pkt. heute",
+      "emptyText": "Heute steht nichts auf deiner Liste. Genieß es.",
+      "emptyTitle": "Ein freier Tag",
+      "listLabel": "Deine Aufgaben",
+      "overview": "Dein Tag",
+      "pending_one": "{{count}} Pkt. warten auf die Pflichten",
+      "pending_other": "{{count}} Pkt. warten auf die Pflichten"
+    },
+    "upload": {
+      "doneBody": "Gut gemacht. Du kannst die Seite jetzt schließen.",
+      "doneBodyNamed": "Gut gemacht, {{name}}. Du kannst die Seite jetzt schließen.",
+      "doneTitle": "Foto gesendet",
+      "failed": "Das Foto wurde nicht hochgeladen. Versuch es noch mal",
+      "for": "Für {{name}}",
+      "invalidBody": "Diesem Link fehlt etwas. Scanne den Code noch einmal.",
+      "invalidTitle": "Dieser Link funktioniert nicht",
+      "kicker": "Foto-Nachweis",
+      "openCamera": "Kamera öffnen",
+      "takeHint": "Zeig die erledigte Aufgabe und verdien dir deine Punkte.",
+      "takeTitle": "Mach ein Foto",
+      "uploading": "Wird hochgeladen"
+    },
+    "week": {
+      "best_one": "Bestwert: {{count}} Tag",
+      "best_other": "Bestwert: {{count}} Tage",
+      "dayEmpty": "{{day}}: nichts zu tun",
+      "dayLabel": "{{day}}: {{done}} von {{total}} erledigt",
+      "days": "Tage dieser Woche",
+      "emptyText": "An dem Tag steht nichts auf der Liste.",
+      "emptyTitle": "Ein freier Tag",
+      "nextMilestone_one": "Noch {{count}} Tag bis {{label}} (+{{points}} Pkt.)",
+      "nextMilestone_other": "Noch {{count}} Tage bis {{label}} (+{{points}} Pkt.)",
+      "streak": "Serie",
+      "streakDays_one": "{{count}} Tag in Folge",
+      "streakDays_other": "{{count}} Tage in Folge",
+      "title": "Diese Woche"
+    }
+  },
   "linkedAccounts": {
     "confirmSignOutEverywhere": "Dieses Profil auf allen Geräten abmelden, auch auf diesem?",
     "confirmUnlink": "{{provider}} trennen? Damit angemeldete Geräte werden abgemeldet.",
@@ -901,19 +964,6 @@
     "signOutEverywhere": "Auf allen Geräten abmelden",
     "title": "Verknüpfte Konten",
     "unlink": "Trennen"
-  },
-  "photo": {
-    "invalidLinkBody": "Diesem Upload-Link fehlen Informationen.",
-    "invalidLinkTitle": "Ungültiger Link",
-    "openCamera": "Kamera öffnen",
-    "pageTitle": "Fotobeweis",
-    "successBody": "Super gemacht! Du kannst diesen Tab jetzt schließen.",
-    "successBodyNamed": "Super gemacht, {{name}}! Du kannst diesen Tab jetzt schließen.",
-    "successTitle": "Foto hochgeladen!",
-    "takePicture": "Foto aufnehmen",
-    "takePictureHint": "Zeig deine erledigte Aufgabe, um deine Punkte zu bekommen!",
-    "uploadFailed": "Foto konnte nicht hochgeladen werden",
-    "uploadingFor": "Wird hochgeladen für {{name}}"
   },
   "profile": {
     "authError": {

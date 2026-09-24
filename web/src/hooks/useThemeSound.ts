@@ -17,6 +17,7 @@ function playNotes(ctx: AudioContext, def: SoundDef) {
   }
 }
 
+/** The signed-in person's skin sounds (and buzz) for finishing chores. */
 export function useThemeSound() {
   const { config } = useTheme();
   const ctxRef = useRef<AudioContext | null>(null);
@@ -27,9 +28,14 @@ export function useThemeSound() {
     return ctxRef.current;
   };
 
+  const buzz = useCallback(() => {
+    try { navigator.vibrate?.(config.vibrate); } catch { /* no vibration support */ }
+  }, [config]);
+
   const playComplete = useCallback(() => {
     try { playNotes(getCtx(), config.sounds.complete); } catch { /* no audio support */ }
-  }, [config]);
+    buzz();
+  }, [config, buzz]);
 
   const playAllDone = useCallback(() => {
     try { playNotes(getCtx(), config.sounds.allDone); } catch { /* no audio support */ }
