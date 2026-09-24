@@ -193,11 +193,29 @@ func randomString() string {
 }
 
 // safeReturn only allows same-origin absolute paths.
+// It is applied both when a flow starts and again right before redirecting.
 func safeReturn(p string) string {
-	if p == "" || !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") || strings.Contains(p, `\`) {
+	// Must start with a single "/": "//host" and "/\host" are protocol-
+	// relative URLs that browsers send off-site.
+	if p == "" || p[0] != '/' || (len(p) > 1 && (p[1] == '/' || p[1] == '\\')) {
+		return ""
+	}
+	if strings.ContainsAny(p, "\\\r\n\t") {
+		return ""
+	}
+	u, err := url.Parse(p)
+	if err != nil || u.Scheme != "" || u.Host != "" || u.User != nil {
 		return ""
 	}
 	return p
+}
+
+// returnOr sanitizes a return path, falling back to def.
+func returnOr(p, def string) string {
+	if safe := safeReturn(p); safe != "" {
+		return safe
+	}
+	return def
 }
 
 // baseURL returns the externally visible origin used for redirect URIs.
@@ -232,8 +250,8 @@ func (o *OIDCService) oauthConfig(r *http.Request, p *oidcProvider, prov *oidc.P
 // redirectError sends the browser back to the UI with an error code.
 func redirectError(w http.ResponseWriter, r *http.Request, mode, returnPath, provider, code string) {
 	target := "/login"
-	if mode == oidcModeLink && returnPath != "" {
-		target = returnPath
+	if mode == oidcModeLink {
+		target = returnOr(returnPath, "/login")
 	}
 	q := url.Values{"auth_error": {code}, "provider": {provider}}
 	sep := "?"
@@ -460,10 +478,7 @@ func (o *OIDCService) Callback(w http.ResponseWriter, r *http.Request) {
 			"user_id": user.ID, "user_name": user.Name, "provider": id, "ip_address": clientIP(r),
 		})
 	}
-	dest := flow.Return
-	if dest == "" {
-		dest = "/"
-	}
+	dest := returnOr(flow.Return, "/")
 	http.Redirect(w, r, dest, http.StatusFound)
 }
 
@@ -494,10 +509,7 @@ func (o *OIDCService) finishLink(w http.ResponseWriter, r *http.Request, flow *o
 			})
 		}
 	}
-	dest := flow.Return
-	if dest == "" {
-		dest = "/"
-	}
+	dest := returnOr(flow.Return, "/")
 	sep := "?"
 	if strings.Contains(dest, "?") {
 		sep = "&"
