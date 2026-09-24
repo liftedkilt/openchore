@@ -1,236 +1,133 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { api, fetchPublicUserData } from '../api';
 import type { User, ScheduledChore, UserStreakData, PointsData } from '../types';
-import styles from './AmbientDashboard.module.css';
-import { Flame } from 'lucide-react';
 import { localDateStr } from '../utils';
+import {
+  Avatar, ChoreRow, DayProgress, FamilyMember, HouseScope, Icon, SkinScope,
+  catFromCategory, resolveSkin, salutationFor, useMinuteClock,
+  type Cat, type ChoreState, type DayProgressItem, type Skin,
+} from '../design';
+import { LineChart, type LineSeries, type Tick } from '../components/charts/LineChart';
+import { personColorVar } from '../components/charts/personColor';
+import styles from './AmbientDashboard.module.css';
 
-// Assign each kid a distinct color
-const KID_COLORS = ['#38bdf8', '#a78bfa', '#f472b6', '#34d399', '#fb923c', '#facc15'];
-
-interface TimelinePoint {
-  time: Date;
-  cumPct: number;
-}
-
-interface KidData {
+interface PersonDay {
   user: User;
+  chores: ScheduledChore[];
   completed: number;
   total: number;
-  percent: number;
   pointsToday: number;
-  totalBalance: number;
+  balance: number;
   streak: number;
-  timeline: TimelinePoint[];
+  /** Completion times, oldest first. */
+  doneAt: Date[];
 }
 
-const ProgressRing: React.FC<{ percent: number }> = ({ percent }) => {
-  // Uses a fixed viewBox; actual size is controlled by the parent container via CSS
-  const vb = 130;
-  const strokeWidth = 5;
-  const radius = (vb - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (Math.min(percent, 100) / 100) * circumference;
-  const color = percent >= 100 ? '#22c55e' : percent >= 50 ? '#38bdf8' : '#f59e0b';
+const REFRESH_MS = 45_000;
+/** How many of a person's next chores their door lists (more are clipped if they don't fit). */
+const NEXT_ROWS = 3;
+/** DayProgress' day, matching its default "7 am" / "9 pm" labels. */
+const DAY_FROM_H = 7;
+const DAY_TO_H = 21;
+/** The family chart's day. */
+const CHART_FROM_H = 6;
+const CHART_TO_H = 22;
+const CAT_ORDER: Record<Cat, number> = { essential: 0, daily: 1, bonus: 2 };
 
-  return (
-    <svg viewBox={`0 0 ${vb} ${vb}`} className={styles.progressRing}>
-      <circle cx={vb / 2} cy={vb / 2} r={radius}
-        stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} fill="none" />
-      <circle cx={vb / 2} cy={vb / 2} r={radius}
-        stroke={color} strokeWidth={strokeWidth} fill="none"
-        strokeDasharray={circumference} strokeDashoffset={offset}
-        strokeLinecap="round" transform={`rotate(-90 ${vb / 2} ${vb / 2})`}
-        style={{ transition: 'stroke-dashoffset 0.8s ease' }} />
-    </svg>
-  );
+/**
+ * Door hero sizing is layout, not theme (the gallery does the same): each
+ * skin draws a different hero, so each gets the width and scale that fits a
+ * door. The door's container query scales it up when doors are wide.
+ */
+const HERO_FIT: Record<Skin, { w: number; s: number }> = {
+  sunroom: { w: 312, s: 0.62 },
+  blocks: { w: 236, s: 0.82 },
+  tint: { w: 312, s: 0.52 },
 };
 
-// Combined line chart showing all kids' cumulative completion % over time today
-const TimelineChart: React.FC<{ kids: KidData[]; colors: string[] }> = ({ kids, colors }) => {
-  const width = 700;
-  const height = 200;
-  const padL = 44;
-  const padR = 16;
-  const padT = 28; // room for legend
-  const padB = 28;
-  const chartW = width - padL - padR;
-  const chartH = height - padT - padB;
+const hoursOf = (d: Date) => d.getHours() + d.getMinutes() / 60;
+const dayFraction = (d: Date) => (hoursOf(d) - DAY_FROM_H) / (DAY_TO_H - DAY_FROM_H);
 
-  // X axis: 6am to 10pm (16 hours)
-  const startHour = 6;
-  const endHour = 22;
-  const hourSpan = endHour - startHour;
+/** "HH:MM" today, as a Date. */
+function atToday(hhmm: string | undefined, now: Date): Date | null {
+  if (!hhmm) return null;
+  const [h, m] = hhmm.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  const d = new Date(now);
+  d.setHours(h, m, 0, 0);
+  return d;
+}
 
-  const now = new Date();
-  const currentHour = now.getHours() + now.getMinutes() / 60;
-  const clampedHour = Math.min(Math.max(currentHour, startHour), endHour);
-  const nowX = padL + ((clampedHour - startHour) / hourSpan) * chartW;
+/**
+ * Hide the children of a box that don't fully fit inside it, so a door shows
+ * as many whole rows as its height allows and never a clipped one.
+ */
+function useFitRows<T extends HTMLElement>(deps: unknown[]) {
+  const ref = useRef<T>(null);
+  useLayoutEffect(() => {
+    const box = ref.current;
+    if (!box) return;
+    const fit = () => {
+      const kids = Array.from(box.children) as HTMLElement[];
+      kids.forEach((k) => { k.hidden = false; });
+      const bottom = box.getBoundingClientRect().bottom;
+      kids.forEach((k, i) => { k.hidden = i > 0 && k.getBoundingClientRect().bottom > bottom + 1; });
+    };
+    fit();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(fit);
+    ro.observe(box);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  return ref;
+}
 
-  const hourToX = (h: number) => padL + ((Math.min(Math.max(h, startHour), endHour) - startHour) / hourSpan) * chartW;
-  const pctToY = (p: number) => padT + chartH - (Math.min(Math.max(p, 0), 100) / 100) * chartH;
-
-  // Hour labels every 2 hours
-  const hourLabels: { h: number; label: string }[] = [];
-  for (let h = startHour; h <= endHour; h += 2) {
-    const label = h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`;
-    hourLabels.push({ h, label });
-  }
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className={styles.chartSvg} preserveAspectRatio="xMidYMid meet">
-      {/* Grid lines */}
-      {[0, 25, 50, 75, 100].map(p => (
-        <g key={p}>
-          <line x1={padL} y1={pctToY(p)} x2={padL + chartW} y2={pctToY(p)}
-            stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
-          <text x={padL - 8} y={pctToY(p) + 3.5} textAnchor="end"
-            fontSize="9" fill="rgba(255,255,255,0.3)" fontWeight="600">{p}%</text>
-        </g>
-      ))}
-
-      {/* Hour labels */}
-      {hourLabels.map(({ h, label }) => (
-        <text key={h} x={hourToX(h)} y={height - 6} textAnchor="middle"
-          fontSize="9" fill="rgba(255,255,255,0.3)" fontWeight="600">{label}</text>
-      ))}
-
-      {/* "Now" indicator */}
-      {currentHour >= startHour && currentHour <= endHour && (
-        <line x1={nowX} y1={padT} x2={nowX} y2={padT + chartH}
-          stroke="rgba(255,255,255,0.15)" strokeWidth={1} strokeDasharray="4,3" />
-      )}
-
-      {/* Lines per kid — always render a line, even if no timeline data */}
-      {kids.map((kid, idx) => {
-        if (kid.total === 0) return null;
-        const color = colors[idx % colors.length];
-
-        // Build SVG path points
-        const svgPoints: { x: number; y: number }[] = [];
-
-        // Always start at 0% at the beginning of the day
-        svgPoints.push({ x: hourToX(startHour), y: pctToY(0) });
-
-        if (kid.timeline.length > 0) {
-          // We have completion timestamps — plot them as a step function
-          let prevPct = 0;
-          for (const pt of kid.timeline) {
-            const h = pt.time.getHours() + pt.time.getMinutes() / 60;
-            const x = hourToX(h);
-            // Horizontal line at previous % up to this time (step function)
-            svgPoints.push({ x, y: pctToY(prevPct) });
-            // Then step up to new %
-            svgPoints.push({ x, y: pctToY(pt.cumPct) });
-            prevPct = pt.cumPct;
-          }
-          // Extend horizontally to current time
-          svgPoints.push({ x: nowX, y: pctToY(prevPct) });
-        } else {
-          // No timeline data — show current % as a flat line from start to now
-          // This handles the case where completed_at isn't available
-          svgPoints.push({ x: nowX, y: pctToY(kid.percent) });
-        }
-
-        const pathD = svgPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-        const lastY = svgPoints[svgPoints.length - 1].y;
-
-        return (
-          <g key={kid.user.id}>
-            <path d={pathD} fill="none" stroke={color} strokeWidth={2.5}
-              strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />
-            {/* Dot at current position */}
-            <circle cx={nowX} cy={lastY} r={4.5}
-              fill={color} stroke="#0f172a" strokeWidth={2} />
-          </g>
-        );
-      })}
-
-      {/* Legend at top */}
-      {kids.map((kid, idx) => {
-        if (kid.total === 0) return null;
-        const color = colors[idx % colors.length];
-        const lx = padL + idx * 110;
-        return (
-          <g key={kid.user.id}>
-            <line x1={lx} y1={12} x2={lx + 14} y2={12}
-              stroke={color} strokeWidth={2.5} strokeLinecap="round" />
-            <text x={lx + 20} y={15} fontSize="10" fill="rgba(255,255,255,0.6)" fontWeight="600">
-              {kid.user.name}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-};
+async function loadPerson(user: User, today: string): Promise<PersonDay> {
+  const [chores, streakData, pointsData] = await Promise.all([
+    fetchPublicUserData<ScheduledChore[]>(`/users/${user.id}/chores?view=daily&date=${today}`),
+    fetchPublicUserData<UserStreakData>(`/users/${user.id}/streak`),
+    fetchPublicUserData<PointsData>(`/users/${user.id}/points`),
+  ]);
+  const done = chores.filter((c) => c.completed);
+  const doneAt = done
+    .map((c) => (c.completed_at ? new Date(c.completed_at) : null))
+    .filter((d): d is Date => !!d && !isNaN(d.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+  return {
+    user,
+    chores,
+    completed: done.length,
+    total: chores.length,
+    pointsToday: done.reduce((sum, c) => sum + c.points_value, 0),
+    balance: pointsData.balance,
+    streak: streakData.current_streak,
+    doneAt,
+  };
+}
 
 export const AmbientDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
-  const [kids, setKids] = useState<KidData[]>([]);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const { t, i18n } = useTranslation();
+  const [people, setPeople] = useState<PersonDay[]>([]);
   const [loading, setLoading] = useState(true);
+  const now = useMinuteClock();
 
   const fetchData = useCallback(async () => {
     try {
-      const allUsers: User[] = await api.users.list();
-      // Everyone takes part: kids always show; parents show on days they
-      // have chores of their own.
-      const members = allUsers.filter(u => !u.paused);
+      const users: User[] = await api.users.list();
       const today = localDateStr(new Date());
-
-      const results = await Promise.allSettled(
-        members.map(async (kid) => {
-          const [chores, streakData, pointsData] = await Promise.all([
-            fetchPublicUserData<ScheduledChore[]>(`/users/${kid.id}/chores?view=daily&date=${today}`),
-            fetchPublicUserData<UserStreakData>(`/users/${kid.id}/streak`),
-            fetchPublicUserData<PointsData>(`/users/${kid.id}/points`),
-          ]);
-
-          const completed = chores.filter(c => c.completed).length;
-          const total = chores.length;
-          const pointsToday = chores.filter(c => c.completed).reduce((sum, c) => sum + c.points_value, 0);
-
-          // Build timeline from completed_at timestamps
-          const completedChores = chores
-            .filter(c => c.completed && c.completed_at)
-            .map(c => {
-              const t = new Date(c.completed_at!);
-              return { time: t, valid: !isNaN(t.getTime()) };
-            })
-            .filter(c => c.valid)
-            .sort((a, b) => a.time.getTime() - b.time.getTime());
-
-          const timeline: TimelinePoint[] = [];
-          let cumCompleted = 0;
-          for (const cc of completedChores) {
-            cumCompleted++;
-            timeline.push({
-              time: cc.time,
-              cumPct: total > 0 ? Math.round((cumCompleted / total) * 100) : 0,
-            });
-          }
-
-          return {
-            user: kid,
-            completed,
-            total,
-            percent: total > 0 ? Math.round((completed / total) * 100) : 0,
-            pointsToday,
-            totalBalance: pointsData.balance,
-            streak: streakData.current_streak,
-            timeline,
-          };
-        })
-      );
-
-      setKids(results
-        .filter((r): r is PromiseFulfilledResult<KidData> => r.status === 'fulfilled')
-        .map(r => r.value)
-        .filter(k => k.user.role === 'child' || k.total > 0)
+      const results = await Promise.allSettled(users.filter((u) => !u.paused).map((u) => loadPerson(u, today)));
+      setPeople(
+        results
+          .filter((r): r is PromiseFulfilledResult<PersonDay> => r.status === 'fulfilled')
+          .map((r) => r.value)
+          // Everyone takes part: kids always show; grown-ups on days they have chores.
+          .filter((p) => p.user.role === 'child' || p.total > 0)
+          // The family's order, never a ranking.
+          .sort((a, b) => a.user.id - b.user.id),
       );
     } catch (err) {
       console.error('Ambient fetch error:', err);
@@ -240,16 +137,11 @@ export const AmbientDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 45000);
+    const interval = setInterval(fetchData, REFRESH_MS);
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  useEffect(() => {
-    const interval = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Wake lock
+  // Keep the wall display awake.
   useEffect(() => {
     let wakeLock: WakeLockSentinel | null = null;
     const request = async () => {
@@ -264,67 +156,219 @@ export const AmbientDashboard: React.FC = () => {
     };
   }, []);
 
-  const timeStr = currentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  const dateStr = currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-
-  // Stable color assignment: prefer user's chosen line_color, fall back to palette
-  const sortedKids = useMemo(() => [...kids].sort((a, b) => a.user.id - b.user.id), [kids]);
-  const colorMap = useMemo(() => {
-    const map = new Map<number, string>();
-    sortedKids.forEach((k, i) => map.set(k.user.id, k.user.line_color || KID_COLORS[i % KID_COLORS.length]));
-    return map;
-  }, [sortedKids]);
-
-  if (loading) return <div className={styles.container} />;
-
-  // Sort by completion percentage (leaders first) for card display
-  const sorted = [...kids].sort((a, b) => b.percent - a.percent);
-  const chartColors = sortedKids.map(k => colorMap.get(k.user.id) || KID_COLORS[0]);
+  const lang = i18n.language;
+  const fmtTime = useCallback(
+    (d: Date) => d.toLocaleTimeString(lang, { hour: 'numeric', minute: '2-digit' }),
+    [lang],
+  );
+  const start = () => navigate('/login');
 
   return (
-    <div className={styles.container} onClick={() => navigate('/login')}>
-      <header className={styles.header}>
-        <div className={styles.clock}>{timeStr}</div>
-        <div className={styles.date}>{dateStr}</div>
-      </header>
+    <HouseScope mode="auto" persistent={false} className={styles.wall} onClick={start}>
+      {!loading && (
+        <>
+          <header className={styles.hello}>
+            <div className={styles.helloText}>
+              <div className={styles.top}>
+                <span className={styles.brand}>
+                  <span className={styles.logo} aria-hidden>
+                    {(['coral', 'mint', 'butter', 'sky'] as const).map((c) => <i key={c} style={{ background: `var(--person-${c})` }} />)}
+                  </span>
+                  openchore
+                </span>
+                <span className={styles.date}>
+                  {now.toLocaleDateString(lang, { weekday: 'long', month: 'long', day: 'numeric' })}
+                </span>
+              </div>
+              <h1 className={styles.greeting}>
+                {t(`wall.greeting.${salutationFor(now)}`)}{' '}
+                <button type="button" className={styles.startBtn} onClick={(e) => { e.stopPropagation(); start(); }}>
+                  {t('wall.tapToStart')}
+                </button>
+              </h1>
+            </div>
+            <time className={styles.clock} dateTime={now.toISOString()} data-testid="wall-clock">
+              {fmtTime(now)}
+            </time>
+          </header>
 
-      <div className={styles.grid}>
-        {sorted.map((kid, i) => {
-          const allDone = kid.completed === kid.total && kid.total > 0;
-          const isLeader = i === 0 && kid.percent > 0;
-          const color = colorMap.get(kid.user.id) || KID_COLORS[0];
+          <div className={styles.doors}>
+            {people.map((p) => <Door key={p.user.id} p={p} now={now} fmtTime={fmtTime} />)}
+          </div>
 
-          return (
-            <div key={kid.user.id} className={`${styles.card} ${allDone ? styles.cardDone : ''} ${isLeader ? styles.cardLeader : ''}`}>
-              <div className={styles.avatarWrap}>
-                <ProgressRing percent={kid.percent} />
-                <div className={styles.avatarInner}>
-                  {kid.user.avatar_url
-                    ? <img src={kid.user.avatar_url} alt={kid.user.name} className={styles.avatarImg} />
-                    : <div className={styles.avatarPlaceholder} />}
+          {people.length > 0 && (
+            <section className={styles.family} aria-labelledby="wall-family">
+              <div className={styles.members}>
+                <h2 id="wall-family" className={styles.label}>{t('wall.familyToday')}</h2>
+                <div className={styles.memberGrid}>
+                  {people.map((p) => (
+                    <FamilyMember key={p.user.id} name={p.user.name} color={p.user.color} done={p.completed} total={p.total} />
+                  ))}
                 </div>
               </div>
-              <h2 className={styles.name}>{kid.user.name}</h2>
-              <div className={styles.completionCount}>{kid.completed}/{kid.total}</div>
-              <div className={styles.completionLabel}>{t('ambient.choresDone')}</div>
-              <div className={styles.statsRow}>
-                {kid.streak > 0 && (
-                  <span className={styles.streak}><Flame size={14} /> {t('ambient.streakDays', { count: kid.streak })}</span>
-                )}
-                <span className={styles.points}>{t('ambient.ptsToday', { count: kid.pointsToday })}</span>
-              </div>
-              {/* Color indicator matching chart line */}
-              <div className={styles.colorDot} style={{ backgroundColor: color }} />
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Combined timeline chart */}
-      <div className={styles.chartPanel}>
-        <h3 className={styles.chartTitle}>{t('ambient.todaysProgress')}</h3>
-        <TimelineChart kids={sortedKids} colors={chartColors} />
-      </div>
-    </div>
+              <DayChart people={people} now={now} />
+            </section>
+          )}
+        </>
+      )}
+    </HouseScope>
   );
 };
+
+/* ---------------- A person's door ---------------- */
+
+function Door({ p, now, fmtTime }: { p: PersonDay; now: Date; fmtTime: (d: Date) => string }) {
+  const { t } = useTranslation();
+  const skin = resolveSkin(p.user.theme, p.user.age);
+  const left = p.total - p.completed;
+  const nameId = `wall-door-${p.user.id}`;
+
+  // One item per chore, finished ones pinned where they happened on the arc.
+  const items: DayProgressItem[] = useMemo(() => {
+    const times = [...p.doneAt];
+    return [...p.chores]
+      .sort((a, b) => Number(b.completed) - Number(a.completed) || CAT_ORDER[catFromCategory(a.category)] - CAT_ORDER[catFromCategory(b.category)])
+      .map((c) => {
+        const at = c.completed ? times.shift() : undefined;
+        return { cat: catFromCategory(c.category), done: c.completed, at: at ? dayFraction(at) : undefined };
+      });
+  }, [p.chores, p.doneAt]);
+
+  // Bonus only opens once every Must do and Every day chore is done.
+  const bonusOpen = p.chores.every((c) => c.category === 'bonus' || c.completed || !c.available);
+  const next = p.chores
+    .filter((c) => !c.completed && !c.expired)
+    .sort((a, b) =>
+      Number(b.available) - Number(a.available)
+      || CAT_ORDER[catFromCategory(a.category)] - CAT_ORDER[catFromCategory(b.category)]
+      || (a.due_by ?? '99').localeCompare(b.due_by ?? '99'))
+    .slice(0, NEXT_ROWS);
+
+  const rowFor = (c: ScheduledChore) => {
+    const cat = catFromCategory(c.category);
+    const state: ChoreState = cat === 'bonus' && !bonusOpen ? 'locked' : 'todo';
+    let meta: string | undefined;
+    let urgent = false;
+    const opens = atToday(c.available_at, now);
+    const due = atToday(c.due_by, now);
+    if (!c.available && opens && opens > now) {
+      meta = t('wall.opensAt', { time: fmtTime(opens) });
+    } else if (due) {
+      meta = t('wall.dueBy', { time: fmtTime(due) });
+      urgent = due.getTime() - now.getTime() < 60 * 60 * 1000;
+    }
+    return (
+      <ChoreRow
+        key={`${c.schedule_id}-${c.chore_id}`}
+        readOnly
+        cat={cat}
+        icon={c.icon}
+        title={c.title}
+        meta={meta}
+        urgent={urgent}
+        points={c.points_value}
+        photo={c.requires_photo}
+        state={state}
+      />
+    );
+  };
+
+  const fit = HERO_FIT[skin];
+  const rowsRef = useFitRows<HTMLDivElement>([next.map((c) => c.schedule_id).join(), bonusOpen]);
+
+  return (
+    <SkinScope skin={skin} color={p.user.color} door className={styles.door} role="group" aria-labelledby={nameId}>
+      <div className={styles.doorHead}>
+        {p.user.avatar_url
+          ? <img src={p.user.avatar_url} alt="" className={styles.photo} />
+          : <Avatar name={p.user.name} color={p.user.color} size="lg" className={styles.avatar} />}
+        <h2 id={nameId} className={styles.name}>{p.user.name}</h2>
+        <div className={styles.meta}>
+          <span className={left === 0 && p.total > 0 ? styles.allDone : undefined}>
+            {p.total === 0 ? t('wall.nothingToday') : left === 0 ? t('wall.allDone') : t('wall.toGo', { count: left })}
+          </span>
+          <span aria-hidden>·</span>
+          <span className={styles.stars} role="img" aria-label={t('design.points.label', { count: p.balance })}>
+            <Icon name="star" />{p.balance}
+          </span>
+        </div>
+        <div className={styles.meta2}>
+          {p.streak > 0 && (
+            <span className={styles.streak}><Icon name="flame" />{t('wall.streak', { count: p.streak })}</span>
+          )}
+          <span>{t('wall.ptsToday', { count: p.pointsToday })}</span>
+        </div>
+      </div>
+
+      {p.total > 0 && (
+        <div className={styles.hero}>
+          <div className={styles.heroFit} style={{ width: fit.w, '--hero-s': fit.s } as React.CSSProperties}>
+            <DayProgress items={items} now={dayFraction(now)} />
+          </div>
+        </div>
+      )}
+
+      {next.length > 0 && (
+        <div className={styles.next}>
+          <h3 className={styles.label}>{t('wall.nextUp')}</h3>
+          <div ref={rowsRef} className={styles.rows}>{next.map(rowFor)}</div>
+        </div>
+      )}
+    </SkinScope>
+  );
+}
+
+/* ---------------- The family's day, hour by hour ---------------- */
+
+function DayChart({ people, now }: { people: PersonDay[]; now: Date }) {
+  const { t, i18n } = useTranslation();
+  const nowH = Math.min(Math.max(hoursOf(now), CHART_FROM_H), CHART_TO_H);
+
+  const series: LineSeries[] = people
+    .filter((p) => p.total > 0)
+    .map((p) => {
+      const pct = (n: number) => Math.round((n / p.total) * 100);
+      const points = [{ x: CHART_FROM_H, y: 0 }];
+      if (p.doneAt.length) {
+        p.doneAt.forEach((d, i) => points.push({ x: hoursOf(d), y: pct(i + 1) }));
+      } else if (p.completed > 0) {
+        // Done, but without completion times: hold today's level.
+        points.push({ x: CHART_FROM_H, y: pct(p.completed) });
+      }
+      points.push({ x: nowH, y: pct(p.completed) });
+      return { key: String(p.user.id), label: p.user.name, color: personColorVar(p.user.color), points, step: true };
+    });
+
+  const hourLabel = (h: number) => {
+    const d = new Date(now);
+    d.setHours(h, 0, 0, 0);
+    return d.toLocaleTimeString(i18n.language, { hour: 'numeric' });
+  };
+  const xTicks: Tick[] = [];
+  for (let h = CHART_FROM_H; h <= CHART_TO_H; h += 4) xTicks.push({ value: h, label: hourLabel(h) });
+  const yTicks: Tick[] = [0, 50, 100].map((v) => ({ value: v, label: `${v}%` }));
+
+  const summary = people
+    .filter((p) => p.total > 0)
+    .map((p) => t('wall.chartPerson', { name: p.user.name, pct: Math.round((p.completed / p.total) * 100) }))
+    .join(', ');
+
+  return (
+    <div className={styles.chart}>
+      <div className={styles.label} aria-hidden>{t('wall.chartTitle')}</div>
+      <LineChart
+        title={t('wall.chartTitle')}
+        description={t('wall.chartDesc', { summary })}
+        series={series}
+        xDomain={[CHART_FROM_H, CHART_TO_H]}
+        yDomain={[0, 100]}
+        xTicks={xTicks}
+        yTicks={yTicks}
+        marker={{ x: nowH }}
+        maxDots={0}
+        hideLegend
+        height={148}
+      />
+    </div>
+  );
+}
