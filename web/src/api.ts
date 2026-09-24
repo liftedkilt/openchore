@@ -1,4 +1,4 @@
-import type { User, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardAssignment, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from './types';
+import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from './types';
 
 const API_BASE = '/api';
 
@@ -157,6 +157,11 @@ export const api = {
       fetchWithAuth<User>(`/users/${id}/line-color`, {
         method: 'PUT',
         body: JSON.stringify({ line_color }),
+      }),
+    updateColor: (id: number, color: PersonColor) =>
+      fetchWithAuth<User>(`/users/${id}/color`, {
+        method: 'PUT',
+        body: JSON.stringify({ color }),
       }),
     setPin: (id: number, newPin: string, currentPin?: string) =>
       fetchWithAuth<{ has_pin: boolean }>(`/users/${id}/pin`, {
@@ -354,7 +359,7 @@ export const api = {
       return resp.blob();
     },
   },
-  setup: (data: { parent: { name: string; pin: string }; children: { name: string; theme: string }[]; chores: { title: string; icon: string; category: string; points_value: number }[] }) =>
+  setup: (data: { parent: { name: string; pin: string; color?: string }; children: { name: string; theme: string; color?: string }[]; chores: { title: string; icon: string; category: string; points_value: number }[] }) =>
     fetchPublic<{ admin: User; children: User[] }>('/setup', {
       method: 'POST',
       body: JSON.stringify(data),

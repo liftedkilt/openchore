@@ -1,0 +1,356 @@
+/* Pickers for the grown-up screens: icons, categories, people, skins, colours. */
+
+.srOnly {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.label {
+  composes: label from '../../styles/forms.module.css';
+  padding: 0;
+}
+
+.fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* A legend ignores the fieldset's gap. */
+.fieldset > legend {
+  margin-bottom: 8px;
+}
+
+.linkBtn {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ---------- icon well + picker ---------- */
+.well {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-well);
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+
+.well svg {
+  width: 22px;
+  height: 22px;
+}
+
+.iconPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.iconCurrent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.iconSummary {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 19px;
+  color: var(--ink-muted);
+}
+
+.iconGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 4px;
+  padding: var(--space-2);
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.iconOption {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.iconOption:hover {
+  background: var(--surface-sunk);
+}
+
+.iconOption[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.autoGlyph {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ---------- segmented radios (category) ---------- */
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 16px;
+  background: var(--surface-sunk);
+}
+
+.segment {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: max-content;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.segment:has(input:checked) {
+  background: var(--surface-raised);
+  box-shadow: var(--lift);
+}
+
+.segment:has(input:focus-visible),
+.doorOption:has(input:focus-visible) .door,
+.swatchOption:has(input:focus-visible) .swatch {
+  outline: 2.5px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.catLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* ---------- people ---------- */
+.personChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.personChip[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.person {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.personName {
+  font-weight: 650;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- skins (small door previews) ---------- */
+.doors {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.doorOption {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.door {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 8px 12px;
+  border-radius: var(--oc-radius-md);
+  border: var(--outline-w) solid var(--line);
+  box-shadow: var(--lift);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.doorOption:has(input:checked) .door {
+  box-shadow: 0 0 0 3px var(--surface-raised), 0 0 0 5.5px var(--ink);
+}
+
+.doorCheck {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 3px var(--surface-raised);
+}
+
+.doorCheck svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.75;
+}
+
+.doorOption:has(input:checked) .doorCaptionName {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+}
+
+.doorMarks {
+  display: flex;
+  gap: 5px;
+}
+
+.doorMarks svg {
+  width: 14px;
+  height: 14px;
+}
+
+.doorMarks svg * {
+  stroke-width: 2;
+}
+
+.doorMarks svg:not(:global(.is-done)) * {
+  fill: var(--mark-empty);
+}
+
+.doorName {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-variation-settings: var(--display-axes);
+  font-style: var(--display-italic);
+  letter-spacing: var(--display-tracking);
+  font-size: 17px;
+  line-height: 20px;
+}
+
+.doorCaption {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: center;
+}
+
+.doorCaptionName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.doorCaptionDesc {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+
+/* ---------- colour swatches ---------- */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.swatchOption {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+}
+
+.swatch {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--you);
+  color: var(--on-person);
+  box-sizing: border-box;
+}
+
+.swatch svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2.5;
+}
+
+.swatchOption:has(input:checked) .swatch {
+  box-shadow: 0 0 0 2.5px var(--surface-raised), 0 0 0 5px var(--ink);
+}

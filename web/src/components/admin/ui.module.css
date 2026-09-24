@@ -1,0 +1,571 @@
+/* The grown-up UI kit: page headers, cards, hairline lists, buttons, chips.
+ * House / House Dark tokens only; nothing here tests which theme it is in.
+ * Form fields compose from styles/forms.module.css.
+ */
+
+/* ---------- page + sections ---------- */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.pageHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.pageTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  font-size: var(--type-title-size);
+  line-height: var(--type-title-line);
+  color: var(--ink);
+}
+
+.pageSub {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.sectionDesc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+
+.sectionDesc code,
+.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--surface-sunk);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* The small uppercase label (like CategoryHeader) for sub-groups. */
+.eyebrow {
+  margin: 0;
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: var(--label-case);
+  color: var(--ink-muted);
+}
+
+/* CategoryHeader above a list: the section's gap does the spacing. */
+.section > .catHead {
+  margin: var(--space-2) 2px 0;
+}
+
+/* ---------- cards + lists ---------- */
+.card {
+  background: var(--surface-raised);
+  color: var(--ink);
+  border-radius: var(--r-row);
+  box-shadow: var(--lift);
+  padding: var(--space-4);
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.cardStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* A card of rows separated by hairlines. */
+.list {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-raised);
+  border-radius: var(--r-row);
+  box-shadow: var(--lift);
+  overflow: hidden;
+}
+
+.list > * + * {
+  border-top: 1px solid var(--line);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 60px;
+  padding: 10px var(--space-4);
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.rowWrap {
+  flex-wrap: wrap;
+}
+
+.rowMuted {
+  opacity: 0.6;
+}
+
+.rowMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* A row's main area as one big button (opens the editor). */
+.rowButton {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  margin: -6px 0;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 12px;
+}
+
+.rowTitle {
+  display: block;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 650;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.rowDesc {
+  display: block;
+  font-size: 13.5px;
+  line-height: 19px;
+  color: var(--ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.rowMeta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rowMeta svg {
+  width: 14px;
+  height: 14px;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+/* The icon well, as on a chore row. */
+.well {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-well);
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+
+.well svg {
+  width: 22px;
+  height: 22px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--r-btn);
+  background: var(--surface-sunk);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.btn svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btnPrimary {
+  composes: btn;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--lift);
+}
+
+.btnGhost {
+  composes: btn;
+  background: transparent;
+}
+
+.btnGhost:hover:not(:disabled) {
+  background: var(--surface-sunk);
+}
+
+.btnDanger {
+  composes: btn;
+  background: transparent;
+  color: var(--urgent);
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
+.iconBtn {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.iconBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+
+.iconBtn[aria-pressed="true"] {
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+
+.iconBtnDanger:hover:not(:disabled) {
+  color: var(--urgent);
+}
+
+.iconBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.actionsEnd {
+  composes: actions;
+  justify-content: flex-end;
+}
+
+/* ---------- chips + toggles ---------- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.chip[aria-pressed="true"],
+.chip[aria-checked="true"],
+.chipOn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+/* A chip that starts with an avatar. */
+.personChip {
+  composes: chip;
+  padding-left: 6px;
+}
+
+/* Checkbox chips (label + input). */
+.checkChip {
+  composes: chip;
+  gap: 8px;
+}
+
+.checkChip input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+/* ---------- badges + status ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--surface-sunk);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+.badgeWaiting {
+  composes: badge;
+  color: var(--waiting);
+}
+
+.badgeUrgent {
+  composes: badge;
+  color: var(--urgent);
+}
+
+.badgeOutline {
+  composes: badge;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink-muted);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--ink);
+}
+
+.dotOff {
+  composes: dot;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--ink-muted);
+}
+
+.dotError {
+  composes: dot;
+  background: var(--urgent);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  font-size: 15px;
+  color: var(--ink-muted);
+  background: var(--surface-raised);
+  border-radius: var(--r-row);
+  box-shadow: var(--lift);
+}
+
+.empty svg {
+  width: 32px;
+  height: 32px;
+  color: var(--ink);
+}
+
+.emptyInline {
+  margin: 0;
+  padding: var(--space-2) 0;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+.msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.msg svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.msgError {
+  composes: msg;
+  color: var(--urgent);
+}
+
+.msgWaiting {
+  composes: msg;
+  color: var(--waiting);
+}
+
+/* A quiet inset panel inside a card (sub-forms, details). */
+.inset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.divider {
+  height: 1px;
+  margin: 0;
+  border: 0;
+  background: var(--line);
+}
+
+/* ---------- form fields (shared kit) ---------- */
+.formGrid { composes: formGrid from '../../styles/forms.module.css'; }
+.formRow { composes: formRow from '../../styles/forms.module.css'; }
+.field { composes: formGroup from '../../styles/forms.module.css'; }
+.label { composes: label from '../../styles/forms.module.css'; }
+.help { composes: help from '../../styles/forms.module.css'; }
+.input { composes: input from '../../styles/forms.module.css'; }
+.check { composes: checkRow from '../../styles/forms.module.css'; }
+.checkLabel { composes: checkLabel from '../../styles/forms.module.css'; }
+
+.range {
+  flex: 1;
+  min-height: 44px;
+  accent-color: var(--accent);
+}
+
+.srOnlyText {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- motion ---------- */
+.spin {
+  animation: ui-spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
+@keyframes ui-spin {
+  to { transform: rotate(360deg); }
+}

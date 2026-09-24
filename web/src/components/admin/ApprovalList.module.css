@@ -1,0 +1,126 @@
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--r-row);
+  background: var(--surface-raised);
+  box-shadow: var(--lift);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.when {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.chore {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 21px;
+  font-weight: 650;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.photo {
+  position: relative;
+  display: block;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface-sunk);
+  aspect-ratio: 16 / 10;
+  max-height: 220px;
+}
+
+.photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photoHint {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--on-chip);
+  box-shadow: var(--lift);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.photoHint svg {
+  width: 15px;
+  height: 15px;
+}
+
+.ai {
+  display: flex;
+  gap: 10px;
+  padding: var(--space-3);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.ai > svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-top: 1px;
+}
+
+.aiLabel {
+  display: block;
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: var(--label-case);
+  color: var(--ink-muted);
+}
+
+.aiText {
+  margin: 2px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.actions > button:first-child {
+  flex: 1;
+}

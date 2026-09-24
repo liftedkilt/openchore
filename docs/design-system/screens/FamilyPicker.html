@@ -1,0 +1,111 @@
+<!-- @dsCard group="Screens" page width=1288 height=1620 subtitle="House by day, House Dark by night; every door opens into that person's own skin" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Family picker</title>
+<style>/*PVSTYLE*/
+.fp-all { width: 1288px; box-sizing: border-box; padding: 44px 56px 36px; display: flex; flex-direction: column; gap: 44px; }
+.fp-stage { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.fp-tab[data-theme="house-dark"] .fp-door:not(.fp-grown) { filter: brightness(.86) saturate(.9); }
+.fp-done { color: var(--ink); }
+.fp-tab { position: relative; width: 1176px; height: 716px; box-sizing: border-box; border-radius: 36px; background: var(--surface); box-shadow: var(--device); overflow: hidden; padding: 34px 44px 36px; font-family: var(--font-text); color: var(--ink); }
+.fp-top { display: flex; align-items: center; justify-content: space-between; }
+.fp-brand { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+.fp-logo { display: flex; }
+.fp-logo i { width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 2px var(--surface); }
+.fp-logo i + i { margin-left: -5px; }
+.fp-date { font-size: 14px; font-weight: 600; color: var(--ink-muted); }
+.fp-hero { margin: 26px 0 0; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: var(--display-tracking); font-size: 44px; line-height: 48px; }
+.fp-hero span { color: var(--ink-muted); }
+
+.fp-doors { margin-top: 26px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.fp-door { position: relative; height: 440px; box-sizing: border-box; border-radius: 28px; overflow: hidden; background: var(--surface); color: var(--ink); border: var(--outline-w) solid var(--line); box-shadow: var(--lift); font-family: var(--font-text); display: flex; flex-direction: column; align-items: center; padding: 30px 12px 0; }
+.fp-door .oc-device__glow { top: -250px; }
+.fp-name { position: relative; margin-top: 14px; font-family: var(--font-display); font-weight: var(--display-weight); font-variation-settings: var(--display-axes); letter-spacing: var(--display-tracking); font-size: 28px; line-height: 32px; }
+.fp-meta { position: relative; margin-top: 4px; font-size: 14px; font-weight: 600; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; }
+.fp-meta .oc-icon { width: 15px; height: 15px; color: var(--star); fill: var(--star); stroke-width: 1.5; }
+.fp-heroz { position: relative; margin: auto -12px 0; height: 210px; width: calc(100% + 24px); display: flex; align-items: center; justify-content: center; }
+.fp-heroz > .oc-prog { flex: none; width: 312px; transform: scale(var(--door-scale, .72)); }
+.fp-door[data-theme="blocks"] .fp-heroz > .oc-prog { --door-scale: .92; width: 262px; }
+.fp-door[data-theme="tint"] .fp-heroz > .oc-prog { --door-scale: .8; }
+.fp-door[data-theme="sunroom"] .fp-heroz > .oc-prog { --door-scale: .8; margin-top: 40px; }
+
+.fp-grown { background: transparent; box-shadow: none; border: 1.5px dashed var(--line); }
+.fp-stack { display: flex; }
+.fp-stack .oc-avatar + .oc-avatar { margin-left: -18px; box-shadow: 0 0 0 4px var(--surface); }
+.fp-grown .fp-name { display: flex; align-items: center; gap: 8px; font-size: 24px; }
+.fp-grown .fp-name .oc-icon { width: 20px; height: 20px; }
+.fp-todo { margin-top: auto; margin-bottom: 26px; width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.fp-todo span { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; border-radius: 14px; background: var(--surface-raised); font-size: 14px; font-weight: 600; }
+.fp-todo span .oc-icon { width: 18px; height: 18px; }
+.fp-todo .w { color: var(--waiting); }
+
+.fp-fam { margin-top: 20px; display: grid; grid-template-columns: auto repeat(4, 1fr); align-items: center; gap: 28px; background: var(--surface-raised); border-radius: 22px; padding: 6px 24px; box-shadow: var(--lift); }
+.fp-fam h3 { margin: 0; font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-muted); }
+.fp-fam .oc-member__n { width: auto; }
+</style></head>
+<body>
+<div id="root"></div>
+<script>
+/*HELPERS*/
+document.documentElement.style.background = document.body.style.background = 'var(--surface-sunk)';
+function day(done, total, cats, now) {
+  var at = [.04, .1, .17, .3, .4, .5, .56, .6, .63, .8, .9];
+  return { now: now, items: cats.slice(0, total).split('').map(function (c, i) {
+    return { cat: { e: 'essential', d: 'daily', b: 'bonus' }[c], done: i < done, at: at[i] };
+  }) };
+}
+var MODES = [
+  { theme: 'house', label: 'Day · House', note: 'Light on shared devices by day, and whenever a personal device is set to light.',
+    time: 'Thursday, September 24 · 4:15 pm', hello: 'Good afternoon.', check: '2 chores to check', gift: '1 reward to hand out',
+    people: [
+      { name: 'Emma', color: 'coral', skin: 'sunroom', left: '3 to go', pts: 240, d: day(6, 9, 'eeddddddb', .66) },
+      { name: 'Lily', color: 'mint', skin: 'tint', left: '2 to go', pts: 185, d: day(6, 8, 'eedddddb', .66) },
+      { name: 'Noah', color: 'butter', skin: 'blocks', left: '4 to go', pts: 85, d: day(3, 7, 'edeeddb', .66) }],
+    fam: [6, 9, 6, 8, 3, 7, 2, 3] },
+  { theme: 'house-dark', label: 'Night · House Dark', note: 'The wall tablet switches at 7:30 pm; phones follow their system setting. Doors dim with it, so no skin glares in a dark hallway.',
+    time: 'Thursday, September 24 · 8:40 pm', hello: 'Good evening.', check: '1 chore to check', gift: 'Nothing to hand out',
+    people: [
+      { name: 'Emma', color: 'coral', skin: 'sunroom', left: 'All done', pts: 275, d: day(9, 9, 'eeddddddb', .97) },
+      { name: 'Lily', color: 'mint', skin: 'tint', left: '1 to go', pts: 205, d: day(7, 8, 'eedddddb', .97) },
+      { name: 'Noah', color: 'butter', skin: 'blocks', left: 'All done', pts: 120, d: day(7, 7, 'edeeddb', .97) }],
+    fam: [9, 9, 7, 8, 7, 7, 3, 3] }
+];
+function Door(p) {
+  return h('div', { className: 'fp-door', 'data-theme': p.skin, 'data-person': p.color },
+    h('div', { className: 'oc-device__glow' }),
+    h(O.Avatar, { name: p.name, color: p.color, size: 'lg' }),
+    h('div', { className: 'fp-name' }, p.name),
+    h('div', { className: 'fp-meta' }, h('span', { className: p.left === 'All done' ? 'fp-done' : null }, p.left), ' · ', h(O.Icon, { name: 'star' }), p.pts),
+    h('div', { className: 'fp-heroz' }, h(O.DayProgress, { items: p.d.items, now: p.d.now })));
+}
+function Picker(m) {
+  var f = m.fam;
+  return h('div', { className: 'fp-stage' },
+    h('div', { className: 'fp-tab', 'data-theme': m.theme },
+      h('div', { className: 'fp-top' },
+        h('div', { className: 'fp-brand' },
+          h('span', { className: 'fp-logo' }, ['coral', 'mint', 'butter', 'sky'].map(function (c) { return h('i', { key: c, style: { background: 'var(--person-' + c + ')' } }); })),
+          'openchore'),
+        h('div', { className: 'fp-date' }, m.time)),
+      h('h1', { className: 'fp-hero' }, m.hello + ' ', h('span', null, "Who's here?")),
+      h('div', { className: 'fp-doors' },
+        m.people.map(function (p) { return h(Door, Object.assign({ key: p.name }, p)); }),
+        h('div', { className: 'fp-door fp-grown' },
+          h('span', { className: 'fp-stack' }, h(O.Avatar, { name: 'Alex', color: 'sky', size: 'lg' }), h(O.Avatar, { name: 'Jamie', size: 'lg' })),
+          h('div', { className: 'fp-name' }, h(O.Icon, { name: 'lock' }), 'Grown-ups'),
+          h('div', { className: 'fp-meta' }, 'PIN or linked account'),
+          h('div', { className: 'fp-todo' },
+            h('span', { className: 'w' }, h(O.Icon, { name: 'clock' }), m.check),
+            h('span', null, h(O.Icon, { name: 'gift' }), m.gift)))),
+      h('div', { className: 'fp-fam' },
+        h('h3', null, 'The family', h('br'), 'today'),
+        h(O.FamilyMember, { name: 'Emma', color: 'coral', done: f[0], total: f[1] }),
+        h(O.FamilyMember, { name: 'Lily', color: 'mint', done: f[2], total: f[3] }),
+        h(O.FamilyMember, { name: 'Noah', color: 'butter', done: f[4], total: f[5] }),
+        h(O.FamilyMember, { name: 'Alex', color: 'sky', done: f[6], total: f[7] }))),
+    h('div', { className: 'pv-cap' }, h('b', null, m.label), m.note));
+}
+mount(h('div', { className: 'fp-all' }, MODES.map(function (m) { return h(Picker, Object.assign({ key: m.theme }, m)); })));
+</script>
+</body>
+</html>

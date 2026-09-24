@@ -1,0 +1,89 @@
+/* A dialog in the person's skin. Tokens and dials only. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: color-mix(in srgb, var(--ink) 38%, transparent);
+}
+
+.panel {
+  width: 100%;
+  max-width: 560px;
+  max-height: min(92dvh, 92vh);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--surface);
+  color: var(--ink);
+  border: var(--outline-w) solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--oc-radius-xl) var(--oc-radius-xl) 0 0;
+  box-shadow: var(--lift-lg);
+  font-family: var(--font-text);
+  outline: none;
+}
+
+.grip {
+  width: 40px;
+  height: 4px;
+  margin: var(--space-2) auto 0;
+  border-radius: var(--oc-radius-pill);
+  background: var(--line);
+  flex: none;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-2) var(--space-5);
+  flex: none;
+}
+
+.title {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-variation-settings: var(--display-axes);
+  letter-spacing: var(--display-tracking);
+  font-size: var(--type-title-size);
+  line-height: var(--type-title-line);
+}
+
+.close {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--oc-radius-pill);
+  background: var(--surface-sunk);
+  color: var(--ink);
+  cursor: pointer;
+}
+.close svg { transform: rotate(45deg); }
+.close:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }
+
+.body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-2) var(--space-5) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 700px) {
+  .backdrop { align-items: center; padding: var(--space-5); }
+  .panel { border-radius: var(--oc-radius-xl); border-bottom: var(--outline-w) solid var(--line); max-height: 88vh; }
+  .grip { display: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .backdrop { animation: fade .18s ease both; }
+  .panel { animation: rise .24s cubic-bezier(.2, .8, .2, 1) both; }
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }

@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '../../api';
-import styles from '../../pages/AdminDashboard.module.css';
-import { Check, Camera, Volume2, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
+import { Loader2, X } from 'lucide-react';
+import { api } from '../../api';
+import { Icon } from '../../design';
+import ui from './ui.module.css';
+import styles from './AIChoreChecker.module.css';
+
+type Step = 'idle' | 'uploading' | 'analyzing' | 'generating_audio' | 'done' | 'error';
 
 export const AIChoreChecker: React.FC = () => {
   const { t } = useTranslation();
   const [choreTitle, setChoreTitle] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [step, setStep] = useState<'idle' | 'uploading' | 'analyzing' | 'generating_audio' | 'done' | 'error'>('idle');
+  const [step, setStep] = useState<Step>('idle');
   const [result, setResult] = useState<{
     complete: boolean;
     confidence: number;
@@ -49,8 +53,8 @@ export const AIChoreChecker: React.FC = () => {
       setResult(res);
 
       setStep('done');
-    } catch (err: any) {
-      setError(err.message || t('admin.aiChoreChecker.errorTestFailed'));
+    } catch (err: unknown) {
+      setError(err instanceof Error && err.message ? err.message : t('admin.aiChoreChecker.errorTestFailed'));
       setStep('error');
     }
   };
@@ -86,106 +90,110 @@ export const AIChoreChecker: React.FC = () => {
   const isWorking = step === 'uploading' || step === 'analyzing' || step === 'generating_audio';
 
   return (
-    <div className={styles.form}>
-      <div className={styles.formHeader}>
-        <h3>{t('admin.aiChoreChecker.heading')}</h3>
+    <div className={ui.page}>
+      <div className={ui.pageHead}>
+        <div>
+          <h2 className={ui.pageTitle}>{t('admin.aiChoreChecker.heading')}</h2>
+          <p className={ui.pageSub}>{t('admin.aiChoreChecker.description')}</p>
+        </div>
       </div>
-      <p className={styles.sectionDesc}>
-        {t('admin.aiChoreChecker.description')}
-      </p>
 
-      <form onSubmit={handleTest}>
-        <div className={styles.formGrid}>
-          <div className={styles.formGroup}>
-            <label className={styles.label}>{t('admin.aiChoreChecker.labelChoreName')}</label>
+      <div className={styles.layout}>
+        <form className={clsx(ui.card, ui.formGrid)} onSubmit={handleTest}>
+          <label className={ui.field}>
+            <span className={ui.label}>{t('admin.aiChoreChecker.labelChoreName')}</span>
             <input
-              className={styles.input}
+              className={ui.input}
               value={choreTitle}
               onChange={e => setChoreTitle(e.target.value)}
               placeholder={t('admin.aiChoreChecker.placeholderChoreName')}
               disabled={isWorking}
             />
-          </div>
+          </label>
 
-          <div className={styles.formGroup}>
-            <label className={styles.label}>{t('admin.aiChoreChecker.labelPhoto')}</label>
-            <label className={styles.photoUploadLabel} style={{ cursor: isWorking ? 'default' : 'pointer', opacity: isWorking ? 0.5 : 1 }}>
-              <Camera size={16} />
-              {photoFile ? photoFile.name : t('admin.aiChoreChecker.choosePhoto')}
-              <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} style={{ display: 'none' }} disabled={isWorking} />
+          <div className={ui.field}>
+            <span className={ui.label}>{t('admin.aiChoreChecker.labelPhoto')}</span>
+            <label className={clsx(styles.upload, isWorking && styles.uploadDisabled)}>
+              {photoPreview
+                ? <img src={photoPreview} alt={t('admin.aiChoreChecker.photoPreviewAlt')} />
+                : <Icon name="camera" />}
+              <span className={styles.uploadText}>{photoFile ? photoFile.name : t('admin.aiChoreChecker.choosePhoto')}</span>
+              <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className={ui.srOnlyText} disabled={isWorking} />
             </label>
           </div>
-        </div>
 
-        {photoPreview && (
-          <div className={styles.photoPreview}>
-            <img src={photoPreview} alt={t('admin.aiChoreChecker.photoPreviewAlt')} />
+          <div className={ui.actionsEnd}>
+            <button type="submit" className={ui.btnPrimary} disabled={!choreTitle || !photoFile || isWorking}>
+              {isWorking
+                ? <><Loader2 aria-hidden className={ui.spin} /> {t('admin.aiChoreChecker.buttonWorking')}</>
+                : <><Icon name="spark" /> {t('admin.aiChoreChecker.buttonTestReview')}</>}
+            </button>
           </div>
-        )}
+        </form>
 
-        <div className={styles.formActions}>
-          <button type="submit" className={styles.saveBtn} disabled={!choreTitle || !photoFile || isWorking}>
-            {isWorking ? <><Loader2 size={16} className={styles.spinning} /> {t('admin.aiChoreChecker.buttonWorking')}</> : t('admin.aiChoreChecker.buttonTestReview')}
-          </button>
-        </div>
-      </form>
+        <div className={styles.results} aria-live="polite">
+          {isWorking && (
+            <ol className={clsx(ui.card, styles.steps)}>
+              {stepLabels.map((s, i) => {
+                const isActive = s.key === step;
+                const isDone = i < activeStepIndex;
+                return (
+                  <li key={s.key} className={clsx(styles.step, isActive && styles.stepActive, isDone && styles.stepDone)}>
+                    {isActive ? <Loader2 aria-hidden className={ui.spin} /> : isDone ? <Icon name="check" /> : <span className={styles.stepDot} aria-hidden />}
+                    <span>{s.label}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
 
-      {isWorking && (
-        <div style={{ marginTop: '1rem' }}>
-          {stepLabels.map((s, i) => {
-            const isActive = s.key === step;
-            const isDone = i < activeStepIndex || step === 'done';
-            return (
-              <div key={s.key} className={styles.stepItem} style={{
-                color: isActive ? 'var(--color-primary, #38bdf8)' : isDone ? 'var(--text-secondary)' : 'var(--text-tertiary, rgba(255,255,255,0.3))',
-              }}>
-                {isActive ? <Loader2 size={14} className={styles.spinning} /> : isDone ? <Check size={14} /> : <div style={{ width: 14, height: 14 }} />}
-                <span>{s.label}</span>
+          {error && (
+            <p className={clsx(ui.card, ui.msgError)} role="alert">{error}</p>
+          )}
+
+          {result && step === 'done' && (
+            <div className={clsx(ui.card, styles.result)}>
+              <div className={styles.verdict}>
+                <span className={clsx(styles.verdictIcon, !result.complete && styles.verdictNo)} aria-hidden>
+                  {result.complete ? <Icon name="check" /> : <X />}
+                </span>
+                <span className={styles.verdictText}>
+                  {result.complete ? t('admin.aiChoreChecker.resultApproved') : t('admin.aiChoreChecker.resultRejected')}
+                </span>
+                <span className={styles.confidence}>
+                  {t('admin.aiChoreChecker.confidence', { value: (result.confidence * 100).toFixed(0) })}
+                </span>
               </div>
-            );
-          })}
+              <div className={styles.feedback}>
+                <p>{result.feedback}</p>
+                {result.feedback_audio ? (
+                  <button
+                    type="button"
+                    onClick={handlePlayAudio}
+                    disabled={playingAudio}
+                    className={ui.iconBtn}
+                    aria-label={t('admin.aiChoreChecker.ariaListenFeedback')}
+                    title={t('admin.aiChoreChecker.ariaListenFeedback')}
+                  >
+                    {playingAudio ? <Loader2 aria-hidden className={ui.spin} /> : <Icon name="sound" />}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleRetryAudio}
+                    disabled={retryingAudio}
+                    className={ui.iconBtn}
+                    aria-label={t('admin.aiChoreChecker.ariaGenerateAudio')}
+                    title={t('admin.aiChoreChecker.ariaGenerateAudio')}
+                  >
+                    {retryingAudio ? <Loader2 aria-hidden className={ui.spin} /> : <Icon name="sound" />}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-      )}
-
-      {error && (
-        <div className={clsx(styles.statusBox, styles.statusBoxError)}>
-          {error}
-        </div>
-      )}
-
-      {result && step === 'done' && (
-        <div className={clsx(styles.statusBox, result.complete ? styles.statusBoxSuccess : styles.statusBoxReject)}>
-          <div className={styles.flexRow} style={{ marginBottom: '0.5rem', fontWeight: 600 }}>
-            <span style={{ fontSize: '1.2rem' }}>{result.complete ? '✅' : '❌'}</span>
-            <span>{result.complete ? t('admin.aiChoreChecker.resultApproved') : t('admin.aiChoreChecker.resultRejected')}</span>
-            <span style={{ marginLeft: 'auto', fontWeight: 400, opacity: 0.7 }}>
-              {t('admin.aiChoreChecker.confidence', { value: (result.confidence * 100).toFixed(0) })}
-            </span>
-          </div>
-          <div className={styles.flexRow}>
-            <span style={{ flex: 1 }}>{result.feedback}</span>
-            {result.feedback_audio ? (
-              <button
-                onClick={handlePlayAudio}
-                disabled={playingAudio}
-                className={styles.audioPlayBtn}
-                aria-label={t('admin.aiChoreChecker.ariaListenFeedback')}
-              >
-                {playingAudio ? <Loader2 size={16} className={styles.spinning} /> : <Volume2 size={16} />}
-              </button>
-            ) : (
-              <button
-                onClick={handleRetryAudio}
-                disabled={retryingAudio}
-                className={styles.audioPlayBtn}
-                aria-label={t('admin.aiChoreChecker.ariaGenerateAudio')}
-              >
-                {retryingAudio ? <Loader2 size={16} className={styles.spinning} /> : <Volume2 size={16} />}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 };

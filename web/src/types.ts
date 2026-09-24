@@ -1,10 +1,10 @@
-export type Theme = 'default' | 'quest' | 'galaxy' | 'forest';
+// A person's skin (users.theme). An empty theme resolves by age on the client.
+export type Theme = 'sunroom' | 'blocks' | 'tint';
 
-export interface CategoryLabels {
-  required: string;
-  core: string;
-  bonus: string;
-}
+// A person's colour key (users.color). Each theme defines its own shade.
+export type PersonColor = 'coral' | 'mint' | 'butter' | 'sky' | 'rose' | 'leaf' | 'lilac' | 'sand';
+
+export const PERSON_COLORS: readonly PersonColor[] = ['coral', 'mint', 'butter', 'sky', 'rose', 'leaf', 'lilac', 'sand'];
 
 export interface SoundDef {
   notes: { freq: number; duration: number; delay: number }[];
@@ -12,39 +12,19 @@ export interface SoundDef {
   gain: number;
 }
 
+// What a skin may change about feedback. Words, categories and greetings are
+// shared by every skin (design i18n); only sounds and the buzz differ.
 export interface ThemeConfig {
-  labels: CategoryLabels;
-  categoryIcons: { required: string; core: string; bonus: string };
-  greetings: { morning: string; afternoon: string; evening: string };
-  messages: {
-    choreComplete: string;
-    allDone: string;
-    empty: string;
-    streakLabel: string;
-  };
-  confettiColors: string[];
   sounds: {
     complete: SoundDef;
     allDone: SoundDef;
   };
+  /** navigator.vibrate pattern on finishing a chore. */
+  vibrate: number | number[];
 }
 
 export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
-  default: {
-    labels: { required: 'Essentials', core: 'Dailies', bonus: 'Bonus' },
-    categoryIcons: { required: 'shield-check', core: 'circle-check', bonus: 'sparkles' },
-    greetings: {
-      morning: 'Good morning',
-      afternoon: 'Good afternoon',
-      evening: 'Good evening',
-    },
-    messages: {
-      choreComplete: 'Nice work!',
-      allDone: 'All done!',
-      empty: 'No chores assigned for this period.',
-      streakLabel: 'Streak',
-    },
-    confettiColors: ['#38bdf8', '#34d399', '#f472b6', '#a78bfa'],
+  sunroom: {
     sounds: {
       complete: {
         notes: [
@@ -65,22 +45,9 @@ export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
         gain: 0.15,
       },
     },
+    vibrate: 50,
   },
-  quest: {
-    labels: { required: 'Main Quest', core: 'Side Quest', bonus: 'Loot' },
-    categoryIcons: { required: 'swords', core: 'scroll', bonus: 'coins' },
-    greetings: {
-      morning: 'Rise and shine',
-      afternoon: 'Ready for adventure',
-      evening: 'Good eve',
-    },
-    messages: {
-      choreComplete: 'Quest complete!',
-      allDone: 'All quests conquered!',
-      empty: 'No quests today, hero. Rest well.',
-      streakLabel: 'Quest Chain',
-    },
-    confettiColors: ['#fbbf24', '#f97316', '#dc2626', '#a3e635'],
+  blocks: {
     sounds: {
       complete: {
         notes: [
@@ -104,22 +71,9 @@ export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
         gain: 0.12,
       },
     },
+    vibrate: [30, 40, 30],
   },
-  galaxy: {
-    labels: { required: 'Critical Mission', core: 'Star Tasks', bonus: 'Discovery' },
-    categoryIcons: { required: 'rocket', core: 'orbit', bonus: 'telescope' },
-    greetings: {
-      morning: 'Systems online',
-      afternoon: 'Stellar afternoon',
-      evening: 'Starlight awaits',
-    },
-    messages: {
-      choreComplete: 'Mission accomplished!',
-      allDone: 'Galaxy explored!',
-      empty: 'Orbit is clear, cadet. Stand by.',
-      streakLabel: 'Light Years',
-    },
-    confettiColors: ['#a855f7', '#818cf8', '#38bdf8', '#d946ef'],
+  tint: {
     sounds: {
       complete: {
         notes: [
@@ -143,51 +97,9 @@ export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
         gain: 0.1,
       },
     },
-  },
-  forest: {
-    labels: { required: 'Roots', core: 'Branches', bonus: 'Leaves' },
-    categoryIcons: { required: 'tree-pine', core: 'sprout', bonus: 'leaf' },
-    greetings: {
-      morning: 'The forest stirs',
-      afternoon: 'The sun is high',
-      evening: 'Twilight falls',
-    },
-    messages: {
-      choreComplete: 'The forest grows!',
-      allDone: 'Forest cleared!',
-      empty: 'The grove is peaceful today.',
-      streakLabel: 'Growth Ring',
-    },
-    confettiColors: ['#4ade80', '#22c55e', '#84cc16', '#fcd34d'],
-    sounds: {
-      complete: {
-        notes: [
-          { freq: 784, duration: 0.1, delay: 0 },
-          { freq: 988, duration: 0.08, delay: 0.08 },
-          { freq: 1175, duration: 0.06, delay: 0.14 },
-        ],
-        waveform: 'sine',
-        gain: 0.08,
-      },
-      allDone: {
-        notes: [
-          { freq: 523, duration: 0.15, delay: 0 },
-          { freq: 659, duration: 0.12, delay: 0.12 },
-          { freq: 784, duration: 0.1, delay: 0.22 },
-          { freq: 988, duration: 0.12, delay: 0.3 },
-          { freq: 1175, duration: 0.25, delay: 0.4 },
-        ],
-        waveform: 'sine',
-        gain: 0.08,
-      },
-    },
+    vibrate: 40,
   },
 };
-
-// Backward compat alias
-export const THEME_LABELS: Record<Theme, CategoryLabels> = Object.fromEntries(
-  Object.entries(THEME_CONFIG).map(([k, v]) => [k, v.labels])
-) as Record<Theme, CategoryLabels>;
 
 export interface User {
   id: number;
@@ -197,6 +109,7 @@ export interface User {
   age?: number;
   theme: Theme;
   line_color?: string;
+  color?: PersonColor;
   paused: boolean;
   has_pin: boolean;
   // IDs of OIDC providers linked to this profile ("Continue with ...").
@@ -421,6 +334,12 @@ export interface PendingCompletion {
   photo_url: string;
   completion_date: string;
   completed_at: string;
+  // Who clicked "complete" (child_name is their name).
+  completed_by?: number;
+  category?: 'required' | 'core' | 'bonus';
+  icon?: string;
+  points_value?: number;
+  ai_feedback?: string;
 }
 
 export interface UserDecayConfig {

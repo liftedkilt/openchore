@@ -1,0 +1,31 @@
+/* Charts draw in the theme's tokens only: gridlines --line, axis text
+   --ink-muted, names and values --ink. Series carry their own colour. */
+.figure { margin: 0; min-width: 0; }
+.plot { width: 100%; min-width: 0; }
+.svg { display: block; overflow: visible; font-family: var(--font-text); }
+
+.legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0 0 var(--space-3); padding: 0; list-style: none; font-size: var(--type-meta-size); line-height: var(--type-meta-line); font-weight: 600; color: var(--ink); }
+.legend li { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+.grid { stroke: var(--line); stroke-width: 1; shape-rendering: crispEdges; }
+.axis { fill: var(--ink-muted); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.marker { stroke: var(--ink-muted); stroke-width: 1; stroke-dasharray: 3 4; }
+.line { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.area { opacity: .12; }
+.dot { stroke: var(--surface-raised); stroke-width: 2; }
+.endLabel { fill: var(--ink); font-size: 13px; font-weight: 700; }
+
+.col { fill: var(--ink-muted); }
+.colStrong { fill: var(--ink); }
+.colValue { fill: var(--ink); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* BarList */
+.barList { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.barRow { display: grid; grid-template-columns: minmax(96px, 36%) 1fr auto; align-items: center; gap: var(--space-3); min-height: 44px; }
+.barName { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.barText { display: flex; flex-direction: column; min-width: 0; }
+.barLabel { font-size: var(--type-body-size); line-height: var(--type-body-line); font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barNote { font-size: var(--type-meta-size); line-height: var(--type-meta-line); font-weight: 500; color: var(--ink-muted); }
+.barTrack { height: 10px; border-radius: var(--oc-radius-pill); background: var(--surface-sunk); overflow: hidden; }
+.barTrack i { display: block; height: 100%; border-radius: var(--oc-radius-pill); }
+.barValue { min-width: 3.5em; text-align: right; font-size: var(--type-meta-size); font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }

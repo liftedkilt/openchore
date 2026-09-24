@@ -88,6 +88,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 			r.Put("/users/{id}/theme", users.UpdateTheme)
 			r.Put("/users/{id}/avatar", users.UpdateAvatar)
 			r.Put("/users/{id}/line-color", users.UpdateLineColor)
+			r.Put("/users/{id}/color", users.UpdateColor)
 			r.Put("/users/{id}/pin", users.SetPin)
 			r.Delete("/users/{id}/pin", users.ClearPin)
 

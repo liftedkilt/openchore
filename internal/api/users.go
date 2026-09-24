@@ -57,6 +57,7 @@ type createUserRequest struct {
 	Role      string `json:"role"`
 	Age       *int   `json:"age"`
 	Theme     string `json:"theme"`
+	Color     string `json:"color"`
 	// Pin sets an initial profile PIN on create. Required for admin profiles,
 	// which must always have a PIN or a linked account.
 	Pin string `json:"pin"`
@@ -83,6 +84,10 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "pin must be 4-8 digits")
 		return
 	}
+	if msg := validateThemeAndColor(req.Theme, req.Color); msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
 	if req.Role == model.RoleAdmin && req.Pin == "" {
 		writeError(w, http.StatusBadRequest, "admin profiles need a pin")
 		return
@@ -94,6 +99,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Role:      req.Role,
 		Age:       req.Age,
 		Theme:     req.Theme,
+		Color:     req.Color, // empty: the store assigns the next free colour
 	}
 	if req.Pin != "" {
 		hash, err := bcrypt.GenerateFromPassword([]byte(req.Pin), bcrypt.DefaultCost)
@@ -131,6 +137,10 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	if msg := validateThemeAndColor(req.Theme, req.Color); msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
 	if req.Name != "" {
 		existing.Name = req.Name
 	}
@@ -166,6 +176,9 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Theme != "" {
 		existing.Theme = req.Theme
+	}
+	if req.Color != "" {
+		existing.Color = req.Color
 	}
 
 	if err := h.store.UpdateUser(r.Context(), existing); err != nil {
@@ -206,8 +219,7 @@ func (h *UserHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	validThemes := map[string]bool{"default": true, "quest": true, "galaxy": true, "forest": true}
-	if !validThemes[req.Theme] {
+	if !model.ValidTheme(req.Theme) {
 		writeError(w, http.StatusBadRequest, "invalid theme")
 		return
 	}
@@ -299,6 +311,59 @@ func (h *UserHandler) UpdateLineColor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, existing)
+}
+
+// UpdateColor sets the caller's own person colour (a key from
+// model.PersonColors). Admins change other people's colour via Update.
+func (h *UserHandler) UpdateColor(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+
+	caller := UserFromContext(r.Context())
+	if caller.ID != id {
+		writeError(w, http.StatusForbidden, "can only update your own color")
+		return
+	}
+
+	var req struct {
+		Color string `json:"color"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if !model.ValidPersonColor(req.Color) {
+		writeError(w, http.StatusBadRequest, "invalid color")
+		return
+	}
+
+	existing, err := h.store.GetUser(r.Context(), id)
+	if err != nil || existing == nil {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	existing.Color = req.Color
+	if err := h.store.UpdateUser(r.Context(), existing); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to update color")
+		return
+	}
+	writeJSON(w, http.StatusOK, existing)
+}
+
+// validateThemeAndColor checks optional theme/color fields on create and
+// update requests. Empty values are allowed (they mean "leave as is" or
+// "assign a default"). It returns an error message, or "" when valid.
+func validateThemeAndColor(theme, color string) string {
+	if theme != "" && !model.ValidTheme(theme) {
+		return "invalid theme"
+	}
+	if color != "" && !model.ValidPersonColor(color) {
+		return "invalid color"
+	}
+	return ""
 }
 
 func (h *UserHandler) Pause(w http.ResponseWriter, r *http.Request) {

@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import type { User, PointBalance } from '../../types';
-import styles from '../../pages/AdminDashboard.module.css';
-import { Save, Star } from 'lucide-react';
+import { Avatar, Icon } from '../../design';
+import { personColor } from './pickers';
+import ui from './ui.module.css';
+import styles from './PointsTab.module.css';
 
 export const PointsTab: React.FC = () => {
   const { t } = useTranslation();
-  const [balances, setBalances] = useState<(PointBalance & { name: string })[]>([]);
-  const [, setUsers] = useState<User[]>([]);
+  const [balances, setBalances] = useState<{ user: User; balance: number }[]>([]);
   const [adjustUser, setAdjustUser] = useState<number | null>(null);
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustNote, setAdjustNote] = useState('');
@@ -17,20 +18,20 @@ export const PointsTab: React.FC = () => {
   const load = useCallback(async () => {
     const [bals, usrs] = await Promise.all([api.points.getAllBalances(), api.users.list()]);
     // Parents take part too, so everyone has a balance.
-    const children = usrs;
-    setUsers(children);
-    setBalances(children.map(u => {
-      const b = bals.find((b: PointBalance) => b.user_id === u.id);
-      return { user_id: u.id, balance: b?.balance || 0, name: u.name };
-    }));
+    setBalances(usrs.map(u => ({
+      user: u,
+      balance: bals.find((b: PointBalance) => b.user_id === u.id)?.balance || 0,
+    })));
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const handleAdjust = async () => {
+  const handleAdjust = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!adjustUser || !adjustAmount) return;
     setSaving(true);
     try {
+      // Every change is written to point_transactions by the API.
       await api.points.adjust(adjustUser, parseInt(adjustAmount), adjustNote || 'Admin adjustment');
       setAdjustUser(null);
       setAdjustAmount('');
@@ -43,54 +44,71 @@ export const PointsTab: React.FC = () => {
   };
 
   return (
-    <div>
-      <h2 className={styles.sectionTitle}>{t('admin.pointsTab.heading')}</h2>
+    <div className={ui.page}>
+      <div className={ui.pageHead}>
+        <div>
+          <h2 className={ui.pageTitle}>{t('admin.pointsTab.heading')}</h2>
+          <p className={ui.pageSub}>{t('admin.pointsTab.subtitle')}</p>
+        </div>
+      </div>
 
-      <div className={styles.balanceGrid}>
-        {balances.map(b => (
-          <div key={b.user_id} className={styles.balanceCard}>
-            <div className={styles.balanceName}>{b.name}</div>
-            <div className={styles.balanceAmount}>
-              <Star size={16} className={styles.balanceIcon} />
-              {b.balance}
-            </div>
-            <button
-              className={styles.adjustBtn}
-              onClick={() => setAdjustUser(adjustUser === b.user_id ? null : b.user_id)}
-            >
-              {adjustUser === b.user_id ? t('admin.pointsTab.cancelButton') : t('admin.pointsTab.adjustButton')}
-            </button>
-
-            {adjustUser === b.user_id && (
-              <div className={styles.adjustForm}>
-                <div className={styles.formRow}>
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>{t('admin.pointsTab.amountLabel')}</label>
-                    <input
-                      className={styles.input}
-                      type="number"
-                      value={adjustAmount}
-                      onChange={e => setAdjustAmount(e.target.value)}
-                      placeholder={t('admin.pointsTab.amountPlaceholder')}
-                    />
-                  </div>
-                  <div className={styles.formGroup} style={{ flex: 2 }}>
-                    <label className={styles.label}>{t('admin.pointsTab.reasonLabel')}</label>
-                    <input
-                      className={styles.input}
-                      value={adjustNote}
-                      onChange={e => setAdjustNote(e.target.value)}
-                      placeholder={t('admin.pointsTab.reasonPlaceholder')}
-                    />
-                  </div>
-                </div>
-                <button className={styles.btnPrimary} onClick={handleAdjust} disabled={saving || !adjustAmount}>
-                  <Save size={14} /> {t('admin.pointsTab.applyButton')}
-                </button>
+      <div className={ui.grid}>
+        {balances.map(({ user, balance }) => {
+          const open = adjustUser === user.id;
+          const formId = `adjust-${user.id}`;
+          return (
+            <div key={user.id} className={ui.card} data-person={personColor(user)}>
+              <div className={styles.head}>
+                <Avatar name={user.name} color={personColor(user)} size="md" />
+                <span className={styles.name}>{user.name}</span>
+                <span className={styles.balance}>
+                  <Icon name="star" fill />
+                  <span aria-hidden>{balance}</span>
+                  <span className={ui.srOnlyText}>{t('design.points.label', { count: balance })}</span>
+                </span>
               </div>
-            )}
-          </div>
-        ))}
+              <button
+                type="button"
+                className={ui.btnGhost}
+                aria-expanded={open}
+                aria-controls={formId}
+                onClick={() => setAdjustUser(open ? null : user.id)}
+              >
+                {open ? t('admin.pointsTab.cancelButton') : t('admin.pointsTab.adjustButton')}
+              </button>
+
+              {open && (
+                <form id={formId} className={styles.form} onSubmit={handleAdjust}>
+                  <div className={ui.formRow}>
+                    <label className={ui.field}>
+                      <span className={ui.label}>{t('admin.pointsTab.amountLabel')}</span>
+                      <input
+                        className={ui.input}
+                        type="number"
+                        value={adjustAmount}
+                        onChange={e => setAdjustAmount(e.target.value)}
+                        placeholder={t('admin.pointsTab.amountPlaceholder')}
+                        autoFocus
+                      />
+                    </label>
+                    <label className={ui.field}>
+                      <span className={ui.label}>{t('admin.pointsTab.reasonLabel')}</span>
+                      <input
+                        className={ui.input}
+                        value={adjustNote}
+                        onChange={e => setAdjustNote(e.target.value)}
+                        placeholder={t('admin.pointsTab.reasonPlaceholder')}
+                      />
+                    </label>
+                  </div>
+                  <button type="submit" className={ui.btnPrimary} disabled={saving || !adjustAmount}>
+                    <Icon name="check" /> {t('admin.pointsTab.applyButton')}
+                  </button>
+                </form>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

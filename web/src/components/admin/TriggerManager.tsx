@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
+import { Trash2, Pencil, X, Pause, Play, Link2, Copy } from 'lucide-react';
 import { api } from '../../api';
 import type { User, ChoreTrigger } from '../../types';
-import styles from '../../pages/AdminDashboard.module.css';
-import { Plus, Trash2, Edit2, X, Save, Check, Pause, Play, Link2, Copy } from 'lucide-react';
-import clsx from 'clsx';
+import { Icon } from '../../design';
+import ui from './ui.module.css';
+import styles from './managers.module.css';
 
 export const TriggerManager: React.FC<{
   choreId: number;
@@ -73,6 +75,7 @@ export const TriggerManager: React.FC<{
   };
 
   const startEdit = (trigger: ChoreTrigger) => {
+    setAdding(false);
     setEditingId(trigger.id);
     setDefaultAssignedTo(trigger.default_assigned_to ?? '');
     setDefaultDueBy(trigger.default_due_by ?? '');
@@ -99,122 +102,138 @@ export const TriggerManager: React.FC<{
   const getUserName = (id: number) => users.find(u => u.id === id)?.name || `User ${id}`;
 
   const triggerForm = (
-    <div className={styles.scheduleForm}>
-      <div className={styles.formGroup}>
-        <label className={styles.label}>{t('admin.triggerManager.assignmentTypeLabel')}</label>
-        <select className={styles.input} value={assignmentType} onChange={e => setAssignmentType(e.target.value)}>
+    <>
+      <label className={ui.field}>
+        <span className={ui.label}>{t('admin.triggerManager.assignmentTypeLabel')}</span>
+        <select className={ui.input} value={assignmentType} onChange={e => setAssignmentType(e.target.value)}>
           <option value="individual">{t('admin.triggerManager.assignmentTypeIndividual')}</option>
           <option value="fcfs">{t('admin.triggerManager.assignmentTypeFcfs')}</option>
         </select>
-        <span className={styles.helpText}>
+        <span className={ui.help}>
           {assignmentType === 'fcfs' ? t('admin.triggerManager.helpFcfs') : t('admin.triggerManager.helpIndividual')}
         </span>
-      </div>
+      </label>
       {assignmentType !== 'fcfs' && (
-        <div className={styles.formGroup}>
-          <label className={styles.label}>{t('admin.triggerManager.defaultAssignedToLabel')}</label>
-          <select className={styles.input} value={defaultAssignedTo} onChange={e => setDefaultAssignedTo(e.target.value ? Number(e.target.value) : '')}>
+        <label className={ui.field}>
+          <span className={ui.label}>{t('admin.triggerManager.defaultAssignedToLabel')}</span>
+          <select className={ui.input} value={defaultAssignedTo} onChange={e => setDefaultAssignedTo(e.target.value ? Number(e.target.value) : '')}>
             <option value="">{t('admin.triggerManager.defaultAssignedToNone')}</option>
             {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
-        </div>
+        </label>
       )}
-      <div className={styles.formRow}>
-        <div className={styles.formGroup}>
-          <label className={styles.label}>{t('admin.triggerManager.defaultAvailableAtLabel')}</label>
-          <input className={styles.input} type="time" value={defaultAvailableAt} onChange={e => setDefaultAvailableAt(e.target.value)} />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.label}>{t('admin.triggerManager.defaultDueByLabel')}</label>
-          <input className={styles.input} type="time" value={defaultDueBy} onChange={e => setDefaultDueBy(e.target.value)} />
-        </div>
+      <div className={ui.formRow}>
+        <label className={ui.field}>
+          <span className={ui.label}>{t('admin.triggerManager.defaultAvailableAtLabel')}</span>
+          <input className={ui.input} type="time" value={defaultAvailableAt} onChange={e => setDefaultAvailableAt(e.target.value)} />
+        </label>
+        <label className={ui.field}>
+          <span className={ui.label}>{t('admin.triggerManager.defaultDueByLabel')}</span>
+          <input className={ui.input} type="time" value={defaultDueBy} onChange={e => setDefaultDueBy(e.target.value)} />
+        </label>
       </div>
-      <div className={styles.formGroup}>
-        <label className={styles.label}>{t('admin.triggerManager.cooldownLabel')}</label>
-        <input className={styles.input} type="number" min="0" value={cooldownMinutes} onChange={e => setCooldownMinutes(e.target.value)} />
-        <span className={styles.helpText}>{t('admin.triggerManager.cooldownHelp')}</span>
-      </div>
-    </div>
+      <label className={ui.field}>
+        <span className={ui.label}>{t('admin.triggerManager.cooldownLabel')}</span>
+        <input className={ui.input} type="number" min="0" value={cooldownMinutes} onChange={e => setCooldownMinutes(e.target.value)} />
+        <span className={ui.help}>{t('admin.triggerManager.cooldownHelp')}</span>
+      </label>
+    </>
   );
 
   return (
-    <div className={styles.scheduleSection}>
-      <div className={styles.scheduleHeader}>
-        <span className={styles.scheduleTitle}><Link2 size={14} /> {t('admin.triggerManager.sectionTitle')}</span>
-        <button className={styles.addBtnSmall} onClick={() => { setAdding(!adding); setEditingId(null); if (!adding) resetForm(); }}>
-          {adding ? <X size={14} /> : <Plus size={14} />}
+    <section className={styles.manager}>
+      <div className={ui.sectionHead}>
+        <h3 className={ui.sectionTitle}><Link2 aria-hidden className={styles.titleIcon} /> {t('admin.triggerManager.sectionTitle')}</h3>
+        <button
+          type="button"
+          className={ui.btnGhost}
+          aria-expanded={adding}
+          onClick={() => { setAdding(!adding); setEditingId(null); if (!adding) resetForm(); }}
+        >
+          {adding ? <X aria-hidden /> : <Icon name="plus" />}
+          {adding ? t('admin.triggerManager.cancelBtn') : t('admin.triggerManager.addBtn')}
         </button>
       </div>
 
       {adding && (
-        <>
+        <div className={ui.inset}>
           {triggerForm}
-          <button className={styles.saveBtn} onClick={handleAdd}>
-            <Save size={14} /> {t('admin.triggerManager.createTriggerBtn')}
-          </button>
-        </>
+          <div className={ui.actionsEnd}>
+            <button type="button" className={ui.btnPrimary} onClick={handleAdd}>
+              <Icon name="check" /> {t('admin.triggerManager.createTriggerBtn')}
+            </button>
+          </div>
+        </div>
       )}
 
-      <div className={styles.scheduleList}>
-        {triggers.length === 0 && !adding && (
-          <p className={styles.helpText} style={{ padding: '0.5rem 0' }}>{t('admin.triggerManager.emptyState')}</p>
-        )}
-        {triggers.map(trigger => (
-          <div key={trigger.id} className={styles.scheduleItem} style={{ opacity: trigger.enabled ? 1 : 0.5 }}>
-            {editingId === trigger.id ? (
-              <>
+      {triggers.length === 0 && !adding && (
+        <p className={ui.emptyInline}>{t('admin.triggerManager.emptyState')}</p>
+      )}
+      {triggers.length > 0 && (
+        <div className={styles.list}>
+          {triggers.map(trigger => (
+            editingId === trigger.id ? (
+              <div key={trigger.id} className={ui.inset}>
                 {triggerForm}
-                <div className={styles.scheduleItemActions}>
-                  <button className={styles.saveBtn} onClick={() => handleUpdate(trigger.id)}>
-                    <Save size={14} /> {t('admin.triggerManager.saveBtn')}
+                <div className={ui.actionsEnd}>
+                  <button type="button" className={ui.btnGhost} onClick={() => { setEditingId(null); resetForm(); }}>
+                    {t('admin.triggerManager.cancelBtn')}
                   </button>
-                  <button className={styles.iconBtn} onClick={() => { setEditingId(null); resetForm(); }}>
-                    <X size={14} />
+                  <button type="button" className={ui.btnPrimary} onClick={() => handleUpdate(trigger.id)}>
+                    <Icon name="check" /> {t('admin.triggerManager.saveBtn')}
                   </button>
                 </div>
-              </>
+              </div>
             ) : (
-              <>
-                <div className={styles.triggerInfo}>
-                  <code className={styles.triggerUrl} onClick={() => copyUrl(trigger.uuid, trigger.id)} title={t('admin.triggerManager.clickToCopy')}>
-                    /api/hooks/trigger/{trigger.uuid.substring(0, 8)}...
-                  </code>
-                  <div className={styles.listItemMeta}>
-                    {trigger.assignment_type === 'fcfs' && <span className={styles.fcfsBadge}>FCFS</span>}
+              <div key={trigger.id} className={clsx(styles.item, !trigger.enabled && ui.rowMuted)}>
+                <div className={ui.rowMain}>
+                  <button
+                    type="button"
+                    className={styles.url}
+                    onClick={() => copyUrl(trigger.uuid, trigger.id)}
+                    title={t('admin.triggerManager.clickToCopy')}
+                  >
+                    /api/hooks/trigger/{trigger.uuid.substring(0, 8)}…
+                  </button>
+                  <div className={ui.rowMeta}>
+                    {trigger.assignment_type === 'fcfs' && <span className={ui.badge}>FCFS</span>}
                     {trigger.default_assigned_to && <span>{t('admin.triggerManager.metaAssigned', { name: getUserName(trigger.default_assigned_to) })}</span>}
                     {trigger.default_due_by && <span>{t('admin.triggerManager.metaDue', { time: trigger.default_due_by })}</span>}
                     {trigger.cooldown_minutes > 0 && <span>{t('admin.triggerManager.metaCooldown', { minutes: trigger.cooldown_minutes })}</span>}
+                    {!trigger.enabled && <span className={ui.badgeOutline}>{t('admin.triggerManager.paused')}</span>}
                   </div>
                 </div>
-                <div className={styles.scheduleItemActions}>
+                <div className={ui.rowActions}>
                   <button
-                    className={styles.iconBtn}
+                    type="button"
+                    className={ui.iconBtn}
                     title={t('admin.triggerManager.copyUrlTitle')}
                     aria-label={t('admin.triggerManager.copyUrlAriaLabel')}
                     onClick={() => copyUrl(trigger.uuid, trigger.id)}
                   >
-                    {copied === trigger.id ? <Check size={14} /> : <Copy size={14} />}
+                    {copied === trigger.id ? <Icon name="check" /> : <Copy aria-hidden />}
                   </button>
                   <button
-                    className={styles.iconBtn}
+                    type="button"
+                    className={ui.iconBtn}
                     title={trigger.enabled ? t('admin.triggerManager.disableTitle') : t('admin.triggerManager.enableTitle')}
                     aria-label={trigger.enabled ? t('admin.triggerManager.disableAriaLabel') : t('admin.triggerManager.enableAriaLabel')}
                     onClick={() => handleToggle(trigger)}
                   >
-                    {trigger.enabled ? <Pause size={14} /> : <Play size={14} />}
+                    {trigger.enabled ? <Pause aria-hidden /> : <Play aria-hidden />}
                   </button>
-                  <button className={styles.iconBtn} title={t('admin.triggerManager.editTitle')} aria-label={t('admin.triggerManager.editAriaLabel')} onClick={() => startEdit(trigger)}>
-                    <Edit2 size={14} />
+                  <button type="button" className={ui.iconBtn} title={t('admin.triggerManager.editTitle')} aria-label={t('admin.triggerManager.editAriaLabel')} onClick={() => startEdit(trigger)}>
+                    <Pencil aria-hidden />
                   </button>
-                  <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} title={t('admin.triggerManager.deleteTitle')} aria-label={t('admin.triggerManager.deleteAriaLabel')} onClick={() => handleDelete(trigger.id)}>
-                    <Trash2 size={14} />
+                  <button type="button" className={clsx(ui.iconBtn, ui.iconBtnDanger)} title={t('admin.triggerManager.deleteTitle')} aria-label={t('admin.triggerManager.deleteAriaLabel')} onClick={() => handleDelete(trigger.id)}>
+                    <Trash2 aria-hidden />
                   </button>
                 </div>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
+              </div>
+            )
+          ))}
+        </div>
+      )}
+    </section>
   );
 };

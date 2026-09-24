@@ -12,8 +12,9 @@ test.describe('Parents acting for kids', () => {
   test('a parent can mark a kid\'s chore done and undo it from the Kids tab', async ({ page }) => {
     await loginAsAdmin(page);
 
-    // The card button's name starts with the avatar initial ("N Noah ...").
-    await page.getByRole('button', { name: new RegExp(`^. ${KID} `) }).click();
+    // The card button's name starts with the person's name ("Noah …"); the
+    // avatar initial is decorative (aria-hidden).
+    await page.getByRole('button', { name: new RegExp(`^${KID}\\b`) }).click();
     const markDone = page.getByRole('button', { name: `Mark "${CHORE}" done for ${KID}` });
     const undo = page.getByRole('button', { name: `Undo "${CHORE}" for ${KID}` });
 
@@ -61,6 +62,8 @@ test.describe('Parents acting for kids', () => {
 test.describe('Linked accounts', () => {
   test('profile menu explains when no sign-in providers are configured', async ({ page }) => {
     await selectUser(page, 'Emma');
+    // Linked accounts live in the "Me" sheet, opened from the avatar.
+    await page.getByRole('button', { name: 'Emma: settings' }).click();
     await page.getByRole('button', { name: 'Linked accounts' }).click();
     await expect(page.getByText('No sign-in providers are configured on this server.')).toBeVisible();
   });
