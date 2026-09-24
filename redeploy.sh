@@ -7,12 +7,12 @@ PROFILE=""
 for arg in "$@"; do
   case "$arg" in
     --wipe) WIPE=true ;;
-    --ai) PROFILE="--profile ai" ;;
+    --ai) PROFILE="--profile ai --profile tts" ;;
     -h|--help)
       echo "Usage: ./redeploy.sh [--wipe] [--ai]"
       echo ""
       echo "  --wipe  Remove volumes (database) before redeploying"
-      echo "  --ai    Include AI sidecars (LiteRT + Kokoro TTS)"
+      echo "  --ai    Include the AI sidecars (llama.cpp + Kokoro TTS; see docs/ai.md)"
       exit 0
       ;;
     *)

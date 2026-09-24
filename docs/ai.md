@@ -8,7 +8,7 @@ still checked by a parent.
 |---------|-------|--------------|
 | Photo review | a vision model | Adds a note to photo chores waiting in **Approvals** ("Bed is made, pillows on the floor"). Can approve clear passes for you. |
 | Weekly summaries | a text model | Writes up each person's week. Shown in Reports, and each Monday shared via Discord and the `report.weekly_summary` webhook. |
-| Description drafts | a text model | The ✨ button in the new-chore wizard writes a short, kid-friendly description. |
+| Description drafts | a text model | The **AI** button next to Description in the new-chore wizard writes a short, kid-friendly description. |
 | Recorded voices | a speech service | Records each chore's title and description in a natural voice, instead of the browser's built-in one. |
 
 ## The AI only advises
@@ -16,7 +16,8 @@ still checked by a parent.
 Photo review never rejects a chore and never keeps a kid waiting. The kid
 finishes the chore, it goes to **Approvals** like any chore that needs
 approval, and the review runs in the background. When it's done, its note
-appears next to the photo and you decide.
+appears on the chore's card in Approvals ("AI: looks done · 92% sure", then
+the model's note) and you decide. Kids never see it.
 
 If you turn on **Approve clear passes automatically**, a chore the model is
 confident is done (at or above the threshold you set) is approved for you,
