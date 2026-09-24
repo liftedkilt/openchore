@@ -35,14 +35,6 @@ const AUTH_ERROR_KEYS: Record<string, string> = {
 
 const isLocked = (u: User) => u.has_pin || u.auth_providers.length > 0;
 
-/**
- * The strip repeats every name the doors already show. A trailing word joiner
- * (invisible, never read aloud) keeps each door the only element whose text is
- * exactly the person's name, which is how name lookups (and the e2e helpers)
- * find the way in.
- */
-const stripName = (name: string) => `${name}⁠`;
-
 /** A person's avatar: their photo when they have one, else their initial. */
 function PersonAvatar({ user, size = 'md', className }: { user: User; size?: AvatarSize; className?: string }) {
   const [broken, setBroken] = useState(false);
@@ -443,7 +435,7 @@ export const ProfileSelection: React.FC = () => {
             {strip.map(u => (
               <FamilyMember
                 key={u.id}
-                name={stripName(u.name)}
+                name={u.name}
                 color={u.color}
                 done={today[u.id].done}
                 total={today[u.id].total}

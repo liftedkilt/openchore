@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { profileButton } from './helpers/setup';
 
 test.describe('Profile Selection', () => {
   test('redirects to /login when no user selected', async ({ page }) => {
@@ -8,16 +9,16 @@ test.describe('Profile Selection', () => {
 
   test('shows all seeded users', async ({ page }) => {
     await page.goto('/login');
-    await expect(page.getByText('Emma', { exact: true })).toBeVisible();
-    await expect(page.getByText('Lily', { exact: true })).toBeVisible();
-    await expect(page.getByText('Noah', { exact: true })).toBeVisible();
-    await expect(page.getByText('Alex', { exact: true })).toBeVisible();
-    await expect(page.getByText('Jamie', { exact: true })).toBeVisible();
+    await expect(profileButton(page, 'Emma')).toBeVisible();
+    await expect(profileButton(page, 'Lily')).toBeVisible();
+    await expect(profileButton(page, 'Noah')).toBeVisible();
+    await expect(profileButton(page, 'Alex')).toBeVisible();
+    await expect(profileButton(page, 'Jamie')).toBeVisible();
   });
 
   test('selecting a child navigates to dashboard', async ({ page }) => {
     await page.goto('/login');
-    await page.getByText('Emma', { exact: true }).click();
+    await profileButton(page, 'Emma').click();
     await expect(page).toHaveURL('/');
     // Dashboard should show chore content
     await expect(page.locator('body')).not.toContainText('Who\'s here?');
