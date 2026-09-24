@@ -1,56 +1,61 @@
+/* Linked accounts dialog. Tokens only: it takes the theme of whoever opens it
+   (a kid's skin from their profile menu, House from the People tab). */
+
 .body {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: var(--space-3);
 }
 
 .hint {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  line-height: 1.5;
+  color: var(--ink-muted);
+  font-size: 15px;
+  line-height: 22px;
 }
 
 .empty {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  font-style: italic;
+  color: var(--ink-muted);
+  font-size: 14px;
 }
 
 .list {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
   padding: 0;
   margin: 0;
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.list > * + * {
+  border-top: 1px solid var(--line);
 }
 
 .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
+  gap: var(--space-3);
+  padding: 10px 10px 10px var(--space-4);
 }
 
 .provider {
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--ink);
 }
 
 .detail {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+  font-size: 13px;
+  color: var(--ink-muted);
   overflow-wrap: anywhere;
 }
 
 .linkButtons {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .linkBtn,
@@ -59,46 +64,39 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  padding: 0.6rem 1rem;
-  border-radius: 12px;
-  font-weight: 600;
-  font-size: 0.9rem;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--r-btn, 999px);
+  font-family: var(--font-text);
+  font-weight: 700;
+  font-size: 15px;
   text-decoration: none;
   cursor: pointer;
 }
 
 .linkBtn {
-  color: var(--text-primary);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-}
-
-.linkBtn:hover {
-  border-color: var(--accent-blue);
-  color: var(--accent-blue);
+  color: var(--ink);
+  background: var(--surface-sunk);
+  border: var(--outline-w, 0px) solid var(--line);
 }
 
 .unlinkBtn {
   flex-shrink: 0;
-  color: #f87171;
+  color: var(--urgent);
   background: transparent;
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  border: 1.5px solid currentColor;
 }
 
 .signOutAll {
-  margin-top: 0.5rem;
-  color: var(--text-secondary);
+  margin-top: var(--space-2);
+  color: var(--ink);
   background: transparent;
-  border: 1px dashed var(--border-subtle);
-}
-
-.signOutAll:hover {
-  color: var(--text-primary);
+  border: 1.5px dashed var(--line);
 }
 
 .error {
-  color: #f87171;
-  font-size: 0.85rem;
+  color: var(--urgent);
+  font-size: 14px;
   font-weight: 600;
 }

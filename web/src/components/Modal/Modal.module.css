@@ -1,90 +1,103 @@
+/* A dialog drawn in the tokens of the scope that opened it (Modal.tsx copies
+   data-theme / data-person onto the overlay). */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
   z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: var(--space-4);
+  box-sizing: border-box;
+  /* A frosted scrim of the ground itself: light on light themes, dark on
+     dark ones, never a hard-coded black. */
+  background: color-mix(in srgb, var(--surface-sunk) 78%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color-scheme: var(--color-scheme, normal);
+  color: var(--ink);
+  font-family: var(--font-text);
+  -webkit-font-smoothing: antialiased;
+  /* legacy: remove after redesign. Dialog content that still reads the old
+     palette (PIN settings, linked accounts) stays legible on the new card. */
+  --bg-primary: var(--surface-raised);
+  --bg-secondary: var(--surface);
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-muted);
+  --border-subtle: var(--line);
+  --accent-blue: var(--accent);
 }
 
 .card {
-  background: var(--bg-primary, #0f172a);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 1.25rem;
-  width: 100%;
-  max-height: 90vh;
-  overflow: hidden;
   position: relative;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-height: min(90vh, 900px);
+  overflow: hidden;
+  box-sizing: border-box;
+  background: var(--surface-raised);
+  color: var(--ink);
+  border: var(--outline-w, 0px) solid var(--line);
+  border-radius: var(--oc-radius-lg);
+  box-shadow: var(--lift-lg);
+}
+
+.card:focus {
+  outline: none;
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  position: sticky;
-  top: 0;
-  background: var(--bg-primary, #0f172a);
-  z-index: 1;
-  border-radius: 1.25rem 1.25rem 0 0;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--line);
 }
 
 .title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text-primary, #e2e8f0);
   margin: 0;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-variation-settings: var(--display-axes);
+  letter-spacing: var(--display-tracking);
+  font-size: 20px;
+  line-height: 26px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
 .closeBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
+  flex: none;
   width: 44px;
   height: 44px;
-  border: none;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  color: var(--text-secondary, #94a3b8);
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-sunk);
+  color: var(--ink);
   cursor: pointer;
 }
 
-.closeBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
+.closeBtn svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: var(--icon-stroke, 1.75);
 }
 
 .body {
-  padding: 1.5rem;
-  overflow-y: auto;
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5);
+  overscroll-behavior: contain;
 }
 
-/* Scrollbar styling for scroll hint */
-.body::-webkit-scrollbar {
-  width: 6px;
-}
-
-.body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
-}
-
-.body::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
+/* Phones: a sheet from the bottom. */
 @media (max-width: 640px) {
   .overlay {
     padding: 0;
@@ -92,7 +105,34 @@
   }
 
   .card {
-    max-height: 95vh;
-    border-radius: 1.25rem 1.25rem 0 0;
+    max-height: 94vh;
+    border-radius: var(--oc-radius-lg) var(--oc-radius-lg) 0 0;
   }
+
+  .body {
+    padding: var(--space-4) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .overlay {
+    animation: modal-fade 0.16s ease both;
+  }
+
+  .card {
+    animation: modal-rise 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+
+/* Lucide glyphs inside a dialog take the line set's stroke weight. */
+.overlay :global(svg.lucide) {
+  stroke-width: var(--icon-stroke, 1.75);
+}
+
+@keyframes modal-fade {
+  from { opacity: 0; }
+}
+
+@keyframes modal-rise {
+  from { opacity: 0; transform: translateY(12px); }
 }

@@ -1,156 +1,72 @@
+/* Global base. Colours, type and spacing come from the design system tokens
+   (web/src/design: tokens.css + themes.css); :root is House. */
+
+/* ---------------------------------------------------------------------------
+   legacy: remove after redesign.
+   The old dark-navy palette, kept only for screens that other phase-2 agents
+   are still migrating (kid Dashboard, picker/PIN pad, setup, photo upload,
+   ambient, reports, charts, LanguageSelector, LinkedAccounts). Delete each
+   variable once nothing in web/src reads it.
+   --------------------------------------------------------------------------- */
 :root {
-  --bg-primary: #0f172a; /* Deep Navy */
-  --bg-secondary: #1e293b; /* Slightly lighter navy for cards */
-  --text-primary: #f8fafc; /* Near white */
-  --text-secondary: #94a3b8; /* Slate gray */
-
-  /* Accent Colors */
-  --accent-blue: #38bdf8; /* Electric Blue */
-  --accent-green: #34d399; /* Mint Green */
-  --accent-pink: #f472b6; /* Coral Pink */
-  --accent-purple: #a78bfa; /* Lavender */
-
-  /* UI Feedback */
-  --status-required: #f87171; /* Soft Red */
-  --status-core: #60a5fa; /* Blue */
-  --status-bonus: #fbbf24; /* Amber */
-
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-card: 16px;
-  --radius-lg: 24px;
-
-  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow-sm: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-  --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-
-  /* Borders */
-  --border-subtle: #334155;
-  --border-faint: rgba(255, 255, 255, 0.04);
-  --border-hover: rgba(255, 255, 255, 0.12);
-
-  /* Badge colors (dark theme) */
-  --badge-required-bg: rgba(248, 113, 113, 0.15);
-  --badge-required-text: #f87171;
-  --badge-core-bg: rgba(96, 165, 250, 0.15);
-  --badge-core-text: #60a5fa;
-  --badge-bonus-bg: rgba(251, 191, 36, 0.15);
-  --badge-bonus-text: #fbbf24;
-  --badge-admin-bg: rgba(167, 139, 250, 0.15);
-  --badge-admin-text: #a78bfa;
-  --badge-child-bg: rgba(52, 211, 153, 0.15);
-  --badge-child-text: #34d399;
-  --badge-paused-bg: rgba(251, 191, 36, 0.15);
-  --badge-paused-text: #d97706;
-  --badge-danger: #ef4444;
-
-  /* Radius */
-  --radius-pill: 100px;
-
-  /* Theme background pattern (none for default) */
-  --bg-pattern: none;
-  --bg-pattern-opacity: 0;
-
-  /* Progress bar */
-  --progress-gradient: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
-  --progress-glow: none;
-  --progress-done-gradient: linear-gradient(90deg, #22c55e, #4ade80);
-  --progress-done-glow: 0 0 12px rgba(34, 197, 94, 0.3);
+  --bg-primary: #0f172a; /* legacy: remove after redesign */
+  --bg-secondary: #1e293b; /* legacy: remove after redesign */
+  --text-primary: #f8fafc; /* legacy: remove after redesign */
+  --text-secondary: #94a3b8; /* legacy: remove after redesign */
+  --accent-blue: #38bdf8; /* legacy: remove after redesign */
+  --accent-green: #34d399; /* legacy: remove after redesign */
+  --accent-purple: #a78bfa; /* legacy: remove after redesign */
+  --status-required: #f87171; /* legacy: remove after redesign */
+  --status-core: #60a5fa; /* legacy: remove after redesign */
+  --status-bonus: #fbbf24; /* legacy: remove after redesign */
+  --radius-md: 12px; /* legacy: remove after redesign */
+  --radius-card: 16px; /* legacy: remove after redesign */
+  --radius-lg: 24px; /* legacy: remove after redesign */
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); /* legacy: remove after redesign */
+  --shadow-sm: 0 4px 6px -1px rgb(0 0 0 / 0.1); /* legacy: remove after redesign */
+  --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.1); /* legacy: remove after redesign */
+  --border-subtle: #334155; /* legacy: remove after redesign */
+  --border-hover: rgba(255, 255, 255, 0.12); /* legacy: remove after redesign */
+  --badge-required-bg: rgba(248, 113, 113, 0.15); /* legacy: remove after redesign */
+  --badge-required-text: #f87171; /* legacy: remove after redesign */
+  --badge-core-bg: rgba(96, 165, 250, 0.15); /* legacy: remove after redesign */
+  --badge-core-text: #60a5fa; /* legacy: remove after redesign */
+  --badge-bonus-bg: rgba(251, 191, 36, 0.15); /* legacy: remove after redesign */
+  --badge-bonus-text: #fbbf24; /* legacy: remove after redesign */
+  --bg-pattern: none; /* legacy: remove after redesign */
+  --bg-pattern-opacity: 0; /* legacy: remove after redesign */
+  --progress-gradient: linear-gradient(90deg, var(--accent-blue), var(--accent-purple)); /* legacy: remove after redesign */
+  --progress-glow: none; /* legacy: remove after redesign */
+  --progress-done-gradient: linear-gradient(90deg, #22c55e, #4ade80); /* legacy: remove after redesign */
+  --progress-done-glow: 0 0 12px rgba(34, 197, 94, 0.3); /* legacy: remove after redesign */
 }
 
-/* ==================== GALAXY THEME (skin: tint; replaced in phase 2) ==================== */
-body.theme-tint {
-  --bg-primary: #020617;
-  --bg-secondary: #0f0a2a;
-  --text-secondary: #7c83a8;
-  --accent-blue: #a855f7;
-  --accent-green: #38bdf8;
-  --accent-pink: #d946ef;
-  --accent-purple: #818cf8;
-  --status-required: #e11d48;
-  --status-core: #7c3aed;
-  --status-bonus: #0ea5e9;
-
-  --progress-gradient: linear-gradient(90deg, #7c3aed, #a855f7, #d946ef);
-  --progress-glow: 0 0 12px rgba(168, 85, 247, 0.4);
-  --progress-done-gradient: linear-gradient(90deg, #38bdf8, #818cf8);
-  --progress-done-glow: 0 0 16px rgba(56, 189, 248, 0.4);
-
-  --bg-pattern:
-    radial-gradient(1.2px 1.2px at 10% 15%, rgba(255,255,255,0.7), transparent),
-    radial-gradient(1px 1px at 25% 45%, rgba(168,85,247,0.6), transparent),
-    radial-gradient(0.8px 0.8px at 40% 80%, rgba(255,255,255,0.5), transparent),
-    radial-gradient(1.5px 1.5px at 55% 25%, rgba(56,189,248,0.5), transparent),
-    radial-gradient(1px 1px at 70% 60%, rgba(255,255,255,0.6), transparent),
-    radial-gradient(0.8px 0.8px at 85% 35%, rgba(217,70,239,0.5), transparent),
-    radial-gradient(1.2px 1.2px at 15% 70%, rgba(255,255,255,0.4), transparent),
-    radial-gradient(1px 1px at 50% 50%, rgba(129,140,248,0.5), transparent),
-    radial-gradient(0.8px 0.8px at 90% 80%, rgba(255,255,255,0.5), transparent),
-    radial-gradient(1.5px 1.5px at 30% 10%, rgba(255,255,255,0.6), transparent),
-    radial-gradient(1px 1px at 65% 90%, rgba(168,85,247,0.4), transparent),
-    radial-gradient(0.8px 0.8px at 5% 50%, rgba(255,255,255,0.5), transparent),
-    radial-gradient(1.2px 1.2px at 75% 15%, rgba(56,189,248,0.4), transparent),
-    radial-gradient(1px 1px at 45% 65%, rgba(255,255,255,0.3), transparent),
-    radial-gradient(0.8px 0.8px at 20% 90%, rgba(217,70,239,0.3), transparent),
-    radial-gradient(1px 1px at 80% 45%, rgba(255,255,255,0.5), transparent),
-    radial-gradient(1.5px 1.5px at 60% 5%, rgba(129,140,248,0.4), transparent),
-    radial-gradient(0.8px 0.8px at 35% 55%, rgba(255,255,255,0.4), transparent),
-    radial-gradient(ellipse 120px 80px at 20% 30%, rgba(168,85,247,0.03), transparent),
-    radial-gradient(ellipse 100px 60px at 75% 70%, rgba(56,189,248,0.03), transparent);
-  --bg-pattern-opacity: 1;
-}
-
-/* ==================== QUEST THEME (skin: blocks; replaced in phase 2) ==================== */
-body.theme-blocks {
-  --bg-primary: #1a1611;
-  --bg-secondary: #2a2419;
-  --text-secondary: #a8977a;
-  --accent-blue: #fbbf24;
-  --accent-green: #4ade80;
-  --accent-pink: #f87171;
-  --accent-purple: #e0a84e;
-  --status-required: #f97316;
-  --status-core: #eab308;
-  --status-bonus: #a3e635;
-
-  --progress-gradient: linear-gradient(90deg, #92400e, #fbbf24, #f97316);
-  --progress-glow: 0 0 10px rgba(251, 191, 36, 0.3);
-  --progress-done-gradient: linear-gradient(90deg, #fbbf24, #f59e0b);
-  --progress-done-glow: 0 0 14px rgba(251, 191, 36, 0.4);
-
-  --bg-pattern:
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 40px,
-      rgba(139, 92, 42, 0.03) 40px,
-      rgba(139, 92, 42, 0.03) 41px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 40px,
-      rgba(139, 92, 42, 0.02) 40px,
-      rgba(139, 92, 42, 0.02) 41px
-    ),
-    radial-gradient(ellipse 200px 200px at 15% 20%, rgba(139, 92, 42, 0.06), transparent),
-    radial-gradient(ellipse 180px 180px at 80% 75%, rgba(139, 92, 42, 0.05), transparent),
-    radial-gradient(ellipse 150px 150px at 50% 50%, rgba(139, 92, 42, 0.03), transparent);
-  --bg-pattern-opacity: 1;
+/* ---------- reset ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 * {
-  box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
-  font-family: 'Nunito', system-ui, -apple-system, sans-serif;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  min-height: 100vh;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-text);
   line-height: 1.5;
+  color-scheme: var(--color-scheme, light);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button {
@@ -158,11 +74,6 @@ button {
   border: none;
   background: none;
   font-family: inherit;
-  transition: var(--transition);
-}
-
-button:active {
-  transform: scale(0.96);
 }
 
 a {
@@ -170,12 +81,34 @@ a {
   color: inherit;
 }
 
-/* Animations */
+/* ---------- focus ----------
+   One visible ring everywhere, drawn in the scope's ink so it holds 3:1 on
+   every ground (House, House Dark and each skin). */
+:focus-visible {
+  outline: 2.5px solid var(--ink);
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline-offset: 1px;
+}
+
+/* legacy: remove after redesign (Dashboard / ProfileSelection animate with it). */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
+/* ---------- motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
