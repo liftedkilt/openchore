@@ -1,0 +1,9 @@
+# Local development override: publishes the optional AI services to the host
+# so `make api` can reach them (see `make ai-up`).
+services:
+  llama:
+    ports:
+      - "8081:8080"
+  kokoro:
+    ports:
+      - "8880:8880"

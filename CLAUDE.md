@@ -1,6 +1,6 @@
 # OpenChore
 
-Family chore-tracking PWA: Go API + React/TypeScript frontend, SQLite storage, optional AI photo verification (LiteRT/Gemma) and TTS (Kokoro).
+Family chore-tracking PWA: Go API + React/TypeScript frontend, SQLite storage, optional AI (any OpenAI-compatible model: photo review notes, weekly summaries, description drafts) and read-aloud audio (any OpenAI-compatible speech API, e.g. Kokoro).
 
 ## Tech stack
 - **Backend:** Go (stdlib + `chi/v5` router). Build with `CGO_ENABLED=0`.
@@ -15,16 +15,16 @@ Family chore-tracking PWA: Go API + React/TypeScript frontend, SQLite storage, o
 - `internal/store/` — SQLite DAO (one method per query, `context.Context`-aware).
 - `internal/webhook/` — async dispatcher, HMAC-SHA256 signing, expiry/decay checkers.
 - `internal/config/` — YAML loader; **seeds only when DB is empty** (except `auth:`, read every start).
-- `internal/ai/`, `internal/aibackend/`, `internal/tts/`, `internal/discord/` — optional integrations.
+- `internal/llm/` (OpenAI-compatible chat client), `internal/tts/` (speech client + per-chore audio), `internal/discord/` — optional integrations. Wiring lives in `internal/api/ai.go` and `cmd/server/main.go`.
 - `migrations/` — numbered `*_up.sql` / `*_down.sql` pairs.
 - `config/config.example.yaml` — dev seed data.
 - `web/src/` — `pages/`, `components/`, `hooks/`, `api.ts` (typed client), `types.ts`.
 - `e2e/` — Playwright suite (auto-starts API + Vite).
-- `litert/`, `compose*.yaml`, `Containerfile` — container/AI sidecars.
+- `compose*.yaml`, `Containerfile` — containers; the optional `ai` (llama.cpp) and `tts` (Kokoro) profiles use upstream images.
 
 ## Common commands
 - `make dev` — wipes DB, copies example config, runs API (`:8080`) + Vite concurrently.
-- `make dev-ai` — same plus LiteRT + Kokoro sidecars.
+- `make dev-ai` — same plus llama.cpp + Kokoro in Docker (`AI_BASE_URL`/`TTS_BASE_URL` set for you).
 - `make api` / `make ui` — run one side.
 - `make test` — Go integration tests (httptest, stdlib).
 - `make test-e2e` — Playwright (fresh DB).
@@ -41,6 +41,7 @@ Family chore-tracking PWA: Go API + React/TypeScript frontend, SQLite storage, o
 - **Auth:** server-issued HMAC-signed sessions (`openchore_session` cookie or `Bearer ocs1.…`) from `POST /api/auth/login` (tap/PIN), OIDC (`internal/api/oidc.go`) or setup; API tokens (`Bearer <hex>`) act as admin. `X-User-ID` is **not** trusted. Admin is a role on a profile; every admin needs a PIN or linked identity. Middleware: `RequireSession`, `RequireUserOrToken`, `RequireAdmin`. See `docs/authentication.md`.
 - **Parents take part:** don't filter by `role = 'child'` for chores/points/rewards/streaks; role only gates management.
 - **Errors:** respond with JSON `{"error": "..."}` via `writeError(w, status, msg)`. Log with stdlib `log.Printf`.
+- **AI is advisory:** it never rejects a completion. Photo review only annotates *pending* completions and may auto-approve (through the same `approveCompletion` path as a parent). AI features are off unless `AI_BASE_URL`/`AI_MODEL` (or `TTS_BASE_URL`) are set; see `docs/ai.md`.
 - **Background work:** long-running goroutines are started from `cmd/server/main.go` and must accept a `context.Context` for shutdown.
 
 ## Testing
