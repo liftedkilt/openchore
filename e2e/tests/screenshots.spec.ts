@@ -13,8 +13,11 @@ test.describe('Screenshots', () => {
     await page.setViewportSize({ width: 1180, height: 820 });
     await page.goto('/login');
     await expect(profileButton(page, 'Emma')).toBeVisible({ timeout: 10_000 });
-    // Wait for every kid's door to load its day (progress and what's left).
-    await expect(page.getByText(/\d+ to go|All done/)).toHaveCount(3, { timeout: 10_000 });
+    // Wait for the seeded kids' doors to load their day. Earlier specs may
+    // have added more kids, so this is a minimum, not an exact count.
+    await expect
+      .poll(() => page.getByText(/\d+ to go|All done|Nothing today/).count(), { timeout: 10_000 })
+      .toBeGreaterThanOrEqual(3);
     await page.screenshot({ path: `${dir}/01-profile-selection.png`, fullPage: false });
   });
 
