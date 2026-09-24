@@ -55,6 +55,9 @@
 - [ ] Plugin architecture for external chore sources (source + external_id on chores)
 - [x] Chore trigger webhooks — per-chore trigger URLs for external systems (Home Assistant, etc.) with cooldown, default assignee, and query param overrides
 - [x] API token auth (Bearer tokens, SHA-256 hashed, admin-level access for integrations)
+- [x] Server-issued sessions; admin is a role on each parent's own profile (household passcode retired)
+- [x] OIDC single sign-on (Pocket ID, Authelia, Authentik, Keycloak, Google, …), linked per profile
+- [x] Parents take part (chores, points, rewards) and can complete chores on a kid's behalf
 - [x] Integration discovery endpoint (`GET /api/chores/triggerable` — chores with triggers + user list)
 - [x] Home Assistant custom integration (openchore-ha) — config flow, service calls, HACS-ready
 - [x] Admin UI for API token management (create, list, revoke)

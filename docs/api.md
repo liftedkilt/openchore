@@ -5,17 +5,31 @@ back as `{"error": "..."}` with a matching HTTP status.
 
 ## Authentication
 
-There are no sessions. A request identifies itself in one of three ways:
+A request identifies itself in one of three ways:
 
-| Method | Header | Used by |
-|--------|--------|---------|
-| User | `X-User-ID: <id>` | The web app, after profile selection |
-| Token | `Authorization: Bearer <token>` | Integrations (Home Assistant, scripts) |
+| Method | How | Used by |
+|--------|-----|---------|
+| Session | `openchore_session` cookie, or `Authorization: Bearer ocs1.…` | The web app, after signing in to a profile |
+| API token | `Authorization: Bearer <token>` | Integrations (Home Assistant, scripts); acts as an admin |
 | None | — | Public endpoints only |
 
-Admin endpoints additionally require the caller to have the `admin` role. The
-admin panel itself is gated behind a passcode (`POST /api/admin/verify`), which
-is a UI lock rather than a transport-level credential.
+Sessions are HMAC-signed and issued by the server: `POST /api/auth/login`
+(tap or PIN), an OIDC sign-in, or `POST /api/setup`. The legacy `X-User-ID`
+header is **ignored**. Admin endpoints need a session for a profile with the
+`admin` role, or an API token. See [authentication.md](authentication.md)
+for the full model.
+
+`POST /api/auth/login` takes `{"user_id": 3, "pin": "1234"}` (omit `pin` for
+profiles without one) and returns `{"user", "session", "token"}`. On failure
+the body includes a `code`:
+
+| Code | Status | Meaning |
+|------|--------|---------|
+| `incorrect_pin` | 401 | Wrong PIN |
+| `locked_out` | 429 | Too many wrong PINs; see `retry_after_seconds` |
+| `oidc_required` | 403 | The profile signs in with a linked account; see `providers` |
+| `admin_setup_required` | 403 | Parent profile without a credential; resend with `new_pin` (plus `legacy_passcode` when `legacy_passcode: true`) |
+| `incorrect_passcode` | 401 | Wrong legacy household passcode |
 
 Uploaded photos are served from `/uploads/*` and generated TTS audio from
 `/tts/*`.
@@ -30,24 +44,40 @@ No authentication required.
 |--------|------|-------------|
 | `GET` | `/api/users` | List users (drives the profile selection screen) |
 | `GET` | `/api/users/{id}` | Get one user |
-| `POST` | `/api/users/{id}/verify-pin` | Verify a profile PIN from the login screen |
-| `POST` | `/api/admin/verify` | Verify the admin passcode |
-| `POST` | `/api/setup` | First-run setup — only succeeds while no users exist |
+| `GET` | `/api/users/{id}/chores?view=daily&date=YYYY-MM-DD` | Scheduled chores, read-only (used by the wall display) |
+| `GET` | `/api/users/{id}/points` | Balance plus the transaction ledger |
+| `GET` | `/api/users/{id}/streak` | Current streak and next milestone |
+| `POST` | `/api/auth/login` | Sign in to a profile (see above) |
+| `POST` | `/api/auth/logout` | Clear the session cookie |
+| `GET` | `/api/auth/providers` | Configured OIDC providers (`id`, `name`) |
+| `GET` | `/api/auth/oidc/{provider}/start?mode=login&user_id=…&return=/path` | Browser redirect to the provider; `user_id` is the tapped profile |
+| `GET` | `/api/auth/oidc/{provider}/start?mode=link&return=/path` | Link the provider to the signed-in profile |
+| `GET` | `/api/auth/oidc/{provider}/callback` | Provider redirect target; errors come back as `?auth_error=<code>` |
+| `POST` | `/api/setup` | First-run setup: `{"parent": {"name", "pin"}, "children", "chores"}`. Only succeeds while no users exist, and signs the parent in |
 | `POST` | `/api/hooks/trigger/{uuid}` | Fire a chore trigger; the UUID is the credential |
 
 ---
 
 ## Authenticated
 
-Requires `X-User-ID` or a Bearer token.
+Requires a session or an API token.
+
+### Session
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/auth/me` | The signed-in user and session (`method`, `expires_at`, `persistent`, `provider`) |
+| `POST` | `/api/auth/logout-everywhere` | Revoke every session for the caller |
+| `POST` | `/api/auth/upload-link` | `{"schedule_id"}` → a 30-minute token that can only upload a photo and complete that chore (used by the QR code) |
+| `GET` | `/api/users/{id}/identities` | Linked accounts (self or admin) |
+| `DELETE` | `/api/users/{id}/identities/{identityID}` | Unlink an account (self or admin); revokes that person's sessions |
 
 ### Chores
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/users/{id}/chores?view=daily&date=YYYY-MM-DD` | Scheduled chores (`view=daily` or `weekly`) |
-| `POST` | `/api/schedules/{id}/complete` | Complete a chore; body may set `completion_date` |
-| `DELETE` | `/api/schedules/{id}/complete?date=YYYY-MM-DD` | Undo a completion |
+| `POST` | `/api/schedules/{id}/complete` | Complete a chore; body may set `completion_date`. Only the assignee or an admin may call it. Points go to the assignee, and an admin completing on someone's behalf doesn't need a photo |
+| `DELETE` | `/api/schedules/{id}/complete?date=YYYY-MM-DD` | Undo a completion (assignee or admin) |
 | `POST` | `/api/upload` | Upload photo proof (multipart) |
 | `PUT` | `/api/completions/{id}/photo` | Attach an uploaded photo to a completion |
 
@@ -55,8 +85,6 @@ Requires `X-User-ID` or a Bearer token.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/users/{id}/points` | Balance plus the transaction ledger |
-| `GET` | `/api/users/{id}/streak` | Current streak and next milestone |
 | `GET` | `/api/rewards` | Rewards visible to this user |
 | `POST` | `/api/rewards/{id}/redeem` | Redeem a reward |
 | `GET` | `/api/users/{id}/redemptions` | Redemption history |
@@ -95,8 +123,8 @@ Requires an authenticated caller with the `admin` role.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/users` | Create a user |
-| `PUT` | `/api/users/{id}` | Update a user |
+| `POST` | `/api/users` | Create a user; `pin` is required for `role: admin` |
+| `PUT` | `/api/users/{id}` | Update a user. Promoting to admin requires an existing credential; the last admin can't be demoted |
 | `DELETE` | `/api/users/{id}` | Delete a user |
 | `PUT` | `/api/users/{id}/pause` | Pause chores (vacation mode) |
 | `PUT` | `/api/users/{id}/unpause` | Resume chores |
@@ -153,8 +181,7 @@ Requires an authenticated caller with the `admin` role.
 |--------|------|-------------|
 | `GET` | `/api/admin/reports` | Analytics data behind the reports page |
 | `GET` | `/api/admin/reports/ai-summary` | Narrative summary of a kid's week |
-| `GET` `PUT` | `/api/admin/settings/{key}` | Read / write a setting |
-| `PUT` | `/api/admin/passcode` | Change the admin passcode |
+| `GET` `PUT` | `/api/admin/settings/{key}` | Read / write a setting (secrets such as `session_secret` are not readable) |
 | `GET` | `/api/admin/export-config` | Export current configuration as YAML |
 | `POST` | `/api/admin/ai/test` | Test photo review against an image |
 | `POST` | `/api/admin/ai/tts` | Synthesize speech for arbitrary text |
@@ -183,5 +210,7 @@ attempt is recorded in the delivery log.
 | `points.decayed` | Daily decay debits a balance (payload reports any points reclaimed from savings goals) |
 | `chore.missed` | A chore ends the day unfinished |
 | `chore.fcfs_completed` | A first-come-first-served chore is claimed |
-| `auth.admin_passcode.verified` `auth.admin_passcode.failed` `auth.admin_passcode.changed` | Admin passcode activity |
-| `auth.profile_pin.verified` `auth.profile_pin.failed` `auth.profile_pin.changed` `auth.profile_pin.cleared` | Profile PIN activity |
+| `auth.profile_pin.verified` `auth.profile_pin.failed` `auth.profile_pin.changed` `auth.profile_pin.cleared` | Profile PIN activity, including PIN sign-ins |
+| `auth.oidc.login` | Someone signed in with a linked account |
+| `auth.identity.linked` `auth.identity.unlinked` | A linked account was added or removed |
+| `auth.admin_passcode.verified` `auth.admin_passcode.failed` | The legacy household passcode was used during the one-time upgrade step |

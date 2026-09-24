@@ -49,9 +49,11 @@ docker compose up -d
 Open **http://localhost:8080** and pick a profile.
 
 > [!IMPORTANT]
-> The admin passcode is `0000` on a fresh database, or whatever
-> `settings.admin_passcode` says in your config (the example file uses `1234`).
-> Change it under **Admin → Settings** before putting this on your network.
+> Parents sign in to their own profile with a PIN (the example config uses
+> `1234` for Alex and `5678` for Jamie) and then tap **Manage**. Change those
+> PINs with the key icon on the dashboard before putting this on your network.
+> Want Pocket ID, Authelia, Google or another OpenID Connect sign-in? See
+> [Signing in](docs/authentication.md).
 
 `config.yaml` is applied **only when the database is empty**. After first boot,
 manage everything from the admin panel — or wipe and re-seed with
@@ -106,11 +108,19 @@ Around it sit the other levers:
 </tr>
 <tr>
 <td><img src="docs/screenshots/kid-week.png" alt="Weekly chore view"></td>
-<td><img src="docs/screenshots/admin-kids.png" alt="Admin dashboard showing each child's status"></td>
+<td><img src="docs/screenshots/admin-kids.png" alt="Manage screen showing a child's chores with tappable status circles"></td>
 </tr>
 <tr>
 <td align="center"><b>Week</b> — what's done, what's locked, what's coming</td>
-<td align="center"><b>Admin</b> — every kid's day at a glance</td>
+<td align="center"><b>Manage</b> — everyone's day at a glance; tap a circle to tick a chore off for them</td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/parent-sign-in.png" alt="A parent's PIN pad with a Continue with Pocket ID button" width="60%"></td>
+<td><img src="docs/screenshots/linked-accounts.png" alt="The linked accounts sheet" width="60%"></td>
+</tr>
+<tr>
+<td align="center"><b>Sign in</b> — tap your profile, then PIN or single sign-on</td>
+<td align="center"><b>Linked accounts</b> — Pocket ID, Authelia, Google, any OIDC provider</td>
 </tr>
 </table>
 
@@ -141,6 +151,8 @@ Around it sit the other levers:
 
 **Household**
 - Parent approval queue
+- Parents can take part too
+- PINs and OIDC single sign-on
 - Photo proof via QR handoff
 - Discord notifications
 - Reports: scorecards, trends, misses
@@ -189,6 +201,9 @@ Around it sit the other levers:
 | `AI_ENDPOINT` | `http://litert:8080` | Vision backend (LiteRT or Ollama) |
 | `TTS_ENDPOINT` | `http://kokoro:8880` | Kokoro TTS service |
 | `POINTS_DECAY_INTERVAL` | `15m` | How often the decay worker checks (the e2e suite shortens it) |
+| `OPENCHORE_PUBLIC_URL` | request host | External URL used for OIDC redirect URIs |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, … | — | One OIDC provider without editing config; see [Signing in](docs/authentication.md) |
+| `OPENCHORE_SESSION_SECRET` | generated | Session signing key (≥32 chars); otherwise generated once and stored in the database |
 
 ## Development
 
@@ -212,6 +227,7 @@ and `httptest`, no mocks.
 
 ## Documentation
 
+- [Signing in](docs/authentication.md) — PINs, parents, sessions, OIDC providers, upgrading
 - [API reference](docs/api.md) — endpoints, auth, and webhook events
 - [Roadmap](ROADMAP.md) — shipped and planned
 - [CLAUDE.md](CLAUDE.md) — architecture notes and conventions
