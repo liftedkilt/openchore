@@ -1,38 +1,6 @@
 /* Global base. Colours, type and spacing come from the design system tokens
    (web/src/design: tokens.css + themes.css); :root is House. */
 
-/* ---------------------------------------------------------------------------
-   legacy: remove after redesign.
-   The old dark-navy palette, kept only for screens another phase-2 agent is
-   still migrating (pages/Dashboard and pages/PhotoUpload). Delete each
-   variable once nothing in web/src reads it.
-   --------------------------------------------------------------------------- */
-:root {
-  --bg-primary: #0f172a; /* legacy: remove after redesign */
-  --bg-secondary: #1e293b; /* legacy: remove after redesign */
-  --text-primary: #f8fafc; /* legacy: remove after redesign */
-  --text-secondary: #94a3b8; /* legacy: remove after redesign */
-  --accent-blue: #38bdf8; /* legacy: remove after redesign */
-  --accent-green: #34d399; /* legacy: remove after redesign */
-  --accent-purple: #a78bfa; /* legacy: remove after redesign */
-  --status-required: #f87171; /* legacy: remove after redesign */
-  --status-core: #60a5fa; /* legacy: remove after redesign */
-  --status-bonus: #fbbf24; /* legacy: remove after redesign */
-  --radius-md: 12px; /* legacy: remove after redesign */
-  --radius-card: 16px; /* legacy: remove after redesign */
-  --radius-lg: 24px; /* legacy: remove after redesign */
-  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); /* legacy: remove after redesign */
-  --shadow-sm: 0 4px 6px -1px rgb(0 0 0 / 0.1); /* legacy: remove after redesign */
-  --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.1); /* legacy: remove after redesign */
-  --border-subtle: #334155; /* legacy: remove after redesign */
-  --bg-pattern: none; /* legacy: remove after redesign */
-  --bg-pattern-opacity: 0; /* legacy: remove after redesign */
-  --progress-gradient: linear-gradient(90deg, var(--accent-blue), var(--accent-purple)); /* legacy: remove after redesign */
-  --progress-glow: none; /* legacy: remove after redesign */
-  --progress-done-gradient: linear-gradient(90deg, #22c55e, #4ade80); /* legacy: remove after redesign */
-  --progress-done-glow: 0 0 12px rgba(34, 197, 94, 0.3); /* legacy: remove after redesign */
-}
-
 /* ---------- reset ---------- */
 *,
 *::before,
@@ -87,11 +55,6 @@ textarea:focus-visible {
   outline-offset: 1px;
 }
 
-/* legacy: remove after redesign (Dashboard animates with it). */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 
 /* ---------- motion ---------- */
 @media (prefers-reduced-motion: reduce) {
