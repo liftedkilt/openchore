@@ -40,7 +40,7 @@ export async function selectUser(page: Page, name: string) {
   await page.waitForURL('/');
 }
 
-const API_ORIGIN = 'http://localhost:8080';
+const API_ORIGIN = `http://localhost:${process.env.E2E_API_PORT || '8080'}`;
 const tokenCache = new Map<string, string>();
 
 /**
