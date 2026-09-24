@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link2, Unlink, LogOut } from 'lucide-react';
 import { api, APIError } from '../../api';
 import type { AuthProvider, LinkedIdentity, User } from '../../types';
+import { Icon } from '../../design';
 import Modal from '../Modal/Modal';
 import styles from './LinkedAccountsModal.module.css';
 
@@ -95,8 +95,8 @@ export const LinkedAccountsModal: React.FC<LinkedAccountsModalProps> = ({ user, 
                     <div className={styles.detail}>{i.email || i.display_name}</div>
                   )}
                 </div>
-                <button className={styles.unlinkBtn} onClick={() => unlink(i)}>
-                  <Unlink size={16} /> {t('linkedAccounts.unlink')}
+                <button type="button" className={styles.unlinkBtn} onClick={() => unlink(i)}>
+                  {t('linkedAccounts.unlink')}
                 </button>
               </li>
             ))}
@@ -107,7 +107,8 @@ export const LinkedAccountsModal: React.FC<LinkedAccountsModalProps> = ({ user, 
           <div className={styles.linkButtons}>
             {unlinkedProviders.map(p => (
               <a key={p.id} className={styles.linkBtn} href={api.auth.oidcLinkURL(p.id, returnPath)}>
-                <Link2 size={16} /> {t('linkedAccounts.link', { provider: p.name })}
+                {t('linkedAccounts.link', { provider: p.name })}
+                <Icon name="chev" />
               </a>
             ))}
           </div>
@@ -116,8 +117,8 @@ export const LinkedAccountsModal: React.FC<LinkedAccountsModalProps> = ({ user, 
         {error && <p className={styles.error} role="alert">{error}</p>}
 
         {self && (
-          <button className={styles.signOutAll} onClick={signOutEverywhere}>
-            <LogOut size={16} /> {t('linkedAccounts.signOutEverywhere')}
+          <button type="button" className={styles.signOutAll} onClick={signOutEverywhere}>
+            {t('linkedAccounts.signOutEverywhere')}
           </button>
         )}
       </div>
