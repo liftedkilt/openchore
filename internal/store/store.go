@@ -942,11 +942,20 @@ type PendingCompletionRow struct {
 	PhotoURL       string    `json:"photo_url"`
 	CompletionDate string    `json:"completion_date"`
 	CompletedAt    time.Time `json:"completed_at"`
+	// CompletedByID is the user who clicked "complete" (ChildName's id).
+	CompletedByID int64 `json:"completed_by"`
+	// Chore details and the AI photo check's feedback, so the parent sees
+	// what they are approving without another round trip.
+	Category    string `json:"category"`
+	Icon        string `json:"icon"`
+	PointsValue int    `json:"points_value"`
+	AIFeedback  string `json:"ai_feedback,omitempty"`
 }
 
 func (s *Store) ListPendingCompletions(ctx context.Context) ([]PendingCompletionRow, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT cc.id, c.title, u.name, cs.assigned_to, cc.photo_url, cc.completion_date, cc.completed_at
+		SELECT cc.id, c.title, u.name, cs.assigned_to, cc.photo_url, cc.completion_date, cc.completed_at,
+		       cc.completed_by, c.category, COALESCE(c.icon, ''), c.points_value, COALESCE(cc.ai_feedback, '')
 		FROM chore_completions cc
 		JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
 		JOIN chores c ON c.id = cs.chore_id
@@ -962,7 +971,8 @@ func (s *Store) ListPendingCompletions(ctx context.Context) ([]PendingCompletion
 	var pending []PendingCompletionRow
 	for rows.Next() {
 		var p PendingCompletionRow
-		if err := rows.Scan(&p.ID, &p.ChoreTitle, &p.ChildName, &p.AssignedUserID, &p.PhotoURL, &p.CompletionDate, &p.CompletedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.ChoreTitle, &p.ChildName, &p.AssignedUserID, &p.PhotoURL, &p.CompletionDate, &p.CompletedAt,
+			&p.CompletedByID, &p.Category, &p.Icon, &p.PointsValue, &p.AIFeedback); err != nil {
 			return nil, err
 		}
 		p.CompletionDate = normalizeDate(p.CompletionDate)

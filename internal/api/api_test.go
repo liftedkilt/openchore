@@ -2627,6 +2627,16 @@ func TestListPendingCompletions(t *testing.T) {
 	if int(pending[0]["assigned_user_id"].(float64)) != kidID {
 		t.Errorf("expected assigned_user_id=%d, got %v", kidID, pending[0]["assigned_user_id"])
 	}
+	// Chore details for the approval card.
+	if pending[0]["category"] != "core" {
+		t.Errorf("expected category=core, got %v", pending[0]["category"])
+	}
+	if int(pending[0]["completed_by"].(float64)) != kidID {
+		t.Errorf("expected completed_by=%d, got %v", kidID, pending[0]["completed_by"])
+	}
+	if _, ok := pending[0]["points_value"]; !ok {
+		t.Errorf("expected points_value on pending response, got %+v", pending[0])
+	}
 }
 
 func TestApproveCompletion(t *testing.T) {
