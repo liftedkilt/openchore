@@ -48,10 +48,18 @@ func Apply(ctx context.Context, s *store.Store, cfg *Config) error {
 	// 1. Create users, build name→ID map
 	nameToID := make(map[string]int64, len(cfg.Users))
 	for _, u := range cfg.Users {
+		theme, ok := normalizeTheme(u.Theme)
+		if !ok {
+			return fmt.Errorf("user %q: unknown theme %q", u.Name, u.Theme)
+		}
+		if u.Color != "" && !model.ValidPersonColor(u.Color) {
+			return fmt.Errorf("user %q: unknown color %q", u.Name, u.Color)
+		}
 		user := &model.User{
 			Name:      u.Name,
 			Role:      u.Role,
-			Theme:     u.Theme,
+			Theme:     theme,
+			Color:     u.Color,
 			AvatarURL: u.Avatar,
 		}
 		if u.Pin != "" {
@@ -227,6 +235,26 @@ func Apply(ctx context.Context, s *store.Store, cfg *Config) error {
 
 	log.Println("config: configuration applied successfully")
 	return nil
+}
+
+// legacyThemes maps pre-redesign theme names to skins.
+var legacyThemes = map[string]string{
+	"default": model.ThemeSunroom,
+	"forest":  model.ThemeSunroom,
+	"quest":   model.ThemeBlocks,
+	"galaxy":  model.ThemeTint,
+}
+
+// normalizeTheme returns the skin for a configured theme, mapping legacy
+// names. Empty stays empty. ok is false for an unknown name.
+func normalizeTheme(t string) (string, bool) {
+	if t == "" || model.ValidTheme(t) {
+		return t, true
+	}
+	if mapped, found := legacyThemes[t]; found {
+		return mapped, true
+	}
+	return "", false
 }
 
 func nilStr(s string) *string {

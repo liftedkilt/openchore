@@ -299,6 +299,84 @@ func TestApplyUnknownUser(t *testing.T) {
 	}
 }
 
+func TestApplyMapsLegacyThemesAndColors(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	cfg := &Config{
+		Users: []UserConfig{
+			{Name: "A", Role: "admin", Pin: "1234", Color: "sky"},
+			{Name: "B", Role: "child", Theme: "default"},
+			{Name: "C", Role: "child", Theme: "quest", Color: "rose"},
+			{Name: "D", Role: "child", Theme: "galaxy"},
+			{Name: "E", Role: "child", Theme: "forest"},
+			{Name: "F", Role: "child", Theme: "tint"},
+		},
+	}
+	if err := Apply(ctx, s, cfg); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	want := map[string][2]string{ // name -> theme, color
+		"A": {"", "sky"},
+		"B": {"sunroom", "coral"}, // first colour not already used
+		"C": {"blocks", "rose"},
+		"D": {"tint", "mint"},
+		"E": {"sunroom", "butter"},
+		"F": {"tint", "leaf"}, // sky and rose are taken
+	}
+	users, err := s.ListUsers(ctx)
+	if err != nil {
+		t.Fatalf("ListUsers: %v", err)
+	}
+	for _, u := range users {
+		if got := [2]string{u.Theme, u.Color}; got != want[u.Name] {
+			t.Errorf("%s: got theme/color %v, want %v", u.Name, got, want[u.Name])
+		}
+	}
+}
+
+func TestApplyRejectsUnknownThemeOrColor(t *testing.T) {
+	for _, u := range []UserConfig{
+		{Name: "Kid", Role: "child", Theme: "ocean"},
+		{Name: "Kid", Role: "child", Color: "teal"},
+	} {
+		s := setupStore(t)
+		if err := Apply(context.Background(), s, &Config{Users: []UserConfig{u}}); err == nil {
+			t.Errorf("expected an error for %+v", u)
+		}
+	}
+}
+
+func TestExampleConfigSeeds(t *testing.T) {
+	cfg, err := Load(filepath.Join("..", "..", "config", "config.example.yaml"))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	s := setupStore(t)
+	ctx := context.Background()
+	if err := Apply(ctx, s, cfg); err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	want := map[string][2]string{
+		"Alex":  {"", "sky"},
+		"Jamie": {"", "rose"},
+		"Emma":  {"sunroom", "coral"},
+		"Lily":  {"tint", "mint"},
+		"Noah":  {"blocks", "butter"},
+	}
+	users, err := s.ListUsers(ctx)
+	if err != nil {
+		t.Fatalf("ListUsers: %v", err)
+	}
+	for _, u := range users {
+		if w, ok := want[u.Name]; ok {
+			if got := [2]string{u.Theme, u.Color}; got != w {
+				t.Errorf("%s: got theme/color %v, want %v", u.Name, got, w)
+			}
+		}
+	}
+}
+
 // --- Export ---
 
 func TestExportRoundTrip(t *testing.T) {

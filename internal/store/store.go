@@ -37,11 +37,20 @@ func New(db *sql.DB) *Store {
 
 // --- Users ---
 
+// CreateUser inserts a user. A user without a colour gets the next free
+// person colour in the household (see model.NextPersonColor).
 func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
+	if u.Color == "" {
+		used, err := s.listUserColors(ctx)
+		if err != nil {
+			return err
+		}
+		u.Color = model.NextPersonColor(used)
+	}
 	paused := boolToInt(u.Paused)
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO users (name, avatar_url, role, age, theme, line_color, paused, pin_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.LineColor, paused, u.PinHash)
+		`INSERT INTO users (name, avatar_url, role, age, theme, line_color, color, paused, pin_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.LineColor, u.Color, paused, u.PinHash)
 	if err != nil {
 		return err
 	}
@@ -53,12 +62,30 @@ func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
 	return nil
 }
 
+// listUserColors returns every user's colour (empty ones skipped).
+func (s *Store) listUserColors(ctx context.Context) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT color FROM users WHERE color != ''`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var c string
+		if err := rows.Scan(&c); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) GetUser(ctx context.Context, id int64) (*model.User, error) {
 	u := &model.User{}
 	var paused int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, pin_hash, session_version, created_at FROM users WHERE id = ?`, id).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.PinHash, &u.SessionVersion, &u.CreatedAt)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, color, paused, pin_hash, session_version, created_at FROM users WHERE id = ?`, id).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &u.Color, &paused, &u.PinHash, &u.SessionVersion, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -85,7 +112,7 @@ func (s *Store) GetUser(ctx context.Context, id int64) (*model.User, error) {
 
 func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, pin_hash, session_version, created_at FROM users ORDER BY name`)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, color, paused, pin_hash, session_version, created_at FROM users ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +120,7 @@ func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 	for rows.Next() {
 		var u model.User
 		var paused int
-		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.PinHash, &u.SessionVersion, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &u.Color, &paused, &u.PinHash, &u.SessionVersion, &u.CreatedAt); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -1005,8 +1032,8 @@ func (s *Store) ListSettings(ctx context.Context) (map[string]string, error) {
 func (s *Store) UpdateUser(ctx context.Context, u *model.User) error {
 	paused := boolToInt(u.Paused)
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE users SET name=?, avatar_url=?, role=?, age=?, theme=?, line_color=?, paused=? WHERE id=?`,
-		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.LineColor, paused, u.ID)
+		`UPDATE users SET name=?, avatar_url=?, role=?, age=?, theme=?, line_color=?, color=?, paused=? WHERE id=?`,
+		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.LineColor, u.Color, paused, u.ID)
 	return err
 }
 
@@ -3004,7 +3031,7 @@ const participantFilter = `(u.role = 'child'
 // ListNonPausedChildren returns all child users that are not paused.
 func (s *Store) ListNonPausedChildren(ctx context.Context) ([]model.User, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, created_at FROM users WHERE role = 'child' AND paused = 0 ORDER BY name`)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, color, paused, created_at FROM users WHERE role = 'child' AND paused = 0 ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -3013,7 +3040,7 @@ func (s *Store) ListNonPausedChildren(ctx context.Context) ([]model.User, error)
 	for rows.Next() {
 		var u model.User
 		var paused int
-		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &u.Color, &paused, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		u.Paused = paused == 1
@@ -3189,8 +3216,8 @@ func (s *Store) GetUserByName(ctx context.Context, name string) (*model.User, er
 	u := &model.User{}
 	var paused int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, pin_hash, created_at FROM users WHERE LOWER(name) = LOWER(?)`, name).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.PinHash, &u.CreatedAt)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, color, paused, pin_hash, created_at FROM users WHERE LOWER(name) = LOWER(?)`, name).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &u.Color, &paused, &u.PinHash, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

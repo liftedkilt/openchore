@@ -74,6 +74,7 @@ type User struct {
 	Age            *int      `json:"age,omitempty"`
 	Theme          string    `json:"theme,omitempty"`
 	LineColor      string    `json:"line_color,omitempty"`
+	Color          string    `json:"color,omitempty"`
 	Paused         bool      `json:"paused"`
 	HasPin         bool      `json:"has_pin"`
 	PinHash        string    `json:"-"`
@@ -88,6 +89,50 @@ const (
 	RoleAdmin = "admin"
 	RoleChild = "child"
 )
+
+// Skins, stored in users.theme. An empty theme means "not chosen"; the
+// client resolves it by age.
+const (
+	ThemeSunroom = "sunroom"
+	ThemeBlocks  = "blocks"
+	ThemeTint    = "tint"
+)
+
+// ValidTheme reports whether t is one of the skins the API accepts.
+func ValidTheme(t string) bool {
+	return t == ThemeSunroom || t == ThemeBlocks || t == ThemeTint
+}
+
+// PersonColors are the keys stored in users.color, in assignment order.
+// They are keys, not hex values: each theme defines its own shade.
+var PersonColors = []string{"coral", "mint", "butter", "sky", "rose", "leaf", "lilac", "sand"}
+
+// ValidPersonColor reports whether c is one of PersonColors.
+func ValidPersonColor(c string) bool {
+	for _, k := range PersonColors {
+		if k == c {
+			return true
+		}
+	}
+	return false
+}
+
+// NextPersonColor picks a colour for a new person given the colours already
+// in use: the first unused one in palette order, or once all are taken the
+// least-used one (so assignment keeps cycling round-robin).
+func NextPersonColor(used []string) string {
+	counts := make(map[string]int, len(PersonColors))
+	for _, c := range used {
+		counts[c]++
+	}
+	best := PersonColors[0]
+	for _, c := range PersonColors[1:] {
+		if counts[c] < counts[best] {
+			best = c
+		}
+	}
+	return best
+}
 
 // UserIdentity is an external OIDC identity linked to a profile.
 type UserIdentity struct {

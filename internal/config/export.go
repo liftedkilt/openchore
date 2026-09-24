@@ -32,6 +32,7 @@ func Export(ctx context.Context, s *store.Store, sections []string) (*Config, er
 				Name:   u.Name,
 				Role:   u.Role,
 				Theme:  u.Theme,
+				Color:  u.Color,
 				Avatar: u.AvatarURL,
 			}
 			if u.Age != nil {

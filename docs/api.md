@@ -107,9 +107,10 @@ instead of spending balance the moment it lands.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `PUT` | `/api/users/{id}/theme` | Set theme |
+| `PUT` | `/api/users/{id}/theme` | Set your skin: `sunroom`, `blocks` or `tint` |
 | `PUT` | `/api/users/{id}/avatar` | Set avatar URL |
 | `PUT` | `/api/users/{id}/line-color` | Set the ambient graph line color |
+| `PUT` | `/api/users/{id}/color` | Set your person colour: `coral`, `mint`, `butter`, `sky`, `rose`, `leaf`, `lilac` or `sand` |
 | `PUT` | `/api/users/{id}/pin` | Set a profile PIN |
 | `DELETE` | `/api/users/{id}/pin` | Clear the profile PIN |
 

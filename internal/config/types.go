@@ -101,7 +101,12 @@ type UserConfig struct {
 	// a PIN (or a linked account) to sign in.
 	Pin    string `yaml:"pin,omitempty"`
 	Age    int    `yaml:"age,omitempty"`
-	Theme  string `yaml:"theme,omitempty"`
+	// Theme is the person's skin: sunroom, blocks or tint. The legacy
+	// names default, quest, galaxy and forest are accepted and mapped.
+	Theme string `yaml:"theme,omitempty"`
+	// Color is a person colour key (coral, mint, butter, sky, rose, leaf,
+	// lilac, sand). Empty assigns the next free one.
+	Color  string `yaml:"color,omitempty"`
 	Avatar string `yaml:"avatar,omitempty"`
 }
 

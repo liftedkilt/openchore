@@ -19,13 +19,15 @@ func NewSetupHandler(s *store.Store, sm *SessionManager) *SetupHandler {
 }
 
 type setupParent struct {
-	Name string `json:"name"`
-	Pin  string `json:"pin"`
+	Name  string `json:"name"`
+	Pin   string `json:"pin"`
+	Color string `json:"color"`
 }
 
 type setupChild struct {
 	Name  string `json:"name"`
 	Theme string `json:"theme"`
+	Color string `json:"color"`
 }
 
 type setupChore struct {
@@ -66,6 +68,16 @@ func (h *SetupHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "parent pin must be 4-8 digits")
 		return
 	}
+	if req.Parent.Color != "" && !model.ValidPersonColor(req.Parent.Color) {
+		writeError(w, http.StatusBadRequest, "invalid color")
+		return
+	}
+	for _, c := range req.Children {
+		if msg := validateThemeAndColor(c.Theme, c.Color); msg != "" {
+			writeError(w, http.StatusBadRequest, msg)
+			return
+		}
+	}
 	parentName := req.Parent.Name
 	if parentName == "" {
 		parentName = "Parent"
@@ -77,7 +89,7 @@ func (h *SetupHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. Create the parent (admin) profile
-	admin := &model.User{Name: parentName, Role: model.RoleAdmin, PinHash: string(pinHash)}
+	admin := &model.User{Name: parentName, Role: model.RoleAdmin, PinHash: string(pinHash), Color: req.Parent.Color}
 	if err := h.store.CreateUser(r.Context(), admin); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create admin user")
 		return
@@ -90,6 +102,7 @@ func (h *SetupHandler) Setup(w http.ResponseWriter, r *http.Request) {
 			Name:  c.Name,
 			Role:  model.RoleChild,
 			Theme: c.Theme,
+			Color: c.Color, // empty: the store assigns the next free colour
 		}
 		if err := h.store.CreateUser(r.Context(), child); err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to create child")
