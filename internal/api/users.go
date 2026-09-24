@@ -57,6 +57,9 @@ type createUserRequest struct {
 	Role      string `json:"role"`
 	Age       *int   `json:"age"`
 	Theme     string `json:"theme"`
+	// Pin sets an initial profile PIN on create. Required for admin profiles,
+	// which must always have a PIN or a linked account.
+	Pin string `json:"pin"`
 }
 
 func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -70,24 +73,35 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Role == "" {
-		req.Role = "child"
+		req.Role = model.RoleChild
 	}
-	if req.Role != "admin" && req.Role != "child" {
+	if req.Role != model.RoleAdmin && req.Role != model.RoleChild {
 		writeError(w, http.StatusBadRequest, "role must be admin or child")
 		return
 	}
-
-	theme := req.Theme
-	if req.Role == "admin" {
-		// Admin users never have a theme — the admin UI always uses the default.
-		theme = ""
+	if req.Pin != "" && !pinFormatValid(req.Pin) {
+		writeError(w, http.StatusBadRequest, "pin must be 4-8 digits")
+		return
 	}
+	if req.Role == model.RoleAdmin && req.Pin == "" {
+		writeError(w, http.StatusBadRequest, "admin profiles need a pin")
+		return
+	}
+
 	user := &model.User{
 		Name:      req.Name,
 		AvatarURL: req.AvatarURL,
 		Role:      req.Role,
 		Age:       req.Age,
-		Theme:     theme,
+		Theme:     req.Theme,
+	}
+	if req.Pin != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(req.Pin), bcrypt.DefaultCost)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to hash pin")
+			return
+		}
+		user.PinHash = string(hash)
 	}
 	if err := h.store.CreateUser(r.Context(), user); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create user")
@@ -123,27 +137,49 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.AvatarURL != "" {
 		existing.AvatarURL = req.AvatarURL
 	}
-	if req.Role != "" {
-		if req.Role != "admin" && req.Role != "child" {
+	roleChanged := false
+	if req.Role != "" && req.Role != existing.Role {
+		if req.Role != model.RoleAdmin && req.Role != model.RoleChild {
 			writeError(w, http.StatusBadRequest, "role must be admin or child")
 			return
 		}
+		if req.Role == model.RoleAdmin && !existing.HasPin && len(existing.AuthProviders) == 0 {
+			writeError(w, http.StatusBadRequest, "set a pin on this profile before making it an admin")
+			return
+		}
+		if existing.Role == model.RoleAdmin {
+			last, err := h.isLastAdmin(r, existing.ID)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to list users")
+				return
+			}
+			if last {
+				writeError(w, http.StatusConflict, "cannot remove the last admin")
+				return
+			}
+		}
 		existing.Role = req.Role
+		roleChanged = true
 	}
 	if req.Age != nil {
 		existing.Age = req.Age
 	}
-	if req.Theme != "" && existing.Role != "admin" {
+	if req.Theme != "" {
 		existing.Theme = req.Theme
-	}
-	if existing.Role == "admin" {
-		// Admin users never have a theme — clear any stale value.
-		existing.Theme = ""
 	}
 
 	if err := h.store.UpdateUser(r.Context(), existing); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update user")
 		return
+	}
+	if roleChanged {
+		// Sessions carry no role, but revoke them anyway so a demoted admin's
+		// open admin screens stop working immediately and the change is
+		// clearly effective.
+		if err := h.store.BumpSessionVersion(r.Context(), existing.ID); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to revoke sessions")
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, existing)
 }
@@ -159,12 +195,6 @@ func (h *UserHandler) UpdateTheme(w http.ResponseWriter, r *http.Request) {
 	caller := UserFromContext(r.Context())
 	if caller.ID != id {
 		writeError(w, http.StatusForbidden, "can only update your own theme")
-		return
-	}
-
-	// Admin users do not have themes — the admin UI always uses the default.
-	if caller.Role == "admin" {
-		writeError(w, http.StatusForbidden, "admin users do not have themes")
 		return
 	}
 
@@ -334,19 +364,13 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "user not found")
 		return
 	}
-	if user.Role == "admin" {
-		users, err := h.store.ListUsers(r.Context())
+	if user.Role == model.RoleAdmin {
+		last, err := h.isLastAdmin(r, user.ID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to list users")
 			return
 		}
-		adminCount := 0
-		for _, u := range users {
-			if u.Role == "admin" {
-				adminCount++
-			}
-		}
-		if adminCount <= 1 {
+		if last {
 			writeError(w, http.StatusConflict, "cannot delete the last admin user")
 			return
 		}
@@ -374,67 +398,6 @@ func pinFormatValid(pin string) bool {
 	return true
 }
 
-type verifyPinRequest struct {
-	Pin string `json:"pin"`
-}
-
-// VerifyPin checks a PIN attempt against the stored hash for the given user.
-// This is a public endpoint: it is how a kid unlocks their own profile at the
-// login screen, before any session identity exists.
-func (h *UserHandler) VerifyPin(w http.ResponseWriter, r *http.Request) {
-	id, err := urlParamInt64(r, "id")
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid user id")
-		return
-	}
-	var req verifyPinRequest
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	hash, err := h.store.GetUserPinHash(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to check pin")
-		return
-	}
-	if hash == "" {
-		// No PIN set — nothing to verify.
-		writeError(w, http.StatusBadRequest, "profile has no pin")
-		return
-	}
-
-	ip := clientIP(r)
-	targetUser, _ := h.store.GetUser(r.Context(), id)
-	targetName := ""
-	if targetUser != nil {
-		targetName = targetUser.Name
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.Pin)); err != nil {
-		log.Printf("auth: failed pin attempt for user %d (%s) from %s", id, targetName, ip)
-		if h.dispatcher != nil {
-			h.dispatcher.Fire(webhook.EventProfilePinFailed, map[string]any{
-				"user_id":    id,
-				"user_name":  targetName,
-				"ip_address": ip,
-			})
-		}
-		writeError(w, http.StatusUnauthorized, "incorrect pin")
-		return
-	}
-
-	log.Printf("auth: user %d (%s) pin verified from %s", id, targetName, ip)
-	if h.dispatcher != nil {
-		h.dispatcher.Fire(webhook.EventProfilePinVerified, map[string]any{
-			"user_id":    id,
-			"user_name":  targetName,
-			"ip_address": ip,
-		})
-	}
-
-	writeJSON(w, http.StatusOK, map[string]bool{"valid": true})
-}
-
 type setPinRequest struct {
 	CurrentPin string `json:"current_pin"`
 	NewPin     string `json:"new_pin"`
@@ -456,7 +419,7 @@ func (h *UserHandler) SetPin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
-	isAdmin := caller.Role == "admin"
+	isAdmin := caller.Role == model.RoleAdmin
 	targetIsSelf := caller.ID == id
 	if !isAdmin && !targetIsSelf {
 		writeError(w, http.StatusForbidden, "can only change your own pin")
@@ -557,7 +520,7 @@ func (h *UserHandler) ClearPin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
-	isAdmin := caller.Role == "admin"
+	isAdmin := caller.Role == model.RoleAdmin
 	targetIsSelf := caller.ID == id
 	if !isAdmin && !targetIsSelf {
 		writeError(w, http.StatusForbidden, "can only change your own pin")
@@ -608,6 +571,11 @@ func (h *UserHandler) ClearPin(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusUnauthorized, "incorrect current pin")
 			return
 		}
+	}
+
+	if targetUser.Role == model.RoleAdmin && len(targetUser.AuthProviders) == 0 {
+		writeError(w, http.StatusConflict, "admin profiles need a pin or linked account; link an account before removing the pin")
+		return
 	}
 
 	if err := h.store.SetUserPin(r.Context(), id, ""); err != nil {
@@ -675,4 +643,18 @@ func (h *UserHandler) GetChores(w http.ResponseWriter, r *http.Request) {
 		chores = []model.ScheduledChore{}
 	}
 	writeJSON(w, http.StatusOK, chores)
+}
+
+// isLastAdmin reports whether userID is the only admin profile.
+func (h *UserHandler) isLastAdmin(r *http.Request, userID int64) (bool, error) {
+	users, err := h.store.ListUsers(r.Context())
+	if err != nil {
+		return false, err
+	}
+	for _, u := range users {
+		if u.Role == model.RoleAdmin && u.ID != userID {
+			return false, nil
+		}
+	}
+	return true, nil
 }

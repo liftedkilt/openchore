@@ -35,6 +35,9 @@ const (
 	EventProfilePinFailed      = "auth.profile_pin.failed"
 	EventProfilePinChanged     = "auth.profile_pin.changed"
 	EventProfilePinCleared     = "auth.profile_pin.cleared"
+	EventOIDCLogin             = "auth.oidc.login"
+	EventIdentityLinked        = "auth.identity.linked"
+	EventIdentityUnlinked      = "auth.identity.unlinked"
 )
 
 type Dispatcher struct {

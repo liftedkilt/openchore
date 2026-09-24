@@ -11,7 +11,13 @@ import (
 	"github.com/liftedkilt/openchore/internal/webhook"
 )
 
-func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *ChoreHandler, *ReportsHandler) {
+// Auth bundles the authentication services the router needs.
+type Auth struct {
+	Sessions *SessionManager
+	OIDC     *OIDCService
+}
+
+func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.Mux, *ChoreHandler, *ReportsHandler) {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -27,8 +33,10 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 	webhooks := NewWebhookHandler(s)
 	triggers := NewTriggerHandler(s)
 	tokens := NewTokenHandler(s)
-	setup := NewSetupHandler(s)
+	setup := NewSetupHandler(s, auth.Sessions)
 	reports := NewReportsHandler(s)
+	authH := NewAuthHandler(s, auth.Sessions, dispatcher, auth.OIDC)
+	oidcH := auth.OIDC
 
 	// Serve uploaded photos
 	_ = os.MkdirAll("data/uploads", 0750)
@@ -43,8 +51,18 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 		r.Get("/users", users.List)
 		r.Get("/users/{id}", users.Get)
 
-		// Public: verify a profile PIN from the login screen (no session yet)
-		r.Post("/users/{id}/verify-pin", users.VerifyPin)
+		// Public, read-only: per-user chores, points and streak. The wall
+		// display (/ambient) shows these without anyone signing in.
+		r.Get("/users/{id}/chores", users.GetChores)
+		r.Get("/users/{id}/points", points.GetUserPoints)
+		r.Get("/users/{id}/streak", streaks.GetUserStreak)
+
+		// Sign-in: tap a profile (PIN when set) or continue with an OIDC provider
+		r.Post("/auth/login", authH.Login)
+		r.Post("/auth/logout", authH.Logout)
+		r.Get("/auth/providers", oidcH.Providers)
+		r.Get("/auth/oidc/{provider}/start", oidcH.Start)
+		r.Get("/auth/oidc/{provider}/callback", oidcH.Callback)
 
 		// Public: chore trigger webhook (UUID is the auth)
 		r.Post("/hooks/trigger/{uuid}", triggers.FireTrigger)
@@ -52,17 +70,16 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 		// Initial setup (only works when no users exist)
 		r.Post("/setup", setup.Setup)
 
-		// Admin passcode verification (no auth required)
-		r.Post("/admin/verify", admin.VerifyPasscode)
-
-		// Authenticated routes (Bearer token or X-User-ID)
+		// Authenticated routes (session cookie, session bearer, or API token)
 		r.Group(func(r chi.Router) {
-			r.Use(RequireUserOrToken(s))
+			r.Use(RequireUserOrToken(s, auth.Sessions))
 
-			// Any user can view their chores, points, streak
-			r.Get("/users/{id}/chores", users.GetChores)
-			r.Get("/users/{id}/points", points.GetUserPoints)
-			r.Get("/users/{id}/streak", streaks.GetUserStreak)
+			r.Get("/auth/me", authH.Me)
+			r.Post("/auth/logout-everywhere", authH.LogoutEverywhere)
+			r.Post("/auth/upload-link", authH.UploadLink)
+			r.Get("/users/{id}/identities", oidcH.ListIdentities)
+			r.Delete("/users/{id}/identities/{identityID}", oidcH.UnlinkIdentity)
+
 			r.Get("/users/{id}/redemptions", rewards.ListRedemptions)
 
 			// Any user can update their own profile preferences
@@ -126,8 +143,6 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher) (*chi.Mux, *Chore
 				r.Get("/completions/pending", chores.ListPending)
 				r.Post("/completions/{id}/approve", chores.Approve)
 				r.Post("/completions/{id}/reject", chores.Reject)
-
-				r.Put("/admin/passcode", admin.UpdatePasscode)
 
 				// Points management
 				r.Get("/points/balances", points.GetAllBalances)

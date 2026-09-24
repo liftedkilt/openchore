@@ -60,6 +60,10 @@ func main() {
 		}
 	}
 
+	if err := api.RetireLegacyPasscodeIfUnused(context.Background(), s); err != nil {
+		log.Printf("auth: could not check legacy admin passcode: %v", err)
+	}
+
 	dispatcher := webhook.NewDispatcher(s)
 
 	// Start background checkers
@@ -89,7 +93,22 @@ func main() {
 	)
 	go deliveryCleaner.Start(context.Background())
 
-	router, choreHandler, reportsHandler := api.NewRouter(s, dispatcher)
+	authCfg, err := config.ResolveAuth(cfg)
+	if err != nil {
+		log.Fatalf("invalid auth config: %v", err)
+	}
+	secret, err := api.LoadSessionSecret(context.Background(), s, os.Getenv("OPENCHORE_SESSION_SECRET"))
+	if err != nil {
+		log.Fatalf("failed to load session secret: %v", err)
+	}
+	sessions := api.NewSessionManager(secret)
+	sessions.SetTTLs(authCfg.SessionTTLs())
+	oidcSvc := api.NewOIDCService(s, sessions, dispatcher, authCfg)
+	for _, p := range authCfg.OIDC {
+		log.Printf("auth: OIDC provider %q (%s) enabled", p.ID, p.Issuer)
+	}
+
+	router, choreHandler, reportsHandler := api.NewRouter(s, dispatcher, api.Auth{Sessions: sessions, OIDC: oidcSvc})
 
 	// Initialize optional AI services in background (waits for sidecars to become ready)
 	go initAIServices(s, choreHandler, reportsHandler)

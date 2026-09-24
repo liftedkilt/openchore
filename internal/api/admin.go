@@ -1,11 +1,8 @@
 package api
 
 import (
-	"log"
 	"net/http"
 	"strings"
-
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/liftedkilt/openchore/internal/config"
 	"github.com/liftedkilt/openchore/internal/store"
@@ -35,115 +32,20 @@ func NewAdminHandler(s *store.Store, dispatcher *webhook.Dispatcher) *AdminHandl
 	return &AdminHandler{store: s, dispatcher: dispatcher}
 }
 
-type verifyPasscodeRequest struct {
-	Passcode string `json:"passcode"`
-}
-
-func (h *AdminHandler) VerifyPasscode(w http.ResponseWriter, r *http.Request) {
-	var req verifyPasscodeRequest
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	stored, err := h.store.GetSetting(r.Context(), "admin_passcode")
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to check passcode")
-		return
-	}
-
-	ip := clientIP(r)
-	if err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(req.Passcode)); err != nil {
-		log.Printf("auth: failed admin passcode attempt from %s", ip)
-		if h.dispatcher != nil {
-			h.dispatcher.Fire(webhook.EventAdminPasscodeFailed, map[string]any{
-				"ip_address": ip,
-				"user_agent": r.UserAgent(),
-			})
-		}
-		writeError(w, http.StatusUnauthorized, "incorrect passcode")
-		return
-	}
-
-	log.Printf("auth: admin passcode verified from %s", ip)
-	if h.dispatcher != nil {
-		h.dispatcher.Fire(webhook.EventAdminPasscodeVerified, map[string]any{
-			"ip_address": ip,
-			"user_agent": r.UserAgent(),
-		})
-	}
-
-	writeJSON(w, http.StatusOK, map[string]bool{"valid": true})
-}
-
-type updatePasscodeRequest struct {
-	OldPasscode string `json:"old_passcode"`
-	NewPasscode string `json:"new_passcode"`
-}
-
-func (h *AdminHandler) UpdatePasscode(w http.ResponseWriter, r *http.Request) {
-	var req updatePasscodeRequest
-	if err := decodeJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if len(req.NewPasscode) < 4 {
-		writeError(w, http.StatusBadRequest, "passcode must be at least 4 characters")
-		return
-	}
-
-	stored, err := h.store.GetSetting(r.Context(), "admin_passcode")
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to check passcode")
-		return
-	}
-	ip := clientIP(r)
-	if err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(req.OldPasscode)); err != nil {
-		log.Printf("auth: failed admin passcode update attempt from %s", ip)
-		if h.dispatcher != nil {
-			h.dispatcher.Fire(webhook.EventAdminPasscodeFailed, map[string]any{
-				"ip_address": ip,
-				"user_agent": r.UserAgent(),
-			})
-		}
-		writeError(w, http.StatusUnauthorized, "incorrect current passcode")
-		return
-	}
-
-	hashed, err := bcrypt.GenerateFromPassword([]byte(req.NewPasscode), bcrypt.DefaultCost)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to hash passcode")
-		return
-	}
-
-	if err := h.store.SetSetting(r.Context(), "admin_passcode", string(hashed)); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to update passcode")
-		return
-	}
-
-	caller := UserFromContext(r.Context())
-	var actorID int64
-	var actorName string
-	if caller != nil {
-		actorID = caller.ID
-		actorName = caller.Name
-	}
-	log.Printf("auth: admin passcode changed by user %d (%s) from %s", actorID, actorName, ip)
-	if h.dispatcher != nil {
-		h.dispatcher.Fire(webhook.EventAdminPasscodeChanged, map[string]any{
-			"actor_id":   actorID,
-			"actor_name": actorName,
-			"ip_address": ip,
-		})
-	}
-
-	writeJSON(w, http.StatusOK, map[string]bool{"updated": true})
+// secretSettings are never readable through the settings API.
+var secretSettings = map[string]bool{
+	legacyPasscodeSetting: true,
+	sessionSecretSetting:  true,
 }
 
 func (h *AdminHandler) GetSetting(w http.ResponseWriter, r *http.Request) {
 	key := urlParam(r, "key")
 	if key == "" {
 		writeError(w, http.StatusBadRequest, "key required")
+		return
+	}
+	if secretSettings[key] {
+		writeError(w, http.StatusForbidden, "setting is not readable")
 		return
 	}
 	val, err := h.store.GetSetting(r.Context(), key)

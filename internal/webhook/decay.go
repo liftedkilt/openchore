@@ -92,7 +92,7 @@ func (pdc *PointsDecayChecker) check(ctx context.Context) {
 			log.Printf("points-decay: failed to load user %d: %v", cfg.UserID, err)
 			continue
 		}
-		if user == nil || user.Role != "child" || user.Paused {
+		if user == nil || user.Paused {
 			continue
 		}
 

@@ -47,6 +47,9 @@ func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
 	}
 	u.ID, _ = res.LastInsertId()
 	u.HasPin = u.PinHash != ""
+	if u.AuthProviders == nil {
+		u.AuthProviders = []string{}
+	}
 	return nil
 }
 
@@ -54,35 +57,153 @@ func (s *Store) GetUser(ctx context.Context, id int64) (*model.User, error) {
 	u := &model.User{}
 	var paused int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, pin_hash, created_at FROM users WHERE id = ?`, id).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.PinHash, &u.CreatedAt)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, pin_hash, session_version, created_at FROM users WHERE id = ?`, id).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.PinHash, &u.SessionVersion, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
+	if err != nil {
+		return nil, err
+	}
 	u.Paused = paused == 1
 	u.HasPin = u.PinHash != ""
-	return u, err
+	providers, err := s.listIdentityProviders(ctx)
+	if err != nil {
+		return nil, err
+	}
+	u.AuthProviders = nonNilStrings(providers[u.ID])
+	return u, nil
 }
 
 func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, pin_hash, created_at FROM users ORDER BY name`)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, paused, pin_hash, session_version, created_at FROM users ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	var users []model.User
 	for rows.Next() {
 		var u model.User
 		var paused int
-		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.PinHash, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &paused, &u.PinHash, &u.SessionVersion, &u.CreatedAt); err != nil {
+			rows.Close()
 			return nil, err
 		}
 		u.Paused = paused == 1
 		u.HasPin = u.PinHash != ""
 		users = append(users, u)
 	}
-	return users, rows.Err()
+	// Close before the next query: the pool holds a single connection.
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	providers, err := s.listIdentityProviders(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range users {
+		users[i].AuthProviders = nonNilStrings(providers[users[i].ID])
+	}
+	return users, nil
+}
+
+// listIdentityProviders maps user ID -> linked provider IDs.
+func (s *Store) listIdentityProviders(ctx context.Context) (map[int64][]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT user_id, provider FROM user_identities ORDER BY provider`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64][]string{}
+	for rows.Next() {
+		var uid int64
+		var p string
+		if err := rows.Scan(&uid, &p); err != nil {
+			return nil, err
+		}
+		out[uid] = append(out[uid], p)
+	}
+	return out, rows.Err()
+}
+
+func nonNilStrings(v []string) []string {
+	if v == nil {
+		return []string{}
+	}
+	return v
+}
+
+// BumpSessionVersion invalidates every outstanding session for a user.
+func (s *Store) BumpSessionVersion(ctx context.Context, userID int64) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET session_version = session_version + 1 WHERE id = ?`, userID)
+	return err
+}
+
+// --- User identities (OIDC) ---
+
+func (s *Store) GetIdentity(ctx context.Context, provider, subject string) (*model.UserIdentity, error) {
+	i := &model.UserIdentity{}
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, user_id, provider, subject, email, display_name, created_at, last_login_at FROM user_identities WHERE provider = ? AND subject = ?`,
+		provider, subject).Scan(&i.ID, &i.UserID, &i.Provider, &i.Subject, &i.Email, &i.DisplayName, &i.CreatedAt, &i.LastLoginAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return i, nil
+}
+
+func (s *Store) ListIdentitiesForUser(ctx context.Context, userID int64) ([]model.UserIdentity, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, user_id, provider, subject, email, display_name, created_at, last_login_at FROM user_identities WHERE user_id = ? ORDER BY provider`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.UserIdentity{}
+	for rows.Next() {
+		var i model.UserIdentity
+		if err := rows.Scan(&i.ID, &i.UserID, &i.Provider, &i.Subject, &i.Email, &i.DisplayName, &i.CreatedAt, &i.LastLoginAt); err != nil {
+			return nil, err
+		}
+		out = append(out, i)
+	}
+	return out, rows.Err()
+}
+
+// LinkIdentity attaches an external identity to a profile. It fails with a
+// UNIQUE constraint error when the subject is already linked to any profile.
+func (s *Store) LinkIdentity(ctx context.Context, i *model.UserIdentity) error {
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO user_identities (user_id, provider, subject, email, display_name) VALUES (?, ?, ?, ?, ?)`,
+		i.UserID, i.Provider, i.Subject, i.Email, i.DisplayName)
+	if err != nil {
+		return err
+	}
+	i.ID, _ = res.LastInsertId()
+	return nil
+}
+
+// UnlinkIdentity removes a linked identity belonging to userID. Returns false
+// when no such identity exists for that user.
+func (s *Store) UnlinkIdentity(ctx context.Context, userID, identityID int64) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM user_identities WHERE id = ? AND user_id = ?`, identityID, userID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// TouchIdentityLogin records a successful login and refreshes profile claims.
+func (s *Store) TouchIdentityLogin(ctx context.Context, id int64, email, displayName string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE user_identities SET last_login_at = CURRENT_TIMESTAMP, email = ?, display_name = ? WHERE id = ?`,
+		email, displayName, id)
+	return err
 }
 
 // --- Chores ---
@@ -2863,6 +2984,13 @@ func isUniqueConstraintErr(err error) bool {
 	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
+// participantFilter selects users who take part in chores: every child, plus
+// any parent who has been assigned a chore or has point history. Parents who
+// only manage the household stay out of per-person reports.
+const participantFilter = `(u.role = 'child'
+			OR EXISTS (SELECT 1 FROM chore_schedules pcs WHERE pcs.assigned_to = u.id)
+			OR EXISTS (SELECT 1 FROM point_transactions ppt WHERE ppt.user_id = u.id))`
+
 // --- FCFS Helpers ---
 
 // ListNonPausedChildren returns all child users that are not paused.
@@ -3441,7 +3569,7 @@ func (s *Store) ReportKidSummaries(ctx context.Context, startDate, endDate strin
 			GROUP BY pt.user_id
 		) earned ON earned.user_id = u.id
 		LEFT JOIN user_streaks us ON us.user_id = u.id
-		WHERE u.role = 'child'
+		WHERE ` + participantFilter + `
 		ORDER BY u.name`
 
 	rows, err := s.db.QueryContext(ctx, query, startDate, endDate, startDate, endDate, startDate, endDate)
@@ -3602,7 +3730,7 @@ func (s *Store) ReportPointsSummary(ctx context.Context, startDate, endDate stri
 		LEFT JOIN point_transactions pt
 			ON pt.user_id = u.id
 			AND DATE(pt.created_at) >= ? AND DATE(pt.created_at) <= ?
-		WHERE u.role = 'child'
+		WHERE ` + participantFilter + `
 		GROUP BY u.id, u.name
 		ORDER BY u.name`
 

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"context"
 	"log"
 	"net/http"
@@ -399,6 +400,19 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only the assignee (or a parent acting on their behalf) may complete.
+	caller := UserFromContext(r.Context())
+	if !canActOnSchedule(caller, schedule) {
+		writeError(w, http.StatusForbidden, "this chore is assigned to someone else")
+		return
+	}
+	completedBy, err := completerFor(caller, schedule, req.CompletedBy)
+	if err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	actingForOther := caller.Role == model.RoleAdmin && completedBy != caller.ID
+
 	// Enforce time lock
 	now := time.Now()
 	nowTime := now.Format("15:04")
@@ -540,7 +554,9 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 			photoSource = model.PhotoSourceChild
 		}
 	}
-	if chore != nil && chore.RequiresPhoto && req.PhotoURL == "" && photoSource == model.PhotoSourceChild {
+	// A parent marking a chore done on someone's behalf vouches for it and
+	// doesn't need to supply the photo.
+	if chore != nil && chore.RequiresPhoto && req.PhotoURL == "" && photoSource == model.PhotoSourceChild && !actingForOther {
 		writeError(w, http.StatusBadRequest, "a photo is required to complete this chore")
 		return
 	}
@@ -578,11 +594,6 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 				// is below the threshold, give the kid the benefit of the doubt.
 				if !result.Complete && result.Confidence >= threshold {
 					// AI says not complete — save as ai_rejected with feedback
-					user := UserFromContext(r.Context())
-					completedBy := user.ID
-					if req.CompletedBy != 0 {
-						completedBy = req.CompletedBy
-					}
 					rejection := &model.ChoreCompletion{
 						ChoreScheduleID: scheduleID,
 						CompletedBy:     completedBy,
@@ -618,11 +629,6 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-	}
-
-	completedBy := user.ID
-	if req.CompletedBy != 0 {
-		completedBy = req.CompletedBy
 	}
 
 	status := model.StatusApproved
@@ -812,6 +818,10 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 
 	// Get the schedule to check for FCFS
 	schedule, _ := h.store.GetSchedule(r.Context(), scheduleID)
+	if schedule != nil && !canActOnSchedule(UserFromContext(r.Context()), schedule) {
+		writeError(w, http.StatusForbidden, "this chore is assigned to someone else")
+		return
+	}
 
 	// Get completion before deleting so we can reverse points
 	existing, _ := h.store.GetCompletionForScheduleDate(r.Context(), scheduleID, dateStr)
@@ -1501,3 +1511,16 @@ func (h *ChoreHandler) Excuse(w http.ResponseWriter, r *http.Request) {
 }
 
 
+
+// completerFor decides whose completion this is (and so who is credited).
+// It defaults to the schedule's assignee, so a parent ticking a kid's chore
+// credits the kid. Only admins may name someone else explicitly.
+func completerFor(caller *model.User, schedule *model.ChoreSchedule, requested int64) (int64, error) {
+	if requested == 0 || requested == schedule.AssignedTo {
+		return schedule.AssignedTo, nil
+	}
+	if caller.Role != model.RoleAdmin {
+		return 0, errors.New("can only complete chores as yourself")
+	}
+	return requested, nil
+}
