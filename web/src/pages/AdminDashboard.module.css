@@ -97,32 +97,6 @@
   margin-left: auto;
 }
 
-/* LanguageSelector's own module styles the legacy dark palette; restyle it
-   in tokens here (two classes beat its one). */
-.headerActions .lang {
-  min-height: 44px;
-  padding: 0 32px 0 14px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background-color: var(--surface-raised);
-  background-image:
-    linear-gradient(45deg, transparent 50%, currentColor 50%),
-    linear-gradient(135deg, currentColor 50%, transparent 50%);
-  background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%;
-  background-size: 5px 5px, 5px 5px;
-  background-repeat: no-repeat;
-  color: var(--ink);
-  font-family: var(--font-text);
-  font-size: 14px;
-  font-weight: 650;
-  box-shadow: none;
-}
-
-.headerActions .lang option {
-  background: var(--surface-raised);
-  color: var(--ink);
-}
-
 .reports {
   display: inline-flex;
   align-items: center;
