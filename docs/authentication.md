@@ -102,6 +102,12 @@ OpenChore sits behind a reverse proxy. Otherwise the redirect URI is guessed
 from the request's `Host` and `X-Forwarded-Proto` headers, which proxies don't
 always pass through.
 
+Browser requests that change something are also checked against their
+`Origin`. This stops another app on a sibling subdomain (say
+`other.home.lan`) from acting with your cookie. If OpenChore sits behind a
+proxy that rewrites `Host` and you see "cross-origin request blocked", set
+`public_url`.
+
 If your provider uses a certificate from a private CA, point `SSL_CERT_FILE`
 at a bundle that includes it.
 

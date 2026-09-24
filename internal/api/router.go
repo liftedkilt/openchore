@@ -47,6 +47,8 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 	r.Handle("/tts/*", http.StripPrefix("/tts/", http.FileServer(http.Dir("data/tts"))))
 
 	r.Route("/api", func(r chi.Router) {
+		r.Use(CheckOrigin(auth.OIDC.publicURL))
+
 		// Public: list users (for profile selection screen)
 		r.Get("/users", users.List)
 		r.Get("/users/{id}", users.Get)
