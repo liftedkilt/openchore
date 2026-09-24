@@ -845,6 +845,58 @@
       "week": "Week"
     }
   },
+  "entry": {
+    "picker": {
+      "allDone": "All done",
+      "dateTime": "{{date}} · {{time}}",
+      "doorsLabel": "Who's here",
+      "familyToday": "The family today",
+      "grownUps": "Grown-ups",
+      "grownUpsHint": "PIN or linked account",
+      "hello": {
+        "afternoon": "Good afternoon.",
+        "evening": "Good evening.",
+        "morning": "Good morning."
+      },
+      "nothingToday": "Nothing today",
+      "paused": "Taking a break",
+      "toGo_one": "{{count}} to go",
+      "toGo_other": "{{count}} to go",
+      "wallDisplay": "Wall display",
+      "whosHere": "Who's here?"
+    },
+    "pinPad": {
+      "progress_one": "{{count}} of {{total}} digits entered",
+      "progress_other": "{{count}} of {{total}} digits entered"
+    },
+    "setup": {
+      "color": "Colour",
+      "colors": {
+        "butter": "Butter",
+        "coral": "Coral",
+        "leaf": "Leaf",
+        "lilac": "Lilac",
+        "mint": "Mint",
+        "rose": "Rose",
+        "sand": "Sand",
+        "sky": "Sky"
+      },
+      "looksDescription": "Each kid gets a skin for their own screens and a colour that follows them everywhere. They can change both later.",
+      "looksTitle": "Pick their look",
+      "progress": "Setup progress",
+      "remove": "Remove {{name}}",
+      "skin": "Skin",
+      "skins": {
+        "blocks": "Blocks",
+        "sunroom": "Sunroom",
+        "tint": "Tint"
+      },
+      "stepOf": "Step {{step}} of {{total}}",
+      "suggestFrom": "Suggested from {{age}}",
+      "suggestUnder": "Suggested under {{age}}",
+      "yourColor": "Your colour"
+    }
+  },
   "linkedAccounts": {
     "confirmSignOutEverywhere": "Sign this profile out on every device, including this one?",
     "confirmUnlink": "Unlink {{provider}}? Devices signed in with it will be signed out.",
@@ -903,10 +955,7 @@
     "or": "or",
     "pinProtected": "PIN protected",
     "selectProfile": "Select profile for {{name}}",
-    "signInWithLinked": "This profile signs in with a linked account.",
-    "wallDisplay": "Wall Display",
-    "welcomeBack": "Welcome back!",
-    "whoIsDoingChores": "Who's doing chores today?"
+    "signInWithLinked": "This profile signs in with a linked account."
   },
   "reports": {
     "aiSummary": "AI Summary",
@@ -966,12 +1015,6 @@
     "parentPinPlaceholder": "Choose a PIN (4–8 digits)",
     "parentTitle": "Who manages the chores?",
     "settingUp": "Setting up...",
-    "themeClassicBlue": "Classic Blue",
-    "themeGalaxyPurple": "Galaxy Purple",
-    "themeNatureForest": "Nature Forest",
-    "themeQuestAdventure": "Quest Adventure",
-    "themesDescription": "Each child can have their own favorite theme.",
-    "themesTitle": "Pick their style",
     "welcomeDescription": "Let's get your family set up in just a few minutes.",
     "welcomeTitle": "Welcome to OpenChore!"
   },

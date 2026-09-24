@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Delete } from 'lucide-react';
+import clsx from 'clsx';
+import { Icon } from '../../design';
 import styles from './PinPad.module.css';
 
 interface PinPadProps {
@@ -16,17 +17,24 @@ interface PinPadProps {
   resetKey?: number;
 }
 
+const DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
+
+/**
+ * An on-screen PIN pad. It has no theme of its own: it reads the tokens and
+ * dials of whatever scope it sits in (House, House Dark or a person's skin).
+ */
 export const PinPad: React.FC<PinPadProps> = ({ prompt, error, onSubmit, length = 4, resetKey }) => {
   const { t } = useTranslation();
   const [code, setCode] = useState('');
   const [shaking, setShaking] = useState(false);
+  const promptId = useId();
 
-  // Reset the input when the parent bumps resetKey or the error changes.
+  // Clear the input shortly after an error so the dots show what went wrong first.
   useEffect(() => {
     if (error) {
       setShaking(true);
-      const t = setTimeout(() => { setShaking(false); setCode(''); }, 500);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => { setShaking(false); setCode(''); }, 500);
+      return () => clearTimeout(timer);
     }
   }, [error]);
 
@@ -63,27 +71,32 @@ export const PinPad: React.FC<PinPadProps> = ({ prompt, error, onSubmit, length 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleDigit, handleDelete]);
 
-  const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
-
   return (
-    <div className={styles.wrapper}>
-      {prompt && <p className={styles.prompt}>{prompt}</p>}
-      <div className={`${styles.dots} ${shaking ? styles.shake : ''}`}>
+    <div className={clsx(styles.wrapper, error && styles.hasError)}>
+      {prompt && <p className={styles.prompt} id={promptId}>{prompt}</p>}
+      <div className={clsx(styles.dots, shaking && styles.shake)} aria-hidden>
         {Array.from({ length }).map((_, i) => (
-          <div
-            key={i}
-            className={`${styles.dot} ${i < code.length ? styles.dotFilled : ''} ${error ? styles.dotError : ''}`}
-          />
+          <span key={i} className={clsx(styles.dot, i < code.length && styles.dotFilled)} />
         ))}
       </div>
-      {error && <p className={styles.error}>{error}</p>}
-      <div className={styles.keypad}>
-        {digits.map((d, i) => {
-          if (d === '') return <div key={i} className={styles.keyEmpty} />;
+      <p className="oc-visually-hidden" aria-live="polite">
+        {t('entry.pinPad.progress', { count: code.length, total: length })}
+      </p>
+      <p className={styles.error} role="alert">{error}</p>
+      <div className={styles.keypad} role="group" aria-labelledby={prompt ? promptId : undefined}>
+        {DIGITS.map((d, i) => {
+          if (d === '') return <span key={i} aria-hidden />;
           if (d === 'del') {
             return (
-              <button key={i} type="button" className={styles.key} onClick={handleDelete} aria-label={t('common.pinPad.deleteAriaLabel')}>
-                <Delete size={22} />
+              <button
+                key={i}
+                type="button"
+                className={clsx(styles.key, styles.keyQuiet)}
+                onClick={handleDelete}
+                disabled={code.length === 0}
+                aria-label={t('common.pinPad.deleteAriaLabel')}
+              >
+                <Icon name="back" size={26} />
               </button>
             );
           }
