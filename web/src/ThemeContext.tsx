@@ -1,12 +1,21 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useMemo } from 'react';
 import { THEME_CONFIG } from './types';
-import type { Theme, ThemeConfig } from './types';
+import type { ThemeConfig } from './types';
 import { useAuth } from './AuthContext';
 import { api } from './api';
+import { isPersonColor, resolveSkin, type PersonColor, type Skin } from './design';
 
+// The signed-in person's skin and colour. Screens that belong to one person
+// render inside <SkinScope skin={skin} color={color}>; nothing here touches
+// <body> any more, so shared screens (picker, admin, ambient) stay in House.
 interface ThemeContextType {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
+  /** The person's skin: their stored theme, or by age when unset. */
+  skin: Skin;
+  /** The person's colour key, or null when they have none. */
+  color: PersonColor | null;
+  setSkin: (skin: Skin) => Promise<void>;
+  setColor: (color: PersonColor) => Promise<void>;
+  /** Per-skin feedback: sounds and vibration. */
   config: ThemeConfig;
 }
 
@@ -14,35 +23,43 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, setUser } = useAuth();
-  const [theme, setThemeState] = useState<Theme>('sunroom');
+  const skin = resolveSkin(user?.theme, user?.age);
+  const color = isPersonColor(user?.color) ? user.color : null;
 
-  useEffect(() => {
-    setThemeState((user?.theme || 'sunroom') as Theme);
-  }, [user]);
-
-  useEffect(() => {
-    document.body.className = `theme-${theme}`;
-  }, [theme]);
-
-  const setTheme = async (newTheme: Theme) => {
-    setThemeState(newTheme);
-    if (user) {
-      try {
-        const updated = await api.users.updateTheme(user.id, newTheme);
-        setUser({ ...user, ...updated });
-      } catch (e) {
-        console.error('Failed to save theme:', e);
-      }
+  const setSkin = useCallback(async (next: Skin) => {
+    if (!user) return;
+    const previous = user;
+    // Optimistic: the screen re-skins at once, and rolls back on failure.
+    setUser({ ...user, theme: next });
+    try {
+      const updated = await api.users.updateTheme(user.id, next);
+      setUser({ ...previous, ...updated });
+    } catch (e) {
+      console.error('Failed to save skin:', e);
+      setUser(previous);
+      throw e;
     }
-  };
+  }, [user, setUser]);
 
-  const config = THEME_CONFIG[theme] || THEME_CONFIG.sunroom;
+  const setColor = useCallback(async (next: PersonColor) => {
+    if (!user) return;
+    const previous = user;
+    setUser({ ...user, color: next });
+    try {
+      const updated = await api.users.updateColor(user.id, next);
+      setUser({ ...previous, ...updated });
+    } catch (e) {
+      console.error('Failed to save colour:', e);
+      setUser(previous);
+      throw e;
+    }
+  }, [user, setUser]);
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme, config }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  const value = useMemo<ThemeContextType>(() => ({
+    skin, color, setSkin, setColor, config: THEME_CONFIG[skin] ?? THEME_CONFIG.sunroom,
+  }), [skin, color, setSkin, setColor]);
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
 
 export const useTheme = () => {

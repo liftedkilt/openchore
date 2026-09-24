@@ -25,7 +25,7 @@ test.describe('Rewards', () => {
     });
 
     await selectUser(page, 'Emma');
-    await page.getByText(/Rewards/i).click();
+    await page.getByRole('link', { name: 'Rewards' }).click();
     await expect(page.getByText('Extra Screen Time')).toBeVisible({ timeout: 5_000 });
 
     // Click first redeem button
@@ -39,11 +39,11 @@ test.describe('Rewards', () => {
   test('child cannot redeem reward they cannot afford', async ({ page }) => {
     // Noah has no points
     await selectUser(page, 'Noah');
-    await page.getByText(/Rewards/i).click();
+    await page.getByRole('link', { name: 'Rewards' }).click();
     await expect(page.getByText('Extra Screen Time')).toBeVisible({ timeout: 5_000 });
 
-    // All redeem buttons should show "Need X more" (disabled)
-    const disabledBtns = page.locator('button[disabled]').filter({ hasText: /Need|pts/i });
+    // Redeem buttons show how many more points are needed ("50 more") and are disabled
+    const disabledBtns = page.locator('button[disabled]').filter({ hasText: /\d+ more/i });
     await expect(disabledBtns.first()).toBeVisible({ timeout: 5_000 });
   });
 

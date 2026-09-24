@@ -1,131 +1,68 @@
-.container {
+/* Photo proof from another device. Tokens and dials only: it renders in the
+   chore owner's skin, or in House when the owner isn't known. */
+.root {
   min-height: 100vh;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  min-height: 100dvh;
+}
+
+.page {
+  box-sizing: border-box;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: calc(var(--space-6) + env(safe-area-inset-top, 0px)) var(--space-5) var(--space-8);
   display: flex;
   flex-direction: column;
+  gap: var(--space-5);
 }
 
-.header {
-  background-color: var(--bg-secondary);
-  padding: 1.5rem;
-  text-align: center;
-  box-shadow: var(--shadow-md);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.header h1 {
-  font-size: 1.25rem;
-  font-weight: 700;
+.head { display: flex; align-items: center; gap: var(--space-3); }
+.kicker {
   margin: 0;
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: var(--label-case);
+  color: var(--ink-muted);
 }
+.for { margin: 0; font-size: 17px; font-weight: 700; }
 
-.header p {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
-}
-
-.content {
-  flex: 1;
-  padding: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.uploadCard {
-  background: var(--bg-secondary);
-  padding: 2.5rem 2rem;
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 400px;
-  text-align: center;
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--border-subtle);
+.card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
-}
-
-.cameraIcon {
-  color: var(--accent-blue);
-  margin-bottom: 0.5rem;
-}
-
-.uploadCard h2 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0;
-}
-
-.uploadCard p {
-  color: var(--text-secondary);
-  margin-bottom: 1rem;
-}
-
-.uploadBtn {
-  background: var(--accent-blue);
-  color: var(--bg-primary);
-  padding: 1rem 2rem;
-  border-radius: var(--radius-md);
-  font-weight: 700;
-  font-size: 1.125rem;
-  cursor: pointer;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--transition);
-}
-
-.uploadBtn:active {
-  filter: brightness(0.85);
-  transform: scale(0.98);
-}
-
-.errorText {
-  color: var(--status-required);
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin-top: 0.5rem;
-}
-
-.successBox, .errorBox {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-5) var(--space-5);
   text-align: center;
-  gap: 1.5rem;
+  border: var(--outline-w) solid var(--line);
+  border-radius: var(--oc-radius-xl);
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: var(--lift-lg);
 }
 
-.checkCircle {
-  width: 80px;
-  height: 80px;
-  background-color: var(--accent-green);
-  color: var(--bg-primary);
+.well {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border: var(--outline-w) solid var(--line);
+  background: var(--cat-daily-soft);
+  color: var(--cat-daily-icon);
 }
+.well[data-kind="done"] { background: var(--done); color: var(--on-done); }
+.well[data-kind="error"] { background: var(--surface-sunk); color: var(--urgent); }
 
-.successBox h1 { color: var(--text-primary); }
-.successBox p { color: var(--text-secondary); font-size: 1.125rem; }
-
-.errorBox { color: var(--status-required); }
-.errorBox h1 { color: var(--text-primary); }
-.errorBox p { color: var(--text-secondary); }
-
-.spinner {
-  animation: spin 1s linear infinite;
+.title {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-variation-settings: var(--display-axes);
+  letter-spacing: var(--display-tracking);
+  font-size: var(--hero-size);
+  line-height: var(--hero-line);
 }
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+.text { margin: 0 0 var(--space-3); max-width: 30ch; color: var(--ink-muted); font-size: 16px; line-height: 22px; }
+.error { margin: 0; color: var(--urgent); font-size: 14px; font-weight: 600; }
