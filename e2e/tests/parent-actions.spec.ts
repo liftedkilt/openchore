@@ -61,6 +61,8 @@ test.describe('Parents acting for kids', () => {
 test.describe('Linked accounts', () => {
   test('profile menu explains when no sign-in providers are configured', async ({ page }) => {
     await selectUser(page, 'Emma');
+    // Linked accounts live in the "Me" sheet, opened from the avatar.
+    await page.getByRole('button', { name: 'Emma: settings' }).click();
     await page.getByRole('button', { name: 'Linked accounts' }).click();
     await expect(page.getByText('No sign-in providers are configured on this server.')).toBeVisible();
   });

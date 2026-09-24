@@ -1,72 +1,83 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { selectUser, authHeaders } from './helpers/setup';
+
+/** Open the "Me" sheet from the avatar at the top of a person's screen. */
+async function openMe(page: Page, name: string) {
+  await page.getByRole('button', { name: `${name}: settings` }).click();
+  await expect(page.getByRole('dialog', { name: 'Me' })).toBeVisible();
+}
 
 test.describe('Theme and Profile', () => {
   test('child can switch themes', async ({ page }) => {
     await selectUser(page, 'Emma');
     await expect(page.locator('body')).toContainText('pts', { timeout: 10_000 });
+    const skinRoot = page.locator('[data-theme][data-person]').first();
+    await expect(skinRoot).toHaveAttribute('data-theme', 'sunroom');
 
-    // Click theme picker (Palette icon button)
-    const themeBtn = page.locator('button[aria-label*="theme"], button').filter({ has: page.locator('svg') });
-    // The theme picker is typically near the header buttons
-    const headerBtns = page.locator('header button, [class*="header"] button');
-    const paletteBtn = headerBtns.filter({ hasText: '' }).nth(1); // Theme picker is typically second icon button
-
-    // Alternative: look for the theme-related functionality after clicking
-    // Try clicking a button that opens theme picker
-    const buttons = page.locator('button');
-    const count = await buttons.count();
-
-    // Find and click the palette/theme button by trying header area buttons
-    for (let i = 0; i < Math.min(count, 10); i++) {
-      const btn = buttons.nth(i);
-      const text = await btn.textContent();
-      if (text === '') {
-        // Icon-only button, might be theme picker
-        continue;
-      }
-    }
+    await openMe(page, 'Emma');
+    await page.getByRole('radio', { name: 'Tint' }).click();
+    await expect(page.getByRole('radio', { name: 'Tint' })).toHaveAttribute('aria-checked', 'true');
+    // The whole screen re-skins at once.
+    await expect(skinRoot).toHaveAttribute('data-theme', 'tint');
 
     // Verify theme is persisted via API
-    const resp = await page.request.get('/api/users/3', {
-      headers: await authHeaders(3),
-    });
-    const user = await resp.json();
-    // User should have a theme field
-    expect(user.theme).toBeDefined();
+    await expect.poll(async () => {
+      const resp = await page.request.get('/api/users/3', { headers: await authHeaders(3) });
+      return (await resp.json()).theme;
+    }).toBe('tint');
+
+    // Put Emma back in her own skin for the rest of the suite.
+    await page.getByRole('radio', { name: 'Sunroom' }).click();
+    await expect(skinRoot).toHaveAttribute('data-theme', 'sunroom');
+    await expect.poll(async () => {
+      const resp = await page.request.get('/api/users/3', { headers: await authHeaders(3) });
+      return (await resp.json()).theme;
+    }).toBe('sunroom');
+  });
+
+  test('child can pick their colour', async ({ page }) => {
+    await selectUser(page, 'Emma');
+    await expect(page.locator('body')).toContainText('pts', { timeout: 10_000 });
+    await openMe(page, 'Emma');
+
+    await page.getByRole('radio', { name: 'Lilac' }).click();
+    await expect(page.locator('[data-theme][data-person]').first()).toHaveAttribute('data-person', 'lilac');
+    await expect.poll(async () => {
+      const resp = await page.request.get('/api/users/3', { headers: await authHeaders(3) });
+      return (await resp.json()).color;
+    }).toBe('lilac');
+
+    // Restore the seeded colour.
+    await page.getByRole('radio', { name: 'Coral' }).click();
+    await expect(page.locator('[data-theme][data-person]').first()).toHaveAttribute('data-person', 'coral');
   });
 
   test('TTS toggle persists preference', async ({ page }) => {
     await selectUser(page, 'Emma');
     await expect(page.locator('body')).toContainText('pts', { timeout: 10_000 });
 
-    // Emma is 11, so TTS should default to off
-    // Find the TTS toggle button (Volume icon in header)
-    const volumeBtn = page.locator('button[aria-label*="speech"], button[aria-label*="TTS"]');
-    if (await volumeBtn.count() > 0) {
-      await volumeBtn.first().click();
-      // Toggle should now be in a different state
-      await page.waitForTimeout(500);
-    }
+    // Emma is 11, so TTS defaults to off.
+    await openMe(page, 'Emma');
+    const toggle = page.getByRole('switch', { name: /read chores aloud/i });
+    const before = await toggle.getAttribute('aria-checked');
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-checked', before === 'true' ? 'false' : 'true');
 
     // Verify localStorage was set
-    const ttsValue = await page.evaluate((userId) => {
-      return localStorage.getItem(`openchore_tts_${userId}`);
-    }, 3);
-    expect(ttsValue).toBeDefined();
+    const ttsValue = await page.evaluate((userId) => localStorage.getItem(`openchore_tts_${userId}`), 3);
+    expect(ttsValue).toBe(before === 'true' ? '0' : '1');
+
+    // Put it back.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-checked', before ?? 'false');
   });
 
   test('logout returns to profile selection', async ({ page }) => {
     await selectUser(page, 'Emma');
     await expect(page.locator('body')).toContainText('pts', { timeout: 10_000 });
 
-    // Find and click the logout button
-    const logoutBtn = page.locator('button[aria-label*="log out"], button[aria-label*="Logout"]')
-      .or(page.getByRole('button', { name: /log ?out/i }));
-
-    if (await logoutBtn.count() > 0) {
-      await logoutBtn.first().click();
-      await expect(page).toHaveURL('/login');
-    }
+    await openMe(page, 'Emma');
+    await page.getByRole('button', { name: /sign out/i }).click();
+    await expect(page).toHaveURL('/login');
   });
 });
