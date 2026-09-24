@@ -31,6 +31,12 @@ export interface ChoreRowProps {
   busy?: boolean;
   /** Extra controls (e.g. a photo upload button) placed before the check. */
   actions?: React.ReactNode;
+  /**
+   * Display only (e.g. the wall display): the check is drawn but is not a
+   * button, and there is no read-aloud button. The state is still carried
+   * by the meta line and the check's tick or lock.
+   */
+  readOnly?: boolean;
   className?: string;
   id?: string;
 }
@@ -42,7 +48,7 @@ export interface ChoreRowProps {
  */
 export function ChoreRow({
   cat = 'daily', icon, title, meta, points, state = 'todo', urgent, photo, readAloud,
-  onToggle, onReadAloud, checkLabel, busy, actions, className, id,
+  onToggle, onReadAloud, checkLabel, busy, actions, readOnly, className, id,
 }: ChoreRowProps) {
   const { t } = useTranslation();
   const iconName = resolveChoreIcon(icon, cat);
@@ -71,6 +77,13 @@ export function ChoreRow({
     ? t('design.chore.lockedLabel')
     : checked ? t('design.chore.markIncomplete') : t('design.chore.markComplete'));
 
+  const ring = (
+    <span className="oc-chore__ring">
+      {state === 'done' && <Icon name="check" />}
+      {locked && <Icon name="lock" />}
+    </span>
+  );
+
   return (
     <div
       id={id}
@@ -85,24 +98,25 @@ export function ChoreRow({
         <span className="oc-chore__title">{title}</span>
         {metaLine != null && <span className="oc-chore__meta">{metaLine}</span>}
       </span>
-      {readAloud && state !== 'done' && (
+      {readAloud && !readOnly && state !== 'done' && (
         <button type="button" className="oc-chore__say" onClick={onReadAloud} aria-label={t('design.chore.readAloud', { title })}>
           <span className="oc-chore__say-ring"><Icon name="sound" /></span>
         </button>
       )}
       {actions && <span className="oc-chore__actions">{actions}</span>}
-      <button
-        type="button"
-        className="oc-chore__check"
-        aria-label={label}
-        disabled={locked || busy}
-        onClick={locked || busy ? undefined : onToggle}
-      >
-        <span className="oc-chore__ring">
-          {state === 'done' && <Icon name="check" />}
-          {locked && <Icon name="lock" />}
-        </span>
-      </button>
+      {readOnly ? (
+        <span className="oc-chore__check" aria-hidden>{ring}</span>
+      ) : (
+        <button
+          type="button"
+          className="oc-chore__check"
+          aria-label={label}
+          disabled={locked || busy}
+          onClick={locked || busy ? undefined : onToggle}
+        >
+          {ring}
+        </button>
+      )}
     </div>
   );
 }

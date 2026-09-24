@@ -567,14 +567,6 @@
       "updateBtn": "Aktualisieren"
     }
   },
-  "ambient": {
-    "choresDone": "Aufgaben erledigt",
-    "ptsToday_one": "{{count}} Pkt. heute",
-    "ptsToday_other": "{{count}} Pkt. heute",
-    "streakDays_one": "{{count}} T.",
-    "streakDays_other": "{{count}} T.",
-    "todaysProgress": "Heutiger Fortschritt"
-  },
   "common": {
     "back": "Zurück",
     "language": "Sprache",
@@ -959,37 +951,43 @@
   },
   "reports": {
     "aiSummary": "KI-Zusammenfassung",
-    "barChart": {
-      "noData": "Keine Daten"
-    },
-    "bestWorstDays": "Beste / schlechteste Tage",
-    "categoryBreakdown": "Kategorienübersicht",
-    "completionTrend": "Trend",
+    "back": "Zurück zur Verwaltung",
+    "bestWorstDays": "Beste und schwerste Tage",
+    "byPerson": "Erledigt, pro Person",
+    "categoryBreakdown": "Nach Kategorie",
+    "completionTrend": "Erledigt im Verlauf",
+    "daysSummary": "Am besten: {{best}} ({{bestRate}}). Am schwersten: {{worst}} ({{worstRate}}).",
     "doneCount": "{{completed}}/{{assigned}} erledigt",
     "failedToGenerateSummary": "Zusammenfassung konnte nicht generiert werden.",
     "failedToLoadReports": "Berichte konnten nicht geladen werden",
-    "generating": "Wird generiert...",
-    "kidScorecards": "Kinder-Scorecards",
-    "lineChart": {
-      "noData": "Keine Daten",
-      "seriesFallback": "Streak {{index}}"
-    },
-    "loadingReports": "Berichte werden geladen...",
-    "mostMissedChores": "Am häufigsten verpasste Aufgaben",
+    "generating": "Zusammenfassung wird geschrieben…",
+    "loadingReports": "Berichte werden geladen…",
+    "missedTimes_one": "{{count}}×",
+    "missedTimes_other": "{{count}}×",
+    "mostMissedChores": "Am häufigsten verpasst",
+    "next": "Nächster Zeitraum",
     "noData": "Keine Daten",
     "noDataForPeriod": "Keine Daten für diesen Zeitraum",
     "noMissedChores": "Keine verpassten Aufgaben!",
+    "periodLabel": "Zeitraum",
     "period_month": "Monat",
     "period_week": "Woche",
     "period_year": "Jahr",
-    "pointsDecayed": "-{{count}} Pkt. erfallen",
-    "pointsEarned": "{{count}} Pkt. verdient",
-    "pointsFlow": "Punkte-Historie",
-    "pointsSpent": "-{{count}} ausgegeben",
+    "pointsDecayed_one": "−{{count}} verfallen",
+    "pointsDecayed_other": "−{{count}} verfallen",
+    "pointsEarned_one": "{{count}} Pkt.",
+    "pointsEarned_other": "{{count}} Pkt.",
+    "pointsFlow": "Punkte",
+    "pointsSpent_one": "−{{count}} ausgegeben",
+    "pointsSpent_other": "−{{count}} ausgegeben",
+    "previous": "Voriger Zeitraum",
+    "scorecards": "Alle",
     "seriesAssigned": "Zugewiesen",
     "seriesCompleted": "Erledigt",
-    "streakDays": "{{count}} Tage Streak",
-    "title": "Berichte"
+    "streakDays_one": "{{count}} Tag in Folge",
+    "streakDays_other": "{{count}} Tage in Folge",
+    "title": "Berichte",
+    "trendDesc": "Erledigte und zugewiesene Aufgaben pro Tag vom {{from}} bis {{to}}: {{done}} von {{assigned}} erledigt."
   },
   "setup": {
     "addButton": "Hinzufügen",
@@ -1022,5 +1020,28 @@
     "greeting": "Hallo, {{name}}",
     "points_one": "{{count}} Punkt",
     "points_other": "{{count}} Punkte"
+  },
+  "wall": {
+    "greeting": {
+      "morning": "Guten Morgen.",
+      "afternoon": "Guten Tag.",
+      "evening": "Guten Abend."
+    },
+    "tapToStart": "Tippen, um loszulegen",
+    "toGo_one": "noch {{count}}",
+    "toGo_other": "noch {{count}}",
+    "allDone": "Alles erledigt",
+    "nothingToday": "Heute nichts",
+    "ptsToday_one": "+{{count}} Pkt. heute",
+    "ptsToday_other": "+{{count}} Pkt. heute",
+    "streak_one": "{{count}} Tag in Folge",
+    "streak_other": "{{count}} Tage in Folge",
+    "nextUp": "Als Nächstes",
+    "opensAt": "Ab {{time}}",
+    "dueBy": "Bis {{time}}",
+    "familyToday": "Die Familie heute",
+    "chartTitle": "Heute bisher",
+    "chartDesc": "Wie viel jede Person von ihrem Tag geschafft hat, Stunde für Stunde. Jetzt: {{summary}}.",
+    "chartPerson": "{{name}} {{pct}} %"
   }
 }

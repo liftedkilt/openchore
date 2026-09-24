@@ -76,7 +76,8 @@ test.describe('Screenshots', () => {
   });
 
   test('09 - Ambient Dashboard', async ({ page }) => {
-    await page.setViewportSize({ width: 1920, height: 1080 });
+    // The wall display's target: a 10–13" landscape tablet.
+    await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/ambient');
     await expect(page.getByText('Emma').first()).toBeVisible({ timeout: 10_000 });
     // Wait for chart to render
