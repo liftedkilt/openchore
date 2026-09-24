@@ -4,14 +4,25 @@ import { useNavigate, useLocation } from 'react-router-dom';
 const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 const EVENTS = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
 
-export function useIdleRedirect(targetPath: string, excludePaths: string[] = []) {
+interface IdleOptions {
+  // Runs before redirecting (e.g. ending a shared-device session).
+  onIdle?: () => Promise<void> | void;
+  // Personal devices never idle out.
+  disabled?: boolean;
+}
+
+export function useIdleRedirect(targetPath: string, excludePaths: string[] = [], { onIdle, disabled = false }: IdleOptions = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const excludeRef = useRef(excludePaths);
   excludeRef.current = excludePaths;
+  const onIdleRef = useRef(onIdle);
+  onIdleRef.current = onIdle;
 
   useEffect(() => {
+    if (disabled) return;
+
     // Don't set up idle redirect if already on the target page
     if (location.pathname === targetPath) return;
 
@@ -20,7 +31,8 @@ export function useIdleRedirect(targetPath: string, excludePaths: string[] = [])
 
     const reset = () => {
       if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
+      timerRef.current = setTimeout(async () => {
+        if (onIdleRef.current) await onIdleRef.current();
         navigate(targetPath);
       }, IDLE_TIMEOUT);
     };
@@ -36,5 +48,5 @@ export function useIdleRedirect(targetPath: string, excludePaths: string[] = [])
         window.removeEventListener(event, reset);
       }
     };
-  }, [navigate, location.pathname, targetPath]);
+  }, [navigate, location.pathname, targetPath, disabled]);
 }

@@ -84,9 +84,10 @@ test.describe('Screenshots', () => {
     await page.screenshot({ path: `${dir}/09-ambient-dashboard.png`, fullPage: false });
   });
 
-  test('10 - Admin PIN Entry', async ({ page }) => {
+  test('10 - Parent PIN Entry', async ({ page }) => {
     await page.setViewportSize({ width: 430, height: 932 });
-    await page.goto('/admin');
+    await page.goto('/login');
+    await page.getByRole('button', { name: 'Select profile for Alex' }).click();
     await expect(page.getByRole('button', { name: '1', exact: true })).toBeVisible({ timeout: 5_000 });
     await page.screenshot({ path: `${dir}/10-admin-pin.png`, fullPage: false });
   });

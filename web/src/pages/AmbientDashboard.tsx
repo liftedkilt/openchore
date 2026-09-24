@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { api, fetchAsUser } from '../api';
+import { api, fetchPublicUserData } from '../api';
 import type { User, ScheduledChore, UserStreakData, PointsData } from '../types';
 import styles from './AmbientDashboard.module.css';
 import { Flame } from 'lucide-react';
@@ -177,15 +177,17 @@ export const AmbientDashboard: React.FC = () => {
   const fetchData = useCallback(async () => {
     try {
       const allUsers: User[] = await api.users.list();
-      const childUsers = allUsers.filter(u => u.role === 'child' && !u.paused);
+      // Everyone takes part: kids always show; parents show on days they
+      // have chores of their own.
+      const members = allUsers.filter(u => !u.paused);
       const today = localDateStr(new Date());
 
       const results = await Promise.allSettled(
-        childUsers.map(async (kid) => {
+        members.map(async (kid) => {
           const [chores, streakData, pointsData] = await Promise.all([
-            fetchAsUser<ScheduledChore[]>(kid.id, `/users/${kid.id}/chores?view=daily&date=${today}`),
-            fetchAsUser<UserStreakData>(kid.id, `/users/${kid.id}/streak`),
-            fetchAsUser<PointsData>(kid.id, `/users/${kid.id}/points`),
+            fetchPublicUserData<ScheduledChore[]>(`/users/${kid.id}/chores?view=daily&date=${today}`),
+            fetchPublicUserData<UserStreakData>(`/users/${kid.id}/streak`),
+            fetchPublicUserData<PointsData>(`/users/${kid.id}/points`),
           ]);
 
           const completed = chores.filter(c => c.completed).length;
@@ -228,6 +230,7 @@ export const AmbientDashboard: React.FC = () => {
       setKids(results
         .filter((r): r is PromiseFulfilledResult<KidData> => r.status === 'fulfilled')
         .map(r => r.value)
+        .filter(k => k.user.role === 'child' || k.total > 0)
       );
     } catch (err) {
       console.error('Ambient fetch error:', err);

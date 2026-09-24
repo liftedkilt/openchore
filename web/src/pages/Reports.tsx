@@ -154,12 +154,8 @@ export const Reports: React.FC = () => {
   }, [period, date]);
 
   useEffect(() => {
-    if (!sessionStorage.getItem('openchore_admin')) {
-      navigate('/admin', { replace: true });
-      return;
-    }
     fetchReports();
-  }, [fetchReports, navigate]);
+  }, [fetchReports]);
 
   const handlePeriodChange = (p: Period) => {
     setPeriod(p);

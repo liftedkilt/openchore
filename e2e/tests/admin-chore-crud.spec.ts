@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { loginAsAdmin, apiGet } from './helpers/setup';
+import { loginAsAdmin, apiGet, authHeaders } from './helpers/setup';
 
 test.describe('Admin Chore CRUD', () => {
   test('admin can edit a chore via API', async ({ page }) => {
     // Update Make Bed points via API
     const resp = await page.request.put('/api/chores/3', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: { title: 'Make Bed', category: 'required', points_value: 10, requires_approval: false, requires_photo: false },
     });
     expect(resp.ok()).toBeTruthy();
@@ -21,14 +21,14 @@ test.describe('Admin Chore CRUD', () => {
   test('admin can delete a chore via API', async ({ page }) => {
     // Create a chore to delete
     const createResp = await page.request.post('/api/chores', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: { title: 'E2E Delete Chore', category: 'bonus', points_value: 5 },
     });
     const chore = await createResp.json();
 
     // Delete it
     const deleteResp = await page.request.delete(`/api/chores/${chore.id}`, {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
     });
     expect(deleteResp.ok()).toBeTruthy();
 

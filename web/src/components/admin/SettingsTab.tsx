@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
-import type { Webhook, WebhookDelivery } from '../../types';
+import type { AuthProvider, Webhook, WebhookDelivery } from '../../types';
 import styles from '../../pages/AdminDashboard.module.css';
 import { Plus, Trash2, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import clsx from 'clsx';
@@ -11,9 +11,7 @@ import { APITokensSection } from './APITokensSection';
 export const SettingsTab: React.FC = () => {
   const { t } = useTranslation();
 
-  const [currentPin, setCurrentPin] = useState('');
-  const [newPin, setNewPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
+  const [providers, setProviders] = useState<AuthProvider[]>([]);
   const [baseUrl, setBaseUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -50,11 +48,13 @@ export const SettingsTab: React.FC = () => {
     { id: 'points.decayed', label: t('admin.settingsTab.webhooks.events.decay'), icon: '📉' },
     { id: 'auth.admin_passcode.verified', label: t('admin.settingsTab.webhooks.events.adminPasscodeVerified'), icon: '🔑' },
     { id: 'auth.admin_passcode.failed', label: t('admin.settingsTab.webhooks.events.adminPasscodeFailed'), icon: '🚫' },
-    { id: 'auth.admin_passcode.changed', label: t('admin.settingsTab.webhooks.events.adminPasscodeChanged'), icon: '🔄' },
     { id: 'auth.profile_pin.verified', label: t('admin.settingsTab.webhooks.events.profilePinVerified'), icon: '🔓' },
     { id: 'auth.profile_pin.failed', label: t('admin.settingsTab.webhooks.events.profilePinFailed'), icon: '⚠️' },
     { id: 'auth.profile_pin.changed', label: t('admin.settingsTab.webhooks.events.profilePinChanged'), icon: '🔢' },
     { id: 'auth.profile_pin.cleared', label: t('admin.settingsTab.webhooks.events.profilePinCleared'), icon: '🗑️' },
+    { id: 'auth.oidc.login', label: t('admin.settingsTab.webhooks.events.oidcLogin'), icon: '🪪' },
+    { id: 'auth.identity.linked', label: t('admin.settingsTab.webhooks.events.identityLinked'), icon: '🔗' },
+    { id: 'auth.identity.unlinked', label: t('admin.settingsTab.webhooks.events.identityUnlinked'), icon: '⛓️‍💥' },
   ];
 
   const allEventsSelected = webhookSelectedEvents.size === 0 || webhookSelectedEvents.size === WEBHOOK_EVENTS.length;
@@ -75,6 +75,7 @@ export const SettingsTab: React.FC = () => {
   }, []);
 
   useEffect(() => { loadWebhooks(); }, [loadWebhooks]);
+  useEffect(() => { api.auth.providers().then(setProviders).catch(() => setProviders([])); }, []);
 
   // Load initial settings
   useEffect(() => {
@@ -169,32 +170,6 @@ export const SettingsTab: React.FC = () => {
     setAiSaving(false);
   };
 
-  const handleChangePin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMessage(null);
-
-    if (newPin.length < 4) {
-      setMessage({ type: 'error', text: t('admin.settingsTab.pin.errorTooShort') });
-      return;
-    }
-    if (newPin !== confirmPin) {
-      setMessage({ type: 'error', text: t('admin.settingsTab.pin.errorMismatch') });
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await api.admin.updatePasscode(currentPin, newPin);
-      setMessage({ type: 'success', text: t('admin.settingsTab.pin.saveSuccess') });
-      setCurrentPin('');
-      setNewPin('');
-      setConfirmPin('');
-    } catch {
-      setMessage({ type: 'error', text: t('admin.settingsTab.pin.saveError') });
-    }
-    setSaving(false);
-  };
-
   const handleCreateWebhook = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!webhookUrl) return;
@@ -253,6 +228,11 @@ export const SettingsTab: React.FC = () => {
             placeholder={t('admin.settingsTab.baseUrl.placeholder')}
           />
         </div>
+        {message && (
+          <p className={clsx(styles.feedbackMsg, message.type === 'success' ? styles.feedbackMsgSuccess : styles.feedbackMsgError)}>
+            {message.text}
+          </p>
+        )}
         <div className={styles.formActions}>
           <button type="submit" className={styles.btnPrimary} disabled={saving}>
             <Save size={16} /> {t('admin.settingsTab.baseUrl.saveButton')}
@@ -345,67 +325,22 @@ export const SettingsTab: React.FC = () => {
         </div>
       </form>
 
-      <form className={styles.form} onSubmit={handleChangePin}>
+      <div className={styles.form} style={{ marginTop: '1.5rem' }}>
         <div className={styles.formHeader}>
-          <h3>{t('admin.settingsTab.pin.title')}</h3>
+          <h3>{t('admin.settingsTab.signIn.title')}</h3>
         </div>
-
-        <div className={styles.formGrid}>
-          <div className={styles.formGroup}>
-            <label className={styles.label}>{t('admin.settingsTab.pin.currentLabel')}</label>
-            <input
-              className={styles.input}
-              type="password"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={currentPin}
-              onChange={e => setCurrentPin(e.target.value.replace(/\D/g, ''))}
-              placeholder={t('admin.settingsTab.pin.currentPlaceholder')}
-              required
-            />
-          </div>
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>{t('admin.settingsTab.pin.newLabel')}</label>
-              <input
-                className={styles.input}
-                type="password"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={newPin}
-                onChange={e => setNewPin(e.target.value.replace(/\D/g, ''))}
-                placeholder={t('admin.settingsTab.pin.newPlaceholder')}
-                required
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>{t('admin.settingsTab.pin.confirmLabel')}</label>
-              <input
-                className={styles.input}
-                type="password"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={confirmPin}
-                onChange={e => setConfirmPin(e.target.value.replace(/\D/g, ''))}
-                placeholder={t('admin.settingsTab.pin.confirmPlaceholder')}
-                required
-              />
-            </div>
-          </div>
-        </div>
-
-        {message && (
-          <p className={clsx(styles.feedbackMsg, message.type === 'success' ? styles.feedbackMsgSuccess : styles.feedbackMsgError)}>
-            {message.text}
-          </p>
+        <p className={styles.sectionDesc}>{t('admin.settingsTab.signIn.description')}</p>
+        {providers.length > 0 ? (
+          <>
+            <p className={styles.sectionDesc}>{t('admin.settingsTab.signIn.providersConfigured')}</p>
+            <ul className={styles.sectionDesc}>
+              {providers.map(p => <li key={p.id}><strong>{p.name}</strong> <code>{p.id}</code></li>)}
+            </ul>
+          </>
+        ) : (
+          <p className={styles.sectionDesc}>{t('admin.settingsTab.signIn.noProviders')}</p>
         )}
-
-        <div className={styles.formActions}>
-          <button type="submit" className={styles.btnPrimary} disabled={saving || !currentPin || !newPin || !confirmPin}>
-            <Save size={16} /> {t('admin.settingsTab.pin.saveButton')}
-          </button>
-        </div>
-      </form>
+      </div>
 
       {/* Export Config Section */}
       <ExportConfigSection />

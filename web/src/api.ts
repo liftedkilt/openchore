@@ -1,4 +1,4 @@
-import type { User, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardAssignment, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from './types';
+import type { User, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardAssignment, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken } from './types';
 
 const API_BASE = '/api';
 
@@ -49,15 +49,30 @@ export class APIError extends Error {
   }
 }
 
+// Sessions ride on an HttpOnly cookie set by the server, so requests carry
+// no identity headers. The one exception is the photo-upload page opened from
+// a QR code on another device: it authenticates with a short-lived,
+// single-chore token passed in the link.
+let bearerOverride: string | null = null;
+export function setBearerToken(token: string | null) {
+  bearerOverride = token;
+}
+
+// Fired when the server says the session is gone (expired, revoked, signed
+// out elsewhere) so the app can return to the profile picker.
+export const SESSION_EXPIRED_EVENT = 'openchore:session-expired';
+
 async function fetchWithAuth<T>(path: string, options: RequestInit = {}, skipContentType = false): Promise<T> {
-  const userStr = localStorage.getItem('openchore_user');
   const headers: Record<string, string> = {
     ...(skipContentType ? {} : { 'Content-Type': 'application/json' }),
-    ...(userStr ? { 'X-User-ID': JSON.parse(userStr).id.toString() } : {}),
+    ...(bearerOverride ? { Authorization: `Bearer ${bearerOverride}` } : {}),
     ...options.headers as Record<string, string>,
   };
 
-  const resp = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const resp = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: 'same-origin' });
+  if (resp.status === 401 && !bearerOverride) {
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  }
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ error: 'Unknown error' }));
     throw new APIError(err.error || `HTTP error! status: ${resp.status}`, resp.status, err);
@@ -71,30 +86,51 @@ async function fetchPublic<T>(path: string, options: RequestInit = {}): Promise<
     'Content-Type': 'application/json',
     ...options.headers as Record<string, string>,
   };
-  const resp = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const resp = await fetch(`${API_BASE}${path}`, { ...options, headers, credentials: 'same-origin' });
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(err.error || `HTTP error! status: ${resp.status}`);
+    throw new APIError(err.error || `HTTP error! status: ${resp.status}`, resp.status, err);
   }
   if (resp.status === 204) return {} as T;
   return resp.json();
 }
 
-// Fetch as a specific user (for ambient dashboard)
-export async function fetchAsUser<T>(userId: number, path: string): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'X-User-ID': userId.toString(),
-  };
-  const resp = await fetch(`${API_BASE}${path}`, { headers });
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(err.error || `HTTP error! status: ${resp.status}`);
-  }
-  return resp.json();
+// Public, read-only per-user data (chores, points, streak) for the wall
+// display, which shows everyone without anyone signing in.
+export function fetchPublicUserData<T>(path: string): Promise<T> {
+  return fetchPublic<T>(path);
+}
+
+export interface LoginRequest {
+  user_id: number;
+  pin?: string;
+  legacy_passcode?: string;
+  new_pin?: string;
 }
 
 export const api = {
+  auth: {
+    login: (req: LoginRequest) =>
+      fetchPublic<AuthSession>('/auth/login', { method: 'POST', body: JSON.stringify(req) }),
+    logout: () => fetchPublic('/auth/logout', { method: 'POST' }),
+    logoutEverywhere: () => fetchWithAuth('/auth/logout-everywhere', { method: 'POST' }),
+    me: () => fetchPublic<AuthSession>('/auth/me'),
+    providers: () => fetchPublic<AuthProvider[]>('/auth/providers'),
+    uploadLink: (scheduleId: number) =>
+      fetchWithAuth<{ token: string; expires_at: string }>('/auth/upload-link', {
+        method: 'POST',
+        body: JSON.stringify({ schedule_id: scheduleId }),
+      }),
+    // Full-page navigations: the provider redirects back to the app.
+    oidcLoginURL: (providerId: string, userId?: number) =>
+      `${API_BASE}/auth/oidc/${encodeURIComponent(providerId)}/start?mode=login` +
+      (userId ? `&user_id=${userId}` : ''),
+    oidcLinkURL: (providerId: string, returnPath: string) =>
+      `${API_BASE}/auth/oidc/${encodeURIComponent(providerId)}/start?mode=link&return=${encodeURIComponent(returnPath)}`,
+    identities: (userId: number) => fetchWithAuth<LinkedIdentity[]>(`/users/${userId}/identities`),
+    unlink: (userId: number, identityId: number) =>
+      fetchWithAuth(`/users/${userId}/identities/${identityId}`, { method: 'DELETE' }),
+  },
   users: {
     list: () => fetchPublic<User[]>('/users'),
     get: (id: number) => fetchPublic<User>(`/users/${id}`),
@@ -121,11 +157,6 @@ export const api = {
       fetchWithAuth<User>(`/users/${id}/line-color`, {
         method: 'PUT',
         body: JSON.stringify({ line_color }),
-      }),
-    verifyPin: (id: number, pin: string) =>
-      fetchPublic<{ valid: boolean }>(`/users/${id}/verify-pin`, {
-        method: 'POST',
-        body: JSON.stringify({ pin }),
       }),
     setPin: (id: number, newPin: string, currentPin?: string) =>
       fetchWithAuth<{ has_pin: boolean }>(`/users/${id}/pin`, {
@@ -283,16 +314,6 @@ export const api = {
       fetchWithAuth<any>(`/admin/reports?period=${period}&date=${date}`),
   },
   admin: {
-    verifyPasscode: (passcode: string) =>
-      fetchPublic<{ valid: boolean }>('/admin/verify', {
-        method: 'POST',
-        body: JSON.stringify({ passcode }),
-      }),
-    updatePasscode: (oldPasscode: string, newPasscode: string) =>
-      fetchWithAuth('/admin/passcode', {
-        method: 'PUT',
-        body: JSON.stringify({ old_passcode: oldPasscode, new_passcode: newPasscode }),
-      }),
     getSetting: (key: string) => fetchWithAuth<{ key: string; value: string }>(`/admin/settings/${key}`),
     setSetting: (key: string, value: string) => fetchWithAuth<{ key: string; value: string }>(`/admin/settings/${key}`, {
       method: 'PUT',
@@ -328,16 +349,12 @@ export const api = {
       fetchWithAuth<{ key: string; value: string }>('/admin/settings/ai_tts_enabled').catch(() => ({ key: 'ai_tts_enabled', value: 'false' })),
     ]).then(settings => Object.fromEntries(settings.map(s => [s.key, s.value]))),
     exportConfig: async (sections: string[]) => {
-      const userStr = localStorage.getItem('openchore_user');
-      const headers: Record<string, string> = userStr
-        ? { 'X-User-ID': JSON.parse(userStr).id.toString() }
-        : {};
-      const resp = await fetch(`${API_BASE}/admin/export-config?sections=${sections.join(',')}`, { headers });
+      const resp = await fetch(`${API_BASE}/admin/export-config?sections=${sections.join(',')}`, { credentials: 'same-origin' });
       if (!resp.ok) throw new Error('export failed');
       return resp.blob();
     },
   },
-  setup: (data: { children: { name: string; theme: string }[]; chores: { title: string; icon: string; category: string; points_value: number }[] }) =>
+  setup: (data: { parent: { name: string; pin: string }; children: { name: string; theme: string }[]; chores: { title: string; icon: string; category: string; points_value: number }[] }) =>
     fetchPublic<{ admin: User; children: User[] }>('/setup', {
       method: 'POST',
       body: JSON.stringify(data),

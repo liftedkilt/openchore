@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { authHeaders } from './helpers/setup';
 
 test.describe('Webhooks', () => {
   test('webhook CRUD via API', async ({ page }) => {
     // Create
     const createResp = await page.request.post('/api/admin/webhooks', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: {
         url: 'https://example.com/e2e-webhook',
         events: 'chore.completed,reward.redeemed',
@@ -17,7 +18,7 @@ test.describe('Webhooks', () => {
 
     // Read
     const listResp = await page.request.get('/api/admin/webhooks', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
     });
     const webhooks = await listResp.json();
     const found = webhooks.find((w: any) => w.url === 'https://example.com/e2e-webhook');
@@ -25,7 +26,7 @@ test.describe('Webhooks', () => {
 
     // Update (disable)
     const updateResp = await page.request.put(`/api/admin/webhooks/${webhook.id}`, {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: { ...webhook, active: false },
     });
     expect(updateResp.ok()).toBeTruthy();
@@ -34,7 +35,7 @@ test.describe('Webhooks', () => {
 
     // Delete
     const deleteResp = await page.request.delete(`/api/admin/webhooks/${webhook.id}`, {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
     });
     expect(deleteResp.ok()).toBeTruthy();
   });

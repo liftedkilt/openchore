@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
-import type { User } from '../types';
 import styles from './AdminDashboard.module.css';
 import { ArrowLeft, Plus, Users, ListChecks, Gift, Coins, Activity, Settings, Undo2, Camera, Home } from 'lucide-react';
 import clsx from 'clsx';
@@ -24,62 +23,23 @@ type Tab = 'kids-status' | 'chores' | 'approvals' | 'users' | 'rewards' | 'point
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { setUser } = useAuth();
+  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('kids-status');
-  const [ready, setReady] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [quickAssignOpen, setQuickAssignOpen] = useState(false);
 
   // Fetch pending count periodically
   useEffect(() => {
-    if (!ready) return;
     const fetchCount = () => api.chores.listPending().then(p => setPendingCount(p.length)).catch(() => {});
     fetchCount();
     const interval = setInterval(fetchCount, 30000);
     return () => clearInterval(interval);
-  }, [ready]);
-
-  // Clear admin session when navigating away via browser back button
-  useEffect(() => {
-    const handlePopState = () => {
-      sessionStorage.removeItem('openchore_admin');
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
-
-  useEffect(() => {
-    const ensureAdminUser = async () => {
-      if (!sessionStorage.getItem('openchore_admin')) {
-        navigate('/admin', { replace: true });
-        return;
-      }
-      try {
-        const users = await api.users.list();
-        const admin = users.find((u: User) => u.role === 'admin');
-        if (admin) {
-          setUser(admin);
-          setReady(true);
-        } else {
-          // No admin exists — redirect to setup
-          setUser(null);
-          sessionStorage.removeItem('openchore_admin');
-          navigate('/setup', { replace: true });
-        }
-      } catch {
-        navigate('/login', { replace: true });
-      }
-    };
-    ensureAdminUser();
-  }, [navigate, setUser]);
-
-  // Block render if not authenticated (synchronous check + useEffect redirect)
-  if (!ready || !sessionStorage.getItem('openchore_admin')) return null;
 
   return (
     <div className={styles.wrapper}>
       <header className={styles.header}>
-        <button className={styles.backBtn} onClick={() => { sessionStorage.removeItem('openchore_admin'); navigate('/login'); }}>
+        <button className={styles.backBtn} onClick={() => navigate('/')} aria-label={t('admin.dashboard.backToMyChores', { name: user?.name ?? '' })} title={t('admin.dashboard.backToMyChores', { name: user?.name ?? '' })}>
           <ArrowLeft size={18} />
         </button>
         <h1 className={styles.title}>{t('admin.dashboard.title')}</h1>

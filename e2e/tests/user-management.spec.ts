@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { loginAsAdmin, apiGet } from './helpers/setup';
+import { loginAsAdmin, apiGet, authHeaders } from './helpers/setup';
 
 test.describe('User Management', () => {
   test('admin can create a new child user via API', async ({ page }) => {
     const createResp = await page.request.post('/api/users', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: { name: 'E2E Test Child', role: 'child' },
     });
     expect(createResp.ok()).toBeTruthy();
@@ -25,7 +25,7 @@ test.describe('User Management', () => {
   test('admin can pause and unpause a user', async ({ page }) => {
     // Pause Lily (user 4)
     const pauseResp = await page.request.put('/api/users/4/pause', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
     });
     expect(pauseResp.ok()).toBeTruthy();
 
@@ -35,7 +35,7 @@ test.describe('User Management', () => {
 
     // Unpause
     const unpauseResp = await page.request.put('/api/users/4/unpause', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
     });
     expect(unpauseResp.ok()).toBeTruthy();
 
@@ -47,14 +47,14 @@ test.describe('User Management', () => {
   test('admin can delete a user via API', async ({ page }) => {
     // Create a user to delete
     const createResp = await page.request.post('/api/users', {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
       data: { name: 'E2E Delete Me', role: 'child' },
     });
     const created = await createResp.json();
 
     // Delete
     const deleteResp = await page.request.delete(`/api/users/${created.id}`, {
-      headers: { 'X-User-ID': '1' },
+      headers: await authHeaders(1),
     });
     expect(deleteResp.ok()).toBeTruthy();
 

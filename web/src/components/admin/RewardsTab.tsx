@@ -249,7 +249,7 @@ export const RewardsTab: React.FC = () => {
     const [r, sr, u] = await Promise.all([api.rewards.listAll(), api.streaks.listRewards(), api.users.list()]);
     setRewards(r);
     setStreakRewards(sr);
-    setUsers(u.filter((u: User) => u.role === 'child'));
+    setUsers(u);
   }, []);
 
   useEffect(() => { load(); }, [load]);

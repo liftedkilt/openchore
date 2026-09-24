@@ -338,6 +338,42 @@
   color: var(--text-secondary);
 }
 
+.toggleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin: -7px -4px -7px -7px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.toggleBtn:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.toggleBtn:hover:not(:disabled) .choreIcon {
+  color: var(--accent-blue);
+}
+
+.toggleBtn:disabled {
+  cursor: default;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .choreIconDone {
   color: var(--accent-green);
 }

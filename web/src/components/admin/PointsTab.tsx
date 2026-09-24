@@ -16,7 +16,8 @@ export const PointsTab: React.FC = () => {
 
   const load = useCallback(async () => {
     const [bals, usrs] = await Promise.all([api.points.getAllBalances(), api.users.list()]);
-    const children = usrs.filter((u: User) => u.role === 'child');
+    // Parents take part too, so everyone has a balance.
+    const children = usrs;
     setUsers(children);
     setBalances(children.map(u => {
       const b = bals.find((b: PointBalance) => b.user_id === u.id);
