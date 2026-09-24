@@ -610,128 +610,6 @@
     "save": "Save"
   },
   "dashboard": {
-    "avatarPicker": {
-      "preview": "Avatar preview",
-      "save": "Save",
-      "shuffle": "Shuffle",
-      "title": "Choose Your Look"
-    },
-    "avatarStyles": {
-      "adventure": "Adventure",
-      "bigEars": "Big Ears",
-      "classic": "Classic",
-      "doodle": "Doodle",
-      "emoji": "Emoji",
-      "glass": "Glass",
-      "lorelei": "Lorelei",
-      "pixel": "Pixel",
-      "robots": "Robots",
-      "shapes": "Shapes",
-      "sketch": "Sketch",
-      "thumbs": "Thumbs"
-    },
-    "chore": {
-      "completedBy": "Completed by {{name}}",
-      "expired": "Expired",
-      "expiredAt": "Expired at {{time}}",
-      "latePenalty": "Late (-{{value}} pts)",
-      "lateZeroPts": "Late (0 pts)",
-      "listenToFeedback": "Listen to feedback",
-      "markComplete": "Mark complete",
-      "markIncomplete": "Mark incomplete",
-      "pts": "pts",
-      "ptsPending": "pts pending",
-      "readAloud": "Read {{title}} aloud",
-      "swipeDone": "Done!",
-      "swipeUndo": "Undo",
-      "uploadPhotoProof": "Upload photo proof"
-    },
-    "daily": {
-      "comingUpLater": "Coming up later"
-    },
-    "errors": {
-      "alreadyHasGoal": "You already have a personal goal — finish or change it first",
-      "breakPersonalConfirm": "Stop saving? Your saved points will go back to your spendable balance.",
-      "breakSharedConfirm": "Leave this family goal? Your contribution will come back to your spendable balance.",
-      "couldNotCancelGoal": "Could not cancel goal — try again",
-      "couldNotSave": "Could not save — try again",
-      "couldNotStartSaving": "Could not start saving — try again",
-      "couldntSave": "Couldn't save — try again",
-      "enterPoints": "Enter a number of points to add",
-      "goalCancelled": "Goal cancelled — points are back in your balance",
-      "leftFamilyGoal": "Left family goal — your share is back",
-      "notEnoughPoints": "You only have {{balance}} spendable",
-      "redemptionFailed": "Redemption failed — try again",
-      "savedMore": "Saved {{amount}} more!"
-    },
-    "goal": {
-      "addPointsPlaceholder": "Add points (max {{max}})",
-      "autoSave": "Auto-save",
-      "familyGoal": "Family goal",
-      "fullyFunded": "Fully funded 🎉",
-      "leaveGoal": "Leave goal",
-      "ready": "Ready!",
-      "redeemNow": "Redeem now",
-      "save": "Save",
-      "savingToward": "Saving toward",
-      "stopSaving": "Stop saving",
-      "tapRedeem": "Tap redeem 🎉",
-      "tapToRedeem": "Tap to redeem 🎉",
-      "toGo": "{{remaining}} to go",
-      "you": "You",
-      "youContrib": "you: {{amount}}"
-    },
-    "header": {
-      "changeAvatar": "Change avatar",
-      "changeLineColor": "Change line color",
-      "changePIN": "Change PIN",
-      "changeTheme": "Change theme",
-      "disableReadAloud": "Disable read aloud",
-      "enableReadAloud": "Enable read aloud",
-      "linkedAccounts": "Linked accounts",
-      "logout": "Logout",
-      "manage": "Manage",
-      "setPIN": "Set PIN"
-    },
-    "lineColors": {
-      "cyan": "Cyan",
-      "green": "Green",
-      "indigo": "Indigo",
-      "lavender": "Lavender",
-      "magenta": "Magenta",
-      "mint": "Mint",
-      "orange": "Orange",
-      "pink": "Pink",
-      "red": "Red",
-      "sky": "Sky",
-      "white": "White",
-      "yellow": "Yellow"
-    },
-    "nav": {
-      "rewards": "Rewards",
-      "today": "Today",
-      "week": "Week"
-    },
-    "paused": {
-      "text": "Enjoy your time off. Your chores are paused and no points will be deducted while you're away.",
-      "title": "You're on a break!"
-    },
-    "progress": {
-      "ofComplete": "{{completed}} of {{available}} complete"
-    },
-    "qr": {
-      "copied": "Copied!",
-      "copyLink": "Copy Link",
-      "helpAddPhoto": "Upload a photo to add proof for this chore.",
-      "helpComplete": "Your chore will be finished automatically once you upload the photo.",
-      "scanOrUpload": "Scan this code with another device, or upload directly from this one.",
-      "takePhoto": "Take Photo on This Device",
-      "titleAddPhoto": "Add Photo Proof",
-      "titlePhotoNeeded": "Photo Proof Needed",
-      "uploadFailed": "Upload failed",
-      "uploading": "Uploading...",
-      "waiting": "Waiting for photo..."
-    },
     "quickAssign": {
       "btnAssign": "Assign",
       "btnAssigning": "Assigning...",
@@ -747,42 +625,6 @@
       "labelWhen": "When",
       "labelWho": "Who",
       "title": "Quick Assign"
-    },
-    "rewards": {
-      "costPts": "pts",
-      "familyBadge": "family",
-      "familyGoalBtn": "Family goal",
-      "goalBadge": "goal",
-      "gone": "Gone",
-      "joinGoal": "Join goal",
-      "needMore": "Need {{amount}}",
-      "noRewardsHint": "Ask a parent to add some rewards!",
-      "noRewardsTitle": "No rewards yet",
-      "redeem": "Redeem",
-      "redeemed": "Redeemed!",
-      "redeeming": "...",
-      "redemptionCost": "-{{points}} pts",
-      "redemptionTitle": "Recent Redemptions",
-      "saveToward": "Save toward",
-      "savingToward": "...",
-      "spendable": "spendable",
-      "spendableWithSaved": "spendable · {{committed}} saved",
-      "stockLeft": "left"
-    },
-    "stats": {
-      "balance": "Balance",
-      "pending": "Pending",
-      "today": "Today"
-    },
-    "streak": {
-      "daysToMilestone_one": "{{count}} day to",
-      "daysToMilestone_other": "{{count}} days to"
-    },
-    "themes": {
-      "classic": "Classic",
-      "forest": "Forest",
-      "galaxy": "Galaxy",
-      "quest": "Quest"
     }
   },
   "design": {
@@ -845,6 +687,227 @@
       "week": "Week"
     }
   },
+  "kid": {
+    "chore": {
+      "about": "About {{time}}",
+      "before": "Before {{time}}",
+      "closed": "Missed. It's closed now",
+      "closedAt": "Missed. Closed at {{time}}",
+      "closedLabel": "Closed",
+      "done": "Done",
+      "doneAt": "Done at {{time}}",
+      "doneBy": "Done by {{name}}",
+      "excused": "Excused today",
+      "from": "From {{time}}",
+      "lateNoPoints": "Late. No points now",
+      "latePenalty_one": "Late. Costs {{count}} pt",
+      "latePenalty_other": "Late. Costs {{count}} pts",
+      "later": "Later today",
+      "left": "{{time}} left",
+      "listenToFeedback": "Listen to the feedback",
+      "notDone": "Not done",
+      "opensAt": "Opens at {{time}}",
+      "opensAtLabel": "Opens at {{time}}",
+      "opensIn": "Opens in {{time}}",
+      "photoRejected": "Photo not accepted. Try again",
+      "pointsPending_one": "Done. {{count}} pt after Must do",
+      "pointsPending_other": "Done. {{count}} pts after Must do",
+      "readonlyDone": "Done",
+      "readonlyTodo": "Not done",
+      "rejected": "Not accepted. Try again",
+      "uploadPhotoProof": "Add photo proof"
+    },
+    "colors": {
+      "butter": "Butter",
+      "coral": "Coral",
+      "leaf": "Leaf",
+      "lilac": "Lilac",
+      "mint": "Mint",
+      "rose": "Rose",
+      "sand": "Sand",
+      "sky": "Sky"
+    },
+    "errors": {
+      "alreadyHasGoal": "You already have a goal. Finish or stop it first",
+      "couldNotCancelGoal": "Couldn't stop the goal. Try again",
+      "couldNotSave": "Couldn't save. Try again",
+      "couldNotStartSaving": "Couldn't start saving. Try again",
+      "couldntSave": "Couldn't save. Try again",
+      "enterPoints": "Type how many points to add",
+      "notEnoughPoints": "You only have {{balance}} to spend",
+      "redemptionFailed": "Couldn't get that reward. Try again"
+    },
+    "goal": {
+      "addPlaceholder": "Add points (up to {{max}})",
+      "addPoints": "Points to add",
+      "amounts": "{{saved}} / {{target}} pts",
+      "autoSave": "Auto-save",
+      "autoSaveHint": "Part of every chore's points goes here",
+      "familyGoal": "Family goal",
+      "fullyFunded": "All saved up",
+      "joinedToast": "You joined the family goal: {{name}}",
+      "leave": "Leave goal",
+      "leaveConfirm": "Leave this family goal? Your share comes back to you.",
+      "leftToast": "You left the family goal. Your share is back",
+      "pace_days_one": "About {{count}} day at your pace",
+      "pace_days_other": "About {{count}} days at your pace",
+      "pace_weeks_one": "About {{count}} week at your pace",
+      "pace_weeks_other": "About {{count}} weeks at your pace",
+      "ready": "Ready!",
+      "redeemNow": "Get it now",
+      "save": "Save",
+      "savedMore_one": "Saved {{count}} more point",
+      "savedMore_other": "Saved {{count}} more points",
+      "saverAmount_one": "{{count}} pt",
+      "saverAmount_other": "{{count}} pts",
+      "savers": "Who's saving",
+      "savingToast": "Saving for {{name}}",
+      "savingToward": "Saving for",
+      "stop": "Stop saving",
+      "stopConfirm": "Stop saving? Your saved points go back to you.",
+      "stoppedToast": "Goal stopped. Your points are back",
+      "title": "Goals",
+      "toGo_one": "{{count}} to go",
+      "toGo_other": "{{count}} to go",
+      "you": "You"
+    },
+    "me": {
+      "changePicture": "Change picture",
+      "changePin": "Change PIN",
+      "color": "Your colour",
+      "language": "Language",
+      "linkedAccounts": "Linked accounts",
+      "manage": "Manage",
+      "manageHint": "Chores, people and rewards",
+      "open": "{{name}}: settings",
+      "pictureStyle": "Style {{n}}",
+      "pictureStyles": "Picture styles",
+      "pictureTitle": "Your picture",
+      "readAloud": "Read chores aloud",
+      "readAloudHint": "Adds a speaker to every chore",
+      "savePicture": "Use this picture",
+      "setPin": "Set a PIN",
+      "settings": "Settings",
+      "shuffle": "Shuffle",
+      "signOut": "Sign out",
+      "skin": "Your look",
+      "title": "Me"
+    },
+    "paused": {
+      "text": "Enjoy your time off. Your chores are paused and no points are taken away while you're away.",
+      "title": "You're on a break"
+    },
+    "photo": {
+      "copied": "Link copied",
+      "copyLink": "Copy link",
+      "helpAdd": "Add a photo to show the chore is done.",
+      "helpComplete": "The chore is done as soon as the photo arrives.",
+      "preparing": "Making the code",
+      "qrLabel": "Code to open the photo page on another device",
+      "scanOrUpload": "Scan the code with a phone, or take the photo here.",
+      "takePhoto": "Take a photo here",
+      "titleAdd": "Add a photo",
+      "titleNeeded": "Snap a photo",
+      "uploadFailed": "The photo didn't upload. Try again",
+      "uploading": "Uploading",
+      "waiting": "Waiting for the photo"
+    },
+    "rewards": {
+      "cost_one": "{{count}} pt",
+      "cost_other": "{{count}} pts",
+      "emptyText": "Ask a grown-up to add some.",
+      "emptyTitle": "No rewards yet",
+      "familyGoal": "Family goal",
+      "familyTag": "Family",
+      "goalTag": "Goal",
+      "gone": "All gone",
+      "history": "Rewards you got",
+      "join": "Join the goal",
+      "more": "{{count}} more",
+      "progress": "{{saved}}/{{target}}",
+      "redeem": "Redeem",
+      "redeemed": "Redeemed!",
+      "redeemedToast": "Enjoy it! {{name}} is yours",
+      "redeeming": "One moment",
+      "saveToward": "Save for it",
+      "shop": "Rewards",
+      "spendableSaved_one": "point to spend · {{saved}} saved",
+      "spendableSaved_other": "points to spend · {{saved}} saved",
+      "spendable_one": "point to spend",
+      "spendable_other": "points to spend",
+      "spent_one": "−{{count}} pt",
+      "spent_other": "−{{count}} pts",
+      "stock_one": "{{count}} left",
+      "stock_other": "{{count}} left",
+      "title": "Rewards"
+    },
+    "sheet": {
+      "back": "Back",
+      "close": "Close"
+    },
+    "skins": {
+      "blocks": {
+        "hint": "Bold and bright",
+        "name": "Blocks"
+      },
+      "sunroom": {
+        "hint": "Warm and soft",
+        "name": "Sunroom"
+      },
+      "tint": {
+        "hint": "Calm and dark",
+        "name": "Tint"
+      }
+    },
+    "time": {
+      "hoursMinutes": "{{h}} h {{m}} min",
+      "hours_one": "{{count}} h",
+      "hours_other": "{{count}} h",
+      "minutes_one": "{{count}} min",
+      "minutes_other": "{{count}} min"
+    },
+    "today": {
+      "allDone": "All done for today",
+      "bonusCount": "+{{count}}",
+      "earned_one": "+{{count}} pt today",
+      "earned_other": "+{{count}} pts today",
+      "emptyText": "Nothing on your list today. Enjoy it.",
+      "emptyTitle": "A free day",
+      "listLabel": "Your chores",
+      "overview": "Your day",
+      "pending_one": "{{count}} pt waiting for Must do",
+      "pending_other": "{{count}} pts waiting for Must do"
+    },
+    "upload": {
+      "doneBody": "Nice work. You can close this page now.",
+      "doneBodyNamed": "Nice work, {{name}}. You can close this page now.",
+      "doneTitle": "Photo sent",
+      "failed": "The photo didn't upload. Try again",
+      "for": "For {{name}}",
+      "invalidBody": "This link is missing something. Scan the code again.",
+      "invalidTitle": "That link doesn't work",
+      "kicker": "Photo proof",
+      "openCamera": "Open the camera",
+      "takeHint": "Show the finished chore to earn your points.",
+      "takeTitle": "Take a picture",
+      "uploading": "Uploading"
+    },
+    "week": {
+      "best_one": "Best: {{count}} day",
+      "best_other": "Best: {{count}} days",
+      "dayEmpty": "{{day}}: nothing to do",
+      "dayLabel": "{{day}}: {{done}} of {{total}} done",
+      "days": "Days this week",
+      "emptyText": "Nothing on the list that day.",
+      "emptyTitle": "A free day",
+      "nextMilestone_one": "{{count}} more day to {{label}} (+{{points}} pts)",
+      "nextMilestone_other": "{{count}} more days to {{label}} (+{{points}} pts)",
+      "streak": "Streak",
+      "streakDays_one": "{{count}} day in a row",
+      "streakDays_other": "{{count}} days in a row",
+      "title": "This week"
+    }
+  },
   "linkedAccounts": {
     "confirmSignOutEverywhere": "Sign this profile out on every device, including this one?",
     "confirmUnlink": "Unlink {{provider}}? Devices signed in with it will be signed out.",
@@ -857,19 +920,6 @@
     "signOutEverywhere": "Sign out on all devices",
     "title": "Linked accounts",
     "unlink": "Unlink"
-  },
-  "photo": {
-    "invalidLinkBody": "This upload link is missing information.",
-    "invalidLinkTitle": "Invalid Link",
-    "openCamera": "Open Camera",
-    "pageTitle": "Photo Proof",
-    "successBody": "Great job! You can close this tab now.",
-    "successBodyNamed": "Great job, {{name}}! You can close this tab now.",
-    "successTitle": "Photo Uploaded!",
-    "takePicture": "Take a picture",
-    "takePictureHint": "Show your completed chore to earn your points!",
-    "uploadFailed": "Failed to upload photo",
-    "uploadingFor": "Uploading for {{name}}"
   },
   "profile": {
     "authError": {

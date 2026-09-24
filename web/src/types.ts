@@ -6,51 +6,25 @@ export type PersonColor = 'coral' | 'mint' | 'butter' | 'sky' | 'rose' | 'leaf' 
 
 export const PERSON_COLORS: readonly PersonColor[] = ['coral', 'mint', 'butter', 'sky', 'rose', 'leaf', 'lilac', 'sand'];
 
-export interface CategoryLabels {
-  required: string;
-  core: string;
-  bonus: string;
-}
-
 export interface SoundDef {
   notes: { freq: number; duration: number; delay: number }[];
   waveform: OscillatorType;
   gain: number;
 }
 
+// What a skin may change about feedback. Words, categories and greetings are
+// shared by every skin (design i18n); only sounds and the buzz differ.
 export interface ThemeConfig {
-  labels: CategoryLabels;
-  categoryIcons: { required: string; core: string; bonus: string };
-  greetings: { morning: string; afternoon: string; evening: string };
-  messages: {
-    choreComplete: string;
-    allDone: string;
-    empty: string;
-    streakLabel: string;
-  };
-  confettiColors: string[];
   sounds: {
     complete: SoundDef;
     allDone: SoundDef;
   };
+  /** navigator.vibrate pattern on finishing a chore. */
+  vibrate: number | number[];
 }
 
 export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
   sunroom: {
-    labels: { required: 'Essentials', core: 'Dailies', bonus: 'Bonus' },
-    categoryIcons: { required: 'shield-check', core: 'circle-check', bonus: 'sparkles' },
-    greetings: {
-      morning: 'Good morning',
-      afternoon: 'Good afternoon',
-      evening: 'Good evening',
-    },
-    messages: {
-      choreComplete: 'Nice work!',
-      allDone: 'All done!',
-      empty: 'No chores assigned for this period.',
-      streakLabel: 'Streak',
-    },
-    confettiColors: ['#38bdf8', '#34d399', '#f472b6', '#a78bfa'],
     sounds: {
       complete: {
         notes: [
@@ -71,22 +45,9 @@ export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
         gain: 0.15,
       },
     },
+    vibrate: 50,
   },
   blocks: {
-    labels: { required: 'Main Quest', core: 'Side Quest', bonus: 'Loot' },
-    categoryIcons: { required: 'swords', core: 'scroll', bonus: 'coins' },
-    greetings: {
-      morning: 'Rise and shine',
-      afternoon: 'Ready for adventure',
-      evening: 'Good eve',
-    },
-    messages: {
-      choreComplete: 'Quest complete!',
-      allDone: 'All quests conquered!',
-      empty: 'No quests today, hero. Rest well.',
-      streakLabel: 'Quest Chain',
-    },
-    confettiColors: ['#fbbf24', '#f97316', '#dc2626', '#a3e635'],
     sounds: {
       complete: {
         notes: [
@@ -110,22 +71,9 @@ export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
         gain: 0.12,
       },
     },
+    vibrate: [30, 40, 30],
   },
   tint: {
-    labels: { required: 'Critical Mission', core: 'Star Tasks', bonus: 'Discovery' },
-    categoryIcons: { required: 'rocket', core: 'orbit', bonus: 'telescope' },
-    greetings: {
-      morning: 'Systems online',
-      afternoon: 'Stellar afternoon',
-      evening: 'Starlight awaits',
-    },
-    messages: {
-      choreComplete: 'Mission accomplished!',
-      allDone: 'Galaxy explored!',
-      empty: 'Orbit is clear, cadet. Stand by.',
-      streakLabel: 'Light Years',
-    },
-    confettiColors: ['#a855f7', '#818cf8', '#38bdf8', '#d946ef'],
     sounds: {
       complete: {
         notes: [
@@ -149,13 +97,9 @@ export const THEME_CONFIG: Record<Theme, ThemeConfig> = {
         gain: 0.1,
       },
     },
+    vibrate: 40,
   },
 };
-
-// Backward compat alias
-export const THEME_LABELS: Record<Theme, CategoryLabels> = Object.fromEntries(
-  Object.entries(THEME_CONFIG).map(([k, v]) => [k, v.labels])
-) as Record<Theme, CategoryLabels>;
 
 export interface User {
   id: number;
