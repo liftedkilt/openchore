@@ -8,7 +8,10 @@ import { selectUser, authHeaders } from './helpers/setup';
  * chores wait for every Must do and Every day chore, so the seeded
  * windowless chores (all Bonus for Emma) can't be used for a plain toggle.
  */
-async function seedKid(page: Page, label: string, chores: { title: string; category: 'required' | 'core' | 'bonus' }[]) {
+async function seedKid(
+  page: Page, label: string,
+  chores: { title: string; category: 'required' | 'core' | 'bonus'; requires_photo?: boolean }[],
+) {
   const stamp = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const admin = await authHeaders(1);
   const kid = await (await page.request.post('/api/users', {
@@ -18,7 +21,7 @@ async function seedKid(page: Page, label: string, chores: { title: string; categ
   for (const c of chores) {
     const title = `${c.title} ${stamp}`;
     const chore = await (await page.request.post('/api/chores', {
-      headers: admin, data: { title, category: c.category, points_value: 5 },
+      headers: admin, data: { title, category: c.category, points_value: 5, requires_photo: !!c.requires_photo },
     })).json();
     const resp = await page.request.post(`/api/chores/${chore.id}/schedules`, {
       headers: admin, data: { assigned_to: kid.id, day_of_week: new Date().getDay() },
@@ -66,6 +69,25 @@ test.describe('Chore Completion', () => {
     await page.getByRole('button', { name: 'Back to my list' }).click();
     await expect(celebration).toBeHidden();
     await expect(choreCard.locator('button[aria-label="Mark incomplete"]')).toBeVisible();
+  });
+
+  test('a photo chore can be finished without a photo, and waits for a grown-up', async ({ page }) => {
+    const { kid, titles: [CHORE] } = await seedKid(page, 'NoCamera', [{ title: 'Feed the Fish', category: 'core', requires_photo: true }]);
+    await selectUser(page, kid.name);
+    const choreCard = cardFor(page, CHORE);
+    await choreCard.locator('button[aria-label="Mark complete"]').click();
+
+    // No photo yet: the photo sheet opens (the server answered "photo required").
+    const sheet = page.getByRole('dialog', { name: 'Snap a photo' });
+    await expect(sheet).toBeVisible({ timeout: 5_000 });
+    await sheet.getByRole('button', { name: 'No photo? Finish anyway' }).click();
+    await expect(sheet).toBeHidden({ timeout: 5_000 });
+
+    // It went to the approval queue without a photo.
+    await expect.poll(async () => {
+      const pending = await (await page.request.get('/api/completions/pending', { headers: await authHeaders(1) })).json();
+      return pending.find((p: { chore_title: string }) => p.chore_title === CHORE)?.photo_url;
+    }, { timeout: 5_000 }).toBe('');
   });
 
   test('bonus chores open once every Must do and Every day chore is done', async ({ page }) => {

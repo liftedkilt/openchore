@@ -19,7 +19,8 @@ interface PhotoSheetProps {
 
 /**
  * Photo proof for a chore: scan a QR code with another device, or take the
- * photo on this one. Polls until the photo (and completion) lands.
+ * photo on this one. Polls until the photo (and completion) lands. With no
+ * photo to hand, the chore can be finished anyway and waits for a grown-up.
  */
 export function PhotoSheet({ chore, userId, baseUrl, onClose, onComplete }: PhotoSheetProps) {
   const { t } = useTranslation();
@@ -76,6 +77,20 @@ export function PhotoSheet({ chore, userId, baseUrl, onClose, onComplete }: Phot
     }
   };
 
+  // No photo to hand: finish anyway, and a grown-up checks it instead.
+  const handleSkipPhoto = async () => {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      await api.chores.complete(chore.schedule_id, chore.date, undefined, { skipPhoto: true });
+      onComplete();
+    } catch (err) {
+      setUploadError((err as Error)?.message || t('kid.photo.skipFailed'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(uploadUrl);
@@ -124,6 +139,15 @@ export function PhotoSheet({ chore, userId, baseUrl, onClose, onComplete }: Phot
         {t('kid.photo.waiting')}
       </p>
       <p className={s.helpLine}>{alreadyCompleted ? t('kid.photo.helpAdd') : t('kid.photo.helpComplete')}</p>
+
+      {!alreadyCompleted && (
+        <div className={s.skipPhoto}>
+          <button type="button" className={s.skipAction} onClick={handleSkipPhoto} disabled={uploading}>
+            {t('kid.photo.skipPhoto')}
+          </button>
+          <p className={s.helpLine}>{t('kid.photo.skipPhotoHelp')}</p>
+        </div>
+      )}
     </Sheet>
   );
 }
