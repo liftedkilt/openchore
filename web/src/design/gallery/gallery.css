@@ -1,0 +1,68 @@
+/* Gallery-only layout (dev route /design). Not part of the design system. */
+.g-page { min-height: 100vh; background: var(--surface-sunk); padding: 40px 56px 80px; box-sizing: border-box; }
+.g-head h1 { font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: var(--display-tracking); font-size: 34px; line-height: 38px; margin: 0; }
+.g-head p { margin: 8px 0 0; color: var(--ink-muted); font-size: 15px; }
+.g-head code { font-size: 13px; }
+.g-nav { display: flex; gap: 16px; margin-top: 12px; font-size: 14px; font-weight: 600; }
+.g-nav a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.g-section { margin-top: 56px; }
+.g-section > h2 { margin: 0 0 24px; font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-muted); }
+.g-row { display: flex; gap: 48px; flex-wrap: wrap; }
+.g-fig { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.g-cap { font-size: 13px; color: var(--ink-muted); font-family: "Onest Variable", system-ui, sans-serif; }
+.g-cap b { color: var(--ink); margin-right: 4px; }
+
+/* Phone frame */
+.g-device { width: 360px; height: 760px; box-sizing: border-box; overflow: hidden; border-radius: var(--oc-radius-device); border: var(--outline-w) solid var(--line); box-shadow: var(--device); }
+.g-device__body { position: relative; height: calc(100% - 48px); }
+.g-status { position: relative; height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 4px 30px 0 34px; font-size: 15px; font-weight: 600; }
+.g-status svg { width: 66px; height: 12px; }
+.g-pad { padding: 8px 24px 0; }
+.g-top { display: flex; align-items: center; justify-content: space-between; }
+.g-me { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; }
+.g-fade { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; height: 140px; background: linear-gradient(to bottom, color-mix(in srgb, var(--surface) 0%, transparent), var(--surface) 62%); pointer-events: none; }
+
+/* Component matrix */
+.g-matrix { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 24px; align-items: start; }
+.g-panel { padding: 24px 24px 32px; border-radius: 28px; box-shadow: var(--lift); }
+.g-label { margin: 0 0 16px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-muted); }
+.g-line { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.g-wrap { flex-wrap: wrap; gap: 8px; }
+.g-tabs { position: relative; margin-top: 24px; }
+.g-icons { margin-top: 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 12px 4px; }
+.g-icon { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--ink); }
+.g-icon small { font-size: 10px; color: var(--ink-muted); }
+
+/* Family picker (port of screens/FamilyPicker.html) */
+.fp-all { display: flex; flex-direction: column; gap: 44px; }
+.fp-stage { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.fp-done { color: var(--ink); }
+.fp-tab { width: 1176px; height: 716px; box-sizing: border-box; border-radius: 36px; box-shadow: var(--device); overflow: hidden; padding: 34px 44px 36px; }
+.fp-top { display: flex; align-items: center; justify-content: space-between; }
+.fp-brand { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+.fp-logo { display: flex; }
+.fp-logo i { width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 2px var(--surface); }
+.fp-logo i + i { margin-left: -5px; }
+.fp-date { font-size: 14px; font-weight: 600; color: var(--ink-muted); }
+.fp-hero { margin: 26px 0 0; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: var(--display-tracking); font-size: 44px; line-height: 48px; }
+.fp-hero span { color: var(--ink-muted); }
+.fp-doors { margin-top: 26px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.fp-door { height: 440px; box-sizing: border-box; border-radius: 28px; overflow: hidden; border: var(--outline-w) solid var(--line); box-shadow: var(--lift); display: flex; flex-direction: column; align-items: center; padding: 30px 12px 0; }
+.fp-door .oc-glow::before { top: -250px; }
+.fp-name { position: relative; margin-top: 14px; font-family: var(--font-display); font-weight: var(--display-weight); font-variation-settings: var(--display-axes); letter-spacing: var(--display-tracking); font-size: 28px; line-height: 32px; }
+.fp-meta { position: relative; margin-top: 4px; font-size: 14px; font-weight: 600; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; }
+.fp-meta .oc-icon { width: 15px; height: 15px; color: var(--star); fill: var(--star); stroke-width: 1.5; }
+.fp-heroz { position: relative; margin: auto -12px 0; height: 210px; width: calc(100% + 24px); display: flex; align-items: center; justify-content: center; }
+.fp-prog { flex: none; width: 312px; transform: scale(var(--door-scale, .72)); }
+.fp-grown { background: transparent; box-shadow: none; border: 1.5px dashed var(--line); }
+.fp-stack { display: flex; }
+.fp-stack .oc-avatar + .oc-avatar { margin-left: -18px; box-shadow: 0 0 0 4px var(--surface); }
+.fp-grown .fp-name { display: flex; align-items: center; gap: 8px; font-size: 24px; }
+.fp-grown .fp-name .oc-icon { width: 20px; height: 20px; }
+.fp-todo { margin-top: auto; margin-bottom: 26px; width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.fp-todo span { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; border-radius: 14px; background: var(--surface-raised); font-size: 14px; font-weight: 600; }
+.fp-todo span .oc-icon { width: 18px; height: 18px; }
+.fp-todo .w { color: var(--waiting); }
+.fp-fam { margin-top: 20px; display: grid; grid-template-columns: auto repeat(4, 1fr); align-items: center; gap: 28px; background: var(--surface-raised); border-radius: 22px; padding: 6px 24px; box-shadow: var(--lift); }
+.fp-fam h3 { margin: 0; font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-muted); }
+.fp-fam .oc-member__n { width: auto; }

@@ -16,7 +16,7 @@ A skin may change **how things look**. It may never change **what things are, wh
 
 Two things carry across every skin:
 
-1. **Each person's colour.** Every person picks one of `person-coral`, `person-mint`, `person-butter` or `person-sky`. It is their avatar fill everywhere and their bar in every family view. On a Tint screen that belongs to them, it also becomes the accent, the progress ring and the done check. Each skin tunes the colour's lightness: pastel in Sunroom, saturated in Blocks, bright on dark in Tint. The hue stays the same, so Lily is mint wherever she appears.
+1. **Each person's colour.** Every person picks one of `person-coral`, `person-mint`, `person-butter` or `person-sky` (the implementation adds `person-rose`, `person-leaf`, `person-lilac` and `person-sand` for big families). It is their avatar fill everywhere and their bar in every family view. On a Tint screen that belongs to them, it also becomes the accent, the progress ring and the done check. Each skin tunes the colour's lightness: pastel in Sunroom, saturated in Blocks, bright on dark in Tint. The hue stays the same, so Lily is mint wherever she appears.
 2. **The category shapes.** Must do is a circle, Every day a rounded square and Bonus a star, in every skin. House and Tint keep the category colours monochrome on purpose, so the shape alone has to carry the meaning. That also keeps categories readable for colour-blind kids.
 
 ## House: the shared frame

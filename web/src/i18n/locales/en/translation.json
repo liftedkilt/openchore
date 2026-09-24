@@ -785,6 +785,66 @@
       "quest": "Quest"
     }
   },
+  "design": {
+    "avatar": {
+      "noName": "Someone"
+    },
+    "category": {
+      "essential": "Must do",
+      "daily": "Every day",
+      "bonus": "Bonus"
+    },
+    "celebration": {
+      "back": "Back to my list",
+      "headline": "Nailed <em>it!</em>",
+      "next": "Next: {{title}}",
+      "points": "+{{count}}",
+      "pointsLabel_one": "{{count}} point earned",
+      "pointsLabel_other": "{{count}} points earned",
+      "streak_one": "{{count}} in a row",
+      "streak_other": "{{count}} in a row"
+    },
+    "chore": {
+      "locked": "Opens when everything else is done",
+      "lockedLabel": "Locked",
+      "markComplete": "Mark complete",
+      "markIncomplete": "Mark incomplete",
+      "photo": "Photo check",
+      "points_one": "{{count}} pt",
+      "points_other": "{{count}} pts",
+      "readAloud": "Read aloud: {{title}}",
+      "waiting": "Waiting for a grown-up"
+    },
+    "family": {
+      "count": "{{done}}/{{total}}",
+      "label": "{{name}}: {{done}} of {{total}} done"
+    },
+    "greeting": {
+      "afternoon": "Afternoon",
+      "evening": "Evening",
+      "hi": "Hi",
+      "morning": "Morning"
+    },
+    "points": {
+      "label_one": "{{count}} point",
+      "label_other": "{{count}} points"
+    },
+    "progress": {
+      "count": "{{done}} of {{total}}",
+      "doneToday": "done today",
+      "from": "7 am",
+      "label": "{{done}} of {{total}} done today",
+      "of": " of {{total}}",
+      "slash": "/{{total}}",
+      "to": "9 pm"
+    },
+    "tabs": {
+      "label": "Main",
+      "rewards": "Rewards",
+      "today": "Today",
+      "week": "Week"
+    }
+  },
   "linkedAccounts": {
     "confirmSignOutEverywhere": "Sign this profile out on every device, including this one?",
     "confirmUnlink": "Unlink {{provider}}? Devices signed in with it will be signed out.",
