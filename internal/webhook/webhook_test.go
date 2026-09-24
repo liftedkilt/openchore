@@ -811,12 +811,14 @@ func TestDecayChecker_NoDuplicatePenalty(t *testing.T) {
 	}
 }
 
-func TestDecayChecker_OnlyPenalizesChildren(t *testing.T) {
+// Parents take part like everyone else: a missed chore with a penalty
+// configured is penalized regardless of role.
+func TestDecayChecker_PenalizesParentsToo(t *testing.T) {
 	env := setupTest(t)
 
 	parentID := createParentUser(t, env, "Parent")
 
-	// Create a required chore assigned to the parent (not a child)
+	// Create a required chore assigned to the parent
 	yesterday := time.Now().AddDate(0, 0, -1)
 	dow := int(yesterday.Weekday())
 	_, scheduleID := createChoreWithSchedule(t, env, parentID, parentID, "required", dow, nil, 5)
@@ -828,8 +830,8 @@ func TestDecayChecker_OnlyPenalizesChildren(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HasMissedChorePenalty error: %v", err)
 	}
-	if hasPenalty {
-		t.Error("parents should not be penalized for missed chores")
+	if !hasPenalty {
+		t.Error("expected a parent's missed chore to be penalized")
 	}
 }
 

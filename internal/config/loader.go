@@ -48,16 +48,21 @@ func Apply(ctx context.Context, s *store.Store, cfg *Config) error {
 	// 1. Create users, build name→ID map
 	nameToID := make(map[string]int64, len(cfg.Users))
 	for _, u := range cfg.Users {
-		theme := u.Theme
-		if u.Role == "admin" {
-			// Admin users never have a theme — the admin UI always uses the default.
-			theme = ""
-		}
 		user := &model.User{
 			Name:      u.Name,
 			Role:      u.Role,
-			Theme:     theme,
+			Theme:     u.Theme,
 			AvatarURL: u.Avatar,
+		}
+		if u.Pin != "" {
+			if !validPin(u.Pin) {
+				return fmt.Errorf("user %q: pin must be 4-8 digits", u.Name)
+			}
+			hash, err := bcrypt.GenerateFromPassword([]byte(u.Pin), bcrypt.DefaultCost)
+			if err != nil {
+				return fmt.Errorf("hashing pin for %q: %w", u.Name, err)
+			}
+			user.PinHash = string(hash)
 		}
 		if u.Age > 0 {
 			age := u.Age
@@ -229,4 +234,17 @@ func nilStr(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// validPin mirrors the API's PIN format rule: 4-8 numeric digits.
+func validPin(pin string) bool {
+	if len(pin) < 4 || len(pin) > 8 {
+		return false
+	}
+	for _, c := range pin {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }

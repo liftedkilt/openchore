@@ -60,7 +60,9 @@ func setupTest(t *testing.T) *testEnv {
 
 	s := store.New(db)
 	d := webhook.NewDispatcher(s)
-	router, chores, _ := api.NewRouter(s, d)
+	sessions := api.NewSessionManager(testSessionSecret)
+	oidcSvc := api.NewOIDCService(s, sessions, d, nil)
+	router, chores, _ := api.NewRouter(s, d, api.Auth{Sessions: sessions, OIDC: oidcSvc})
 	server := httptest.NewServer(router)
 
 	t.Cleanup(func() {
@@ -111,12 +113,30 @@ func (e *testEnv) createAdmin(t *testing.T) map[string]any {
 	return map[string]any{"id": float64(1), "name": "Admin", "role": "admin"}
 }
 
+// testSessionSecret signs sessions in tests so helpers can mint them
+// without going through the login flow.
+var testSessionSecret = []byte("openchore-test-session-secret-0123456789")
+
+// sessionToken mints a session for userID. Tokens carry session_version 0,
+// which is what every freshly created user has.
+func sessionToken(userID int) string {
+	return api.SignSessionToken(testSessionSecret, api.SessionClaims{
+		UserID:  int64(userID),
+		Method:  api.SessionMethodPin,
+		Expires: time.Now().Add(time.Hour).Unix(),
+	})
+}
+
+func sessionHeaders(userID int) map[string]string {
+	return map[string]string{"Authorization": "Bearer " + sessionToken(userID)}
+}
+
 func adminHeaders() map[string]string {
-	return map[string]string{"X-User-ID": "1"}
+	return sessionHeaders(1)
 }
 
 func childHeaders(id int) map[string]string {
-	return map[string]string{"X-User-ID": fmt.Sprintf("%d", id)}
+	return sessionHeaders(id)
 }
 
 func (e *testEnv) createChild(t *testing.T, name string) int {
@@ -200,7 +220,7 @@ func TestCreateUserRequiresAdmin(t *testing.T) {
 	resp := env.request(t, "POST", "/api/users", map[string]any{
 		"name": "Another Kid",
 		"role": "child",
-	}, map[string]string{"X-User-ID": "2"})
+	}, sessionHeaders(2))
 
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", resp.StatusCode)
@@ -1020,68 +1040,6 @@ func TestRewardCustomCost(t *testing.T) {
 	if redemption["points_spent"].(float64) != 25 {
 		t.Fatalf("expected custom cost 25, got %v", redemption["points_spent"])
 	}
-}
-
-// =================== ADMIN PASSCODE TESTS ===================
-
-func TestAdminPasscodeVerify(t *testing.T) {
-	env := setupTest(t)
-
-	// Default passcode is "0000"
-	resp := env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
-		"passcode": "0000",
-	}, nil, http.StatusOK)
-	var result map[string]any
-	decodeBody(t, resp, &result)
-	if result["valid"] != true {
-		t.Fatal("expected valid=true for correct passcode")
-	}
-
-	// Wrong passcode
-	env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
-		"passcode": "9999",
-	}, nil, http.StatusUnauthorized)
-}
-
-func TestAdminPasscodeUpdate(t *testing.T) {
-	env := setupTest(t)
-	env.createAdmin(t)
-
-	// Update passcode
-	env.expectStatus(t, "PUT", "/api/admin/passcode", map[string]any{
-		"old_passcode": "0000",
-		"new_passcode": "1234",
-	}, adminHeaders(), http.StatusOK)
-
-	// Old passcode should fail
-	env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
-		"passcode": "0000",
-	}, nil, http.StatusUnauthorized)
-
-	// New passcode should work
-	env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
-		"passcode": "1234",
-	}, nil, http.StatusOK)
-}
-
-func TestAdminPasscodeTooShort(t *testing.T) {
-	env := setupTest(t)
-	env.createAdmin(t)
-
-	env.expectStatus(t, "PUT", "/api/admin/passcode", map[string]any{
-		"old_passcode": "0000",
-		"new_passcode": "12",
-	}, adminHeaders(), http.StatusBadRequest)
-}
-
-func TestAdminPasscodeWrongOld(t *testing.T) {
-	env := setupTest(t)
-	env.createAdmin(t)
-
-	env.expectStatus(t, "PUT", "/api/admin/passcode", map[string]any{
-		"old_passcode": "wrong",
-		"new_passcode": "5678",
-	}, adminHeaders(), http.StatusUnauthorized)
 }
 
 // =================== STREAK TESTS ===================
@@ -2430,51 +2388,6 @@ func TestRequiredChoresGateCoreChorePoints(t *testing.T) {
 
 // =================== BCRYPT PASSCODE TESTS ===================
 
-func TestBcryptPasscodeRoundTrip(t *testing.T) {
-	env := setupTest(t)
-	env.createAdmin(t)
-
-	// Default passcode "0000" should work (stored as bcrypt hash in migration)
-	resp := env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
-		"passcode": "0000",
-	}, nil, http.StatusOK)
-	var result map[string]any
-	decodeBody(t, resp, &result)
-	if result["valid"] != true {
-		t.Fatal("expected valid=true for correct default passcode")
-	}
-
-	// Update passcode to "abcd1234"
-	env.expectStatus(t, "PUT", "/api/admin/passcode", map[string]any{
-		"old_passcode": "0000",
-		"new_passcode": "abcd1234",
-	}, adminHeaders(), http.StatusOK)
-
-	// Old passcode should fail
-	env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
-		"passcode": "0000",
-	}, nil, http.StatusUnauthorized)
-
-	// New passcode should work
-	resp = env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
-		"passcode": "abcd1234",
-	}, nil, http.StatusOK)
-	decodeBody(t, resp, &result)
-	if result["valid"] != true {
-		t.Fatal("expected valid=true for new passcode")
-	}
-
-	// Verify the stored value is a bcrypt hash (starts with $2a$)
-	var stored string
-	err := env.db.QueryRow(`SELECT value FROM app_settings WHERE key = 'admin_passcode'`).Scan(&stored)
-	if err != nil {
-		t.Fatalf("failed to read stored passcode: %v", err)
-	}
-	if len(stored) < 4 || stored[:4] != "$2a$" {
-		t.Fatalf("expected bcrypt hash starting with $2a$, got %q", stored)
-	}
-}
-
 // =================== UPLOAD MIME VALIDATION TESTS ===================
 
 func TestUploadRejectsNonImage(t *testing.T) {
@@ -2496,7 +2409,7 @@ func TestUploadRejectsNonImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("Authorization", "Bearer "+sessionToken(1))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -2539,7 +2452,7 @@ func TestUploadAcceptsImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("Authorization", "Bearer "+sessionToken(1))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -2558,6 +2471,7 @@ func TestSetupCreatesAdminAndChildren(t *testing.T) {
 	env := setupTest(t)
 
 	resp := env.expectStatus(t, "POST", "/api/setup", map[string]any{
+		"parent": map[string]any{"name": "Robin", "pin": "2468"},
 		"children": []map[string]any{
 			{"name": "Alice", "theme": "galaxy"},
 			{"name": "Bob", "theme": "forest"},
@@ -2570,8 +2484,14 @@ func TestSetupCreatesAdminAndChildren(t *testing.T) {
 	decodeBody(t, resp, &result)
 
 	admin := result["admin"].(map[string]any)
-	if admin["name"] != "Parent" {
-		t.Fatalf("expected admin name 'Parent', got %v", admin["name"])
+	if admin["name"] != "Robin" {
+		t.Fatalf("expected admin name 'Robin', got %v", admin["name"])
+	}
+	if admin["has_pin"] != true {
+		t.Fatalf("expected setup to give the parent a pin")
+	}
+	if !hasSessionCookie(resp) {
+		t.Fatal("expected setup to sign the parent in")
 	}
 	if admin["role"] != "admin" {
 		t.Fatalf("expected admin role, got %v", admin["role"])
@@ -2905,25 +2825,6 @@ func TestListRedemptionsInvalidUserID(t *testing.T) {
 
 // =================== MIDDLEWARE EDGE CASE TESTS ===================
 
-func TestInvalidUserIDHeader(t *testing.T) {
-	env := setupTest(t)
-	env.createAdmin(t)
-
-	// Non-numeric X-User-ID
-	env.expectStatus(t, "GET", "/api/users/1/chores", nil, map[string]string{
-		"X-User-ID": "not-a-number",
-	}, http.StatusBadRequest)
-}
-
-func TestNonExistentUserIDHeader(t *testing.T) {
-	env := setupTest(t)
-
-	// User ID that doesn't exist in DB
-	env.expectStatus(t, "GET", "/api/users/1/chores", nil, map[string]string{
-		"X-User-ID": "9999",
-	}, http.StatusUnauthorized)
-}
-
 // =================== USER EDGE CASE TESTS ===================
 
 func TestGetUserNotFound(t *testing.T) {
@@ -3162,7 +3063,7 @@ func TestUploadNoPhotoField(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", env.server.URL+"/api/upload", &buf)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("X-User-ID", "1")
+	req.Header.Set("Authorization", "Bearer "+sessionToken(1))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -3705,9 +3606,9 @@ func TestProfilePinSetVerifyAndClear(t *testing.T) {
 		t.Fatalf("expected has_pin=false, got true")
 	}
 
-	// Verify against an unset PIN is rejected.
-	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID),
-		map[string]any{"pin": "1234"}, nil, http.StatusBadRequest)
+	// Without a PIN, tapping the profile is enough to sign in.
+	env.expectStatus(t, "POST", "/api/auth/login",
+		map[string]any{"user_id": kidID}, nil, http.StatusOK)
 
 	// Kid sets their own PIN (no current_pin required on first set).
 	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidID),
@@ -3721,12 +3622,12 @@ func TestProfilePinSetVerifyAndClear(t *testing.T) {
 	}
 
 	// Wrong PIN is rejected on the public verify endpoint.
-	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID),
-		map[string]any{"pin": "9999"}, nil, http.StatusUnauthorized)
+	env.expectStatus(t, "POST", "/api/auth/login",
+		map[string]any{"user_id": kidID, "pin": "9999"}, nil, http.StatusUnauthorized)
 
 	// Correct PIN succeeds.
-	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID),
-		map[string]any{"pin": "1234"}, nil, http.StatusOK)
+	env.expectStatus(t, "POST", "/api/auth/login",
+		map[string]any{"user_id": kidID, "pin": "1234"}, nil, http.StatusOK)
 
 	// Kid cannot change to a new PIN without supplying the current one.
 	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kidID),
@@ -3737,10 +3638,10 @@ func TestProfilePinSetVerifyAndClear(t *testing.T) {
 		map[string]any{"current_pin": "1234", "new_pin": "5678"}, childHeaders(kidID), http.StatusOK)
 
 	// Old PIN no longer verifies; new one does.
-	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID),
-		map[string]any{"pin": "1234"}, nil, http.StatusUnauthorized)
-	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID),
-		map[string]any{"pin": "5678"}, nil, http.StatusOK)
+	env.expectStatus(t, "POST", "/api/auth/login",
+		map[string]any{"user_id": kidID, "pin": "1234"}, nil, http.StatusUnauthorized)
+	env.expectStatus(t, "POST", "/api/auth/login",
+		map[string]any{"user_id": kidID, "pin": "5678"}, nil, http.StatusOK)
 
 	// Admin can clear a kid's PIN without supplying it (reset flow).
 	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/users/%d/pin", kidID),
@@ -3813,21 +3714,24 @@ func TestProfilePinAdminMustVerifyOwnCurrentPin(t *testing.T) {
 		map[string]any{"current_pin": "1234", "new_pin": "5678"}, adminHeaders(), http.StatusOK)
 
 	// Old PIN no longer verifies.
-	env.expectStatus(t, "POST", "/api/users/1/verify-pin",
-		map[string]any{"pin": "1234"}, nil, http.StatusUnauthorized)
+	env.expectStatus(t, "POST", "/api/auth/login",
+		map[string]any{"user_id": 1, "pin": "1234"}, nil, http.StatusUnauthorized)
 
 	// Clearing own PIN with the wrong current value is rejected.
 	env.expectStatus(t, "DELETE", "/api/users/1/pin",
 		map[string]any{"current_pin": "0000"}, adminHeaders(), http.StatusUnauthorized)
 
-	// Clearing with the right current value succeeds.
+	// Even with the right current value, an admin can't drop their only
+	// credential: admin profiles always need a PIN or a linked account.
 	env.expectStatus(t, "DELETE", "/api/users/1/pin",
-		map[string]any{"current_pin": "5678"}, adminHeaders(), http.StatusOK)
+		map[string]any{"current_pin": "5678"}, adminHeaders(), http.StatusConflict)
 }
 
 // =================== AUTH & PIN EVENT LOGGING / WEBHOOK TESTS ===================
 
-func TestAdminPasscodeWebhookEvents(t *testing.T) {
+// An upgraded install still has the household admin passcode. An admin
+// profile without a PIN uses it once to claim a PIN; attempts are audited.
+func TestLegacyPasscodeClaimWebhookEvents(t *testing.T) {
 	env := setupTest(t)
 	env.createAdmin(t)
 
@@ -3853,27 +3757,15 @@ func TestAdminPasscodeWebhookEvents(t *testing.T) {
 		"events": "*",
 	}, adminHeaders(), http.StatusCreated)
 
-	// 1. Successful verification
-	env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
-		"passcode": "0000",
-	}, nil, http.StatusOK)
-
-	// 2. Failed verification
-	env.expectStatus(t, "POST", "/api/admin/verify", map[string]any{
-		"passcode": "9999",
+	// 1. Failed claim (wrong legacy passcode)
+	env.expectStatus(t, "POST", "/api/auth/login", map[string]any{
+		"user_id": 1, "legacy_passcode": "9999", "new_pin": "2468",
 	}, nil, http.StatusUnauthorized)
 
-	// 3. Failed passcode update (wrong current passcode)
-	env.expectStatus(t, "PUT", "/api/admin/passcode", map[string]any{
-		"old_passcode": "wrong",
-		"new_passcode": "validpass1",
-	}, adminHeaders(), http.StatusUnauthorized)
-
-	// 4. Successful passcode update
-	env.expectStatus(t, "PUT", "/api/admin/passcode", map[string]any{
-		"old_passcode": "0000",
-		"new_passcode": "validpass1",
-	}, adminHeaders(), http.StatusOK)
+	// 2. Successful claim: passcode verified, then the new PIN is recorded
+	env.expectStatus(t, "POST", "/api/auth/login", map[string]any{
+		"user_id": 1, "legacy_passcode": "0000", "new_pin": "2468",
+	}, nil, http.StatusOK)
 
 	time.Sleep(500 * time.Millisecond)
 
@@ -3881,10 +3773,9 @@ func TestAdminPasscodeWebhookEvents(t *testing.T) {
 	defer mu.Unlock()
 
 	expectedEvents := []string{
+		webhook.EventAdminPasscodeFailed,
 		webhook.EventAdminPasscodeVerified,
-		webhook.EventAdminPasscodeFailed,
-		webhook.EventAdminPasscodeFailed,
-		webhook.EventAdminPasscodeChanged,
+		webhook.EventProfilePinChanged,
 	}
 
 	if len(receivedEvents) != len(expectedEvents) {
@@ -3901,7 +3792,7 @@ func TestAdminPasscodeWebhookEvents(t *testing.T) {
 	for i, p := range receivedPayloads {
 		dataBytes, _ := json.Marshal(p.Data)
 		dataStr := string(dataBytes)
-		if strings.Contains(dataStr, "0000") || strings.Contains(dataStr, "validpass1") || strings.Contains(dataStr, "wrong") {
+		if strings.Contains(dataStr, "0000") || strings.Contains(dataStr, "9999") || strings.Contains(dataStr, "2468") {
 			t.Errorf("payload %d leaks passcode in data: %s", i, dataStr)
 		}
 	}
@@ -3940,13 +3831,15 @@ func TestProfilePinWebhookEvents(t *testing.T) {
 	}, childHeaders(kidID), http.StatusOK)
 
 	// 2. Successful PIN verify
-	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID), map[string]any{
-		"pin": "1234",
+	env.expectStatus(t, "POST", "/api/auth/login", map[string]any{
+		"user_id": kidID,
+		"pin":     "1234",
 	}, nil, http.StatusOK)
 
 	// 3. Failed PIN verify
-	env.expectStatus(t, "POST", fmt.Sprintf("/api/users/%d/verify-pin", kidID), map[string]any{
-		"pin": "0000",
+	env.expectStatus(t, "POST", "/api/auth/login", map[string]any{
+		"user_id": kidID,
+		"pin":     "0000",
 	}, nil, http.StatusUnauthorized)
 
 	// 4. Failed PIN change (wrong current_pin)

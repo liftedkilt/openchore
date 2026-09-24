@@ -62,18 +62,43 @@ const (
 	ExpiryPenalty  = "penalty"
 )
 
+// User is a household member. AuthProviders lists the IDs of the OIDC
+// providers linked to the profile so the login screen can offer "Continue
+// with ..." after the profile is tapped; subjects and emails are never
+// exposed on the public listing.
 type User struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	AvatarURL string    `json:"avatar_url"`
-	Role      string    `json:"role"`
-	Age       *int      `json:"age,omitempty"`
-	Theme     string    `json:"theme,omitempty"`
-	LineColor string    `json:"line_color,omitempty"`
-	Paused    bool      `json:"paused"`
-	HasPin    bool      `json:"has_pin"`
-	PinHash   string    `json:"-"`
-	CreatedAt time.Time `json:"created_at"`
+	ID             int64     `json:"id"`
+	Name           string    `json:"name"`
+	AvatarURL      string    `json:"avatar_url"`
+	Role           string    `json:"role"`
+	Age            *int      `json:"age,omitempty"`
+	Theme          string    `json:"theme,omitempty"`
+	LineColor      string    `json:"line_color,omitempty"`
+	Paused         bool      `json:"paused"`
+	HasPin         bool      `json:"has_pin"`
+	PinHash        string    `json:"-"`
+	AuthProviders  []string  `json:"auth_providers"`
+	SessionVersion int64     `json:"-"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+// User roles. Admins manage the household *and* take part like everyone else
+// (chores, points, rewards, streaks); the role only gates management actions.
+const (
+	RoleAdmin = "admin"
+	RoleChild = "child"
+)
+
+// UserIdentity is an external OIDC identity linked to a profile.
+type UserIdentity struct {
+	ID          int64      `json:"id"`
+	UserID      int64      `json:"user_id"`
+	Provider    string     `json:"provider"`
+	Subject     string     `json:"-"`
+	Email       string     `json:"email,omitempty"`
+	DisplayName string     `json:"display_name,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
 }
 
 type Chore struct {

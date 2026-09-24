@@ -3,16 +3,24 @@ package api
 import (
 	"net/http"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/store"
 )
 
 type SetupHandler struct {
-	store *store.Store
+	store    *store.Store
+	sessions *SessionManager
 }
 
-func NewSetupHandler(s *store.Store) *SetupHandler {
-	return &SetupHandler{store: s}
+func NewSetupHandler(s *store.Store, sm *SessionManager) *SetupHandler {
+	return &SetupHandler{store: s, sessions: sm}
+}
+
+type setupParent struct {
+	Name string `json:"name"`
+	Pin  string `json:"pin"`
 }
 
 type setupChild struct {
@@ -28,6 +36,7 @@ type setupChore struct {
 }
 
 type setupRequest struct {
+	Parent   setupParent  `json:"parent"`
 	Children []setupChild `json:"children"`
 	Chores   []setupChore `json:"chores"`
 }
@@ -53,9 +62,22 @@ func (h *SetupHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "at least one child is required")
 		return
 	}
+	if !pinFormatValid(req.Parent.Pin) {
+		writeError(w, http.StatusBadRequest, "parent pin must be 4-8 digits")
+		return
+	}
+	parentName := req.Parent.Name
+	if parentName == "" {
+		parentName = "Parent"
+	}
+	pinHash, err := bcrypt.GenerateFromPassword([]byte(req.Parent.Pin), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to hash pin")
+		return
+	}
 
-	// 1. Create admin user
-	admin := &model.User{Name: "Parent", Role: "admin"}
+	// 1. Create the parent (admin) profile
+	admin := &model.User{Name: parentName, Role: model.RoleAdmin, PinHash: string(pinHash)}
 	if err := h.store.CreateUser(r.Context(), admin); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create admin user")
 		return
@@ -66,7 +88,7 @@ func (h *SetupHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	for _, c := range req.Children {
 		child := &model.User{
 			Name:  c.Name,
-			Role:  "child",
+			Role:  model.RoleChild,
 			Theme: c.Theme,
 		}
 		if err := h.store.CreateUser(r.Context(), child); err != nil {
@@ -113,6 +135,10 @@ func (h *SetupHandler) Setup(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	// Sign the parent in so the wizard can drop them straight into the app.
+	token, issued := h.sessions.Issue(SessionClaims{UserID: admin.ID, Version: admin.SessionVersion, Method: SessionMethodPin})
+	setSessionCookie(w, r, token, issued)
 
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"admin":    admin,

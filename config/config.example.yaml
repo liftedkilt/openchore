@@ -3,11 +3,16 @@
 # The config is applied only when the database is empty (first boot).
 # To re-apply, use ./redeploy.sh --wipe to clear the database.
 
+# Admins (parents) manage the household and can also be assigned chores,
+# earn points and redeem rewards. Every admin needs a PIN (4-8 digits) or a
+# linked OIDC account to sign in. Kids may have a PIN too, or none at all.
 users:
   - name: Alex
     role: admin
+    pin: "1234"
   - name: Jamie
     role: admin
+    pin: "5678"
   - name: Emma
     role: child
     age: 11
@@ -289,8 +294,7 @@ streak_rewards:
     bonus_points: 100
     label: "Monthly Master!"
 
-settings:
-  admin_passcode: "1234"
+settings: {}
 
 # AI-powered features (requires LiteRT + Kokoro sidecars — see compose.yaml)
 # Enable with: docker compose --profile ai up
@@ -317,3 +321,29 @@ webhooks:
   # How often (in hours) the cleanup goroutine wakes up to purge old rows.
   # Default: 24 (once per day).
   delivery_cleanup_interval_hours: 24
+
+# Authentication. Unlike the sections above, this is read on every start,
+# so providers can be added to an existing install (restart required).
+# Values support ${ENV_VAR} expansion to keep secrets out of this file.
+# A single provider can also be configured purely with environment variables:
+# OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_PROVIDER_ID,
+# OIDC_PROVIDER_NAME, OIDC_SCOPES, OIDC_PROMPT (and OPENCHORE_PUBLIC_URL).
+auth:
+  # Externally reachable URL; used to build redirect URIs
+  # (<public_url>/api/auth/oidc/<id>/callback). Defaults to the request host.
+  # public_url: "https://chores.example.com"
+  # kiosk_session_ttl: 12h        # tap/PIN sign-ins on shared devices
+  # personal_session_ttl: 720h    # OIDC sign-ins, e.g. on a parent's phone
+  oidc: []
+  # oidc:
+  #   - id: pocketid                # stable; stored with linked accounts
+  #     name: "Pocket ID"           # button label: "Continue with Pocket ID"
+  #     issuer: "https://id.example.com"
+  #     client_id: "openchore"
+  #     client_secret: "${POCKET_ID_CLIENT_SECRET}"
+  #     prompt: login               # re-authenticate every time (shared tablets)
+  #   - id: google
+  #     name: "Google"
+  #     issuer: "https://accounts.google.com"
+  #     client_id: "1234.apps.googleusercontent.com"
+  #     client_secret: "${GOOGLE_CLIENT_SECRET}"

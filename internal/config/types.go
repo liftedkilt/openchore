@@ -9,6 +9,41 @@ type Config struct {
 	Settings      map[string]string    `yaml:"settings,omitempty"`
 	AI            *AIConfig            `yaml:"ai,omitempty"`
 	Webhooks      *WebhooksConfig      `yaml:"webhooks,omitempty"`
+	Auth          *AuthConfig          `yaml:"auth,omitempty"`
+}
+
+// AuthConfig holds runtime authentication settings. Unlike the seed sections
+// above it is read on every start, so providers can be added to an existing
+// install. String values support ${ENV_VAR} expansion so secrets can stay out
+// of the file.
+type AuthConfig struct {
+	// PublicURL is the externally reachable base URL (e.g.
+	// https://chores.example.com), used to build OIDC redirect URIs. When
+	// empty, the base_url setting or the request's Host is used.
+	PublicURL string `yaml:"public_url,omitempty"`
+	// KioskSessionTTL bounds tap/PIN sessions (default 12h).
+	KioskSessionTTL string `yaml:"kiosk_session_ttl,omitempty"`
+	// PersonalSessionTTL bounds OIDC sessions on personal devices (default 720h).
+	PersonalSessionTTL string               `yaml:"personal_session_ttl,omitempty"`
+	OIDC               []OIDCProviderConfig `yaml:"oidc,omitempty"`
+}
+
+// OIDCProviderConfig describes one OpenID Connect provider (Pocket ID,
+// Authelia, Authentik, Keycloak, Zitadel, Google, Microsoft, ...).
+type OIDCProviderConfig struct {
+	// ID is the stable identifier stored with linked identities and used in
+	// the callback URL: /api/auth/oidc/<id>/callback. Do not change it once
+	// accounts are linked.
+	ID           string   `yaml:"id"`
+	Name         string   `yaml:"name"`
+	Issuer       string   `yaml:"issuer"`
+	ClientID     string   `yaml:"client_id"`
+	ClientSecret string   `yaml:"client_secret,omitempty"`
+	Scopes       []string `yaml:"scopes,omitempty"`
+	// Prompt is passed through as the OIDC prompt parameter. "login" forces
+	// the provider to re-authenticate every time, which is recommended when
+	// parents sign in on a shared wall tablet.
+	Prompt string `yaml:"prompt,omitempty"`
 }
 
 // WebhooksConfig holds runtime tunables for the webhook subsystem.
@@ -60,8 +95,11 @@ type AIConfig struct {
 }
 
 type UserConfig struct {
-	Name   string `yaml:"name"`
-	Role   string `yaml:"role"`
+	Name string `yaml:"name"`
+	Role string `yaml:"role"`
+	// Pin is a 4-8 digit profile PIN, hashed on seed. Admin profiles need
+	// a PIN (or a linked account) to sign in.
+	Pin    string `yaml:"pin,omitempty"`
 	Age    int    `yaml:"age,omitempty"`
 	Theme  string `yaml:"theme,omitempty"`
 	Avatar string `yaml:"avatar,omitempty"`

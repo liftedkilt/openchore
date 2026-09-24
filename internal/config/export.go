@@ -166,8 +166,9 @@ func Export(ctx context.Context, s *store.Store, sections []string) (*Config, er
 		if err != nil {
 			return nil, fmt.Errorf("listing settings: %w", err)
 		}
-		// Exclude admin_passcode from export for security
+		// Exclude secrets from export
 		delete(settings, "admin_passcode")
+		delete(settings, "session_secret")
 		if len(settings) > 0 {
 			cfg.Settings = settings
 		}
