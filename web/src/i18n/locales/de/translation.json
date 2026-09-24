@@ -1039,6 +1039,7 @@
     "nextUp": "Als Nächstes",
     "opensAt": "Ab {{time}}",
     "dueBy": "Bis {{time}}",
+    "late": "War bis {{time}} fällig",
     "familyToday": "Die Familie heute",
     "chartTitle": "Heute bisher",
     "chartDesc": "Wie viel jede Person von ihrem Tag geschafft hat, Stunde für Stunde. Jetzt: {{summary}}.",

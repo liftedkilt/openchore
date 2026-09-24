@@ -8,10 +8,11 @@ import { localDateStr } from '../utils';
 import {
   Avatar, ChoreRow, DayProgress, FamilyMember, HouseScope, Icon, SkinScope,
   catFromCategory, resolveSkin, salutationFor, useMinuteClock,
-  type Cat, type ChoreState, type DayProgressItem, type Skin,
+  type DayProgressItem, type Skin,
 } from '../design';
 import { LineChart, type LineSeries, type Tick } from '../components/charts/LineChart';
 import { personColorVar } from '../components/charts/personColor';
+import { CAT_ORDER, nextRows, type NextRow } from './AmbientDashboard.data';
 import styles from './AmbientDashboard.module.css';
 
 interface PersonDay {
@@ -28,15 +29,14 @@ interface PersonDay {
 
 const REFRESH_MS = 45_000;
 const MAX_CHART_LINES = 6;
-/** How many of a person's next chores their door lists (more are clipped if they don't fit). */
-const NEXT_ROWS = 3;
+/** The most rows a door lists; fewer show when fewer whole rows fit. */
+const NEXT_ROWS = 4;
 /** DayProgress' day, matching its default "7 am" / "9 pm" labels. */
 const DAY_FROM_H = 7;
 const DAY_TO_H = 21;
 /** The family chart's day. */
 const CHART_FROM_H = 6;
 const CHART_TO_H = 22;
-const CAT_ORDER: Record<Cat, number> = { essential: 0, daily: 1, bonus: 2 };
 
 /**
  * Door hero sizing is layout, not theme (the gallery does the same): each
@@ -52,40 +52,40 @@ const HERO_FIT: Record<Skin, { w: number; s: number }> = {
 const hoursOf = (d: Date) => d.getHours() + d.getMinutes() / 60;
 const dayFraction = (d: Date) => (hoursOf(d) - DAY_FROM_H) / (DAY_TO_H - DAY_FROM_H);
 
-/** "HH:MM" today, as a Date. */
-function atToday(hhmm: string | undefined, now: Date): Date | null {
-  if (!hhmm) return null;
-  const [h, m] = hhmm.split(':').map(Number);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-  const d = new Date(now);
-  d.setHours(h, m, 0, 0);
-  return d;
-}
-
 /**
- * Hide the children of a box that don't fully fit inside it, so a door shows
- * as many whole rows as its height allows and never a clipped one.
+ * Hide the rows of a door's "Next up" list that don't fully fit, so a door
+ * shows as many whole rows as its height allows and never a clipped one.
+ * When not even one fits, the section (and its label) hides.
+ *
+ * It watches the door, whose size is set by the grid, not the list: hiding
+ * rows or the section never feeds back into the measurement. It re-fits
+ * when the door resizes and once the web fonts have loaded.
  */
 function useFitRows<T extends HTMLElement>(deps: unknown[]) {
   const ref = useRef<T>(null);
   useLayoutEffect(() => {
     const box = ref.current;
-    if (!box) return;
+    const section = box?.parentElement;
+    const door = box?.closest<HTMLElement>(`.${styles.door}`);
+    if (!box || !section || !door) return;
+    let alive = true;
     const fit = () => {
+      if (!alive) return;
       const kids = Array.from(box.children) as HTMLElement[];
+      section.hidden = false;
       kids.forEach((k) => { k.hidden = false; });
-      if (box.parentElement) box.parentElement.hidden = false;
       const bottom = box.getBoundingClientRect().bottom;
       kids.forEach((k) => { k.hidden = k.getBoundingClientRect().bottom > bottom + 1; });
-      // Nothing fits: hide the section (and its label) rather than a clipped row.
-      const section = box.parentElement;
-      if (section) section.hidden = kids.every((k) => k.hidden);
+      section.hidden = kids.length > 0 && kids.every((k) => k.hidden);
     };
     fit();
-    if (typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(fit);
-    ro.observe(box);
-    return () => ro.disconnect();
+    document.fonts?.ready.then(fit).catch(() => {});
+    let ro: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(fit);
+      ro.observe(door);
+    }
+    return () => { alive = false; ro?.disconnect(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return ref;
@@ -242,29 +242,13 @@ function Door({ p, now, fmtTime }: { p: PersonDay; now: Date; fmtTime: (d: Date)
       });
   }, [p.chores, p.doneAt]);
 
-  // Bonus only opens once every Must do and Every day chore is done.
-  const bonusOpen = p.chores.every((c) => c.category === 'bonus' || c.completed || !c.available);
-  const next = p.chores
-    .filter((c) => !c.completed && !c.expired)
-    .sort((a, b) =>
-      Number(b.available) - Number(a.available)
-      || CAT_ORDER[catFromCategory(a.category)] - CAT_ORDER[catFromCategory(b.category)]
-      || (a.due_by ?? '99').localeCompare(b.due_by ?? '99'))
-    .slice(0, NEXT_ROWS);
+  const next = nextRows(p.chores, now).slice(0, NEXT_ROWS);
 
-  const rowFor = (c: ScheduledChore) => {
-    const cat = catFromCategory(c.category);
-    const state: ChoreState = cat === 'bonus' && !bonusOpen ? 'locked' : 'todo';
-    let meta: string | undefined;
-    let urgent = false;
-    const opens = atToday(c.available_at, now);
-    const due = atToday(c.due_by, now);
-    if (!c.available && opens && opens > now) {
-      meta = t('wall.opensAt', { time: fmtTime(opens) });
-    } else if (due) {
-      meta = t('wall.dueBy', { time: fmtTime(due) });
-      urgent = due.getTime() - now.getTime() < 60 * 60 * 1000;
-    }
+  const rowFor = ({ chore: c, cat, state, meta: m, urgent }: NextRow) => {
+    const meta = !m ? undefined
+      : m.kind === 'opens' ? t('wall.opensAt', { time: fmtTime(m.at) })
+      : m.kind === 'late' ? t('wall.late', { time: fmtTime(m.at) })
+      : t('wall.dueBy', { time: fmtTime(m.at) });
     return (
       <ChoreRow
         key={`${c.schedule_id}-${c.chore_id}`}
@@ -282,7 +266,7 @@ function Door({ p, now, fmtTime }: { p: PersonDay; now: Date; fmtTime: (d: Date)
   };
 
   const fit = HERO_FIT[skin];
-  const rowsRef = useFitRows<HTMLDivElement>([next.map((c) => c.schedule_id).join(), bonusOpen]);
+  const rowsRef = useFitRows<HTMLDivElement>([next.map((r) => `${r.chore.schedule_id}:${r.state}:${r.meta?.kind}`).join()]);
 
   return (
     <SkinScope skin={skin} color={p.user.color} door className={styles.door} role="group" aria-labelledby={nameId}>
