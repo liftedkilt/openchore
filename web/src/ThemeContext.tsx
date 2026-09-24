@@ -14,10 +14,10 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, setUser } = useAuth();
-  const [theme, setThemeState] = useState<Theme>('default');
+  const [theme, setThemeState] = useState<Theme>('sunroom');
 
   useEffect(() => {
-    setThemeState((user?.theme || 'default') as Theme);
+    setThemeState((user?.theme || 'sunroom') as Theme);
   }, [user]);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const config = THEME_CONFIG[theme] || THEME_CONFIG.default;
+  const config = THEME_CONFIG[theme] || THEME_CONFIG.sunroom;
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, config }}>
