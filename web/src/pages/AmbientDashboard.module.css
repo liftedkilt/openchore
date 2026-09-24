@@ -61,7 +61,7 @@
   gap: var(--space-4);
 }
 .door {
-  container-type: inline-size;
+  container-type: size;
   --hero-k: 1;
   min-width: 0;
   min-height: 0;
@@ -104,6 +104,7 @@
 
 /* What's left: rows that don't fit whole are hidden (useFitRows). */
 .next { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.next[hidden] { display: none; }
 .rows { flex: 1 1 0; min-height: 0; overflow: hidden; }
 .rows > [hidden] { display: none; }
 
@@ -120,14 +121,23 @@
   background: var(--surface-raised);
   box-shadow: var(--lift);
 }
-.members { min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
-.memberGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); column-gap: var(--space-5); }
+.familyWide { grid-template-columns: minmax(0, 1fr); }
+.members { min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: var(--space-1); }
+.memberGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); column-gap: var(--space-5); max-height: 144px; overflow: hidden; }
 .memberGrid :global(.oc-member__n) { width: 72px; }
 .chart { min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 
 /* Wide doors (three or fewer people): a bigger hero. */
 @container (min-width: 300px) {
   .hero, .heroFit { --hero-k: 1.15; }
+}
+/* Short doors (big families, two or three rows of doors): keep the person
+   and their count, drop the hero and then the avatar. */
+@container (max-height: 300px) {
+  .hero { display: none; }
+}
+@container (max-height: 170px) {
+  .door .avatar, .door .photo, .meta2, .next { display: none; }
 }
 
 /* Landscape tablets and up: one screen, no scrolling. */
@@ -149,6 +159,7 @@
   .greeting { font-size: 30px; line-height: 36px; }
   .clock { font-size: 64px; line-height: 64px; }
   .doors { grid-auto-rows: auto; }
+  .door { container-type: inline-size; }
   .next, .rows { flex: none; }
   .door { min-height: 360px; }
   .family { grid-template-columns: 1fr; }

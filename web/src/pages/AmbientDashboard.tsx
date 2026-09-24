@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
 import { api, fetchPublicUserData } from '../api';
 import type { User, ScheduledChore, UserStreakData, PointsData } from '../types';
 import { localDateStr } from '../utils';
@@ -26,6 +27,7 @@ interface PersonDay {
 }
 
 const REFRESH_MS = 45_000;
+const MAX_CHART_LINES = 6;
 /** How many of a person's next chores their door lists (more are clipped if they don't fit). */
 const NEXT_ROWS = 3;
 /** DayProgress' day, matching its default "7 am" / "9 pm" labels. */
@@ -72,8 +74,12 @@ function useFitRows<T extends HTMLElement>(deps: unknown[]) {
     const fit = () => {
       const kids = Array.from(box.children) as HTMLElement[];
       kids.forEach((k) => { k.hidden = false; });
+      if (box.parentElement) box.parentElement.hidden = false;
       const bottom = box.getBoundingClientRect().bottom;
-      kids.forEach((k, i) => { k.hidden = i > 0 && k.getBoundingClientRect().bottom > bottom + 1; });
+      kids.forEach((k) => { k.hidden = k.getBoundingClientRect().bottom > bottom + 1; });
+      // Nothing fits: hide the section (and its label) rather than a clipped row.
+      const section = box.parentElement;
+      if (section) section.hidden = kids.every((k) => k.hidden);
     };
     fit();
     if (typeof ResizeObserver === 'undefined') return;
@@ -162,6 +168,8 @@ export const AmbientDashboard: React.FC = () => {
     [lang],
   );
   const start = () => navigate('/login');
+  // Past a handful of lines the chart stops being readable; the strip stays.
+  const showChart = people.filter((p) => p.total > 0).length <= MAX_CHART_LINES;
 
   return (
     <HouseScope mode="auto" persistent={false} className={styles.wall} onClick={start}>
@@ -197,7 +205,7 @@ export const AmbientDashboard: React.FC = () => {
           </div>
 
           {people.length > 0 && (
-            <section className={styles.family} aria-labelledby="wall-family">
+            <section className={clsx(styles.family, !showChart && styles.familyWide)} aria-labelledby="wall-family">
               <div className={styles.members}>
                 <h2 id="wall-family" className={styles.label}>{t('wall.familyToday')}</h2>
                 <div className={styles.memberGrid}>
@@ -206,7 +214,7 @@ export const AmbientDashboard: React.FC = () => {
                   ))}
                 </div>
               </div>
-              <DayChart people={people} now={now} />
+              {showChart && <DayChart people={people} now={now} />}
             </section>
           )}
         </>
