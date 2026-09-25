@@ -866,6 +866,42 @@ func TestDeleteReward(t *testing.T) {
 	}
 }
 
+// Redemptions and goals reference the reward, so deleting one with history
+// deactivates it instead of failing the foreign key.
+func TestDeleteRewardWithHistory(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	parent := createTestUser(t, s, "Parent", "admin")
+	child := createTestUser(t, s, "Child", "child")
+	s.AdminAdjustPoints(ctx, child.ID, 100, "starting balance")
+
+	redeemed := &model.Reward{Name: "Movie Night", Cost: 30, Active: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, redeemed)
+	if _, err := s.RedeemReward(ctx, child.ID, redeemed.ID); err != nil {
+		t.Fatalf("RedeemReward: %v", err)
+	}
+	goal := &model.Reward{Name: "Lego", Cost: 500, Active: true, CreatedBy: parent.ID}
+	s.CreateReward(ctx, goal)
+	if _, err := s.CreateCommitment(ctx, child.ID, goal.ID, 0); err != nil {
+		t.Fatalf("CreateCommitment: %v", err)
+	}
+
+	for _, r := range []*model.Reward{redeemed, goal} {
+		if err := s.DeleteReward(ctx, r.ID); err != nil {
+			t.Fatalf("DeleteReward %q: %v", r.Name, err)
+		}
+		got, _ := s.GetReward(ctx, r.ID)
+		if got == nil || got.Active {
+			t.Fatalf("expected %q kept but deactivated, got %+v", r.Name, got)
+		}
+	}
+	history, err := s.ListRedemptionsForUser(ctx, child.ID, 10)
+	if err != nil || len(history) != 1 {
+		t.Fatalf("expected the redemption kept, got %v (%v)", history, err)
+	}
+}
+
 func TestRedeemReward(t *testing.T) {
 	s := setupStore(t)
 	ctx := context.Background()
