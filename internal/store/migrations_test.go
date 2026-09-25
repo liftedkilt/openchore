@@ -157,3 +157,53 @@ func TestMigration018SimplifyAI(t *testing.T) {
 		t.Fatalf("up again: %v", err)
 	}
 }
+
+// Older versions deleted schedules and users without cascading, so a
+// database can hold completions pointing at rows that no longer exist. 018
+// rebuilds chore_completions with foreign keys enforced; the orphans must
+// not make it fail.
+func TestMigration018OrphanedCompletions(t *testing.T) {
+	m, db := migrator(t)
+	if err := m.Migrate(17); err != nil {
+		t.Fatalf("migrate to 17: %v", err)
+	}
+
+	mustExec(t, db, `INSERT INTO users (id, name, role, theme, color) VALUES (1, 'Mia', 'child', 'sunroom', 'mint')`)
+	mustExec(t, db, `INSERT INTO chores (id, title, created_by) VALUES (1, 'Make bed', 1)`)
+	mustExec(t, db, `INSERT INTO chore_schedules (id, chore_id, assigned_to, day_of_week) VALUES (1, 1, 1, 1)`)
+	mustExec(t, db, `PRAGMA foreign_keys = OFF`)
+	mustExec(t, db, `INSERT INTO chore_completions (id, chore_schedule_id, completed_by, status, approved_by, completion_date)
+		VALUES (1, 1, 1, 'approved', 1, '2026-09-21'),
+		       (2, 99, 1, 'approved', NULL, '2026-09-21'),
+		       (3, 1, 99, 'approved', NULL, '2026-09-21'),
+		       (4, 1, 1, 'approved', 99, '2026-09-22')`)
+	mustExec(t, db, `PRAGMA foreign_keys = ON`)
+
+	if err := m.Migrate(18); err != nil {
+		t.Fatalf("migrate to 18: %v", err)
+	}
+
+	rows, err := db.Query(`SELECT id, approved_by FROM chore_completions ORDER BY id`)
+	if err != nil {
+		t.Fatalf("query completions: %v", err)
+	}
+	got := map[int64]sql.NullInt64{}
+	for rows.Next() {
+		var id int64
+		var approvedBy sql.NullInt64
+		if err := rows.Scan(&id, &approvedBy); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		got[id] = approvedBy
+	}
+	rows.Close()
+	if len(got) != 2 {
+		t.Fatalf("expected completions 1 and 4 kept, got %v", got)
+	}
+	if a, ok := got[1]; !ok || !a.Valid || a.Int64 != 1 {
+		t.Fatalf("expected completion 1 kept with its approver, got %v", got)
+	}
+	if a, ok := got[4]; !ok || a.Valid {
+		t.Fatalf("expected completion 4 kept with approved_by cleared, got %v", got)
+	}
+}
