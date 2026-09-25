@@ -1,6 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import tokens from '../../../docs/design-system/tokens.json';
 import { PERSON_COLORS } from './types';
+
+// Vitest runs in Node, but the app tsconfig carries no Node types. The tokens
+// live outside web/ (docs/design-system), so read them at test time rather
+// than importing them: the web image builds with web/ as its only context.
+type Fs = { readFileSync: (path: string, encoding: 'utf8') => string };
+const fsModule: string = 'node:fs';
+const { readFileSync } = (await import(/* @vite-ignore */ fsModule)) as Fs;
+
+type Token = { name: string; value: string | Record<string, string> };
+type Tokens = { color: { themes: { id: string }[]; tokens: Token[] } };
+const tokens = JSON.parse(
+  readFileSync(new URL('../../../docs/design-system/tokens.json', import.meta.url).pathname, 'utf8'),
+) as Tokens;
 
 // WCAG 2.x relative luminance and contrast ratio.
 function luminance(hex: string): number {
