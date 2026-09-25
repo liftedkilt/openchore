@@ -21,12 +21,12 @@
     "clsx": "^2.1.1",
     "i18next": "^26.4.2",
     "i18next-browser-languagedetector": "^8.2.1",
-    "lucide-react": "^1.45.0",
+    "lucide-react": "^1.47.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-i18next": "^17.0.14",
-    "react-router-dom": "^7.18.3"
+    "react-i18next": "^17.0.15",
+    "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.3",
