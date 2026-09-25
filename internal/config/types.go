@@ -83,14 +83,13 @@ func (c *Config) WebhookCleanupIntervalHours() int {
 	return c.Webhooks.DeliveryCleanupIntervalHours
 }
 
-// AIConfig holds settings for AI-powered features (LiteRT or Ollama + Kokoro TTS).
+// AIConfig seeds the optional AI settings. Which servers to use comes from
+// the environment (AI_BASE_URL, TTS_BASE_URL, ...), not from here.
 type AIConfig struct {
-	Enabled              bool    `yaml:"enabled"`
-	Endpoint             string  `yaml:"endpoint"`
-	Model                string  `yaml:"model"`
+	PhotoReview          bool    `yaml:"photo_review"`
+	AutoApprove          bool    `yaml:"auto_approve"`
 	AutoApproveThreshold float64 `yaml:"auto_approve_threshold"`
-	TTSEnabled           bool    `yaml:"tts_enabled"`
-	TTSEndpoint          string  `yaml:"tts_endpoint"`
+	WeeklySummary        bool    `yaml:"weekly_summary"`
 	TTSVoice             string  `yaml:"tts_voice"`
 }
 

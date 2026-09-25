@@ -1,21 +1,4 @@
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-4);
-  align-items: start;
-}
-
-@media (min-width: 880px) {
-  .layout {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-}
-
-.results {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
+/* Settings → AI: "Try photo review". */
 
 .upload {
   display: flex;
@@ -23,7 +6,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  min-height: 160px;
+  min-height: 140px;
   padding: var(--space-4);
   border: 1.5px dashed var(--line);
   border-radius: 16px;
@@ -46,7 +29,7 @@
 
 .upload img {
   max-width: 100%;
-  max-height: 260px;
+  max-height: 240px;
   border-radius: 12px;
   object-fit: contain;
 }
@@ -62,48 +45,13 @@
   overflow-wrap: anywhere;
 }
 
-.steps {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
-  list-style: none;
-}
-
-.step {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  color: var(--ink-muted);
-}
-
-.step svg {
-  width: 16px;
-  height: 16px;
-}
-
-.stepActive {
-  color: var(--ink);
-  font-weight: 700;
-}
-
-.stepDone {
-  color: var(--ink);
-}
-
-.stepDot {
-  width: 8px;
-  height: 8px;
-  margin: 0 4px;
-  border-radius: 50%;
-  background: var(--surface-sunk);
-}
-
 .result {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: 14px;
+  background: var(--surface);
 }
 
 .verdict {
@@ -117,6 +65,7 @@
   place-items: center;
   width: 32px;
   height: 32px;
+  flex: none;
   border-radius: 50%;
   background: var(--done);
   color: var(--on-done);
@@ -125,12 +74,11 @@
 .verdictIcon svg {
   width: 18px;
   height: 18px;
-  stroke-width: 2.75;
 }
 
 .verdictNo {
   background: transparent;
-  color: var(--urgent);
+  color: var(--ink);
   box-shadow: inset 0 0 0 2px currentColor;
 }
 
@@ -146,17 +94,13 @@
 }
 
 .feedback {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-radius: 14px;
-  background: var(--surface);
-}
-
-.feedback p {
-  flex: 1;
   margin: 0;
   font-size: 15px;
   line-height: 21px;
+}
+
+.outcome {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-muted);
 }

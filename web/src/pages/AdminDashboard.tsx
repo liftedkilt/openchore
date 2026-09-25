@@ -14,12 +14,11 @@ import { UsersTab } from '../components/admin/UsersTab';
 import { RewardsTab } from '../components/admin/RewardsTab';
 import { PointsTab } from '../components/admin/PointsTab';
 import { ActivityTab } from '../components/admin/ActivityTab';
-import { AIChoreChecker } from '../components/admin/AIChoreChecker';
 import { SettingsTab } from '../components/admin/SettingsTab';
 import { KidsStatusTab } from '../components/admin/KidsStatusTab';
 import { LanguageSelector } from '../components/LanguageSelector/LanguageSelector';
 
-type Tab = 'kids-status' | 'approvals' | 'chores' | 'rewards' | 'points' | 'activity' | 'users' | 'ai' | 'settings';
+type Tab = 'kids-status' | 'approvals' | 'chores' | 'rewards' | 'points' | 'activity' | 'users' | 'settings';
 
 const TABS: { id: Tab; label: string; icon?: IconName }[] = [
   { id: 'kids-status', label: 'admin.dashboard.tabKids', icon: 'home' },
@@ -29,7 +28,6 @@ const TABS: { id: Tab; label: string; icon?: IconName }[] = [
   { id: 'points', label: 'admin.dashboard.tabPoints', icon: 'star' },
   { id: 'activity', label: 'admin.dashboard.tabLog', icon: 'clock' },
   { id: 'users', label: 'admin.dashboard.tabPeople', icon: 'people' },
-  { id: 'ai', label: 'admin.dashboard.tabAi', icon: 'camera' },
   // Settings stays last (e2e: `nav button` last).
   { id: 'settings', label: 'admin.dashboard.tabSettings' },
 ];
@@ -112,7 +110,6 @@ export const AdminDashboard: React.FC = () => {
         {tab === 'rewards' && <RewardsTab />}
         {tab === 'points' && <PointsTab />}
         {tab === 'activity' && <ActivityTab />}
-        {tab === 'ai' && <AIChoreChecker />}
         {tab === 'settings' && <SettingsTab />}
       </main>
 

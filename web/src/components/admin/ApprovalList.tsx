@@ -20,8 +20,8 @@ function formatDay(date: string, lang: string): string {
 }
 
 /**
- * Chores waiting for a grown-up: who, what, the photo and the photo check's
- * feedback, with Approve / Reject. Parents open the app mostly for this.
+ * Chores waiting for a grown-up: who, what, the photo and the AI photo
+ * review's advisory note, with Approve / Reject. Parents open the app mostly for this.
  */
 export const ApprovalList: React.FC<Props> = ({ pending, users, onChanged }) => {
   const { t, i18n } = useTranslation();
@@ -77,11 +77,36 @@ export const ApprovalList: React.FC<Props> = ({ pending, users, onChanged }) => 
               </a>
             )}
 
-            {p.ai_feedback && (
+            {p.requires_photo && !p.photo_url && (
+              // A "child" photo chore pending without a photo was finished
+              // with "No photo? Finish anyway"; otherwise it may still come.
+              <div className={styles.ai}>
+                <Icon name="camera" />
+                <div>
+                  <span className={styles.aiLabel}>
+                    {p.photo_source === 'child' || !p.photo_source
+                      ? t('admin.approvalsTab.noPhotoSkipped')
+                      : t('admin.approvalsTab.noPhotoYet')}
+                  </span>
+                  <p className={styles.aiText}>
+                    {p.photo_source === 'child' || !p.photo_source
+                      ? t('admin.approvalsTab.noPhotoSkippedHint', { name: p.child_name })
+                      : t('admin.approvalsTab.noPhotoYetHint')}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {p.ai_feedback && p.ai_complete != null && (
+              // The photo check only advises; the parent still decides.
               <div className={styles.ai}>
                 <Icon name="spark" />
                 <div>
-                  <span className={styles.aiLabel}>{t('admin.approvalsTab.aiFeedback')}</span>
+                  <span className={styles.aiLabel}>
+                    {p.ai_complete ? t('admin.approvalsTab.aiLooksDone') : t('admin.approvalsTab.aiLooksNotDone')}
+                    {' · '}
+                    {t('admin.approvalsTab.aiConfidence', { value: Math.round((p.ai_confidence ?? 0) * 100) })}
+                  </span>
                   <p className={styles.aiText}>{p.ai_feedback}</p>
                 </div>
               </div>

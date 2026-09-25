@@ -7,6 +7,8 @@ import type { AuthProvider, Webhook, WebhookDelivery } from '../../types';
 import { Icon } from '../../design';
 import { ExportConfigSection } from './ExportConfigSection';
 import { APITokensSection } from './APITokensSection';
+import { PhotoReviewTester } from './PhotoReviewTester';
+import { useAIStatus } from '../../hooks/useAIStatus';
 import ui from './ui.module.css';
 import styles from './SettingsTab.module.css';
 
@@ -29,6 +31,7 @@ const WEBHOOK_EVENT_IDS: { id: string; key: string }[] = [
   { id: 'daily.complete', key: 'dailyDone' },
   { id: 'streak.milestone', key: 'streak' },
   { id: 'points.decayed', key: 'decay' },
+  { id: 'report.weekly_summary', key: 'weeklySummary' },
   { id: 'auth.admin_passcode.verified', key: 'adminPasscodeVerified' },
   { id: 'auth.admin_passcode.failed', key: 'adminPasscodeFailed' },
   { id: 'auth.profile_pin.verified', key: 'profilePinVerified' },
@@ -53,10 +56,15 @@ export const SettingsTab: React.FC = () => {
   const [discordSaving, setDiscordSaving] = useState(false);
   const [discordMessage, setDiscordMessage] = useState<Msg>(null);
 
-  // AI settings state
-  const [aiEnabled, setAiEnabled] = useState(false);
+  // AI settings state. What can be set depends on which services the
+  // server has configured (AI_BASE_URL / TTS_BASE_URL).
+  const aiStatus = useAIStatus();
+  const [aiPhotoReview, setAiPhotoReview] = useState(false);
+  const [aiAutoApprove, setAiAutoApprove] = useState(false);
   const [aiThreshold, setAiThreshold] = useState('0.85');
-  const [aiTtsEnabled, setAiTtsEnabled] = useState(false);
+  const [aiWeeklySummary, setAiWeeklySummary] = useState(false);
+  const [ttsVoice, setTtsVoice] = useState('');
+  const [savedTtsVoice, setSavedTtsVoice] = useState('');
   const [aiSaving, setAiSaving] = useState(false);
   const [aiMessage, setAiMessage] = useState<Msg>(null);
 
@@ -102,13 +110,16 @@ export const SettingsTab: React.FC = () => {
     api.admin.getSetting('discord_webhook_url')
       .then(data => setDiscordUrl(data.value || ''))
       .catch(() => {});
-    api.admin.getAISettings()
-      .then(settings => {
-        setAiEnabled(settings.ai_enabled === 'true');
-        setAiThreshold(settings.ai_auto_approve_threshold || '0.85');
-        setAiTtsEnabled(settings.ai_tts_enabled === 'true');
-      })
-      .catch(() => {});
+    const setting = (key: string) => api.admin.getSetting(key).then(d => d.value || '').catch(() => '');
+    Promise.all(['ai_photo_review', 'ai_auto_approve', 'ai_auto_approve_threshold', 'ai_weekly_summary', 'tts_voice'].map(setting))
+      .then(([photoReview, autoApprove, threshold, weeklySummary, voice]) => {
+        setAiPhotoReview(photoReview === 'true');
+        setAiAutoApprove(autoApprove === 'true');
+        setAiThreshold(threshold || '0.85');
+        setAiWeeklySummary(weeklySummary === 'true');
+        setTtsVoice(voice);
+        setSavedTtsVoice(voice);
+      });
   }, []);
 
   const handleSaveBaseUrl = async (e: React.FormEvent) => {
@@ -170,12 +181,16 @@ export const SettingsTab: React.FC = () => {
     setAiMessage(null);
     try {
       await Promise.all([
-        api.admin.setSetting('ai_enabled', aiEnabled ? 'true' : 'false'),
+        api.admin.setSetting('ai_photo_review', aiPhotoReview ? 'true' : 'false'),
+        api.admin.setSetting('ai_auto_approve', aiAutoApprove ? 'true' : 'false'),
         api.admin.setSetting('ai_auto_approve_threshold', aiThreshold),
-        api.admin.setSetting('ai_tts_enabled', aiTtsEnabled ? 'true' : 'false'),
+        api.admin.setSetting('ai_weekly_summary', aiWeeklySummary ? 'true' : 'false'),
+        api.admin.setSetting('tts_voice', ttsVoice.trim()),
       ]);
-      if (aiTtsEnabled) {
-        api.admin.triggerTTSSync().catch(() => {});
+      // A new voice means every chore's audio needs re-recording.
+      if (aiStatus.tts.configured && ttsVoice.trim() !== savedTtsVoice) {
+        api.admin.regenerateAllTTS().catch(() => {});
+        setSavedTtsVoice(ttsVoice.trim());
       }
       setAiMessage({ type: 'success', text: t('admin.settingsTab.ai.saveSuccess') });
     } catch {
@@ -277,46 +292,87 @@ export const SettingsTab: React.FC = () => {
             </div>
           </form>
 
-          <form className={clsx(ui.card, ui.section)} onSubmit={handleSaveAISettings}>
-            <h3 className={ui.sectionTitle}><Icon name="camera" /> {t('admin.settingsTab.ai.title')}</h3>
-            <p className={ui.sectionDesc}>{t('admin.settingsTab.ai.description')}</p>
+          {!aiStatus.ai.configured && !aiStatus.tts.configured ? (
+            <section className={clsx(ui.card, ui.section)} aria-labelledby="settings-ai">
+              <h3 className={ui.sectionTitle} id="settings-ai"><Icon name="spark" /> {t('admin.settingsTab.ai.title')}</h3>
+              <p className={ui.sectionDesc}>{t('admin.settingsTab.ai.notConfigured')}</p>
+            </section>
+          ) : (
+            <form className={clsx(ui.card, ui.section)} onSubmit={handleSaveAISettings} aria-labelledby="settings-ai">
+              <h3 className={ui.sectionTitle} id="settings-ai"><Icon name="spark" /> {t('admin.settingsTab.ai.title')}</h3>
+              <p className={ui.sectionDesc}>
+                {aiStatus.ai.configured
+                  ? t('admin.settingsTab.ai.description', { model: aiStatus.ai.model })
+                  : t('admin.settingsTab.ai.aiNotConfigured')}
+              </p>
 
-            <label className={ui.check}>
-              <input type="checkbox" checked={aiEnabled} onChange={e => setAiEnabled(e.target.checked)} />
-              <span className={ui.checkLabel}>{t('admin.settingsTab.ai.enableLabel')}</span>
-            </label>
+              {aiStatus.ai.configured && (
+                <>
+                  <div className={ui.field}>
+                    <label className={ui.check}>
+                      <input type="checkbox" checked={aiPhotoReview} onChange={e => setAiPhotoReview(e.target.checked)} />
+                      <span className={ui.checkLabel}>{t('admin.settingsTab.ai.photoReviewLabel')}</span>
+                    </label>
+                    <span className={ui.help}>{t('admin.settingsTab.ai.photoReviewHelp')}</span>
+                  </div>
 
-            <label className={ui.field}>
-              <span className={ui.label}>{t('admin.settingsTab.ai.thresholdLabel')}</span>
-              <span className={styles.rangeRow}>
-                <input
-                  type="range"
-                  className={ui.range}
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={aiThreshold}
-                  onChange={e => setAiThreshold(e.target.value)}
-                  disabled={!aiEnabled}
-                />
-                <output className={styles.rangeValue}>{Number(aiThreshold).toFixed(2)}</output>
-              </span>
-              <span className={ui.help}>{t('admin.settingsTab.ai.thresholdHelp')}</span>
-            </label>
+                  <label className={ui.check}>
+                    <input type="checkbox" checked={aiAutoApprove} disabled={!aiPhotoReview} onChange={e => setAiAutoApprove(e.target.checked)} />
+                    <span className={ui.checkLabel}>{t('admin.settingsTab.ai.autoApproveLabel')}</span>
+                  </label>
 
-            <label className={ui.check}>
-              <input type="checkbox" checked={aiTtsEnabled} onChange={e => setAiTtsEnabled(e.target.checked)} />
-              <span className={ui.checkLabel}>{t('admin.settingsTab.ai.ttsLabel')}</span>
-            </label>
+                  <label className={ui.field}>
+                    <span className={ui.label}>{t('admin.settingsTab.ai.thresholdLabel')}</span>
+                    <span className={styles.rangeRow}>
+                      <input
+                        type="range"
+                        className={ui.range}
+                        min="0.5"
+                        max="1"
+                        step="0.05"
+                        value={aiThreshold}
+                        onChange={e => setAiThreshold(e.target.value)}
+                        disabled={!aiPhotoReview || !aiAutoApprove}
+                      />
+                      <output className={styles.rangeValue}>{Math.round(Number(aiThreshold) * 100)}%</output>
+                    </span>
+                    <span className={ui.help}>{t('admin.settingsTab.ai.thresholdHelp')}</span>
+                  </label>
 
-            <FormMessage msg={aiMessage} />
+                  <div className={ui.field}>
+                    <label className={ui.check}>
+                      <input type="checkbox" checked={aiWeeklySummary} onChange={e => setAiWeeklySummary(e.target.checked)} />
+                      <span className={ui.checkLabel}>{t('admin.settingsTab.ai.weeklySummaryLabel')}</span>
+                    </label>
+                    <span className={ui.help}>{t('admin.settingsTab.ai.weeklySummaryHelp')}</span>
+                  </div>
+                </>
+              )}
 
-            <div className={ui.actionsEnd}>
-              <button type="submit" className={ui.btnPrimary} disabled={aiSaving}>
-                <Icon name="check" /> {aiSaving ? t('admin.settingsTab.ai.savingButton') : t('admin.settingsTab.ai.saveButton')}
-              </button>
-            </div>
-          </form>
+              {aiStatus.tts.configured && (
+                <label className={ui.field}>
+                  <span className={ui.label}>{t('admin.settingsTab.ai.voiceLabel')}</span>
+                  <input
+                    className={ui.input}
+                    value={ttsVoice}
+                    onChange={e => setTtsVoice(e.target.value)}
+                    placeholder="af_heart"
+                  />
+                  <span className={ui.help}>{t('admin.settingsTab.ai.voiceHelp')}</span>
+                </label>
+              )}
+
+              <FormMessage msg={aiMessage} />
+
+              <div className={ui.actionsEnd}>
+                <button type="submit" className={ui.btnPrimary} disabled={aiSaving}>
+                  <Icon name="check" /> {aiSaving ? t('admin.settingsTab.ai.savingButton') : t('admin.settingsTab.ai.saveButton')}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {aiStatus.ai.configured && <PhotoReviewTester />}
         </div>
 
         <div className={ui.cardStack}>

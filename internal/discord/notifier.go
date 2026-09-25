@@ -20,6 +20,7 @@ const (
 	ColorGreen  = 0x22c55e // completions approved
 	ColorYellow = 0xeab308 // pending approval
 	ColorRed    = 0xef4444 // rejected
+	ColorBlue   = 0x3b82f6 // weekly summaries
 )
 
 // Notifier sends formatted messages to a Discord webhook.
@@ -128,6 +129,17 @@ func (n *Notifier) NotifyCompleted(userName, choreTitle, photoURL string, points
 	}
 	if photoURL != "" {
 		embed.Thumbnail = &discordImage{URL: photoURL}
+	}
+	go n.send(embed)
+}
+
+// NotifyWeeklySummary shares a person's AI-written summary of last week.
+func (n *Notifier) NotifyWeeklySummary(userName, weekStart, summary string) {
+	embed := discordEmbed{
+		Title:       fmt.Sprintf("%s's week (from %s)", userName, weekStart),
+		Description: summary,
+		Color:       ColorBlue,
+		Timestamp:   time.Now().UTC().Format(time.RFC3339),
 	}
 	go n.send(embed)
 }

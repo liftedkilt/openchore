@@ -28,6 +28,7 @@ const (
 	EventPointsDecayed         = "points.decayed"
 	EventChoreMissed           = "chore.missed"
 	EventChoreFCFSCompleted    = "chore.fcfs_completed"
+	EventWeeklySummary         = "report.weekly_summary"
 	EventAdminPasscodeVerified = "auth.admin_passcode.verified"
 	EventAdminPasscodeFailed   = "auth.admin_passcode.failed"
 	EventAdminPasscodeChanged  = "auth.admin_passcode.changed"

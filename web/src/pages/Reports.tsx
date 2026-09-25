@@ -11,6 +11,7 @@ import { LineChart, type Tick } from '../components/charts/LineChart';
 import { ColumnChart } from '../components/charts/ColumnChart';
 import { BarList } from '../components/charts/BarList';
 import { personColorVar } from '../components/charts/personColor';
+import { useAIStatus } from '../hooks/useAIStatus';
 import styles from './Reports.module.css';
 
 type Period = 'week' | 'month' | 'year';
@@ -121,6 +122,8 @@ export const Reports: React.FC = () => {
   const [colors, setColors] = useState<Record<number, PersonColor | undefined>>({});
   const [aiSummaries, setAiSummaries] = useState<Record<number, string>>({});
   const [summaryLoading, setSummaryLoading] = useState<Record<number, boolean>>({});
+  // Summaries need an AI model on the server; without one the button goes.
+  const aiStatus = useAIStatus();
 
   // People's colours: every per-person series is drawn in its person's colour.
   useEffect(() => {
@@ -215,7 +218,7 @@ export const Reports: React.FC = () => {
             colors={colors}
             aiSummaries={aiSummaries}
             summaryLoading={summaryLoading}
-            onSummary={handleGenerateSummary}
+            onSummary={aiStatus.ai.configured ? handleGenerateSummary : undefined}
           />
         )}
       </div>
@@ -228,7 +231,8 @@ interface ReportBodyProps {
   colors: Record<number, PersonColor | undefined>;
   aiSummaries: Record<number, string>;
   summaryLoading: Record<number, boolean>;
-  onSummary: (userId: number) => void;
+  /** Writes a person's AI summary; absent when no AI is configured. */
+  onSummary?: (userId: number) => void;
 }
 
 function ReportBody({ data, colors, aiSummaries, summaryLoading, onSummary }: ReportBodyProps) {
@@ -284,7 +288,7 @@ function ReportBody({ data, colors, aiSummaries, summaryLoading, onSummary }: Re
                 <span className={styles.personBar} aria-hidden><i style={{ width: pct(Math.min(100, kid.completion_rate)) }} /></span>
                 {aiSummaries[kid.user_id] ? (
                   <p className={styles.summary}>{aiSummaries[kid.user_id]}</p>
-                ) : (
+                ) : onSummary && (
                   <button
                     type="button"
                     className={styles.summaryBtn}

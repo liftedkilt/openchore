@@ -25,28 +25,6 @@
       "title": "Aktivität",
       "undoTitle": "Dieses Ereignis rückgängig machen"
     },
-    "aiChoreChecker": {
-      "ariaGenerateAudio": "Audio generieren",
-      "ariaListenFeedback": "Feedback anhören",
-      "buttonTestReview": "Prüfung testen",
-      "buttonWorking": "Wird verarbeitet...",
-      "choosePhoto": "Foto auswählen...",
-      "confidence": "Sicherheit: {{value}}%",
-      "description": "Gib einen Aufgabennamen ein, mache ein Foto und sieh dir an, wie die KI es bewertet — inklusive Kokoro-TTS-Audio.",
-      "errorTestFailed": "Test fehlgeschlagen",
-      "errorTtsFailed": "TTS fehlgeschlagen: {{message}}",
-      "errorUnknown": "Unbekannter Fehler",
-      "heading": "KI-Aufgabenprüfer",
-      "labelChoreName": "Aufgabenname",
-      "labelPhoto": "Foto",
-      "photoPreviewAlt": "Vorschau",
-      "placeholderChoreName": "z. B. Spielzeug aufräumen, Bett machen, Küche putzen",
-      "resultApproved": "Genehmigt",
-      "resultRejected": "Abgelehnt",
-      "stepAnalyzing": "KI analysiert Foto",
-      "stepGeneratingAudio": "Audio wird generiert",
-      "stepUploading": "Foto wird hochgeladen"
-    },
     "apiTokens": {
       "addButton": "Hinzufügen",
       "cancel": "Abbrechen",
@@ -70,11 +48,17 @@
       "tokenNamePlaceholder": "z. B. Home Assistant, CI-Pipeline"
     },
     "approvalsTab": {
-      "aiFeedback": "Die Fotoprüfung sagt",
+      "aiConfidence": "{{value}} % sicher",
+      "aiLooksDone": "KI: sieht erledigt aus",
+      "aiLooksNotDone": "KI: sieht nicht erledigt aus",
       "approveButton": "Genehmigen",
       "cardLabel": "{{title}} für {{name}}",
       "emptyState": "Alles erledigt! Keine ausstehenden Freigaben.",
       "loading": "Wird geladen...",
+      "noPhotoSkipped": "Ohne Foto erledigt",
+      "noPhotoSkippedHint": "{{name}} hat das Foto übersprungen, also schau selbst nach.",
+      "noPhotoYet": "Noch kein Foto",
+      "noPhotoYetHint": "Das Foto kann noch von einem anderen Gerät hinzugefügt werden.",
       "openPhoto": "Foto öffnen",
       "photoAlt": "Nachweis",
       "rejectButton": "Ablehnen",
@@ -116,11 +100,8 @@
     "createChore": {
       "ai": {
         "aiLabel": "KI",
-        "apply": "Übernehmen",
         "generateTitle": "Mit KI generieren",
-        "generating": "Wird generiert...",
-        "suggesting": "KI-Vorschlag wird geladen...",
-        "suggestion": "KI schlägt vor: {{points}} Pkt., ca. {{minutes}} Min."
+        "generating": "Wird generiert..."
       },
       "error": {
         "createFailed": "Aufgabe konnte nicht erstellt werden",
@@ -218,7 +199,6 @@
       "navLabel": "Bereiche",
       "quickAssign": "Schnell zuweisen",
       "reports": "Berichte",
-      "tabAi": "KI",
       "tabApprovals": "Freigaben",
       "tabChores": "Aufgaben",
       "tabKids": "Heute",
@@ -230,7 +210,6 @@
       "title": "Verwalten"
     },
     "editChore": {
-      "generatingLabel": "Wird generiert…",
       "labelCategory": "Kategorie",
       "labelDescription": "Beschreibung",
       "labelIcon": "Symbol",
@@ -238,7 +217,6 @@
       "labelPenalty": "Abzug",
       "labelPhotoSource": "Fotoquelle",
       "labelPoints": "Punkte",
-      "labelTTSDescription": "Gesprochene Beschreibung (TTS-Prompt)",
       "labelTitle": "Titel",
       "modalTitle": "Bearbeiten: {{title}}",
       "photoSourceBoth": "Extern mit manuellem Fallback",
@@ -253,13 +231,9 @@
       "savedLabel": "Gespeichert",
       "savingLabel": "Wird gespeichert...",
       "sectionDetails": "Aufgabendetails",
-      "sectionTTS": "Kokoro TTS",
-      "suggestTextBtn": "Text vorschlagen",
-      "suggestTextTitle": "Neue gesprochene Beschreibung mit KI generieren",
-      "ttsClickPreview": "Klicken, um generiertes Audio vorzuhören",
-      "ttsDescriptionPlaceholder": "Was soll die TTS-Stimme für diese Aufgabe sagen?",
-      "ttsGenerateDescError": "Beschreibung konnte nicht generiert werden",
-      "ttsNoAudio": "Für diese Aufgabe wurde noch kein TTS-Audio generiert.",
+      "sectionTTS": "Vorlese-Audio",
+      "ttsClickPreview": "Liest Titel und Beschreibung vor",
+      "ttsNoAudio": "Noch kein Audio. Es wird automatisch aus Titel und Beschreibung aufgenommen.",
       "ttsPauseAriaLabel": "TTS-Audio pausieren",
       "ttsPauseTitle": "Pausieren",
       "ttsPlayAriaLabel": "TTS-Audio abspielen",
@@ -373,6 +347,24 @@
     "modal": {
       "close": "Schließen"
     },
+    "photoReviewTester": {
+      "buttonTest": "Foto prüfen",
+      "buttonWorking": "Wird geprüft...",
+      "choosePhoto": "Foto auswählen...",
+      "confidence": "Sicherheit: {{value}} %",
+      "description": "Lade ein Foto hoch und sieh, wie das eingestellte Modell es bewertet. Es wird nichts gespeichert.",
+      "elapsed": "dauerte {{seconds}} s",
+      "errorTestFailed": "Prüfung fehlgeschlagen",
+      "heading": "Fotoprüfung ausprobieren",
+      "labelChoreName": "Name der Aufgabe",
+      "labelPhoto": "Foto",
+      "looksDone": "Sieht erledigt aus",
+      "looksNotDone": "Sieht nicht erledigt aus",
+      "photoPreviewAlt": "Vorschau",
+      "placeholderChoreName": "z. B. Spielzeug aufräumen, Bett machen, Küche putzen",
+      "wouldApprove": "Würde automatisch bestätigt",
+      "wouldWait": "Würde auf ein Elternteil warten"
+    },
     "pointsTab": {
       "adjustButton": "Anpassen",
       "amountLabel": "Betrag (+/-)",
@@ -479,16 +471,23 @@
     },
     "settingsTab": {
       "ai": {
-        "description": "Verwende KI, um Fotos von erledigten Aufgaben automatisch zu prüfen. Wenn aktiviert, werden hochgeladene Fotos analysiert, bevor eine Aufgabe als erledigt markiert wird.",
-        "enableLabel": "KI-Fotoprüfung aktivieren",
+        "aiNotConfigured": "Nur ein Sprachdienst ist eingerichtet (TTS_BASE_URL). Setze AI_BASE_URL und AI_MODEL für Fotoprüfung und Berichte.",
+        "autoApproveLabel": "Eindeutige Fälle automatisch bestätigen",
+        "description": "Verwendet {{model}}. Die KI berät nur – sie lehnt nie eine Aufgabe ab.",
+        "notConfigured": "Es ist kein KI-Dienst eingerichtet. Für Fotoprüfung, Aufgabenbeschreibungen, Wochenberichte oder aufgenommene Vorlesestimmen verweise den Server auf ein OpenAI-kompatibles Modell (AI_BASE_URL und AI_MODEL) oder einen Sprachdienst (TTS_BASE_URL). Ohne sie liest die Stimme des Geräts die Aufgaben vor.",
+        "photoReviewHelp": "Kommt eine bestätigungspflichtige Aufgabe mit Foto herein, fügt die KI unter Bestätigungen einen Hinweis hinzu.",
+        "photoReviewLabel": "Fotos zur Bestätigung prüfen",
         "saveButton": "KI-Einstellungen speichern",
         "saveError": "KI-Einstellungen konnten nicht gespeichert werden",
         "saveSuccess": "KI-Einstellungen gespeichert",
-        "savingButton": "Wird gespeichert...",
-        "thresholdHelp": "Fotos mit einer Sicherheit über diesem Schwellenwert werden automatisch genehmigt. Niedrigere Werte sind großzügiger.",
-        "thresholdLabel": "Schwellenwert für Auto-Genehmigung (0 – 1)",
-        "title": "KI-Fotoprüfung",
-        "ttsLabel": "TTS-Beschreibungen für Aufgaben generieren"
+        "savingButton": "Speichern...",
+        "thresholdHelp": "Wie sicher die KI sein muss, dass eine Aufgabe erledigt ist, bevor sie sie ohne dich bestätigt. Alles darunter wartet auf dich.",
+        "thresholdLabel": "Sicherheit für automatische Bestätigung",
+        "title": "KI",
+        "voiceHelp": "Eine Stimme deines Sprachdiensts, z. B. af_heart für Kokoro oder alloy für OpenAI. Eine Änderung nimmt alle Aufgaben neu auf.",
+        "voiceLabel": "Vorlesestimme",
+        "weeklySummaryHelp": "Fasst jeden Montag die vergangene Woche aller zusammen und teilt sie über Discord und den Webhook report.weekly_summary.",
+        "weeklySummaryLabel": "Wochenbericht schreiben"
       },
       "baseUrl": {
         "description": "Die öffentliche URL dieses Servers (z. B. ",
@@ -550,7 +549,8 @@
           "profilePinVerified": "Profil-PIN verifiziert",
           "redeemed": "Eingelöst",
           "streak": "Streak",
-          "uncompleted": "Zurückgesetzt"
+          "uncompleted": "Zurückgesetzt",
+          "weeklySummary": "Wochenbericht"
         },
         "form": {
           "cancelButton": "Abbrechen",
@@ -846,12 +846,10 @@
       "latePenalty_other": "Zu spät. Kostet {{count}} Pkt.",
       "later": "Später heute",
       "left": "Noch {{time}}",
-      "listenToFeedback": "Rückmeldung anhören",
       "notDone": "Nicht erledigt",
       "opensAt": "Ab {{time}}",
       "opensAtLabel": "Ab {{time}}",
       "opensIn": "In {{time}}",
-      "photoRejected": "Foto nicht angenommen. Versuch es noch mal",
       "pointsPending_one": "Erledigt. {{count}} Pkt. nach den Pflichten",
       "pointsPending_other": "Erledigt. {{count}} Pkt. nach den Pflichten",
       "readonlyDone": "Erledigt",
@@ -947,6 +945,9 @@
       "preparing": "Code wird erstellt",
       "qrLabel": "Code, der die Fotoseite auf einem anderen Gerät öffnet",
       "scanOrUpload": "Scanne den Code mit einem Handy oder mach das Foto hier.",
+      "skipFailed": "Das hat nicht geklappt. Versuch es noch mal",
+      "skipPhoto": "Kein Foto? Trotzdem fertig",
+      "skipPhotoHelp": "Ein Erwachsener schaut es sich dann an.",
       "takePhoto": "Foto hier machen",
       "titleAdd": "Foto hinzufügen",
       "titleNeeded": "Mach ein Foto",

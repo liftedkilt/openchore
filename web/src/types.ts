@@ -157,7 +157,6 @@ export interface Chore {
   requires_approval: boolean;
   requires_photo: boolean;
   photo_source?: 'child' | 'external' | 'both';
-  tts_description?: string;
   tts_audio_url?: string;
 }
 
@@ -315,11 +314,10 @@ export interface ScheduledChore {
   completed_at?: string;
   photo_url?: string;
   date: string;
-  completion_status?: 'approved' | 'pending' | 'rejected' | 'ai_rejected' | 'excused';
+  completion_status?: 'approved' | 'pending' | 'rejected' | 'excused';
   ai_feedback?: string;
   completed_by_name?: string;
   completed_by_sibling?: boolean;
-  tts_description?: string;
   tts_audio_url?: string;
 }
 
@@ -328,6 +326,7 @@ export interface ScheduledChore {
 // approvals to the kid the chore belongs to, not just whoever clicked it).
 export interface PendingCompletion {
   id: number;
+  chore_id: number;
   chore_title: string;
   child_name: string;
   assigned_user_id: number;
@@ -339,7 +338,16 @@ export interface PendingCompletion {
   category?: 'required' | 'core' | 'bonus';
   icon?: string;
   points_value?: number;
+  // Whether the chore needs a photo, and who takes it. A "child" chore
+  // pending without a photo was finished via "No photo? Finish anyway";
+  // for "external"/"both" the photo can still be attached later.
+  requires_photo?: boolean;
+  photo_source?: 'child' | 'external' | 'both';
+  // The AI photo reviewer's advisory note, once a review has run.
+  // ai_complete is its read on the photo (absent until reviewed).
   ai_feedback?: string;
+  ai_confidence?: number;
+  ai_complete?: boolean;
 }
 
 export interface UserDecayConfig {
@@ -400,12 +408,16 @@ export interface WebhookDelivery {
   created_at: string;
 }
 
-export interface AIReviewError {
-  error: string;
-  ai_review: {
-    complete: boolean;
-    confidence: number;
-    feedback: string;
-    feedback_audio?: string;
-  };
+// Which optional AI services the server has configured.
+export interface AIStatus {
+  ai: { configured: boolean; model?: string };
+  tts: { configured: boolean; model?: string };
+}
+
+export interface AIReviewResult {
+  complete: boolean;
+  confidence: number;
+  feedback: string;
+  would_approve: boolean;
+  elapsed_ms: number;
 }

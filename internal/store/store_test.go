@@ -530,7 +530,7 @@ func TestUncompleteChore(t *testing.T) {
 	}
 }
 
-func TestUncompleteChore_AIRejectedHardDeletes(t *testing.T) {
+func TestUncompleteChore_RejectedHardDeletes(t *testing.T) {
 	s := setupStore(t)
 	ctx := context.Background()
 
@@ -541,7 +541,7 @@ func TestUncompleteChore_AIRejectedHardDeletes(t *testing.T) {
 	cc := &model.ChoreCompletion{
 		ChoreScheduleID: cs.ID,
 		CompletedBy:     u.ID,
-		Status:          model.StatusAIRejected,
+		Status:          model.StatusRejected,
 		CompletionDate:  "2026-03-28",
 	}
 	s.CompleteChore(ctx, cc)
@@ -550,10 +550,10 @@ func TestUncompleteChore_AIRejectedHardDeletes(t *testing.T) {
 		t.Fatalf("UncompleteChore: %v", err)
 	}
 
-	// ai_rejected rows should be hard-deleted so the retry flow works.
+	// Rejected rows should be hard-deleted so the retry flow works.
 	got, _ := s.GetCompletionForScheduleDate(ctx, cs.ID, "2026-03-28")
 	if got != nil {
-		t.Errorf("expected ai_rejected row to be hard-deleted, got %+v", got)
+		t.Errorf("expected rejected row to be hard-deleted, got %+v", got)
 	}
 }
 
@@ -2508,7 +2508,7 @@ func TestCompleteChoreWithAIFields(t *testing.T) {
 	}
 }
 
-func TestCompleteChoreAIRejected(t *testing.T) {
+func TestSetCompletionAIReview(t *testing.T) {
 	s := setupStore(t)
 	ctx := context.Background()
 
@@ -2519,26 +2519,100 @@ func TestCompleteChoreAIRejected(t *testing.T) {
 	cc := &model.ChoreCompletion{
 		ChoreScheduleID: cs.ID,
 		CompletedBy:     u.ID,
-		Status:          "ai_rejected",
+		Status:          model.StatusPending,
 		PhotoURL:        "/uploads/bed.jpg",
 		CompletionDate:  "2026-03-31",
-		AIFeedback:      "Almost! The pillows need to be straightened.",
-		AIConfidence:    0.35,
 	}
-	err := s.CompleteChore(ctx, cc)
-	if err != nil {
-		t.Fatalf("CompleteChore ai_rejected: %v", err)
+	if err := s.CompleteChore(ctx, cc); err != nil {
+		t.Fatalf("CompleteChore: %v", err)
 	}
 
-	got, err := s.GetCompletion(ctx, cc.ID)
-	if err != nil {
-		t.Fatalf("GetCompletion: %v", err)
+	got, _ := s.GetCompletion(ctx, cc.ID)
+	if got.AIComplete != nil {
+		t.Fatalf("expected no review yet, got %v", *got.AIComplete)
 	}
-	if got.Status != "ai_rejected" {
-		t.Errorf("expected status ai_rejected, got %q", got.Status)
+
+	review := model.AIReviewResult{Complete: false, Confidence: 0.35, Feedback: "Pillows are on the floor."}
+	if err := s.SetCompletionAIReview(ctx, cc.ID, review); err != nil {
+		t.Fatalf("SetCompletionAIReview: %v", err)
 	}
-	if got.AIFeedback != "Almost! The pillows need to be straightened." {
-		t.Errorf("unexpected AI feedback: %q", got.AIFeedback)
+	got, _ = s.GetCompletion(ctx, cc.ID)
+	if got.Status != model.StatusPending {
+		t.Errorf("a review must not change status, got %q", got.Status)
+	}
+	if got.AIFeedback != review.Feedback || got.AIConfidence != 0.35 || got.AIComplete == nil || *got.AIComplete {
+		t.Errorf("unexpected review fields: %+v", got)
+	}
+
+	// A new photo invalidates the old review.
+	if err := s.UpdateCompletionPhoto(ctx, cc.ID, "/uploads/bed2.jpg"); err != nil {
+		t.Fatalf("UpdateCompletionPhoto: %v", err)
+	}
+	got, _ = s.GetCompletion(ctx, cc.ID)
+	if got.AIFeedback != "" || got.AIComplete != nil {
+		t.Errorf("expected review cleared after new photo, got %+v", got)
+	}
+}
+
+func TestAIRejectedStatusIsGone(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Make Bed", 5, u.ID)
+	cs := createTestSchedule(t, s, c.ID, u.ID, 2)
+
+	err := s.CompleteChore(ctx, &model.ChoreCompletion{
+		ChoreScheduleID: cs.ID,
+		CompletedBy:     u.ID,
+		Status:          "ai_rejected",
+		CompletionDate:  "2026-03-31",
+	})
+	if err == nil {
+		t.Fatal("expected the ai_rejected status to be refused")
+	}
+}
+
+func TestApproveCompletionWithoutApprover(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+
+	u := createTestUser(t, s, "Child", "child")
+	c := createTestChore(t, s, "Make Bed", 5, u.ID)
+	cs := createTestSchedule(t, s, c.ID, u.ID, 2)
+	cc := &model.ChoreCompletion{ChoreScheduleID: cs.ID, CompletedBy: u.ID, Status: model.StatusPending, CompletionDate: "2026-03-31"}
+	if err := s.CompleteChore(ctx, cc); err != nil {
+		t.Fatalf("CompleteChore: %v", err)
+	}
+
+	if err := s.ApproveCompletionAndCreditPoints(ctx, cc.ID, nil, 5); err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+	got, _ := s.GetCompletion(ctx, cc.ID)
+	if got.Status != model.StatusApproved || got.ApprovedBy != nil {
+		t.Errorf("expected approved with no approver, got %+v", got)
+	}
+	if err := s.ApproveCompletionAndCreditPoints(ctx, cc.ID, nil, 5); !errors.Is(err, store.ErrNotPending) {
+		t.Errorf("expected ErrNotPending on a second approval, got %v", err)
+	}
+}
+
+func TestWeeklySummaries(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+	u := createTestUser(t, s, "Child", "child")
+
+	if got, err := s.GetWeeklySummary(ctx, u.ID, "2026-03-30"); err != nil || got != "" {
+		t.Fatalf("expected no summary, got %q, %v", got, err)
+	}
+	if err := s.SaveWeeklySummary(ctx, u.ID, "2026-03-30", "first"); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if err := s.SaveWeeklySummary(ctx, u.ID, "2026-03-30", "second"); err != nil {
+		t.Fatalf("resave: %v", err)
+	}
+	if got, _ := s.GetWeeklySummary(ctx, u.ID, "2026-03-30"); got != "second" {
+		t.Errorf("expected the replaced summary, got %q", got)
 	}
 }
 
@@ -2551,11 +2625,11 @@ func TestGetScheduledChoresIncludesAIFields(t *testing.T) {
 	// Saturday 2026-04-04 = day_of_week 6
 	cs := createTestSchedule(t, s, c.ID, child.ID, 6)
 
-	// Complete with ai_rejected status
+	// A pending completion carrying the AI reviewer's note
 	cc := &model.ChoreCompletion{
 		ChoreScheduleID: cs.ID,
 		CompletedBy:     child.ID,
-		Status:          "ai_rejected",
+		Status:          model.StatusPending,
 		PhotoURL:        "/uploads/floor.jpg",
 		CompletionDate:  "2026-04-04",
 		AIFeedback:      "There is still dirt in the corner.",
@@ -2576,14 +2650,11 @@ func TestGetScheduledChoresIncludesAIFields(t *testing.T) {
 
 	sc := chores[0]
 
-	// ai_rejected completions should NOT be considered "completed"
-	if sc.Completed {
-		t.Error("expected Completed=false for ai_rejected completion")
+	if !sc.Completed {
+		t.Error("expected Completed=true for a pending completion")
 	}
-
-	// CompletionStatus should be set to ai_rejected
-	if sc.CompletionStatus == nil || *sc.CompletionStatus != "ai_rejected" {
-		t.Errorf("expected CompletionStatus=ai_rejected, got %v", sc.CompletionStatus)
+	if sc.CompletionStatus == nil || *sc.CompletionStatus != model.StatusPending {
+		t.Errorf("expected CompletionStatus=pending, got %v", sc.CompletionStatus)
 	}
 
 	// AIFeedback should be populated
@@ -2591,9 +2662,8 @@ func TestGetScheduledChoresIncludesAIFields(t *testing.T) {
 		t.Errorf("expected AI feedback to be set, got %v", sc.AIFeedback)
 	}
 
-	// CompletionID should still be set (so the frontend knows there's a record)
 	if sc.CompletionID == nil {
-		t.Error("expected CompletionID to be set even for ai_rejected")
+		t.Error("expected CompletionID to be set")
 	}
 }
 
@@ -2639,57 +2709,36 @@ func TestGetScheduledChoresApprovedIncludesAIFeedback(t *testing.T) {
 	}
 }
 
-func TestUpdateChoreTTSDescription(t *testing.T) {
+func TestUpdateChoreTTSAudioURL(t *testing.T) {
 	s := setupStore(t)
 	ctx := context.Background()
 
 	u := createTestUser(t, s, "Parent", "admin")
 	c := createTestChore(t, s, "Feed Cat", 5, u.ID)
 
-	// Initially empty
+	if err := s.UpdateChoreTTSAudioURL(ctx, c.ID, "/tts/chore_1.mp3?v=2"); err != nil {
+		t.Fatalf("UpdateChoreTTSAudioURL: %v", err)
+	}
 	got, _ := s.GetChore(ctx, c.ID)
-	if got.TTSDescription != "" {
-		t.Errorf("expected empty TTS description initially, got %q", got.TTSDescription)
-	}
-
-	// Update TTS description
-	err := s.UpdateChoreTTSDescription(ctx, c.ID, "Time to feed the kitty cat! Give them their food and fresh water.")
-	if err != nil {
-		t.Fatalf("UpdateChoreTTSDescription: %v", err)
-	}
-
-	// Verify it persists
-	got, _ = s.GetChore(ctx, c.ID)
-	if got.TTSDescription != "Time to feed the kitty cat! Give them their food and fresh water." {
-		t.Errorf("TTS description not updated, got %q", got.TTSDescription)
-	}
-
-	// Update again to empty
-	err = s.UpdateChoreTTSDescription(ctx, c.ID, "")
-	if err != nil {
-		t.Fatalf("UpdateChoreTTSDescription to empty: %v", err)
-	}
-	got, _ = s.GetChore(ctx, c.ID)
-	if got.TTSDescription != "" {
-		t.Errorf("expected empty TTS description, got %q", got.TTSDescription)
+	if got.TTSAudioURL != "/tts/chore_1.mp3?v=2" {
+		t.Errorf("audio URL not updated, got %q", got.TTSAudioURL)
 	}
 }
 
-func TestTTSDescriptionInScheduledChores(t *testing.T) {
+func TestTTSAudioURLInScheduledChores(t *testing.T) {
 	s := setupStore(t)
 	ctx := context.Background()
 
 	child := createTestUser(t, s, "Child", "child")
 
-	// Create chore with TTS description set via the model
 	c := &model.Chore{
-		Title:          "Brush Teeth",
-		Description:    "Brush your teeth for two minutes",
-		Category:       "required",
-		PointsValue:    5,
-		Source:         "manual",
-		TTSDescription: "Time to brush your teeth! Make sure to brush for two whole minutes.",
-		CreatedBy:      child.ID,
+		Title:       "Brush Teeth",
+		Description: "Brush your teeth for two minutes",
+		Category:    "required",
+		PointsValue: 5,
+		Source:      "manual",
+		TTSAudioURL: "/tts/chore_1.mp3?v=1",
+		CreatedBy:   child.ID,
 	}
 	if err := s.CreateChore(ctx, c); err != nil {
 		t.Fatalf("CreateChore with TTS: %v", err)
@@ -2707,8 +2756,8 @@ func TestTTSDescriptionInScheduledChores(t *testing.T) {
 	if len(chores) != 1 {
 		t.Fatalf("expected 1 chore, got %d", len(chores))
 	}
-	if chores[0].TTSDescription != "Time to brush your teeth! Make sure to brush for two whole minutes." {
-		t.Errorf("expected TTS description in scheduled chore, got %q", chores[0].TTSDescription)
+	if chores[0].TTSAudioURL != "/tts/chore_1.mp3?v=1" {
+		t.Errorf("expected audio URL in scheduled chore, got %q", chores[0].TTSAudioURL)
 	}
 }
 

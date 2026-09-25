@@ -34,8 +34,10 @@ looks back.
   daily decay are enforced by the server, not by you at 9pm.
 - **Built to be wired up.** Signed outbound webhooks, per-chore trigger URLs,
   API tokens, and a Home Assistant integration.
-- **Optional local AI.** Photo proof can be checked by a vision model, and chores
-  can be read aloud — both running on your own machine, if you want them at all.
+- **Optional AI, your choice of model.** A vision model can pre-check photo
+  proof for you and write up each week, and chores can be read aloud in a
+  recorded voice. Point it at a model on your own machine or a hosted one — or
+  leave it off entirely.
 
 ## Quick start
 
@@ -60,10 +62,14 @@ manage everything from the admin panel — or wipe and re-seed with
 `./redeploy.sh --wipe`. Starting with no config at all drops you into a guided
 setup wizard instead.
 
-Want the AI extras? They sit behind a compose profile and are off by default:
+Want the AI extras? They are off by default. Point OpenChore at any
+OpenAI-compatible model — a local one from the compose profiles below, Ollama,
+or a hosted API — see [AI features](docs/ai.md):
 
 ```bash
-docker compose --profile ai up -d    # adds LiteRT (~3.1 GB) + Kokoro TTS (~2 GB)
+# in .env: AI_BASE_URL=http://llama:8080/v1  AI_MODEL=gemma-4-e4b
+#          TTS_BASE_URL=http://kokoro:8880/v1
+docker compose --profile ai --profile tts up -d   # Gemma 4 E4B (~6 GB RAM) + Kokoro voices (~2 GB)
 ```
 
 ## How the points work
@@ -171,11 +177,11 @@ Around it sit the other levers:
 
 </td><td valign="top">
 
-**Optional AI** (local)
-- Photo verification via Gemma 4 / LiteRT
-- Text-to-speech via Kokoro
+**Optional AI** (local or hosted)
+- Photo pre-checks for approvals
+- Weekly summaries
 - Chore description drafting
-- Point-value suggestions
+- Recorded read-aloud voices
 
 </td><td valign="top">
 
@@ -198,8 +204,8 @@ Around it sit the other levers:
 | `CONFIG_PATH` | `config/config.yaml` | Seed configuration |
 | `TZ` | system | **Set this** — deadlines and time locks depend on it |
 | `WEB_PORT` | `8080` | Host port for the web container |
-| `AI_ENDPOINT` | `http://litert:8080` | Vision backend (LiteRT or Ollama) |
-| `TTS_ENDPOINT` | `http://kokoro:8880` | Kokoro TTS service |
+| `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY` | — | OpenAI-compatible model for AI features; off when unset. See [AI features](docs/ai.md) |
+| `TTS_BASE_URL`, `TTS_MODEL`, `TTS_API_KEY` | — | OpenAI-compatible speech service for read-aloud audio; the browser's voice is used when unset |
 | `POINTS_DECAY_INTERVAL` | `15m` | How often the decay worker checks (the e2e suite shortens it) |
 | `OPENCHORE_PUBLIC_URL` | request host | External URL used for OIDC redirect URIs |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, … | — | One OIDC provider without editing config; see [Signing in](docs/authentication.md) |
@@ -228,6 +234,7 @@ and `httptest`, no mocks.
 ## Documentation
 
 - [Signing in](docs/authentication.md) — PINs, parents, sessions, OIDC providers, upgrading
+- [AI features](docs/ai.md) — photo review, summaries, read-aloud voices, choosing a model, upgrading
 - [API reference](docs/api.md) — endpoints, auth, and webhook events
 - [Roadmap](ROADMAP.md) — shipped and planned
 - [CLAUDE.md](CLAUDE.md) — architecture notes and conventions

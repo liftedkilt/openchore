@@ -337,7 +337,7 @@ func TestParentCompletesKidsChoreOnTheirBehalf(t *testing.T) {
 	kid := env.createChild(t, "Kid")
 	sched := env.createScheduledChore(t, "Photo chore", kid, map[string]any{"requires_photo": true})
 
-	// The kid still needs a photo...
+	// The kid still needs a photo (or to skip it and wait for approval)...
 	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", sched), map[string]any{},
 		childHeaders(kid), http.StatusBadRequest)
 

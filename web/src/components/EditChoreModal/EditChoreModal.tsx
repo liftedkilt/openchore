@@ -6,6 +6,7 @@ import { api, APIError } from '../../api';
 import type { Chore, User } from '../../types';
 import { Icon, catFromCategory } from '../../design';
 import { CategoryPicker, IconPicker } from '../admin/pickers';
+import { useAIStatus } from '../../hooks/useAIStatus';
 import styles from './EditChoreModal.module.css';
 
 interface Props {
@@ -36,12 +37,12 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
-  // TTS editing state
-  const [ttsDescription, setTtsDescription] = useState(chore.tts_description || '');
+  // Read-aloud audio (only when the server has a speech service configured).
+  // The server re-records it whenever the title or description changes, and
+  // the URL carries a version so browsers don't replay stale audio.
+  const aiStatus = useAIStatus();
   const [ttsAudioURL, setTtsAudioURL] = useState(chore.tts_audio_url || '');
-  const [ttsCacheBust, setTtsCacheBust] = useState(() => Date.now());
   const [ttsRegenerating, setTtsRegenerating] = useState(false);
-  const [ttsGenerating, setTtsGenerating] = useState(false);
   const [ttsSaved, setTtsSaved] = useState(false);
   const [ttsError, setTtsError] = useState('');
   const [ttsPlaying, setTtsPlaying] = useState(false);
@@ -63,8 +64,6 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
     };
   }, [ttsAudioURL]);
 
-  const audioSrc = ttsAudioURL ? `${ttsAudioURL}?v=${ttsCacheBust}` : '';
-
   const handlePlayPause = () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -82,10 +81,8 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
     setTtsError('');
     setTtsSaved(false);
     try {
-      const resp = await api.chores.regenerateTTS(chore.id, ttsDescription.trim());
-      setTtsDescription(resp.tts_description);
+      const resp = await api.chores.regenerateTTS(chore.id);
       setTtsAudioURL(resp.tts_audio_url);
-      setTtsCacheBust(Date.now());
       setTtsSaved(true);
       onSaved();
       setTimeout(() => setTtsSaved(false), 2000);
@@ -94,19 +91,6 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
       setTtsError(msg);
     }
     setTtsRegenerating(false);
-  };
-
-  const handleGenerateTTSDescription = async () => {
-    setTtsGenerating(true);
-    setTtsError('');
-    try {
-      const resp = await api.chores.generateTTSDescription(chore.id);
-      setTtsDescription(resp.description);
-    } catch (e) {
-      const msg = e instanceof APIError ? (e.data?.error || e.message) : (e instanceof Error ? e.message : t('admin.editChore.ttsGenerateDescError'));
-      setTtsError(msg);
-    }
-    setTtsGenerating(false);
   };
 
   const handleSave = async () => {
@@ -203,67 +187,51 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
 
       <hr className={styles.divider} />
 
-      {/* --- Read aloud (TTS) --- */}
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}><Icon name="sound" /> {t('admin.editChore.sectionTTS')}</h3>
-        <div className={styles.formGrid}>
-          {ttsAudioURL ? (
-            <div className={styles.ttsPlayerRow}>
-              <button
-                type="button"
-                className={styles.ttsPlayBtn}
-                onClick={handlePlayPause}
-                aria-label={ttsPlaying ? t('admin.editChore.ttsPauseAriaLabel') : t('admin.editChore.ttsPlayAriaLabel')}
-                title={ttsPlaying ? t('admin.editChore.ttsPauseTitle') : t('admin.editChore.ttsPlayTitle')}
-              >
-                {ttsPlaying ? <Pause aria-hidden /> : <Play aria-hidden />}
-              </button>
-              <audio ref={audioRef} src={audioSrc} preload="none" />
-              <span className={styles.ttsHint}>
-                {ttsPlaying ? t('admin.editChore.ttsPlaying') : t('admin.editChore.ttsClickPreview')}
-              </span>
+      {aiStatus.tts.configured && (
+        <>
+          {/* --- Read aloud (TTS) --- */}
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}><Icon name="sound" /> {t('admin.editChore.sectionTTS')}</h3>
+            <div className={styles.formGrid}>
+              {ttsAudioURL ? (
+                <div className={styles.ttsPlayerRow}>
+                  <button
+                    type="button"
+                    className={styles.ttsPlayBtn}
+                    onClick={handlePlayPause}
+                    aria-label={ttsPlaying ? t('admin.editChore.ttsPauseAriaLabel') : t('admin.editChore.ttsPlayAriaLabel')}
+                    title={ttsPlaying ? t('admin.editChore.ttsPauseTitle') : t('admin.editChore.ttsPlayTitle')}
+                  >
+                    {ttsPlaying ? <Pause aria-hidden /> : <Play aria-hidden />}
+                  </button>
+                  <audio ref={audioRef} src={ttsAudioURL} preload="none" />
+                  <span className={styles.ttsHint}>
+                    {ttsPlaying ? t('admin.editChore.ttsPlaying') : t('admin.editChore.ttsClickPreview')}
+                  </span>
+                </div>
+              ) : (
+                <p className={styles.ttsHint}>{t('admin.editChore.ttsNoAudio')}</p>
+              )}
+
+              <div className={styles.saveRow}>
+                {ttsSaved && <span className={styles.saved} role="status"><Icon name="check" /> {t('admin.editChore.ttsRegeneratedLabel')}</span>}
+                {ttsError && <span className={styles.error} role="alert">{ttsError}</span>}
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  onClick={handleRegenerateTTS}
+                  disabled={ttsRegenerating}
+                >
+                  <RefreshCw aria-hidden className={ttsRegenerating ? styles.spin : undefined} />
+                  {ttsRegenerating ? t('admin.editChore.regeneratingLabel') : t('admin.editChore.regenerateAudioBtn')}
+                </button>
+              </div>
             </div>
-          ) : (
-            <p className={styles.ttsHint}>{t('admin.editChore.ttsNoAudio')}</p>
-          )}
+          </section>
 
-          <label className={styles.formGroup}>
-            <span className={styles.label}>{t('admin.editChore.labelTTSDescription')}</span>
-            <textarea
-              className={styles.input}
-              value={ttsDescription}
-              onChange={e => setTtsDescription(e.target.value)}
-              placeholder={t('admin.editChore.ttsDescriptionPlaceholder')}
-              rows={3}
-            />
-          </label>
-
-          <div className={styles.saveRow}>
-            {ttsSaved && <span className={styles.saved} role="status"><Icon name="check" /> {t('admin.editChore.ttsRegeneratedLabel')}</span>}
-            {ttsError && <span className={styles.error} role="alert">{ttsError}</span>}
-            <button
-              type="button"
-              className={styles.btnSecondary}
-              onClick={handleGenerateTTSDescription}
-              disabled={ttsGenerating || ttsRegenerating}
-              title={t('admin.editChore.suggestTextTitle')}
-            >
-              <Icon name="spark" /> {ttsGenerating ? t('admin.editChore.generatingLabel') : t('admin.editChore.suggestTextBtn')}
-            </button>
-            <button
-              type="button"
-              className={styles.btnPrimary}
-              onClick={handleRegenerateTTS}
-              disabled={ttsRegenerating || ttsGenerating || !ttsDescription.trim()}
-            >
-              <RefreshCw aria-hidden className={ttsRegenerating ? styles.spin : undefined} />
-              {ttsRegenerating ? t('admin.editChore.regeneratingLabel') : t('admin.editChore.regenerateAudioBtn')}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <hr className={styles.divider} />
+          <hr className={styles.divider} />
+        </>
+      )}
 
       {renderSchedules(chore.id, users)}
 

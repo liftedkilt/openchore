@@ -251,9 +251,9 @@ func (s *Store) CreateChore(ctx context.Context, c *model.Chore) error {
 		photoSource = model.PhotoSourceChild
 	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO chores (title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_description, tts_audio_url, created_by)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, requiresApproval, requiresPhoto, photoSource, c.Source, c.ExternalID, c.TTSDescription, c.TTSAudioURL, c.CreatedBy)
+		`INSERT INTO chores (title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_audio_url, created_by)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, requiresApproval, requiresPhoto, photoSource, c.Source, c.ExternalID, c.TTSAudioURL, c.CreatedBy)
 	if err != nil {
 		return err
 	}
@@ -265,9 +265,9 @@ func (s *Store) GetChore(ctx context.Context, id int64) (*model.Chore, error) {
 	c := &model.Chore{}
 	var reqApp, reqPho int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_description, tts_audio_url, created_by, created_at
+		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_audio_url, created_by, created_at
 		 FROM chores WHERE id = ?`, id).
-		Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &reqApp, &reqPho, &c.PhotoSource, &c.Source, &c.ExternalID, &c.TTSDescription, &c.TTSAudioURL, &c.CreatedBy, &c.CreatedAt)
+		Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &reqApp, &reqPho, &c.PhotoSource, &c.Source, &c.ExternalID, &c.TTSAudioURL, &c.CreatedBy, &c.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -278,7 +278,7 @@ func (s *Store) GetChore(ctx context.Context, id int64) (*model.Chore, error) {
 
 func (s *Store) ListChores(ctx context.Context) ([]model.Chore, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_description, tts_audio_url, created_by, created_at
+		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_audio_url, created_by, created_at
 		 FROM chores ORDER BY title`)
 	if err != nil {
 		return nil, err
@@ -288,7 +288,7 @@ func (s *Store) ListChores(ctx context.Context) ([]model.Chore, error) {
 	for rows.Next() {
 		var c model.Chore
 		var reqApp, reqPho int
-		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &reqApp, &reqPho, &c.PhotoSource, &c.Source, &c.ExternalID, &c.TTSDescription, &c.TTSAudioURL, &c.CreatedBy, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &reqApp, &reqPho, &c.PhotoSource, &c.Source, &c.ExternalID, &c.TTSAudioURL, &c.CreatedBy, &c.CreatedAt); err != nil {
 			return nil, err
 		}
 		c.RequiresApproval = reqApp == 1
@@ -306,20 +306,14 @@ func (s *Store) UpdateChore(ctx context.Context, c *model.Chore) error {
 		photoSource = model.PhotoSourceChild
 	}
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE chores SET title=?, description=?, category=?, icon=?, points_value=?, missed_penalty_value=?, estimated_minutes=?, requires_approval=?, requires_photo=?, photo_source=?, source=?, external_id=?, tts_description=?, tts_audio_url=?
+		`UPDATE chores SET title=?, description=?, category=?, icon=?, points_value=?, missed_penalty_value=?, estimated_minutes=?, requires_approval=?, requires_photo=?, photo_source=?, source=?, external_id=?
 		 WHERE id=?`,
-		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, requiresApproval, requiresPhoto, photoSource, c.Source, c.ExternalID, c.TTSDescription, c.TTSAudioURL, c.ID)
+		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, requiresApproval, requiresPhoto, photoSource, c.Source, c.ExternalID, c.ID)
 	return err
 }
 
 func (s *Store) DeleteChore(ctx context.Context, id int64) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM chores WHERE id = ?`, id)
-	return err
-}
-
-// UpdateChoreTTSDescription updates only the TTS description for a chore.
-func (s *Store) UpdateChoreTTSDescription(ctx context.Context, choreID int64, desc string) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE chores SET tts_description = ? WHERE id = ?`, desc, choreID)
 	return err
 }
 
@@ -388,7 +382,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			cs.assignment_type, cs.available_at, cs.due_by, cs.expiry_penalty, cs.expiry_penalty_value,
 			cs.day_of_week, cs.specific_date,
 			cc.id, cc.completed_at, cc.photo_url, cc.status, cc.ai_feedback,
-			c.tts_description, c.tts_audio_url,
+			c.tts_audio_url,
 			(SELECT u2.name FROM chore_completions cc2
 			 JOIN chore_schedules cs2 ON cs2.id = cc2.chore_schedule_id
 			 JOIN users u2 ON u2.id = cc2.completed_by
@@ -396,7 +390,6 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			   AND cs2.fcfs_group_id IS NOT NULL
 			   AND cs2.id != cs.id
 			   AND cc2.completion_date = ?
-			   AND cc2.status != 'ai_rejected'
 			   AND cc2.uncompleted_at IS NULL
 			 LIMIT 1) as completed_by_sibling_name
 		FROM chore_schedules cs
@@ -410,7 +403,6 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 					WHEN 'excused'  THEN 2
 					WHEN 'pending'  THEN 3
 					WHEN 'rejected' THEN 4
-					WHEN 'ai_rejected' THEN 5
 				END
 				LIMIT 1
 			)
@@ -455,15 +447,14 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 				&sc.ExpiryPenalty, &sc.ExpiryPenaltyValue,
 				&dayOfWeek, &specificDate,
 				&compID, &completedAt, &photoURL, &compStatus, &aiFeedback,
-				&sc.TTSDescription, &sc.TTSAudioURL, &siblingName); err != nil {
+				&sc.TTSAudioURL, &siblingName); err != nil {
 				rows.Close()
 				return nil, err
 			}
 			sc.RequiresApproval = reqApp == 1
 			sc.RequiresPhoto = reqPho == 1
 			sc.Date = dateStr
-			// ai_rejected completions are not "completed" from the kid's perspective
-			sc.Completed = compID.Valid && compStatus.String != model.StatusAIRejected
+			sc.Completed = compID.Valid
 			if compID.Valid {
 				id := compID.Int64
 				sc.CompletionID = &id
@@ -570,8 +561,9 @@ func (s *Store) CompleteChoreAndCreditPoints(ctx context.Context, cc *model.Chor
 }
 
 // ApproveCompletionAndCreditPoints atomically updates a pending completion status to approved
-// and credits the awarded points in a single database transaction.
-func (s *Store) ApproveCompletionAndCreditPoints(ctx context.Context, completionID int64, adminID int64, pts int) error {
+// and credits the awarded points in a single database transaction. A nil
+// approverID records an automatic (AI) approval.
+func (s *Store) ApproveCompletionAndCreditPoints(ctx context.Context, completionID int64, approverID *int64, pts int) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -582,13 +574,13 @@ func (s *Store) ApproveCompletionAndCreditPoints(ctx context.Context, completion
 		`UPDATE chore_completions
 		   SET status = ?, approved_by = ?, approved_at = CURRENT_TIMESTAMP
 		 WHERE id = ? AND status = ?`,
-		model.StatusApproved, adminID, completionID, model.StatusPending)
+		model.StatusApproved, approverID, completionID, model.StatusPending)
 	if err != nil {
 		return err
 	}
 	updated, _ := res.RowsAffected()
 	if updated == 0 {
-		return fmt.Errorf("completion %d not found or not pending", completionID)
+		return ErrNotPending
 	}
 
 	if pts > 0 {
@@ -701,10 +693,9 @@ func (s *Store) ExcuseChoreAndRefundPenalty(ctx context.Context, scheduleID int6
 
 // UncompleteChore removes (or soft-deletes) the completion for a schedule +
 // date. approved and pending completions are soft-deleted (uncompleted_at
-// set) so the kid can re-check without losing the photo + AI approval
-// metadata for the same day. ai_rejected and rejected completions are hard
-// deleted so the retry flow (a fresh photo + AI call) continues to work as
-// before.
+// set) so the kid can re-check without losing the photo + approval
+// metadata for the same day. Rejected completions are hard deleted so the
+// kid can try again from scratch.
 func (s *Store) UncompleteChore(ctx context.Context, scheduleID int64, completionDate string) error {
 	// Only soft-delete live (non-uncompleted) approved/pending rows. Already
 	// soft-deleted rows are left alone — double-uncomplete is a no-op.
@@ -738,8 +729,8 @@ func (s *Store) UncompleteChore(ctx context.Context, scheduleID int64, completio
 	).Scan(&softDeleted); err == nil && softDeleted > 0 {
 		return nil
 	}
-	// No approved/pending row found — fall back to the old hard-delete so
-	// ai_rejected / rejected rows are cleared and can be retried fresh.
+	// No approved/pending row found — fall back to a hard delete so
+	// rejected rows are cleared and can be retried fresh.
 	_, err = s.db.ExecContext(ctx,
 		`DELETE FROM chore_completions WHERE chore_schedule_id = ? AND completion_date = ?`,
 		scheduleID, completionDate)
@@ -747,7 +738,7 @@ func (s *Store) UncompleteChore(ctx context.Context, scheduleID int64, completio
 }
 
 // UncompleteChoreAndDebitPoints atomically uncompletes a chore (soft-deleting approved/pending rows,
-// or hard-deleting ai_rejected/rejected rows) and debits any net points that were credited for it.
+// or hard-deleting rejected rows) and debits any net points that were credited for it.
 func (s *Store) UncompleteChoreAndDebitPoints(ctx context.Context, scheduleID int64, completionDate string, userID int64, completionID int64, netPoints int) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -907,10 +898,10 @@ func (s *Store) GetSchedule(ctx context.Context, id int64) (*model.ChoreSchedule
 func (s *Store) GetCompletionForScheduleDate(ctx context.Context, scheduleID int64, completionDate string) (*model.ChoreCompletion, error) {
 	cc := &model.ChoreCompletion{}
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, chore_schedule_id, completed_by, status, photo_url, approved_by, approved_at, completed_at, completion_date, ai_feedback, ai_confidence, uncompleted_at
+		`SELECT id, chore_schedule_id, completed_by, status, photo_url, approved_by, approved_at, completed_at, completion_date, ai_feedback, ai_confidence, ai_complete, uncompleted_at
 		 FROM chore_completions WHERE chore_schedule_id = ? AND completion_date = ?`,
 		scheduleID, completionDate).
-		Scan(&cc.ID, &cc.ChoreScheduleID, &cc.CompletedBy, &cc.Status, &cc.PhotoURL, &cc.ApprovedBy, &cc.ApprovedAt, &cc.CompletedAt, &cc.CompletionDate, &cc.AIFeedback, &cc.AIConfidence, &cc.UncompletedAt)
+		Scan(&cc.ID, &cc.ChoreScheduleID, &cc.CompletedBy, &cc.Status, &cc.PhotoURL, &cc.ApprovedBy, &cc.ApprovedAt, &cc.CompletedAt, &cc.CompletionDate, &cc.AIFeedback, &cc.AIConfidence, &cc.AIComplete, &cc.UncompletedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -921,9 +912,9 @@ func (s *Store) GetCompletionForScheduleDate(ctx context.Context, scheduleID int
 func (s *Store) GetCompletion(ctx context.Context, id int64) (*model.ChoreCompletion, error) {
 	cc := &model.ChoreCompletion{}
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, chore_schedule_id, completed_by, status, photo_url, approved_by, approved_at, completed_at, completion_date, ai_feedback, ai_confidence, uncompleted_at
+		`SELECT id, chore_schedule_id, completed_by, status, photo_url, approved_by, approved_at, completed_at, completion_date, ai_feedback, ai_confidence, ai_complete, uncompleted_at
 		 FROM chore_completions WHERE id = ?`, id).
-		Scan(&cc.ID, &cc.ChoreScheduleID, &cc.CompletedBy, &cc.Status, &cc.PhotoURL, &cc.ApprovedBy, &cc.ApprovedAt, &cc.CompletedAt, &cc.CompletionDate, &cc.AIFeedback, &cc.AIConfidence, &cc.UncompletedAt)
+		Scan(&cc.ID, &cc.ChoreScheduleID, &cc.CompletedBy, &cc.Status, &cc.PhotoURL, &cc.ApprovedBy, &cc.ApprovedAt, &cc.CompletedAt, &cc.CompletionDate, &cc.AIFeedback, &cc.AIConfidence, &cc.AIComplete, &cc.UncompletedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -933,6 +924,7 @@ func (s *Store) GetCompletion(ctx context.Context, id int64) (*model.ChoreComple
 
 type PendingCompletionRow struct {
 	ID             int64     `json:"id"`
+	ChoreID        int64     `json:"chore_id"`
 	ChoreTitle     string    `json:"chore_title"`
 	ChildName      string    `json:"child_name"`
 	// AssignedUserID is the user_id the underlying schedule is assigned to
@@ -944,18 +936,29 @@ type PendingCompletionRow struct {
 	CompletedAt    time.Time `json:"completed_at"`
 	// CompletedByID is the user who clicked "complete" (ChildName's id).
 	CompletedByID int64 `json:"completed_by"`
-	// Chore details and the AI photo check's feedback, so the parent sees
-	// what they are approving without another round trip.
+	// Chore details, so the parent sees what they are approving without
+	// another round trip.
 	Category    string `json:"category"`
 	Icon        string `json:"icon"`
 	PointsValue int    `json:"points_value"`
-	AIFeedback  string `json:"ai_feedback,omitempty"`
+	// RequiresPhoto / PhotoSource let the card explain a missing photo: for
+	// "child" chores it was skipped, otherwise it may still arrive.
+	RequiresPhoto bool   `json:"requires_photo"`
+	PhotoSource   string `json:"photo_source"`
+	// AIFeedback / AIConfidence carry the AI photo reviewer's note, if a
+	// review has run. AIComplete is its yes/no read on the photo (nil until
+	// reviewed). The review is advisory: the parent still decides.
+	AIFeedback   string  `json:"ai_feedback,omitempty"`
+	AIConfidence float64 `json:"ai_confidence,omitempty"`
+	AIComplete   *bool   `json:"ai_complete,omitempty"`
 }
 
 func (s *Store) ListPendingCompletions(ctx context.Context) ([]PendingCompletionRow, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT cc.id, c.title, u.name, cs.assigned_to, cc.photo_url, cc.completion_date, cc.completed_at,
-		       cc.completed_by, c.category, COALESCE(c.icon, ''), c.points_value, COALESCE(cc.ai_feedback, '')
+		SELECT cc.id, c.id, c.title, u.name, cs.assigned_to, cc.photo_url, cc.completion_date, cc.completed_at,
+		       cc.completed_by, c.category, COALESCE(c.icon, ''), c.points_value,
+		       c.requires_photo, COALESCE(NULLIF(c.photo_source, ''), 'child'),
+		       cc.ai_feedback, cc.ai_confidence, cc.ai_complete
 		FROM chore_completions cc
 		JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
 		JOIN chores c ON c.id = cs.chore_id
@@ -971,8 +974,10 @@ func (s *Store) ListPendingCompletions(ctx context.Context) ([]PendingCompletion
 	var pending []PendingCompletionRow
 	for rows.Next() {
 		var p PendingCompletionRow
-		if err := rows.Scan(&p.ID, &p.ChoreTitle, &p.ChildName, &p.AssignedUserID, &p.PhotoURL, &p.CompletionDate, &p.CompletedAt,
-			&p.CompletedByID, &p.Category, &p.Icon, &p.PointsValue, &p.AIFeedback); err != nil {
+		if err := rows.Scan(&p.ID, &p.ChoreID, &p.ChoreTitle, &p.ChildName, &p.AssignedUserID, &p.PhotoURL, &p.CompletionDate, &p.CompletedAt,
+			&p.CompletedByID, &p.Category, &p.Icon, &p.PointsValue,
+			&p.RequiresPhoto, &p.PhotoSource,
+			&p.AIFeedback, &p.AIConfidence, &p.AIComplete); err != nil {
 			return nil, err
 		}
 		p.CompletionDate = normalizeDate(p.CompletionDate)
@@ -995,10 +1000,44 @@ func (s *Store) UpdateCompletionStatus(ctx context.Context, id int64, status str
 	return err
 }
 
+// UpdateCompletionPhoto replaces a completion's photo and clears any AI
+// review of the previous one.
 func (s *Store) UpdateCompletionPhoto(ctx context.Context, id int64, photoURL string) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE chore_completions SET photo_url = ? WHERE id = ?`,
+		`UPDATE chore_completions SET photo_url = ?, ai_feedback = '', ai_confidence = 0, ai_complete = NULL WHERE id = ?`,
 		photoURL, id)
+	return err
+}
+
+// SetCompletionAIReview records the AI photo reviewer's note on a completion.
+func (s *Store) SetCompletionAIReview(ctx context.Context, id int64, r model.AIReviewResult) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE chore_completions SET ai_feedback = ?, ai_confidence = ?, ai_complete = ? WHERE id = ?`,
+		r.Feedback, r.Confidence, r.Complete, id)
+	return err
+}
+
+// --- Weekly summaries ---
+
+// GetWeeklySummary returns the stored summary for a user's week, or "" if
+// none has been generated.
+func (s *Store) GetWeeklySummary(ctx context.Context, userID int64, weekStart string) (string, error) {
+	var summary string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT summary FROM weekly_summaries WHERE user_id = ? AND week_start = ?`,
+		userID, weekStart).Scan(&summary)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return summary, err
+}
+
+// SaveWeeklySummary stores (or replaces) the summary for a user's week.
+func (s *Store) SaveWeeklySummary(ctx context.Context, userID int64, weekStart, summary string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO weekly_summaries (user_id, week_start, summary) VALUES (?, ?, ?)
+		 ON CONFLICT (user_id, week_start) DO UPDATE SET summary = excluded.summary, created_at = CURRENT_TIMESTAMP`,
+		userID, weekStart, summary)
 	return err
 }
 
@@ -1749,6 +1788,10 @@ func (s *Store) redeemSharedPoolTx(ctx context.Context, tx *sql.Tx, userID, rewa
 // --- Reward Commitments ---
 
 // ErrActiveCommitmentExists indicates the user already has an active commitment.
+// ErrNotPending is returned when approving a completion that is no longer
+// pending (already approved, rejected, or gone).
+var ErrNotPending = fmt.Errorf("completion is not pending")
+
 var ErrActiveCommitmentExists = fmt.Errorf("user already has an active commitment")
 
 // hydrateCommitmentSaved derives AmountSaved for a commitment from the ledger.
@@ -3066,7 +3109,6 @@ func (s *Store) FcfsGroupCompletedForDate(ctx context.Context, groupID, date str
 		`SELECT EXISTS(SELECT 1 FROM chore_completions cc
 		   JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
 		   WHERE cs.fcfs_group_id = ? AND cc.completion_date = ?
-		   AND cc.status NOT IN ('ai_rejected')
 		   AND cc.uncompleted_at IS NULL)`,
 		groupID, date).Scan(&exists)
 	return exists, err
@@ -3517,7 +3559,6 @@ func (s *Store) GetExpiredChores(ctx context.Context, date string, currentTime s
 		LEFT JOIN chore_completions cc ON cc.id = (
 				SELECT cc3.id FROM chore_completions cc3
 				WHERE cc3.chore_schedule_id = cs.id AND cc3.completion_date = ?
-				  AND cc3.status != 'ai_rejected'
 				  AND cc3.uncompleted_at IS NULL
 				LIMIT 1
 			)

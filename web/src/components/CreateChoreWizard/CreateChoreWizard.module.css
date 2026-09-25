@@ -133,43 +133,6 @@
   height: 16px;
 }
 
-.aiSuggestionRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: 6px 6px 6px var(--space-3);
-  border-radius: 14px;
-  background: var(--surface);
-}
-
-.aiSuggestionText {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: var(--ink);
-}
-
-.aiSuggestionText svg {
-  width: 16px;
-  height: 16px;
-  flex: none;
-}
-
-.aiApplyBtn {
-  min-height: 44px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--surface-sunk);
-  color: var(--ink);
-  font-family: var(--font-text);
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
 /* ---------- people, days ---------- */
 .chips {
   display: flex;
