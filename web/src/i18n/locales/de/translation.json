@@ -471,10 +471,9 @@
     },
     "settingsTab": {
       "ai": {
-        "aiNotConfigured": "Nur ein Sprachdienst ist eingerichtet (TTS_BASE_URL). Setze AI_BASE_URL und AI_MODEL für Fotoprüfung und Berichte.",
+        "aiNotConfigured": "Nur ein Sprachdienst ist verbunden. Füge oben ein KI-Modell hinzu, um Fotoprüfung, Aufgabenbeschreibungen und Berichte zu nutzen.",
         "autoApproveLabel": "Eindeutige Fälle automatisch bestätigen",
         "description": "Verwendet {{model}}. Die KI berät nur – sie lehnt nie eine Aufgabe ab.",
-        "notConfigured": "Es ist kein KI-Dienst eingerichtet. Für Fotoprüfung, Aufgabenbeschreibungen, Wochenberichte oder aufgenommene Vorlesestimmen verweise den Server auf ein OpenAI-kompatibles Modell (AI_BASE_URL und AI_MODEL) oder einen Sprachdienst (TTS_BASE_URL). Ohne sie liest die Stimme des Geräts die Aufgaben vor.",
         "photoReviewHelp": "Kommt eine bestätigungspflichtige Aufgabe mit Foto herein, fügt die KI unter Bestätigungen einen Hinweis hinzu.",
         "photoReviewLabel": "Fotos zur Bestätigung prüfen",
         "saveButton": "KI-Einstellungen speichern",
@@ -514,9 +513,66 @@
       "pageTitle": "Einstellungen",
       "signIn": {
         "description": "Jedes Elternteil meldet sich mit einer PIN oder einem verknüpften Konto in seinem eigenen Profil an; danach erscheint auf dem Dashboard die Schaltfläche „Verwalten“. Deine PIN legst du über das Schlüsselsymbol auf deinem Dashboard fest.",
-        "noProviders": "Es sind keine Single-Sign-on-Anbieter (OIDC) eingerichtet. Füge sie unter auth.oidc in der config.yaml oder über die OIDC_*-Umgebungsvariablen hinzu.",
-        "providersConfigured": "Auf diesem Server eingerichtete Single-Sign-on-Anbieter:",
-        "title": "Anmeldung"
+        "noProviders": "Noch keine Single-Sign-on-Anbieter.",
+        "title": "Anmeldung",
+        "providersIntro": "Mit Single Sign-on kann man ein Konto eines OpenID-Connect-Anbieters (Pocket ID, Authelia, Authentik, Keycloak, Google, Microsoft…) verknüpfen und statt einer PIN nutzen.",
+        "addButton": "Anbieter hinzufügen",
+        "addTitle": "Anmeldeanbieter hinzufügen",
+        "editTitle": "{{name}} bearbeiten",
+        "editButton": "Bearbeiten",
+        "testButton": "Testen",
+        "testing": "Teste...",
+        "testSuccess": "{{name}} ist erreichbar.",
+        "testError": "{{name}} ist nicht erreichbar. {{detail}}",
+        "fromConfig": "config.yaml",
+        "linkedAccounts_one": "{{count}} verknüpftes Konto",
+        "linkedAccounts_other": "{{count}} verknüpfte Konten",
+        "removeAriaLabel": "{{name}} entfernen",
+        "confirmRemove": "{{name}} entfernen?",
+        "confirmRemoveLinked_one": "{{name}} entfernen? {{count}} Person hat ihn verknüpft und kann sich damit nicht mehr anmelden. Mit derselben ID wieder hinzugefügt, gilt die Verknüpfung wieder.",
+        "confirmRemoveLinked_other": "{{name}} entfernen? {{count}} Personen haben ihn verknüpft und können sich damit nicht mehr anmelden. Mit derselben ID wieder hinzugefügt, gelten die Verknüpfungen wieder.",
+        "removed": "{{name}} entfernt",
+        "removeError": "Anbieter konnte nicht entfernt werden. {{detail}}",
+        "saveSuccess": "{{name}} gespeichert",
+        "saveError": "Anbieter konnte nicht gespeichert werden. {{detail}}",
+        "form": {
+          "name": "Beschriftung",
+          "id": "ID",
+          "idHelp": "Kleinbuchstaben, Ziffern, - oder _. Teil der Weiterleitungs-URI und später nicht änderbar.",
+          "redirectUri": "Weiterleitungs-URI",
+          "redirectUriHelp": "Trage sie beim Anbieter ein. Stimmt die Adresse nicht, setze die System-Basis-URL.",
+          "issuer": "Issuer-URL",
+          "issuerChangeWarning_one": "{{count}} Person hat diesen Anbieter verknüpft. Konten hängen am Issuer und müssen nach einer Änderung neu verknüpft werden.",
+          "issuerChangeWarning_other": "{{count}} Personen haben diesen Anbieter verknüpft. Konten hängen am Issuer und müssen nach einer Änderung neu verknüpft werden.",
+          "clientId": "Client-ID",
+          "clientSecret": "Client-Secret",
+          "clientSecretSaved": "Gespeichert. Leer lassen, um es zu behalten",
+          "scopes": "Scopes",
+          "prompt": "Anmeldung abfragen",
+          "promptHelp": "„Jedes Mal“ empfiehlt sich auf einem geteilten Tablet, damit eine offene Sitzung eines Elternteils beim Anbieter nicht wiederverwendet wird.",
+          "prompts": {
+            "default": "Nur wenn nötig (Standard des Anbieters)",
+            "login": "Jedes Mal",
+            "select_account": "Jedes Mal ein Konto wählen",
+            "consent": "Jedes Mal um Zustimmung bitten"
+          },
+          "cancel": "Abbrechen",
+          "add": "Anbieter hinzufügen",
+          "save": "Speichern"
+        },
+        "sessions": {
+          "title": "Sitzungsdauer",
+          "kioskLabel": "Antippen und PIN",
+          "kioskHelp": "Standard {{hours}} Stunden. Endet außerdem nach 5 Minuten ohne Aktivität.",
+          "personalLabel": "Verknüpfte Konten",
+          "personalHelp": "Standard {{days}} Tage, damit man auf dem eigenen Handy angemeldet bleibt.",
+          "hours": "Stunden",
+          "days": "Tage",
+          "fromConfig": "In der config.yaml auf dem Server festgelegt.",
+          "saveButton": "Speichern",
+          "saveSuccess": "Gespeichert. Gilt für neue Anmeldungen.",
+          "saveError": "Konnte nicht gespeichert werden. {{detail}}"
+        }
       },
       "subtitle": "Server, Benachrichtigungen, Fotoprüfung und Integrationen.",
       "webhooks": {
@@ -565,6 +621,34 @@
         "inactive": "Aus",
         "signed": "Signiert",
         "title": "Webhooks"
+      },
+      "aiConnection": {
+        "title": "KI-Verbindungen",
+        "description": "OpenChore funktioniert mit jedem OpenAI-kompatiblen Server: lokal wie Ollama, llama.cpp oder LM Studio, oder bei einem gehosteten Anbieter. Lass eine Basis-URL leer, um den Dienst auszuschalten. Änderungen gelten sofort.",
+        "baseUrlLabel": "Basis-URL",
+        "modelLabel": "Modell",
+        "apiKeyLabel": "API-Schlüssel",
+        "apiKeyPlaceholder": "Für lokale Server leer lassen",
+        "apiKeySavedPlaceholder": "Gespeichert. Leer lassen, um ihn zu behalten",
+        "clearKey": "Gespeicherten API-Schlüssel entfernen",
+        "saveButton": "Verbindungen speichern",
+        "savingButton": "Speichern...",
+        "saveSuccess": "Verbindungen gespeichert",
+        "saveError": "Verbindungen konnten nicht gespeichert werden. {{detail}}",
+        "ai": {
+          "title": "KI-Modell",
+          "help": "Für Fotoprüfung, Aufgabenbeschreibungen und Wochenberichte. Mit /v1 am Ende. Fotos werden an diesen Server geschickt, ein gehosteter Anbieter sieht sie also.",
+          "baseUrlPlaceholder": "http://ollama:11434/v1",
+          "modelPlaceholder": "gemma4:e4b",
+          "fromEnv": "Über die Umgebungsvariable AI_BASE_URL auf dem Server festgelegt. Ändere sie dort."
+        },
+        "tts": {
+          "title": "Sprachdienst",
+          "help": "Nimmt jede Aufgabe mit natürlicher Stimme auf, z. B. Kokoro. Ohne ihn liest die Stimme des Geräts vor.",
+          "baseUrlPlaceholder": "http://kokoro:8880/v1",
+          "modelPlaceholder": "kokoro",
+          "fromEnv": "Über die Umgebungsvariable TTS_BASE_URL auf dem Server festgelegt. Ändere sie dort."
+        }
       }
     },
     "skins": {

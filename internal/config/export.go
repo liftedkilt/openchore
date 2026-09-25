@@ -170,6 +170,8 @@ func Export(ctx context.Context, s *store.Store, sections []string) (*Config, er
 		// Exclude secrets from export
 		delete(settings, "admin_passcode")
 		delete(settings, "session_secret")
+		delete(settings, "ai_api_key")
+		delete(settings, "tts_api_key")
 		if len(settings) > 0 {
 			cfg.Settings = settings
 		}

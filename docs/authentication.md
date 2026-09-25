@@ -27,8 +27,13 @@ The API does not trust a client-supplied user ID.
 
 | Signed in with | Lasts | On idle |
 |---|---|---|
-| Tap or PIN | 12 hours (`auth.kiosk_session_ttl`) | Signed out after 5 minutes idle; the tablet returns to the wall display |
-| Linked account (OIDC) | 30 days (`auth.personal_session_ttl`) | Stays signed in, so your phone just opens to your chores |
+| Tap or PIN | 12 hours | Signed out after 5 minutes idle; the tablet returns to the wall display |
+| Linked account (OIDC) | 30 days | Stays signed in, so your phone just opens to your chores |
+
+Change these under **Manage → Settings → Sign-in → Session length**. New
+sign-ins use the new length. `auth.kiosk_session_ttl` and
+`auth.personal_session_ttl` in `config.yaml` (e.g. `12h`, `720h`) take
+precedence and make the fields read-only.
 
 **Sign out on all devices** (in *Linked accounts*) revokes every session for
 your profile. Unlinking an account or changing someone's role does the same
@@ -68,9 +73,28 @@ Register OpenChore as an OIDC client at your provider:
 - **Scopes:** `openid profile email`
 - **Client type:** confidential (client secret). PKCE (S256) is always used as well.
 
-Then add it to `config/config.yaml`. Unlike the seed sections, the `auth`
-section is read on **every** start, so you can add it to an existing install
-and restart:
+Then add it under **Manage → Settings → Sign-in → Add provider**: a button
+label, an ID (it becomes part of the redirect URI, which the form shows you,
+and can't be changed later), the issuer URL, the client ID and secret, and
+whether to ask people to sign in every time. It's available on the login
+screen straight away. **Test** checks that OpenChore can reach the issuer.
+
+Client secrets are write-only: editing a provider shows that a secret is
+saved, and leaving the field blank keeps it. A provider can't be removed while
+someone has no PIN and no other linked account, since they'd be locked out;
+give them a PIN first. Removing a provider keeps people's links, so adding it
+back with the same ID restores them.
+
+Changing a provider's issuer disconnects the accounts linked through it
+(account IDs are specific to an issuer), so people need to link again.
+
+#### In config.yaml or the environment
+
+Providers can also live in `config/config.yaml`. Unlike the seed sections,
+the `auth` section is read on **every** start, so you can add it to an
+existing install and restart. These providers appear under Settings marked
+*config.yaml* and are read-only there; one with the same ID as a provider
+added in Settings takes its place.
 
 ```yaml
 auth:

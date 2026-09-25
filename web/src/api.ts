@@ -1,4 +1,4 @@
-import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult } from './types';
+import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput } from './types';
 
 const API_BASE = '/api';
 
@@ -315,6 +315,20 @@ export const api = {
       body: JSON.stringify({ value }),
     }),
     aiStatus: () => fetchWithAuth<AIStatus>('/admin/ai/status'),
+    aiConfig: () => fetchWithAuth<AIConfig>('/admin/ai/config'),
+    updateAIConfig: (data: { ai?: AIConnectionUpdate; tts?: AIConnectionUpdate }) =>
+      fetchWithAuth<AIConfig>('/admin/ai/config', { method: 'PUT', body: JSON.stringify(data) }),
+    authConfig: () => fetchWithAuth<AdminAuthConfig>('/admin/auth/config'),
+    updateSessionLengths: (data: { kiosk_session_hours: number | null; personal_session_hours: number | null }) =>
+      fetchWithAuth<AdminAuthConfig>('/admin/auth/sessions', { method: 'PUT', body: JSON.stringify(data) }),
+    createAuthProvider: (data: AuthProviderInput) =>
+      fetchWithAuth<AdminAuthConfig>('/admin/auth/providers', { method: 'POST', body: JSON.stringify(data) }),
+    updateAuthProvider: (id: string, data: AuthProviderInput) =>
+      fetchWithAuth<AdminAuthConfig>(`/admin/auth/providers/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteAuthProvider: (id: string) =>
+      fetchWithAuth<AdminAuthConfig>(`/admin/auth/providers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    testAuthProvider: (id: string) =>
+      fetchWithAuth<{ status: string }>(`/admin/auth/providers/${encodeURIComponent(id)}/test`, { method: 'POST' }),
     testAIReview: (choreTitle: string, photoUrl: string) =>
       fetchWithAuth<AIReviewResult>('/admin/ai/test', {
         method: 'POST',

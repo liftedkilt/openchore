@@ -206,6 +206,10 @@ export const ProfileSelection: React.FC = () => {
     return (id: string) => byId.get(id) ?? id;
   }, [providers]);
 
+  // A provider removed in Settings keeps its links (re-adding it restores
+  // them), so only offer the ones that still exist.
+  const linkedProviders = (pendingUser?.auth_providers ?? []).filter(id => providers.some(p => p.id === id));
+
   const reset = () => {
     setPendingUser(null);
     setStep(null);
@@ -309,10 +313,10 @@ export const ProfileSelection: React.FC = () => {
             <p className={styles.hint}>{t('profile.signInWithLinked')}</p>
           )}
 
-          {pendingUser.auth_providers.length > 0 && (
+          {linkedProviders.length > 0 && (
             <div className={styles.oidc}>
               {step.kind === 'pin' && <div className={styles.divider}><span>{t('profile.or')}</span></div>}
-              {pendingUser.auth_providers.map(id => (
+              {linkedProviders.map(id => (
                 <a key={id} className={styles.oidcBtn} href={api.auth.oidcLoginURL(id, pendingUser.id)}>
                   {t('profile.continueWith', { provider: providerName(id) })}
                   <Icon name="chev" />

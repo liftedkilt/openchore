@@ -20,20 +20,21 @@ type ChoreHandler struct {
 	store      *store.Store
 	dispatcher *webhook.Dispatcher
 	discord    *discord.Notifier
-	ai         *llm.Client     // nil when AI_BASE_URL is unset
-	audio      *tts.ChoreAudio // nil when TTS_BASE_URL is unset
-	reviews    sync.WaitGroup  // in-flight background photo reviews
+	aiSvc      *AIServices    // optional AI and read-aloud audio
+	reviews    sync.WaitGroup // in-flight background photo reviews
 }
 
-func NewChoreHandler(s *store.Store, d *webhook.Dispatcher, dn *discord.Notifier) *ChoreHandler {
-	return &ChoreHandler{store: s, dispatcher: d, discord: dn}
+func NewChoreHandler(s *store.Store, d *webhook.Dispatcher, dn *discord.Notifier, ai *AIServices) *ChoreHandler {
+	return &ChoreHandler{store: s, dispatcher: d, discord: dn, aiSvc: ai}
 }
 
-// SetAI wires in the optional AI client and read-aloud audio. Either may be
-// nil. Call before serving requests.
+// AIServices returns the handler's (swappable) AI and audio services.
+func (h *ChoreHandler) AIServices() *AIServices { return h.aiSvc }
+
+// SetAI replaces the AI client and read-aloud audio directly (tests).
+// Either may be nil.
 func (h *ChoreHandler) SetAI(ai *llm.Client, audio *tts.ChoreAudio) {
-	h.ai = ai
-	h.audio = audio
+	h.aiSvc.set(ai, audio)
 }
 
 // WaitForReviews blocks until background photo reviews finish (for tests
@@ -135,8 +136,8 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.audio != nil {
-		h.audio.GenerateAsync(*chore)
+	if audio := h.aiSvc.Audio(); audio != nil {
+		audio.GenerateAsync(*chore)
 	}
 
 	writeJSON(w, http.StatusCreated, chore)
@@ -207,8 +208,8 @@ func (h *ChoreHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to update chore")
 		return
 	}
-	if h.audio != nil && (existing.TTSAudioURL == "" || tts.SpokenText(existing) != spokenBefore) {
-		h.audio.GenerateAsync(*existing)
+	if audio := h.aiSvc.Audio(); audio != nil && (existing.TTSAudioURL == "" || tts.SpokenText(existing) != spokenBefore) {
+		audio.GenerateAsync(*existing)
 	}
 	writeJSON(w, http.StatusOK, existing)
 }

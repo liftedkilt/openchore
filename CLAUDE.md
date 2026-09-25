@@ -38,10 +38,10 @@ Family chore-tracking PWA: Go API + React/TypeScript frontend, SQLite storage, o
 - **Seed data:** edit `config/config.example.yaml`; the seeder only runs on an empty DB, so `make dev` (which wipes) is the way to re-seed.
 - **Points:** every points change must write a row to `point_transactions`.
 - **Bonus chores:** do not award bonus points unless all `required` and `core` chores for the day are complete.
-- **Auth:** server-issued HMAC-signed sessions (`openchore_session` cookie or `Bearer ocs1.…`) from `POST /api/auth/login` (tap/PIN), OIDC (`internal/api/oidc.go`) or setup; API tokens (`Bearer <hex>`) act as admin. `X-User-ID` is **not** trusted. Admin is a role on a profile; every admin needs a PIN or linked identity. Middleware: `RequireSession`, `RequireUserOrToken`, `RequireAdmin`. See `docs/authentication.md`.
+- **Auth:** server-issued HMAC-signed sessions (`openchore_session` cookie or `Bearer ocs1.…`) from `POST /api/auth/login` (tap/PIN), OIDC (`internal/api/oidc.go`) or setup; API tokens (`Bearer <hex>`) act as admin. `X-User-ID` is **not** trusted. Admin is a role on a profile; every admin needs a PIN or linked identity. Middleware: `RequireSession`, `RequireUserOrToken`, `RequireAdmin`. OIDC providers come from `auth.oidc`/`OIDC_*` (read-only) plus the `oidc_providers` table (Settings UI); `OIDCService.Reload` applies changes without a restart. See `docs/authentication.md`.
 - **Parents take part:** don't filter by `role = 'child'` for chores/points/rewards/streaks; role only gates management.
 - **Errors:** respond with JSON `{"error": "..."}` via `writeError(w, status, msg)`. Log with stdlib `log.Printf`.
-- **AI is advisory:** it never rejects a completion. Photo review only annotates *pending* completions and may auto-approve (through the same `approveCompletion` path as a parent). AI features are off unless `AI_BASE_URL`/`AI_MODEL` (or `TTS_BASE_URL`) are set; see `docs/ai.md`.
+- **AI is advisory:** it never rejects a completion. Photo review only annotates *pending* completions and may auto-approve (through the same `approveCompletion` path as a parent). AI features are off unless a base URL is set, via `AI_BASE_URL`/`AI_MODEL` (or `TTS_BASE_URL`) or Manage → Settings (env wins). Clients are swappable at runtime: fetch them per use from `AIServices` (`internal/api/aiconfig.go`) and handle nil; see `docs/ai.md`.
 - **Background work:** long-running goroutines are started from `cmd/server/main.go` and must accept a `context.Context` for shutdown.
 
 ## Testing

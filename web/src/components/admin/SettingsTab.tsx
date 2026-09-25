@@ -3,24 +3,18 @@ import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { Trash2, X } from 'lucide-react';
 import { api } from '../../api';
-import type { AuthProvider, Webhook, WebhookDelivery } from '../../types';
+import type { Webhook, WebhookDelivery } from '../../types';
 import { Icon } from '../../design';
 import { ExportConfigSection } from './ExportConfigSection';
 import { APITokensSection } from './APITokensSection';
 import { PhotoReviewTester } from './PhotoReviewTester';
+import { AIConnectionSection } from './AIConnectionSection';
+import { SignInSection } from './SignInSection';
+import { FormMessage, type Msg } from './FormMessage';
 import { useAIStatus } from '../../hooks/useAIStatus';
 import ui from './ui.module.css';
 import styles from './SettingsTab.module.css';
 
-type Msg = { type: 'success' | 'error'; text: string } | null;
-
-/** A saved / failed line under a settings form. */
-export const FormMessage: React.FC<{ msg: Msg }> = ({ msg }) => {
-  if (!msg) return null;
-  return msg.type === 'success'
-    ? <p className={ui.msg} role="status"><Icon name="check" /> {msg.text}</p>
-    : <p className={ui.msgError} role="alert">{msg.text}</p>;
-};
 
 const WEBHOOK_EVENT_IDS: { id: string; key: string }[] = [
   { id: 'chore.completed', key: 'completed' },
@@ -46,7 +40,6 @@ const WEBHOOK_EVENT_IDS: { id: string; key: string }[] = [
 export const SettingsTab: React.FC = () => {
   const { t, i18n } = useTranslation();
 
-  const [providers, setProviders] = useState<AuthProvider[]>([]);
   const [baseUrl, setBaseUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<Msg>(null);
@@ -56,8 +49,8 @@ export const SettingsTab: React.FC = () => {
   const [discordSaving, setDiscordSaving] = useState(false);
   const [discordMessage, setDiscordMessage] = useState<Msg>(null);
 
-  // AI settings state. What can be set depends on which services the
-  // server has configured (AI_BASE_URL / TTS_BASE_URL).
+  // AI settings state. What can be set depends on which services are
+  // connected (in AIConnectionSection or AI_BASE_URL / TTS_BASE_URL).
   const aiStatus = useAIStatus();
   const [aiPhotoReview, setAiPhotoReview] = useState(false);
   const [aiAutoApprove, setAiAutoApprove] = useState(false);
@@ -100,7 +93,6 @@ export const SettingsTab: React.FC = () => {
   }, []);
 
   useEffect(() => { loadWebhooks(); }, [loadWebhooks]);
-  useEffect(() => { api.auth.providers().then(setProviders).catch(() => setProviders([])); }, []);
 
   // There's no bulk settings API, so fetch each setting we show.
   useEffect(() => {
@@ -292,12 +284,9 @@ export const SettingsTab: React.FC = () => {
             </div>
           </form>
 
-          {!aiStatus.ai.configured && !aiStatus.tts.configured ? (
-            <section className={clsx(ui.card, ui.section)} aria-labelledby="settings-ai">
-              <h3 className={ui.sectionTitle} id="settings-ai"><Icon name="spark" /> {t('admin.settingsTab.ai.title')}</h3>
-              <p className={ui.sectionDesc}>{t('admin.settingsTab.ai.notConfigured')}</p>
-            </section>
-          ) : (
+          <AIConnectionSection />
+
+          {(aiStatus.ai.configured || aiStatus.tts.configured) && (
             <form className={clsx(ui.card, ui.section)} onSubmit={handleSaveAISettings} aria-labelledby="settings-ai">
               <h3 className={ui.sectionTitle} id="settings-ai"><Icon name="spark" /> {t('admin.settingsTab.ai.title')}</h3>
               <p className={ui.sectionDesc}>
@@ -376,25 +365,7 @@ export const SettingsTab: React.FC = () => {
         </div>
 
         <div className={ui.cardStack}>
-          <section className={clsx(ui.card, ui.section)}>
-            <h3 className={ui.sectionTitle}><Icon name="lock" /> {t('admin.settingsTab.signIn.title')}</h3>
-            <p className={ui.sectionDesc}>{t('admin.settingsTab.signIn.description')}</p>
-            {providers.length > 0 ? (
-              <>
-                <p className={ui.sectionDesc}>{t('admin.settingsTab.signIn.providersConfigured')}</p>
-                <ul className={styles.providers}>
-                  {providers.map(p => (
-                    <li key={p.id}>
-                      <span className={ui.rowTitle}>{p.name}</span>
-                      <code className={ui.code}>{p.id}</code>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <p className={ui.sectionDesc}>{t('admin.settingsTab.signIn.noProviders')}</p>
-            )}
-          </section>
+          <SignInSection />
 
           <section className={clsx(ui.card, ui.section)}>
             <div className={ui.sectionHead}>

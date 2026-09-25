@@ -307,8 +307,9 @@ streak_rewards:
 
 settings: {}
 
-# Optional AI behaviour. Which model and speech servers to use comes from the
-# environment (AI_BASE_URL, AI_MODEL, TTS_BASE_URL, ...) — see docs/ai.md.
+# Optional AI behaviour. Which model and speech servers to use is set under
+# Admin > Settings > AI connections, or in the environment (AI_BASE_URL,
+# AI_MODEL, TTS_BASE_URL, ...), which wins — see docs/ai.md.
 # Like the rest of this file, these are only applied on first boot; change
 # them later under Admin > Settings.
 ai:
@@ -332,6 +333,8 @@ webhooks:
 
 # Authentication. Unlike the sections above, this is read on every start,
 # so providers can be added to an existing install (restart required).
+# Providers and session lengths can also be managed under Admin > Settings >
+# Sign-in without a restart; anything set here is read-only there.
 # Values support ${ENV_VAR} expansion to keep secrets out of this file.
 # A single provider can also be configured purely with environment variables:
 # OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_PROVIDER_ID,

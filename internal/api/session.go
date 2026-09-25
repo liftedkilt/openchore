@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/liftedkilt/openchore/internal/store"
@@ -71,31 +72,34 @@ func (c *SessionClaims) Persistent() bool { return c.Method == SessionMethodOIDC
 // SessionManager signs and verifies session tokens.
 type SessionManager struct {
 	secret    []byte
-	kioskTTL  time.Duration
-	oidcTTL   time.Duration
+	kioskTTL  atomic.Int64 // time.Duration; changeable at runtime
+	oidcTTL   atomic.Int64 // time.Duration; changeable at runtime
 	uploadTTL time.Duration
 	now       func() time.Time
 }
 
 // NewSessionManager builds a manager around an HMAC secret.
 func NewSessionManager(secret []byte) *SessionManager {
-	return &SessionManager{
+	m := &SessionManager{
 		secret:    secret,
-		kioskTTL:  DefaultKioskSessionTTL,
-		oidcTTL:   DefaultOIDCSessionTTL,
 		uploadTTL: DefaultUploadSessionTTL,
 		now:       time.Now,
 	}
+	m.SetTTLs(0, 0)
+	return m
 }
 
-// SetTTLs overrides session lifetimes; zero values keep the defaults.
+// SetTTLs sets the lifetimes of new sessions; zero means the default. Safe
+// to call while serving requests.
 func (m *SessionManager) SetTTLs(kiosk, oidc time.Duration) {
-	if kiosk > 0 {
-		m.kioskTTL = kiosk
+	if kiosk <= 0 {
+		kiosk = DefaultKioskSessionTTL
 	}
-	if oidc > 0 {
-		m.oidcTTL = oidc
+	if oidc <= 0 {
+		oidc = DefaultOIDCSessionTTL
 	}
+	m.kioskTTL.Store(int64(kiosk))
+	m.oidcTTL.Store(int64(oidc))
 }
 
 // LoadSessionSecret returns the HMAC secret: the OPENCHORE_SESSION_SECRET
@@ -128,10 +132,10 @@ func LoadSessionSecret(ctx context.Context, s *store.Store, envValue string) ([]
 // Issue signs a new token for the given claims, filling in timestamps.
 func (m *SessionManager) Issue(c SessionClaims) (string, *SessionClaims) {
 	now := m.now()
-	ttl := m.kioskTTL
+	ttl := time.Duration(m.kioskTTL.Load())
 	switch c.Method {
 	case SessionMethodOIDC:
-		ttl = m.oidcTTL
+		ttl = time.Duration(m.oidcTTL.Load())
 	case SessionMethodUpload:
 		ttl = m.uploadTTL
 	}

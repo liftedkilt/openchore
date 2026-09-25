@@ -32,21 +32,31 @@ anyway…"); it then waits for a parent instead.
 ## Connecting a model
 
 OpenChore talks to anything that speaks the OpenAI API: a local server or a
-hosted provider. Set these on the API container (for Docker Compose, in `.env`
-next to `compose.yaml`):
+hosted provider. The easiest way to connect one is **Manage → Settings → AI
+connections**: fill in the base URL (**including** `/v1`), the model name and,
+for hosted providers, an API key. Changes apply straight away, with no
+restart. Leave a base URL blank to turn that service off. API keys are
+write-only: the page shows that one is saved, never the key itself, and config
+export leaves them out.
+
+You can also set them on the API container (for Docker Compose, in `.env`
+next to `compose.yaml`). **An environment variable wins over the settings
+page**: while `AI_BASE_URL` is set, the AI model is shown read-only there, and
+the same goes for `TTS_BASE_URL` and the speech service.
 
 | Variable | Example | |
 |----------|---------|---|
-| `AI_BASE_URL` | `http://llama:8080/v1` | Base URL **including** `/v1` (or the provider's equivalent). AI features are off when unset. |
+| `AI_BASE_URL` | `http://llama:8080/v1` | Base URL **including** `/v1` (or the provider's equivalent). |
 | `AI_MODEL` | `gemma-4-e4b` | Model name as the server knows it. Required with `AI_BASE_URL`. |
 | `AI_API_KEY` | `sk-…` | Sent as a bearer token. Leave empty for local servers. |
-| `TTS_BASE_URL` | `http://kokoro:8880/v1` | Speech service base URL. Recorded voices are off when unset. |
+| `TTS_BASE_URL` | `http://kokoro:8880/v1` | Speech service base URL. |
 | `TTS_MODEL` | `kokoro` | Defaults to `kokoro`. |
 | `TTS_API_KEY` | | For hosted speech services. |
 
-Restart the API after changing them. **Manage → Settings → AI** shows what's
-connected and has a **Try photo review** box for testing a model on your own
-photos before you rely on it.
+Restart the API after changing environment variables. **Manage → Settings**
+also has a **Try photo review** box for testing a model on your own photos
+before you rely on it. When a speech service is connected (or changed), any
+chore still missing a recording is recorded in the background.
 
 ### Local: the bundled compose profiles
 
@@ -70,14 +80,14 @@ Either profile can run on its own.
 
 ### Local: Ollama, LM Studio, or your own server
 
-Point `AI_BASE_URL` at it. For Ollama that's `http://<host>:11434/v1`, with
+Enter its address under **AI connections** (or point `AI_BASE_URL` at it). For Ollama that's `http://<host>:11434/v1`, with
 a model you've pulled, for example `AI_MODEL=gemma4:e4b` or
 `AI_MODEL=qwen3.5:9b`.
 
 ### Hosted
 
 Use the provider's OpenAI-compatible endpoint, a vision-capable model, and
-`AI_API_KEY`. At household volumes a small hosted model costs very little: a
+an API key. At household volumes a small hosted model costs very little: a
 photo review is a fraction of a cent. **Photos of your home and your kids are
 sent to that provider**, so decide if you're comfortable with that. The local
 options keep everything on your machine.

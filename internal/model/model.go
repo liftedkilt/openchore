@@ -145,6 +145,19 @@ type UserIdentity struct {
 	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
 }
 
+// OIDCProvider is a single sign-on provider added from the admin UI.
+// Scopes is space-separated; empty means "openid profile email".
+type OIDCProvider struct {
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Issuer       string    `json:"issuer"`
+	ClientID     string    `json:"client_id"`
+	ClientSecret string    `json:"-"`
+	Scopes       string    `json:"scopes"`
+	Prompt       string    `json:"prompt"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
 type Chore struct {
 	ID                 int64     `json:"id"`
 	Title              string    `json:"title"`

@@ -414,6 +414,67 @@ export interface AIStatus {
   tts: { configured: boolean; model?: string };
 }
 
+/** Where one OpenAI-compatible service lives. The key is write-only. */
+export interface AIConnection {
+  base_url: string;
+  model: string;
+  api_key_set: boolean;
+  /** Set by AI_BASE_URL / TTS_BASE_URL: read-only in the UI. */
+  from_env: boolean;
+}
+
+export interface AIConfig {
+  ai: AIConnection;
+  tts: AIConnection;
+}
+
+/** One section of an AI config update. Omit api_key to keep the saved one; '' clears it. */
+export interface AIConnectionUpdate {
+  base_url: string;
+  model: string;
+  api_key?: string;
+}
+
+/** A single sign-on provider as the admin Sign-in settings show it. */
+export interface AdminAuthProvider {
+  id: string;
+  name: string;
+  issuer: string;
+  client_id: string;
+  client_secret_set: boolean;
+  scopes: string;
+  prompt: string;
+  /** 'config' = config.yaml or OIDC_* environment variables (read-only). */
+  source: 'config' | 'settings';
+  linked_accounts: number;
+  redirect_uri: string;
+}
+
+export interface SessionLength {
+  hours: number;
+  default_hours: number;
+  from_config: boolean;
+}
+
+export interface AdminAuthConfig {
+  providers: AdminAuthProvider[];
+  callback_base: string;
+  public_url_from_config: boolean;
+  kiosk_session: SessionLength;
+  personal_session: SessionLength;
+}
+
+/** Body of create/update provider. Omit client_secret on update to keep it. */
+export interface AuthProviderInput {
+  id?: string;
+  name: string;
+  issuer: string;
+  client_id: string;
+  client_secret?: string;
+  scopes: string;
+  prompt: string;
+}
+
 export interface AIReviewResult {
   complete: boolean;
   confidence: number;
