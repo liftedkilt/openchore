@@ -1,0 +1,106 @@
+/* Settings → AI: "Try photo review". */
+
+.upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 140px;
+  padding: var(--space-4);
+  border: 1.5px dashed var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: center;
+  overflow: hidden;
+}
+
+.upload:focus-within {
+  outline: 2.5px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.upload > svg {
+  width: 32px;
+  height: 32px;
+}
+
+.upload img {
+  max-width: 100%;
+  max-height: 240px;
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+.uploadDisabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.uploadText {
+  font-size: 14px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.verdict {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.verdictIcon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--done);
+  color: var(--on-done);
+}
+
+.verdictIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.verdictNo {
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px currentColor;
+}
+
+.verdictText {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.confidence {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.feedback {
+  margin: 0;
+  font-size: 15px;
+  line-height: 21px;
+}
+
+.outcome {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-muted);
+}

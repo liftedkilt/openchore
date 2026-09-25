@@ -83,14 +83,13 @@ func (c *Config) WebhookCleanupIntervalHours() int {
 	return c.Webhooks.DeliveryCleanupIntervalHours
 }
 
-// AIConfig holds settings for AI-powered features (LiteRT or Ollama + Kokoro TTS).
+// AIConfig seeds the optional AI settings. Which servers to use comes from
+// the environment (AI_BASE_URL, TTS_BASE_URL, ...), not from here.
 type AIConfig struct {
-	Enabled              bool    `yaml:"enabled"`
-	Endpoint             string  `yaml:"endpoint"`
-	Model                string  `yaml:"model"`
+	PhotoReview          bool    `yaml:"photo_review"`
+	AutoApprove          bool    `yaml:"auto_approve"`
 	AutoApproveThreshold float64 `yaml:"auto_approve_threshold"`
-	TTSEnabled           bool    `yaml:"tts_enabled"`
-	TTSEndpoint          string  `yaml:"tts_endpoint"`
+	WeeklySummary        bool    `yaml:"weekly_summary"`
 	TTSVoice             string  `yaml:"tts_voice"`
 }
 
@@ -101,7 +100,12 @@ type UserConfig struct {
 	// a PIN (or a linked account) to sign in.
 	Pin    string `yaml:"pin,omitempty"`
 	Age    int    `yaml:"age,omitempty"`
-	Theme  string `yaml:"theme,omitempty"`
+	// Theme is the person's skin: sunroom, blocks or tint. The legacy
+	// names default, quest, galaxy and forest are accepted and mapped.
+	Theme string `yaml:"theme,omitempty"`
+	// Color is a person colour key (coral, mint, butter, sky, rose, leaf,
+	// lilac, sand). Empty assigns the next free one.
+	Color  string `yaml:"color,omitempty"`
 	Avatar string `yaml:"avatar,omitempty"`
 }
 

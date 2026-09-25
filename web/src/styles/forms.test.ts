@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+
+// Vitest runs in Node, but the app tsconfig carries no Node types.
+type Fs = { readFileSync: (path: string, encoding: 'utf8') => string };
+type Path = { resolve: (...parts: string[]) => string };
+const fsModule: string = 'node:fs';
+const pathModule: string = 'node:path';
+const { readFileSync } = (await import(/* @vite-ignore */ fsModule)) as Fs;
+const { resolve } = (await import(/* @vite-ignore */ pathModule)) as Path;
 
 // Issue #20 regression tests. CreateChoreWizard and EditChoreModal used to
 // duplicate their form CSS verbatim. The fix extracted the shared rules into

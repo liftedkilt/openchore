@@ -76,7 +76,7 @@ Requires a session or an API token.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/schedules/{id}/complete` | Complete a chore; body may set `completion_date`. Only the assignee or an admin may call it. Points go to the assignee, and an admin completing on someone's behalf doesn't need a photo |
+| `POST` | `/api/schedules/{id}/complete` | Complete a chore; body may set `completion_date`, `photo_url`, and `skip_photo` (finish a photo chore without one; it then waits for approval). Only the assignee or an admin may call it. Points go to the assignee, and an admin completing on someone's behalf doesn't need a photo |
 | `DELETE` | `/api/schedules/{id}/complete?date=YYYY-MM-DD` | Undo a completion (assignee or admin) |
 | `POST` | `/api/upload` | Upload photo proof (multipart) |
 | `PUT` | `/api/completions/{id}/photo` | Attach an uploaded photo to a completion |
@@ -107,9 +107,10 @@ instead of spending balance the moment it lands.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `PUT` | `/api/users/{id}/theme` | Set theme |
+| `PUT` | `/api/users/{id}/theme` | Set your skin: `sunroom`, `blocks` or `tint` |
 | `PUT` | `/api/users/{id}/avatar` | Set avatar URL |
 | `PUT` | `/api/users/{id}/line-color` | Set the ambient graph line color |
+| `PUT` | `/api/users/{id}/color` | Set your person colour: `coral`, `mint`, `butter`, `sky`, `rose`, `leaf`, `lilac` or `sand` |
 | `PUT` | `/api/users/{id}/pin` | Set a profile PIN |
 | `DELETE` | `/api/users/{id}/pin` | Clear the profile PIN |
 
@@ -143,7 +144,7 @@ Requires an authenticated caller with the `admin` role.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/completions/pending` | Completions awaiting review |
+| `GET` | `/api/completions/pending` | Completions awaiting review, newest first: the chore (`chore_id`, `chore_title`, `category`, `icon`, `points_value`), whose it is (`assigned_user_id`) and who ticked it off (`completed_by`, `child_name`), `photo_url` with the chore's `requires_photo` and `photo_source` (an empty `photo_url` on a `child` photo chore means the photo was skipped; for `external`/`both` it may still arrive), `completion_date`, `completed_at`, and the AI photo review's advisory note once it has run (`ai_feedback`, `ai_confidence`, `ai_complete`) |
 | `POST` | `/api/completions/{id}/approve` | Approve, releasing points |
 | `POST` | `/api/completions/{id}/reject` | Reject |
 
@@ -180,16 +181,17 @@ Requires an authenticated caller with the `admin` role.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/admin/reports` | Analytics data behind the reports page |
-| `GET` | `/api/admin/reports/ai-summary` | Narrative summary of a kid's week |
+| `GET` | `/api/admin/reports/ai-summary?user_id=&period=&date=` | Narrative summary of someone's period; a finished week's summary is generated once and kept |
 | `GET` `PUT` | `/api/admin/settings/{key}` | Read / write a setting (secrets such as `session_secret` are not readable) |
 | `GET` | `/api/admin/export-config` | Export current configuration as YAML |
-| `POST` | `/api/admin/ai/test` | Test photo review against an image |
-| `POST` | `/api/admin/ai/tts` | Synthesize speech for arbitrary text |
-| `POST` | `/api/admin/ai/tts-sync` | Kick off a TTS sync pass |
-| `POST` | `/api/admin/ai/generate-description` | Draft a chore description |
-| `POST` | `/api/admin/ai/suggest-points` | Suggest a point value for a chore |
-| `POST` | `/api/chores/{id}/tts/regenerate` | Regenerate one chore's audio |
-| `POST` | `/api/chores/{id}/tts/generate-description` | Regenerate one chore's spoken description |
+| `GET` | `/api/admin/ai/status` | Which optional AI services are configured (`{"ai": {"configured", "model"}, "tts": {...}}`) |
+| `POST` | `/api/admin/ai/test` | Run photo review on an uploaded image without saving anything |
+| `POST` | `/api/admin/ai/generate-description` | Draft a kid-friendly chore description |
+| `POST` | `/api/admin/tts/regenerate` | Re-record every chore's read-aloud audio (e.g. after a voice change) |
+| `POST` | `/api/chores/{id}/tts/regenerate` | Re-record one chore's audio |
+
+The AI endpoints return `503` when no model or speech service is configured.
+See [AI features](ai.md).
 
 ---
 
@@ -210,6 +212,7 @@ attempt is recorded in the delivery log.
 | `points.decayed` | Daily decay debits a balance (payload reports any points reclaimed from savings goals) |
 | `chore.missed` | A chore ends the day unfinished |
 | `chore.fcfs_completed` | A first-come-first-served chore is claimed |
+| `report.weekly_summary` | The AI wrote someone's summary of last week (`user_id`, `user_name`, `week_start`, `week_end`, `summary`) |
 | `auth.profile_pin.verified` `auth.profile_pin.failed` `auth.profile_pin.changed` `auth.profile_pin.cleared` | Profile PIN activity, including PIN sign-ins |
 | `auth.oidc.login` | Someone signed in with a linked account |
 | `auth.identity.linked` `auth.identity.unlinked` | A linked account was added or removed |

@@ -14,36 +14,16 @@
         "admin_adjust": "Admin-Anpassung",
         "chore_complete": "Aufgabe erledigt",
         "chore_uncomplete": "Aufgabe zurückgesetzt",
+        "commit_to_goal": "Für ein Ziel gespart",
         "expiry_penalty": "Verspätungsabzug",
+        "goal_break": "Ersparnis zurückgebucht",
         "missed_chore": "Abzug für verpasste Aufgabe",
         "points_decay": "Punkte verfallen",
         "reward_redeem": "Belohnung eingelöst",
         "streak_bonus": "Streak-Bonus"
       },
-      "title": "Aktivitätsprotokoll",
+      "title": "Aktivität",
       "undoTitle": "Dieses Ereignis rückgängig machen"
-    },
-    "aiChoreChecker": {
-      "ariaGenerateAudio": "Audio generieren",
-      "ariaListenFeedback": "Feedback anhören",
-      "buttonTestReview": "Prüfung testen",
-      "buttonWorking": "Wird verarbeitet...",
-      "choosePhoto": "Foto auswählen...",
-      "confidence": "Sicherheit: {{value}}%",
-      "description": "Gib einen Aufgabennamen ein, mache ein Foto und sieh dir an, wie die KI es bewertet — inklusive Kokoro-TTS-Audio.",
-      "errorTestFailed": "Test fehlgeschlagen",
-      "errorTtsFailed": "TTS fehlgeschlagen: {{message}}",
-      "errorUnknown": "Unbekannter Fehler",
-      "heading": "KI-Aufgabenprüfer",
-      "labelChoreName": "Aufgabenname",
-      "labelPhoto": "Foto",
-      "photoPreviewAlt": "Vorschau",
-      "placeholderChoreName": "z. B. Spielzeug aufräumen, Bett machen, Küche putzen",
-      "resultApproved": "Genehmigt",
-      "resultRejected": "Abgelehnt",
-      "stepAnalyzing": "KI analysiert Foto",
-      "stepGeneratingAudio": "Audio wird generiert",
-      "stepUploading": "Foto wird hochgeladen"
     },
     "apiTokens": {
       "addButton": "Hinzufügen",
@@ -68,24 +48,34 @@
       "tokenNamePlaceholder": "z. B. Home Assistant, CI-Pipeline"
     },
     "approvalsTab": {
+      "aiConfidence": "{{value}} % sicher",
+      "aiLooksDone": "KI: sieht erledigt aus",
+      "aiLooksNotDone": "KI: sieht nicht erledigt aus",
       "approveButton": "Genehmigen",
+      "cardLabel": "{{title}} für {{name}}",
       "emptyState": "Alles erledigt! Keine ausstehenden Freigaben.",
       "loading": "Wird geladen...",
+      "noPhotoSkipped": "Ohne Foto erledigt",
+      "noPhotoSkippedHint": "{{name}} hat das Foto übersprungen, also schau selbst nach.",
+      "noPhotoYet": "Noch kein Foto",
+      "noPhotoYetHint": "Das Foto kann noch von einem anderen Gerät hinzugefügt werden.",
+      "openPhoto": "Foto öffnen",
       "photoAlt": "Nachweis",
       "rejectButton": "Ablehnen",
       "rejectConfirm": "Möchtest du wirklich ablehnen?",
-      "title": "Ausstehende Freigaben",
+      "tickedOffBy": "Abgehakt von {{name}}",
+      "title": "Freigaben",
       "waitingForReview_one": "{{count}} Aufgabe wartet auf Prüfung",
       "waitingForReview_other": "{{count}} Aufgaben warten auf Prüfung"
     },
     "choresTab": {
       "addChore": "Aufgabe hinzufügen",
       "confirmDelete": "Aufgabe \"{{name}}\" löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
-      "deleteAriaLabel": "Aufgabe löschen",
+      "deleteAriaLabel": "{{name}} löschen",
       "deleteTitle": "Löschen",
-      "editAriaLabel": "Aufgabe bearbeiten",
       "editTitle": "Bearbeiten",
-      "heading": "Alle Aufgaben",
+      "empty": "Noch keine Aufgaben. Leg die erste an.",
+      "heading": "Aufgaben",
       "minutes_one": "{{count}} Min.",
       "minutes_other": "{{count}} Min.",
       "points_one": "{{count}} Pkt.",
@@ -93,21 +83,25 @@
       "requiresApprovalLabel": "Freigabe",
       "requiresApprovalTitle": "Freigabe erforderlich",
       "requiresPhotoLabel": "Foto",
-      "requiresPhotoTitle": "Foto erforderlich"
+      "requiresPhotoTitle": "Foto erforderlich",
+      "subtitle_one": "{{count}} Aufgabe",
+      "subtitle_other": "{{count}} Aufgaben"
+    },
+    "colors": {
+      "butter": "Butter",
+      "coral": "Koralle",
+      "leaf": "Blatt",
+      "lilac": "Flieder",
+      "mint": "Minze",
+      "rose": "Rosa",
+      "sand": "Sand",
+      "sky": "Himmel"
     },
     "createChore": {
       "ai": {
         "aiLabel": "KI",
-        "apply": "Übernehmen",
         "generateTitle": "Mit KI generieren",
-        "generating": "Wird generiert...",
-        "suggesting": "KI-Vorschlag wird geladen...",
-        "suggestion": "KI schlägt vor: {{points}} Pkt., ca. {{minutes}} Min."
-      },
-      "category": {
-        "bonus": "Bonus",
-        "core": "Kern",
-        "required": "Pflicht"
+        "generating": "Wird generiert..."
       },
       "error": {
         "createFailed": "Aufgabe konnte nicht erstellt werden",
@@ -155,7 +149,6 @@
         "available": "Verfügbar",
         "categoryLabel": "Kategorie",
         "choreDetails": "Aufgabendetails",
-        "descLabel": "Beschreibung",
         "dueBy": "Fällig bis",
         "edit": "Bearbeiten",
         "flagApproval": "Freigabe",
@@ -172,7 +165,6 @@
         "pts": "Pkt.",
         "scheduleTitle": "Zeitplan",
         "timeLabel": "Zeit",
-        "titleLabel": "Titel",
         "when": "Wann"
       },
       "schedule": {
@@ -187,6 +179,7 @@
         "ifMissed": "Wenn verpasst",
         "intervalSuffix": "Tage, beginnend am",
         "repeatEvery": "Wiederholen alle",
+        "startDate": "Startdatum",
         "typeLabel": "Zeitplantyp"
       },
       "scheduleType": {
@@ -203,23 +196,20 @@
     },
     "dashboard": {
       "backToMyChores": "Zurück zu den Aufgaben von {{name}}",
+      "navLabel": "Bereiche",
       "quickAssign": "Schnell zuweisen",
       "reports": "Berichte",
-      "tabAi": "KI",
       "tabApprovals": "Freigaben",
       "tabChores": "Aufgaben",
-      "tabKids": "Kinder",
+      "tabKids": "Heute",
       "tabLog": "Protokoll",
       "tabPeople": "Personen",
       "tabPoints": "Punkte",
       "tabRewards": "Belohnungen",
-      "title": "Admin"
+      "tabSettings": "Einstellungen",
+      "title": "Verwalten"
     },
     "editChore": {
-      "categoryBonus": "Bonus",
-      "categoryCore": "Haupt",
-      "categoryRequired": "Pflicht",
-      "generatingLabel": "Wird generiert…",
       "labelCategory": "Kategorie",
       "labelDescription": "Beschreibung",
       "labelIcon": "Symbol",
@@ -227,7 +217,6 @@
       "labelPenalty": "Abzug",
       "labelPhotoSource": "Fotoquelle",
       "labelPoints": "Punkte",
-      "labelTTSDescription": "Gesprochene Beschreibung (TTS-Prompt)",
       "labelTitle": "Titel",
       "modalTitle": "Bearbeiten: {{title}}",
       "photoSourceBoth": "Extern mit manuellem Fallback",
@@ -242,13 +231,9 @@
       "savedLabel": "Gespeichert",
       "savingLabel": "Wird gespeichert...",
       "sectionDetails": "Aufgabendetails",
-      "sectionTTS": "Kokoro TTS",
-      "suggestTextBtn": "Text vorschlagen",
-      "suggestTextTitle": "Neue gesprochene Beschreibung mit KI generieren",
-      "ttsClickPreview": "Klicken, um generiertes Audio vorzuhören",
-      "ttsDescriptionPlaceholder": "Was soll die TTS-Stimme für diese Aufgabe sagen?",
-      "ttsGenerateDescError": "Beschreibung konnte nicht generiert werden",
-      "ttsNoAudio": "Für diese Aufgabe wurde noch kein TTS-Audio generiert.",
+      "sectionTTS": "Vorlese-Audio",
+      "ttsClickPreview": "Liest Titel und Beschreibung vor",
+      "ttsNoAudio": "Noch kein Audio. Es wird automatisch aus Titel und Beschreibung aufgenommen.",
       "ttsPauseAriaLabel": "TTS-Audio pausieren",
       "ttsPauseTitle": "Pausieren",
       "ttsPlayAriaLabel": "TTS-Audio abspielen",
@@ -258,28 +243,83 @@
       "ttsRegenerateError": "TTS konnte nicht neu generiert werden",
       "ttsRegeneratedLabel": "Neu generiert"
     },
+    "exportConfig": {
+      "descriptionAfter": " mit dem aktuellen Stand der Datenbank herunter, um einen neuen Server einzurichten.",
+      "descriptionBefore": "Lade eine ",
+      "download": "config.yaml herunterladen",
+      "exporting": "Wird exportiert …",
+      "sections": {
+        "chores": "Aufgaben und Zeitpläne",
+        "rewards": "Belohnungen",
+        "settings": "Einstellungen",
+        "streak_rewards": "Streak-Meilensteine",
+        "users": "Personen"
+      },
+      "sectionsLabel": "Was soll enthalten sein?",
+      "title": "Konfiguration exportieren"
+    },
+    "iconPicker": {
+      "autoShort": "Auto",
+      "automatic": "Automatisch: {{icon}}",
+      "automaticOption": "Automatisch (nach Kategorie)",
+      "choose": "Symbol wählen",
+      "hide": "Fertig",
+      "legacy": "{{icon}} (aus einem alten Emoji-Symbol)"
+    },
+    "icons": {
+      "back": "Zurück",
+      "bed": "Bett",
+      "bike": "Fahrrad",
+      "bin": "Mülleimer",
+      "book": "Buch",
+      "bowl": "Schüssel",
+      "broom": "Besen",
+      "cal": "Kalender",
+      "camera": "Kamera",
+      "check": "Haken",
+      "chev": "Weiter",
+      "clock": "Uhr",
+      "cone": "Eis",
+      "dish": "Geschirr",
+      "film": "Film",
+      "fish": "Fisch",
+      "flame": "Flamme",
+      "gift": "Geschenk",
+      "home": "Zuhause",
+      "lock": "Schloss",
+      "moon": "Mond",
+      "paw": "Haustier",
+      "people": "Personen",
+      "piano": "Musik",
+      "plus": "Hinzufügen",
+      "rocket": "Rakete",
+      "screen": "Bildschirm",
+      "shirt": "Kleidung",
+      "sound": "Ton",
+      "spark": "Funkeln",
+      "sprout": "Pflanze",
+      "star": "Stern",
+      "table": "Tisch",
+      "tooth": "Zahnbürste",
+      "toy": "Spielzeug"
+    },
     "kidsStatusTab": {
       "allDone": "Alles erledigt",
       "awaitingApproval_one": "{{count}} wartet auf Freigabe",
       "awaitingApproval_other": "{{count}} warten auf Freigabe",
-      "bonusHint": "Bonus wird freigeschaltet, wenn Pflicht + Hauptaufgaben erledigt sind",
-      "categoryBonus": "Bonus",
-      "categoryCore": "Haupt",
-      "categoryRequired": "Pflicht",
+      "bonusHint": "Bonus öffnet sich, wenn alle Pflicht- und Jeden-Tag-Aufgaben erledigt sind",
+      "catCount": "{{done}} von {{total}}",
       "childLoadError": "Die Aufgaben dieses Kindes konnten nicht geladen werden.",
       "confirmUndo": "„{{title}}“ für {{name}} rückgängig machen? Die dafür erhaltenen Punkte werden abgezogen.",
       "excuseButton": "Entschuldigen",
       "excuseButtonTooltip": "Diese Aufgabe entschuldigen und Strafe erlassen",
       "excusePrompt": "\"{{title}}\" für heute entschuldigen? Optionalen Grund eingeben (z. B. krank, Wetter, Reise):",
-      "heading": "Übersicht - Kinder",
-      "labelBonus": "Bonus",
-      "labelCore": "Kern",
-      "labelRequired": "Pflicht",
+      "heading": "Heute",
       "loadError": "Übersicht konnte nicht geladen werden. Bitte aktualisieren.",
       "loading": "Wird geladen...",
       "markDone": "„{{title}}“ für {{name}} als erledigt markieren",
       "markNotDone": "„{{title}}“ für {{name}} rückgängig machen",
-      "noChildren": "Keine Kinder konfiguriert. Füge im Tab \"Personen\" ein Kind hinzu, um hier den Status zu sehen.",
+      "noChildren": "Noch hat niemand Aufgaben. Füge unter „Personen“ jemanden hinzu, um hier seinen Tag zu sehen.",
       "noChoresScheduled": "Heute keine Aufgaben geplant",
       "noChoresScheduledDetail": "Für heute sind keine Aufgaben geplant.",
       "overdue_one": "{{count}} Aufgabe überfällig",
@@ -289,6 +329,7 @@
       "pendingToday_other": "{{count}} Aufgaben heute noch offen",
       "points_one": "{{count}} Pkt.",
       "points_other": "{{count}} Pkt.",
+      "progress": "{{done}} von {{total}} erledigt",
       "refreshLabel": "Aktualisieren",
       "refreshTitle": "Aktualisieren",
       "statusDone": "+{{points}}",
@@ -298,9 +339,31 @@
       "statusPending": "Ausstehend",
       "streak_one": "{{count}} Tages-Streak",
       "streak_other": "{{count}} Tage-Streak",
-      "subtitle": "Heutiger Fortschritt auf einen Blick — {{date}}",
+      "subtitle": "Der Tag aller auf einen Blick, {{date}}",
       "tapHint": "Tippe auf eine Person, um die heutigen Aufgaben zu sehen. Tippe auf den Kreis einer Aufgabe, um sie für sie zu erledigen.",
-      "toggleError": "„{{title}}“ konnte nicht aktualisiert werden: {{error}}"
+      "toggleError": "„{{title}}“ konnte nicht aktualisiert werden: {{error}}",
+      "waitingHeading": "Wartet auf dich"
+    },
+    "modal": {
+      "close": "Schließen"
+    },
+    "photoReviewTester": {
+      "buttonTest": "Foto prüfen",
+      "buttonWorking": "Wird geprüft...",
+      "choosePhoto": "Foto auswählen...",
+      "confidence": "Sicherheit: {{value}} %",
+      "description": "Lade ein Foto hoch und sieh, wie das eingestellte Modell es bewertet. Es wird nichts gespeichert.",
+      "elapsed": "dauerte {{seconds}} s",
+      "errorTestFailed": "Prüfung fehlgeschlagen",
+      "heading": "Fotoprüfung ausprobieren",
+      "labelChoreName": "Name der Aufgabe",
+      "labelPhoto": "Foto",
+      "looksDone": "Sieht erledigt aus",
+      "looksNotDone": "Sieht nicht erledigt aus",
+      "photoPreviewAlt": "Vorschau",
+      "placeholderChoreName": "z. B. Spielzeug aufräumen, Bett machen, Küche putzen",
+      "wouldApprove": "Würde automatisch bestätigt",
+      "wouldWait": "Würde auf ein Elternteil warten"
     },
     "pointsTab": {
       "adjustButton": "Anpassen",
@@ -308,24 +371,25 @@
       "amountPlaceholder": "+10 oder -5",
       "applyButton": "Übernehmen",
       "cancelButton": "Abbrechen",
-      "heading": "Punktestände",
+      "heading": "Punkte",
       "reasonLabel": "Grund",
-      "reasonPlaceholder": "Warum?"
+      "reasonPlaceholder": "Warum?",
+      "subtitle": "Jede Änderung steht im Aktivitätsprotokoll."
     },
     "rewardsTab": {
-      "active": "Aktiv",
       "add": "Hinzufügen",
       "addMilestone": "Meilenstein hinzufügen",
       "addReward": "Belohnung hinzufügen",
-      "allKids": "Alle Kinder (keine Einschränkungen)",
+      "allKids": "Alle",
       "ariaDeleteReward": "Belohnung löschen",
       "ariaDeleteStreakReward": "Streak-Belohnung löschen",
       "ariaEditReward": "Belohnung bearbeiten",
-      "assignmentHintAll": "Keine Einschränkungen — alle Kinder können diese Belohnung sehen.",
-      "assignmentHintRestricted": "Nur markierte Kinder können diese Belohnung sehen.",
+      "assignmentHintAll": "Keine Einschränkung: Alle sehen diese Belohnung.",
+      "assignmentHintRestricted": "Nur die hier angehakten Personen sehen diese Belohnung.",
       "bonusPts": "Bonus-Punkte",
       "cancel": "Abbrechen",
       "create": "Erstellen",
+      "customCostLabel": "Preis für {{name}}",
       "customCostPlaceholder": "{{cost}} (Standard)",
       "editRewardTitle": "Belohnung bearbeiten",
       "fieldCost": "Kosten (Pkt.)",
@@ -333,7 +397,6 @@
       "fieldDescription": "Beschreibung",
       "fieldDescriptionPlaceholder": "Was bekommen sie?",
       "fieldIcon": "Symbol",
-      "fieldIconPlaceholder": "Emoji",
       "fieldName": "Name",
       "fieldNamePlaceholder": "z. B. Eis essen gehen",
       "fieldShareableLabel": "Teilbar / Familienziel — mehrere Kinder können gemeinsam Punkte sammeln",
@@ -343,29 +406,36 @@
       "inStock_one": "{{count}} verfügbar",
       "inStock_other": "{{count}} verfügbar",
       "inactive": "Inaktiv",
-      "kidsAssigned_one": "{{count}} Kind zugewiesen",
-      "kidsAssigned_other": "{{count}} Kindern zugewiesen",
+      "kidsAssigned_one": "{{count}} Person",
+      "kidsAssigned_other": "{{count}} Personen",
       "newRewardTitle": "Neue Belohnung",
       "noRewards": "Noch keine Belohnungen",
       "noStreakMilestones": "Noch keine Streak-Meilensteine",
       "pts": "Pkt.",
       "ptsLabel": "Pkt.",
-      "rewardsStoreTitle": "Belohnungs-Shop",
+      "rewardsStoreTitle": "Belohnungen",
       "saveAssignments": "Zuweisungen speichern",
+      "shareable": "Familienziel",
+      "streakDays_one": "{{count}} Tag",
+      "streakDays_other": "{{count}} Tage",
       "streakFieldBonusPts": "Bonus-Pkt.",
       "streakFieldDays": "Tage",
       "streakFieldLabel": "Bezeichnung",
       "streakFieldLabelPlaceholder": "z. B. Wochenheld!",
       "streakMilestonesTitle": "Streak-Meilensteine",
+      "streakSubtitle": "Bonuspunkte für Tage am Stück.",
+      "subtitle": "Was man sich mit Punkten holen kann.",
       "unlimited": "Unbegrenzt",
       "update": "Aktualisieren"
     },
     "scheduleManager": {
       "ariaDeleteSchedule": "Zeitplan löschen",
       "availableAtTitle": "Aufgabe erscheint erst ab dieser Uhrzeit. Leer lassen für keine Zeitsperre.",
+      "btnAdd": "Zeitplan hinzufügen",
       "btnAll": "Alle",
       "btnAssign": "Zuweisen",
-      "btnAssignMultiple": "{{count}} Kindern zuweisen",
+      "btnAssignMultiple": "{{count}} Personen zuweisen",
+      "btnCancel": "Abbrechen",
       "displayDeductIfLate": "(-{{points}} Pkt. bei Verspätung)",
       "displayDue": "fällig um {{time}}",
       "displayFrom": "ab {{time}}",
@@ -401,16 +471,23 @@
     },
     "settingsTab": {
       "ai": {
-        "description": "Verwende KI, um Fotos von erledigten Aufgaben automatisch zu prüfen. Wenn aktiviert, werden hochgeladene Fotos analysiert, bevor eine Aufgabe als erledigt markiert wird.",
-        "enableLabel": "KI-Fotoprüfung aktivieren",
+        "aiNotConfigured": "Nur ein Sprachdienst ist eingerichtet (TTS_BASE_URL). Setze AI_BASE_URL und AI_MODEL für Fotoprüfung und Berichte.",
+        "autoApproveLabel": "Eindeutige Fälle automatisch bestätigen",
+        "description": "Verwendet {{model}}. Die KI berät nur – sie lehnt nie eine Aufgabe ab.",
+        "notConfigured": "Es ist kein KI-Dienst eingerichtet. Für Fotoprüfung, Aufgabenbeschreibungen, Wochenberichte oder aufgenommene Vorlesestimmen verweise den Server auf ein OpenAI-kompatibles Modell (AI_BASE_URL und AI_MODEL) oder einen Sprachdienst (TTS_BASE_URL). Ohne sie liest die Stimme des Geräts die Aufgaben vor.",
+        "photoReviewHelp": "Kommt eine bestätigungspflichtige Aufgabe mit Foto herein, fügt die KI unter Bestätigungen einen Hinweis hinzu.",
+        "photoReviewLabel": "Fotos zur Bestätigung prüfen",
         "saveButton": "KI-Einstellungen speichern",
         "saveError": "KI-Einstellungen konnten nicht gespeichert werden",
         "saveSuccess": "KI-Einstellungen gespeichert",
-        "savingButton": "Wird gespeichert...",
-        "thresholdHelp": "Fotos mit einer Sicherheit über diesem Schwellenwert werden automatisch genehmigt. Niedrigere Werte sind großzügiger.",
-        "thresholdLabel": "Schwellenwert für Auto-Genehmigung (0 – 1)",
-        "title": "KI-Fotoprüfung",
-        "ttsLabel": "TTS-Beschreibungen für Aufgaben generieren"
+        "savingButton": "Speichern...",
+        "thresholdHelp": "Wie sicher die KI sein muss, dass eine Aufgabe erledigt ist, bevor sie sie ohne dich bestätigt. Alles darunter wartet auf dich.",
+        "thresholdLabel": "Sicherheit für automatische Bestätigung",
+        "title": "KI",
+        "voiceHelp": "Eine Stimme deines Sprachdiensts, z. B. af_heart für Kokoro oder alloy für OpenAI. Eine Änderung nimmt alle Aufgaben neu auf.",
+        "voiceLabel": "Vorlesestimme",
+        "weeklySummaryHelp": "Fasst jeden Montag die vergangene Woche aller zusammen und teilt sie über Discord und den Webhook report.weekly_summary.",
+        "weeklySummaryLabel": "Wochenbericht schreiben"
       },
       "baseUrl": {
         "description": "Die öffentliche URL dieses Servers (z. B. ",
@@ -441,7 +518,9 @@
         "providersConfigured": "Auf diesem Server eingerichtete Single-Sign-on-Anbieter:",
         "title": "Anmeldung"
       },
+      "subtitle": "Server, Benachrichtigungen, Fotoprüfung und Integrationen.",
       "webhooks": {
+        "active": "Aktiv",
         "addButton": "Hinzufügen",
         "allEvents": "Alle Ereignisse",
         "deleteAriaLabel": "Webhook löschen",
@@ -470,7 +549,8 @@
           "profilePinVerified": "Profil-PIN verifiziert",
           "redeemed": "Eingelöst",
           "streak": "Streak",
-          "uncompleted": "Zurückgesetzt"
+          "uncompleted": "Zurückgesetzt",
+          "weeklySummary": "Wochenbericht"
         },
         "form": {
           "cancelButton": "Abbrechen",
@@ -482,14 +562,31 @@
           "urlLabel": "URL",
           "urlPlaceholder": "https://..."
         },
+        "inactive": "Aus",
         "signed": "Signiert",
         "title": "Webhooks"
       }
     },
+    "skins": {
+      "blocks": {
+        "desc": "Kräftig und klobig",
+        "name": "Blocks"
+      },
+      "sunroom": {
+        "desc": "Warm und weich",
+        "name": "Sunroom"
+      },
+      "tint": {
+        "desc": "Ruhig und dunkel",
+        "name": "Tint"
+      }
+    },
     "triggerManager": {
+      "addBtn": "Trigger hinzufügen",
       "assignmentTypeFcfs": "Wer zuerst kommt, mahlt zuerst",
       "assignmentTypeIndividual": "individuell",
       "assignmentTypeLabel": "Zuweisungstyp",
+      "cancelBtn": "Abbrechen",
       "clickToCopy": "Zum Kopieren klicken",
       "cooldownHelp": "0 = keine Abklingzeit",
       "cooldownLabel": "Abklingzeit (Minuten)",
@@ -514,6 +611,7 @@
       "metaAssigned": "Zugewiesen: {{name}}",
       "metaCooldown": "Abklingzeit: {{minutes}} Min.",
       "metaDue": "Fällig: {{time}}",
+      "paused": "Pausiert",
       "saveBtn": "Speichern",
       "sectionTitle": "Trigger-URLs"
     },
@@ -537,6 +635,7 @@
       "editUserAriaLabel": "Benutzer bearbeiten",
       "fieldAge": "Alter",
       "fieldAgePlaceholder": "Optional",
+      "fieldColor": "Farbe",
       "fieldName": "Name",
       "fieldNamePlaceholder": "Name",
       "fieldPinHelp": "Sie kann später im eigenen Profil geändert werden.",
@@ -544,7 +643,7 @@
       "fieldPinPlaceholder": "4–8 Ziffern",
       "fieldPinRequired": "PIN (für Eltern erforderlich)",
       "fieldRole": "Rolle",
-      "fieldTheme": "Theme",
+      "fieldSkin": "Stil",
       "formEditTitle": "Person bearbeiten",
       "formNewTitle": "Neue Person",
       "linkedAccountsTitle": "Verknüpfte Konten",
@@ -554,26 +653,17 @@
       "pinFormat": "Die PIN muss aus 4–8 Ziffern bestehen",
       "pinRequiredForParent": "Eltern brauchen eine PIN (oder ein verknüpftes Konto), um sich anzumelden.",
       "resetPinTitle": "Profil-PIN zurücksetzen",
-      "roleAdmin": "Admin",
+      "roleAdmin": "Elternteil",
       "roleChild": "Kind",
       "saveBtn": "Speichern",
-      "sectionTitle": "Familienmitglieder",
-      "themeDefault": "🌊 Klassisch",
-      "themeForest": "🌲 Wald",
-      "themeGalaxy": "🚀 Galaxie",
-      "themeQuest": "⚔️ Expedition",
+      "sectionTitle": "Personen",
+      "skinDisplay": "Stil: {{skin}}",
+      "skinSuggested": "Passend zum Alter vorgeschlagen. Jederzeit änderbar.",
+      "subtitle": "Die ganze Familie, mit Farbe und Stil.",
       "unpauseAriaLabel": "Benutzer fortsetzen",
       "unpauseTitle": "Fortsetzen (Aufgaben wieder aufnehmen)",
       "updateBtn": "Aktualisieren"
     }
-  },
-  "ambient": {
-    "choresDone": "Aufgaben erledigt",
-    "ptsToday_one": "{{count}} Pkt. heute",
-    "ptsToday_other": "{{count}} Pkt. heute",
-    "streakDays_one": "{{count}} T.",
-    "streakDays_other": "{{count}} T.",
-    "todaysProgress": "Heutiger Fortschritt"
   },
   "common": {
     "back": "Zurück",
@@ -610,128 +700,6 @@
     "save": "Speichern"
   },
   "dashboard": {
-    "avatarPicker": {
-      "preview": "Avatar-Vorschau",
-      "save": "Speichern",
-      "shuffle": "Zufällig",
-      "title": "Wähle dein Aussehen"
-    },
-    "avatarStyles": {
-      "adventure": "Abenteuer",
-      "bigEars": "Große Ohren",
-      "classic": "Klassisch",
-      "doodle": "Kritzelei",
-      "emoji": "Emoji",
-      "glass": "Glas",
-      "lorelei": "Lorelei",
-      "pixel": "Pixel",
-      "robots": "Roboter",
-      "shapes": "Formen",
-      "sketch": "Skizze",
-      "thumbs": "Daumen"
-    },
-    "chore": {
-      "completedBy": "Erledigt von {{name}}",
-      "expired": "Abgelaufen",
-      "expiredAt": "Abgelaufen um {{time}}",
-      "latePenalty": "Verspätet (-{{value}} Pkt.)",
-      "lateZeroPts": "Verspätet (0 Pkt.)",
-      "listenToFeedback": "Feedback anhören",
-      "markComplete": "Als erledigt markieren",
-      "markIncomplete": "Als nicht erledigt markieren",
-      "pts": "Pkt.",
-      "ptsPending": "Pkt. ausstehend",
-      "readAloud": "{{title}} vorlesen",
-      "swipeDone": "Erledigt!",
-      "swipeUndo": "Rückgängig",
-      "uploadPhotoProof": "Fotobeweis hochladen"
-    },
-    "daily": {
-      "comingUpLater": "Heute noch"
-    },
-    "errors": {
-      "alreadyHasGoal": "Du hast bereits ein persönliches Ziel — schließe es zuerst ab oder ändere es",
-      "breakPersonalConfirm": "Sparen beenden? Deine gesparten Punkte gehen zurück auf dein verfügbares Guthaben.",
-      "breakSharedConfirm": "Dieses Familienziel verlassen? Dein Beitrag geht zurück auf dein verfügbares Guthaben.",
-      "couldNotCancelGoal": "Ziel konnte nicht abgebrochen werden — bitte erneut versuchen",
-      "couldNotSave": "Konnte nicht gespeichert werden — bitte erneut versuchen",
-      "couldNotStartSaving": "Sparen konnte nicht gestartet werden — bitte erneut versuchen",
-      "couldntSave": "Konnte nicht gespeichert werden — bitte erneut versuchen",
-      "enterPoints": "Gib eine Anzahl an Punkten ein, die hinzugefügt werden soll",
-      "goalCancelled": "Ziel abgebrochen — Punkte sind wieder in deinem Guthaben",
-      "leftFamilyGoal": "Familienziel verlassen — dein Anteil ist zurück",
-      "notEnoughPoints": "Du hast nur {{balance}} verfügbar",
-      "redemptionFailed": "Einlösen fehlgeschlagen — bitte erneut versuchen",
-      "savedMore": "{{amount}} mehr gespart!"
-    },
-    "goal": {
-      "addPointsPlaceholder": "Punkte hinzufügen (max. {{max}})",
-      "autoSave": "Automatisch sparen",
-      "familyGoal": "Familienziel",
-      "fullyFunded": "Vollständig finanziert 🎉",
-      "leaveGoal": "Ziel verlassen",
-      "ready": "Bereit!",
-      "redeemNow": "Jetzt einlösen",
-      "save": "Sparen",
-      "savingToward": "Sparen für",
-      "stopSaving": "Sparen beenden",
-      "tapRedeem": "Zum Einlösen tippen 🎉",
-      "tapToRedeem": "Zum Einlösen tippen 🎉",
-      "toGo": "Noch {{remaining}}",
-      "you": "Du",
-      "youContrib": "du: {{amount}}"
-    },
-    "header": {
-      "changeAvatar": "Avatar ändern",
-      "changeLineColor": "Linienfarbe ändern",
-      "changePIN": "PIN ändern",
-      "changeTheme": "Theme ändern",
-      "disableReadAloud": "Vorlesen deaktivieren",
-      "enableReadAloud": "Vorlesen aktivieren",
-      "linkedAccounts": "Verknüpfte Konten",
-      "logout": "Abmelden",
-      "manage": "Verwalten",
-      "setPIN": "PIN festlegen"
-    },
-    "lineColors": {
-      "cyan": "Cyan",
-      "green": "Grün",
-      "indigo": "Indigo",
-      "lavender": "Lavendel",
-      "magenta": "Magenta",
-      "mint": "Mint",
-      "orange": "Orange",
-      "pink": "Pink",
-      "red": "Rot",
-      "sky": "Himmelblau",
-      "white": "Weiß",
-      "yellow": "Gelb"
-    },
-    "nav": {
-      "rewards": "Belohnungen",
-      "today": "Heute",
-      "week": "Woche"
-    },
-    "paused": {
-      "text": "Genieße deine Auszeit. Deine Aufgaben sind pausiert und während deiner Abwesenheit werden keine Punkte abgezogen.",
-      "title": "Du machst gerade Pause!"
-    },
-    "progress": {
-      "ofComplete": "{{completed}} von {{available}} erledigt"
-    },
-    "qr": {
-      "copied": "Kopiert!",
-      "copyLink": "Link kopieren",
-      "helpAddPhoto": "Lade ein Foto hoch, um einen Nachweis für diese Aufgabe hinzuzufügen.",
-      "helpComplete": "Deine Aufgabe wird automatisch abgeschlossen, sobald du das Foto hochlädst.",
-      "scanOrUpload": "Scanne diesen Code mit einem anderen Gerät oder lade direkt von diesem Gerät hoch.",
-      "takePhoto": "Foto auf diesem Gerät aufnehmen",
-      "titleAddPhoto": "Fotobeweis hinzufügen",
-      "titlePhotoNeeded": "Fotobeweis erforderlich",
-      "uploadFailed": "Upload fehlgeschlagen",
-      "uploading": "Wird hochgeladen...",
-      "waiting": "Warte auf Foto..."
-    },
     "quickAssign": {
       "btnAssign": "Zuweisen",
       "btnAssigning": "Wird zugewiesen...",
@@ -747,42 +715,340 @@
       "labelWhen": "Wann",
       "labelWho": "Wer",
       "title": "Schnell zuweisen"
+    }
+  },
+  "design": {
+    "avatar": {
+      "noName": "Jemand"
+    },
+    "category": {
+      "essential": "Pflicht",
+      "daily": "Jeden Tag",
+      "bonus": "Bonus"
+    },
+    "celebration": {
+      "back": "Zurück zu meiner Liste",
+      "headline": "Super <em>gemacht!</em>",
+      "next": "Weiter: {{title}}",
+      "points": "+{{count}}",
+      "pointsLabel_one": "{{count}} Punkt verdient",
+      "pointsLabel_other": "{{count}} Punkte verdient",
+      "streak_one": "{{count}} in Folge",
+      "streak_other": "{{count}} in Folge"
+    },
+    "chore": {
+      "locked": "Geht auf, wenn alles andere erledigt ist",
+      "lockedLabel": "Gesperrt",
+      "markComplete": "Als erledigt markieren",
+      "markIncomplete": "Als nicht erledigt markieren",
+      "photo": "Fotokontrolle",
+      "points_one": "{{count}} Pkt.",
+      "points_other": "{{count}} Pkt.",
+      "readAloud": "Vorlesen: {{title}}",
+      "waiting": "Wartet auf einen Erwachsenen"
+    },
+    "family": {
+      "count": "{{done}}/{{total}}",
+      "label": "{{name}}: {{done}} von {{total}} erledigt"
+    },
+    "greeting": {
+      "afternoon": "Guten Tag",
+      "evening": "Guten Abend",
+      "hi": "Hallo",
+      "morning": "Guten Morgen"
+    },
+    "points": {
+      "label_one": "{{count}} Punkt",
+      "label_other": "{{count}} Punkte"
+    },
+    "progress": {
+      "count": "{{done}} von {{total}}",
+      "doneToday": "heute erledigt",
+      "from": "7 Uhr",
+      "label": "{{done}} von {{total}} heute erledigt",
+      "of": " von {{total}}",
+      "slash": "/{{total}}",
+      "to": "21 Uhr"
+    },
+    "tabs": {
+      "label": "Hauptmenü",
+      "rewards": "Belohnungen",
+      "today": "Heute",
+      "week": "Woche"
+    }
+  },
+  "entry": {
+    "picker": {
+      "allDone": "Alles erledigt",
+      "dateTime": "{{date}} · {{time}}",
+      "doorsLabel": "Wer ist da",
+      "familyToday": "Die Familie heute",
+      "grownUps": "Erwachsene",
+      "grownUpsHint": "PIN oder verknüpftes Konto",
+      "hello": {
+        "afternoon": "Guten Tag.",
+        "evening": "Guten Abend.",
+        "morning": "Guten Morgen."
+      },
+      "nothingToday": "Heute nichts",
+      "paused": "Macht gerade Pause",
+      "toGo_one": "noch {{count}}",
+      "toGo_other": "noch {{count}}",
+      "wallDisplay": "Wandanzeige",
+      "whosHere": "Wer ist da?"
+    },
+    "pinPad": {
+      "progress_one": "{{count}} von {{total}} Ziffern eingegeben",
+      "progress_other": "{{count}} von {{total}} Ziffern eingegeben"
+    },
+    "setup": {
+      "color": "Farbe",
+      "colors": {
+        "butter": "Butter",
+        "coral": "Koralle",
+        "leaf": "Blatt",
+        "lilac": "Flieder",
+        "mint": "Minze",
+        "rose": "Rosa",
+        "sand": "Sand",
+        "sky": "Himmel"
+      },
+      "looksDescription": "Jedes Kind bekommt einen Look für die eigenen Bildschirme und eine Farbe, die es überallhin begleitet. Beides lässt sich später ändern.",
+      "looksTitle": "Wähle ihren Look",
+      "progress": "Fortschritt der Einrichtung",
+      "remove": "{{name}} entfernen",
+      "skin": "Look",
+      "skins": {
+        "blocks": "Blocks",
+        "sunroom": "Sunroom",
+        "tint": "Tint"
+      },
+      "stepOf": "Schritt {{step}} von {{total}}",
+      "suggestFrom": "Empfohlen ab {{age}}",
+      "suggestUnder": "Empfohlen unter {{age}}",
+      "yourColor": "Deine Farbe"
+    }
+  },
+  "kid": {
+    "chore": {
+      "about": "Etwa {{time}}",
+      "before": "Bis {{time}}",
+      "closed": "Verpasst. Jetzt geschlossen",
+      "closedAt": "Verpasst. Um {{time}} geschlossen",
+      "closedLabel": "Geschlossen",
+      "done": "Erledigt",
+      "doneAt": "Erledigt um {{time}}",
+      "doneBy": "Erledigt von {{name}}",
+      "excused": "Heute entschuldigt",
+      "from": "Ab {{time}}",
+      "lateNoPoints": "Zu spät. Jetzt keine Punkte",
+      "latePenalty_one": "Zu spät. Kostet {{count}} Pkt.",
+      "latePenalty_other": "Zu spät. Kostet {{count}} Pkt.",
+      "later": "Später heute",
+      "left": "Noch {{time}}",
+      "notDone": "Nicht erledigt",
+      "opensAt": "Ab {{time}}",
+      "opensAtLabel": "Ab {{time}}",
+      "opensIn": "In {{time}}",
+      "pointsPending_one": "Erledigt. {{count}} Pkt. nach den Pflichten",
+      "pointsPending_other": "Erledigt. {{count}} Pkt. nach den Pflichten",
+      "readonlyDone": "Erledigt",
+      "readonlyTodo": "Nicht erledigt",
+      "rejected": "Nicht angenommen. Versuch es noch mal",
+      "uploadPhotoProof": "Foto als Nachweis hinzufügen"
+    },
+    "colors": {
+      "butter": "Butter",
+      "coral": "Koralle",
+      "leaf": "Blatt",
+      "lilac": "Flieder",
+      "mint": "Minze",
+      "rose": "Rosa",
+      "sand": "Sand",
+      "sky": "Himmel"
+    },
+    "errors": {
+      "alreadyHasGoal": "Du hast schon ein Sparziel. Schließ es erst ab oder hör damit auf",
+      "couldNotCancelGoal": "Das Sparziel ließ sich nicht beenden. Versuch es noch mal",
+      "couldNotSave": "Speichern hat nicht geklappt. Versuch es noch mal",
+      "couldNotStartSaving": "Sparen ließ sich nicht starten. Versuch es noch mal",
+      "couldntSave": "Speichern hat nicht geklappt. Versuch es noch mal",
+      "enterPoints": "Gib ein, wie viele Punkte dazukommen",
+      "notEnoughPoints": "Du hast nur {{balance}} zum Ausgeben",
+      "redemptionFailed": "Das hat nicht geklappt. Versuch es noch mal"
+    },
+    "goal": {
+      "addPlaceholder": "Punkte dazu (bis {{max}})",
+      "addPoints": "Punkte dazu",
+      "amounts": "{{saved}} / {{target}} Pkt.",
+      "autoSave": "Automatisch sparen",
+      "autoSaveHint": "Ein Teil der Punkte jeder Aufgabe kommt hierher",
+      "familyGoal": "Familienziel",
+      "fullyFunded": "Alles gespart",
+      "joinedToast": "Du machst beim Familienziel mit: {{name}}",
+      "leave": "Ziel verlassen",
+      "leaveConfirm": "Dieses Familienziel verlassen? Dein Anteil kommt zu dir zurück.",
+      "leftToast": "Du hast das Familienziel verlassen. Dein Anteil ist zurück",
+      "pace_days_one": "Etwa {{count}} Tag in deinem Tempo",
+      "pace_days_other": "Etwa {{count}} Tage in deinem Tempo",
+      "pace_weeks_one": "Etwa {{count}} Woche in deinem Tempo",
+      "pace_weeks_other": "Etwa {{count}} Wochen in deinem Tempo",
+      "ready": "Bereit!",
+      "redeemNow": "Jetzt einlösen",
+      "save": "Sparen",
+      "savedMore_one": "{{count}} Punkt mehr gespart",
+      "savedMore_other": "{{count}} Punkte mehr gespart",
+      "saverAmount_one": "{{count}} Pkt.",
+      "saverAmount_other": "{{count}} Pkt.",
+      "savers": "Wer spart mit",
+      "savingToast": "Du sparst jetzt für {{name}}",
+      "savingToward": "Du sparst für",
+      "stop": "Aufhören zu sparen",
+      "stopConfirm": "Aufhören zu sparen? Deine gesparten Punkte kommen zu dir zurück.",
+      "stoppedToast": "Sparziel beendet. Deine Punkte sind zurück",
+      "title": "Sparziele",
+      "toGo_one": "Noch {{count}}",
+      "toGo_other": "Noch {{count}}",
+      "you": "Du"
+    },
+    "me": {
+      "changePicture": "Bild ändern",
+      "changePin": "PIN ändern",
+      "color": "Deine Farbe",
+      "language": "Sprache",
+      "linkedAccounts": "Verknüpfte Konten",
+      "manage": "Verwalten",
+      "manageHint": "Aufgaben, Personen und Belohnungen",
+      "open": "{{name}}: Einstellungen",
+      "pictureStyle": "Stil {{n}}",
+      "pictureStyles": "Bildstile",
+      "pictureTitle": "Dein Bild",
+      "readAloud": "Aufgaben vorlesen",
+      "readAloudHint": "Jede Aufgabe bekommt einen Lautsprecher",
+      "savePicture": "Dieses Bild nehmen",
+      "setPin": "PIN festlegen",
+      "settings": "Einstellungen",
+      "shuffle": "Mischen",
+      "signOut": "Abmelden",
+      "skin": "Dein Look",
+      "title": "Ich"
+    },
+    "paused": {
+      "text": "Genieß die freie Zeit. Deine Aufgaben ruhen, und solange du weg bist, gehen keine Punkte verloren.",
+      "title": "Du hast Pause"
+    },
+    "photo": {
+      "copied": "Link kopiert",
+      "copyLink": "Link kopieren",
+      "helpAdd": "Füge ein Foto hinzu, das zeigt, dass die Aufgabe erledigt ist.",
+      "helpComplete": "Die Aufgabe ist erledigt, sobald das Foto ankommt.",
+      "preparing": "Code wird erstellt",
+      "qrLabel": "Code, der die Fotoseite auf einem anderen Gerät öffnet",
+      "scanOrUpload": "Scanne den Code mit einem Handy oder mach das Foto hier.",
+      "skipFailed": "Das hat nicht geklappt. Versuch es noch mal",
+      "skipPhoto": "Kein Foto? Trotzdem fertig",
+      "skipPhotoHelp": "Ein Erwachsener schaut es sich dann an.",
+      "takePhoto": "Foto hier machen",
+      "titleAdd": "Foto hinzufügen",
+      "titleNeeded": "Mach ein Foto",
+      "uploadFailed": "Das Foto wurde nicht hochgeladen. Versuch es noch mal",
+      "uploading": "Wird hochgeladen",
+      "waiting": "Warte auf das Foto"
     },
     "rewards": {
-      "costPts": "Pkt.",
-      "familyBadge": "Familie",
-      "familyGoalBtn": "Familienziel",
-      "goalBadge": "Ziel",
-      "gone": "Weg",
-      "joinGoal": "Ziel beitreten",
-      "needMore": "Noch {{amount}}",
-      "noRewardsHint": "Bitte ein Elternteil, einige Belohnungen hinzuzufügen!",
-      "noRewardsTitle": "Noch keine Belohnungen",
+      "cost_one": "{{count}} Pkt.",
+      "cost_other": "{{count}} Pkt.",
+      "emptyText": "Frag einen Erwachsenen, ob er welche anlegt.",
+      "emptyTitle": "Noch keine Belohnungen",
+      "familyGoal": "Familienziel",
+      "familyTag": "Familie",
+      "goalTag": "Ziel",
+      "gone": "Alle weg",
+      "history": "Deine Belohnungen",
+      "join": "Mitmachen",
+      "more": "Noch {{count}}",
+      "progress": "{{saved}}/{{target}}",
       "redeem": "Einlösen",
       "redeemed": "Eingelöst!",
-      "redeeming": "...",
-      "redemptionCost": "-{{points}} Pkt.",
-      "redemptionTitle": "Letzte Einlösungen",
+      "redeemedToast": "Viel Spaß! {{name}} gehört dir",
+      "redeeming": "Einen Moment",
       "saveToward": "Dafür sparen",
-      "savingToward": "...",
-      "spendable": "verfügbar",
-      "spendableWithSaved": "verfügbar · {{committed}} gespart",
-      "stockLeft": "übrig"
+      "shop": "Belohnungen",
+      "spendableSaved_one": "Punkt zum Ausgeben · {{saved}} gespart",
+      "spendableSaved_other": "Punkte zum Ausgeben · {{saved}} gespart",
+      "spendable_one": "Punkt zum Ausgeben",
+      "spendable_other": "Punkte zum Ausgeben",
+      "spent_one": "−{{count}} Pkt.",
+      "spent_other": "−{{count}} Pkt.",
+      "stock_one": "Noch {{count}}",
+      "stock_other": "Noch {{count}}",
+      "title": "Belohnungen"
     },
-    "stats": {
-      "balance": "Guthaben",
-      "pending": "Ausstehend",
-      "today": "Heute"
+    "sheet": {
+      "back": "Zurück",
+      "close": "Schließen"
     },
-    "streak": {
-      "daysToMilestone_one": "{{count}} Tag bis",
-      "daysToMilestone_other": "{{count}} Tage bis"
+    "skins": {
+      "blocks": {
+        "hint": "Kräftig und bunt",
+        "name": "Blocks"
+      },
+      "sunroom": {
+        "hint": "Warm und weich",
+        "name": "Sunroom"
+      },
+      "tint": {
+        "hint": "Ruhig und dunkel",
+        "name": "Tint"
+      }
     },
-    "themes": {
-      "classic": "Klassisch",
-      "forest": "Wald",
-      "galaxy": "Galaxie",
-      "quest": "Expedition"
+    "time": {
+      "hoursMinutes": "{{h}} Std. {{m}} Min.",
+      "hours_one": "{{count}} Std.",
+      "hours_other": "{{count}} Std.",
+      "minutes_one": "{{count}} Min.",
+      "minutes_other": "{{count}} Min."
+    },
+    "today": {
+      "allDone": "Alles erledigt für heute",
+      "bonusCount": "+{{count}}",
+      "earned_one": "+{{count}} Pkt. heute",
+      "earned_other": "+{{count}} Pkt. heute",
+      "emptyText": "Heute steht nichts auf deiner Liste. Genieß es.",
+      "emptyTitle": "Ein freier Tag",
+      "listLabel": "Deine Aufgaben",
+      "overview": "Dein Tag",
+      "pending_one": "{{count}} Pkt. warten auf die Pflichten",
+      "pending_other": "{{count}} Pkt. warten auf die Pflichten"
+    },
+    "upload": {
+      "doneBody": "Gut gemacht. Du kannst die Seite jetzt schließen.",
+      "doneBodyNamed": "Gut gemacht, {{name}}. Du kannst die Seite jetzt schließen.",
+      "doneTitle": "Foto gesendet",
+      "failed": "Das Foto wurde nicht hochgeladen. Versuch es noch mal",
+      "for": "Für {{name}}",
+      "invalidBody": "Diesem Link fehlt etwas. Scanne den Code noch einmal.",
+      "invalidTitle": "Dieser Link funktioniert nicht",
+      "kicker": "Foto-Nachweis",
+      "openCamera": "Kamera öffnen",
+      "takeHint": "Zeig die erledigte Aufgabe und verdien dir deine Punkte.",
+      "takeTitle": "Mach ein Foto",
+      "uploading": "Wird hochgeladen"
+    },
+    "week": {
+      "best_one": "Bestwert: {{count}} Tag",
+      "best_other": "Bestwert: {{count}} Tage",
+      "dayEmpty": "{{day}}: nichts zu tun",
+      "dayLabel": "{{day}}: {{done}} von {{total}} erledigt",
+      "days": "Tage dieser Woche",
+      "emptyText": "An dem Tag steht nichts auf der Liste.",
+      "emptyTitle": "Ein freier Tag",
+      "nextMilestone_one": "Noch {{count}} Tag bis {{label}} (+{{points}} Pkt.)",
+      "nextMilestone_other": "Noch {{count}} Tage bis {{label}} (+{{points}} Pkt.)",
+      "streak": "Serie",
+      "streakDays_one": "{{count}} Tag in Folge",
+      "streakDays_other": "{{count}} Tage in Folge",
+      "title": "Diese Woche"
     }
   },
   "linkedAccounts": {
@@ -797,19 +1063,6 @@
     "signOutEverywhere": "Auf allen Geräten abmelden",
     "title": "Verknüpfte Konten",
     "unlink": "Trennen"
-  },
-  "photo": {
-    "invalidLinkBody": "Diesem Upload-Link fehlen Informationen.",
-    "invalidLinkTitle": "Ungültiger Link",
-    "openCamera": "Kamera öffnen",
-    "pageTitle": "Fotobeweis",
-    "successBody": "Super gemacht! Du kannst diesen Tab jetzt schließen.",
-    "successBodyNamed": "Super gemacht, {{name}}! Du kannst diesen Tab jetzt schließen.",
-    "successTitle": "Foto hochgeladen!",
-    "takePicture": "Foto aufnehmen",
-    "takePictureHint": "Zeig deine erledigte Aufgabe, um deine Punkte zu bekommen!",
-    "uploadFailed": "Foto konnte nicht hochgeladen werden",
-    "uploadingFor": "Wird hochgeladen für {{name}}"
   },
   "profile": {
     "authError": {
@@ -843,44 +1096,47 @@
     "or": "oder",
     "pinProtected": "PIN-geschützt",
     "selectProfile": "Profil für {{name}} auswählen",
-    "signInWithLinked": "Dieses Profil meldet sich mit einem verknüpften Konto an.",
-    "wallDisplay": "Wand-Display",
-    "welcomeBack": "Willkommen zurück!",
-    "whoIsDoingChores": "Wer erledigt heute Aufgaben?"
+    "signInWithLinked": "Dieses Profil meldet sich mit einem verknüpften Konto an."
   },
   "reports": {
     "aiSummary": "KI-Zusammenfassung",
-    "barChart": {
-      "noData": "Keine Daten"
-    },
-    "bestWorstDays": "Beste / schlechteste Tage",
-    "categoryBreakdown": "Kategorienübersicht",
-    "completionTrend": "Trend",
+    "back": "Zurück zur Verwaltung",
+    "bestWorstDays": "Beste und schwerste Tage",
+    "byPerson": "Erledigt, pro Person",
+    "categoryBreakdown": "Nach Kategorie",
+    "completionTrend": "Erledigt im Verlauf",
+    "daysSummary": "Am besten: {{best}} ({{bestRate}}). Am schwersten: {{worst}} ({{worstRate}}).",
     "doneCount": "{{completed}}/{{assigned}} erledigt",
     "failedToGenerateSummary": "Zusammenfassung konnte nicht generiert werden.",
     "failedToLoadReports": "Berichte konnten nicht geladen werden",
-    "generating": "Wird generiert...",
-    "kidScorecards": "Kinder-Scorecards",
-    "lineChart": {
-      "noData": "Keine Daten",
-      "seriesFallback": "Streak {{index}}"
-    },
-    "loadingReports": "Berichte werden geladen...",
-    "mostMissedChores": "Am häufigsten verpasste Aufgaben",
+    "generating": "Zusammenfassung wird geschrieben…",
+    "loadingReports": "Berichte werden geladen…",
+    "missedTimes_one": "{{count}}×",
+    "missedTimes_other": "{{count}}×",
+    "mostMissedChores": "Am häufigsten verpasst",
+    "next": "Nächster Zeitraum",
     "noData": "Keine Daten",
     "noDataForPeriod": "Keine Daten für diesen Zeitraum",
     "noMissedChores": "Keine verpassten Aufgaben!",
+    "periodLabel": "Zeitraum",
     "period_month": "Monat",
     "period_week": "Woche",
     "period_year": "Jahr",
-    "pointsDecayed": "-{{count}} Pkt. erfallen",
-    "pointsEarned": "{{count}} Pkt. verdient",
-    "pointsFlow": "Punkte-Historie",
-    "pointsSpent": "-{{count}} ausgegeben",
+    "pointsDecayed_one": "−{{count}} verfallen",
+    "pointsDecayed_other": "−{{count}} verfallen",
+    "pointsEarned_one": "{{count}} Pkt.",
+    "pointsEarned_other": "{{count}} Pkt.",
+    "pointsFlow": "Punkte",
+    "pointsSpent_one": "−{{count}} ausgegeben",
+    "pointsSpent_other": "−{{count}} ausgegeben",
+    "previous": "Voriger Zeitraum",
+    "scorecards": "Alle",
     "seriesAssigned": "Zugewiesen",
     "seriesCompleted": "Erledigt",
-    "streakDays": "{{count}} Tage Streak",
-    "title": "Berichte"
+    "streakDays_one": "{{count}} Tag in Folge",
+    "streakDays_other": "{{count}} Tage in Folge",
+    "title": "Berichte",
+    "trendDesc": "Erledigte und zugewiesene Aufgaben pro Tag vom {{from}} bis {{to}}: {{done}} von {{assigned}} erledigt."
   },
   "setup": {
     "addButton": "Hinzufügen",
@@ -906,12 +1162,6 @@
     "parentPinPlaceholder": "PIN wählen (4–8 Ziffern)",
     "parentTitle": "Wer verwaltet die Aufgaben?",
     "settingUp": "Wird eingerichtet...",
-    "themeClassicBlue": "Klassisches Blau",
-    "themeGalaxyPurple": "Galaktisches Lila",
-    "themeNatureForest": "Urwaldliches Grün",
-    "themeQuestAdventure": "Sandiges Gelb",
-    "themesDescription": "Jedes Kind kann sein eigenes Lieblingstheme haben.",
-    "themesTitle": "Ihren Stil auswählen",
     "welcomeDescription": "Lass uns deine Familie in nur wenigen Minuten einrichten.",
     "welcomeTitle": "Willkommen bei OpenChore!"
   },
@@ -919,5 +1169,29 @@
     "greeting": "Hallo, {{name}}",
     "points_one": "{{count}} Punkt",
     "points_other": "{{count}} Punkte"
+  },
+  "wall": {
+    "greeting": {
+      "morning": "Guten Morgen.",
+      "afternoon": "Guten Tag.",
+      "evening": "Guten Abend."
+    },
+    "tapToStart": "Tippen, um loszulegen",
+    "toGo_one": "noch {{count}}",
+    "toGo_other": "noch {{count}}",
+    "allDone": "Alles erledigt",
+    "nothingToday": "Heute nichts",
+    "ptsToday_one": "+{{count}} Pkt. heute",
+    "ptsToday_other": "+{{count}} Pkt. heute",
+    "streak_one": "{{count}} Tag in Folge",
+    "streak_other": "{{count}} Tage in Folge",
+    "nextUp": "Als Nächstes",
+    "opensAt": "Ab {{time}}",
+    "dueBy": "Bis {{time}}",
+    "late": "War bis {{time}} fällig",
+    "familyToday": "Die Familie heute",
+    "chartTitle": "Heute bisher",
+    "chartDesc": "Wie viel jede Person von ihrem Tag geschafft hat, Stunde für Stunde. Jetzt: {{summary}}.",
+    "chartPerson": "{{name}} {{pct}} %"
   }
 }

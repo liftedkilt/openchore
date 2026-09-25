@@ -1,49 +1,116 @@
+/* Reads tokens and dials only, so it takes on whatever scope it sits in. */
 .wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
-  max-width: 320px;
+  max-width: 300px;
   margin: 0 auto;
+  font-family: var(--font-text);
+  color: var(--ink);
 }
 
 .prompt {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-bottom: 1.25rem;
+  margin: 0 0 var(--space-4);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+  font-weight: 600;
+  color: var(--ink-muted);
   text-align: center;
 }
 
 .dots {
   display: flex;
-  gap: 1rem;
-  margin-bottom: 0.5rem;
+  gap: var(--space-4);
 }
 
 .dot {
   width: 16px;
   height: 16px;
+  box-sizing: border-box;
   border-radius: 50%;
-  border: 2px solid var(--border-subtle);
-  transition: all 0.15s ease;
+  border: 2px solid var(--ink-muted);
 }
 
 .dotFilled {
-  background: var(--accent-blue);
-  border-color: var(--accent-blue);
-  transform: scale(1.1);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
-.dotError {
-  border-color: var(--status-required);
+/* The words below carry the error; the dots only echo it. */
+.hasError .dot {
+  border-color: var(--urgent);
+  border-style: dashed;
 }
 
-.dotFilled.dotError {
-  background: var(--status-required);
+.error {
+  min-height: var(--type-body-line);
+  margin: var(--space-3) 0 0;
+  font-size: 15px;
+  line-height: var(--type-body-line);
+  font-weight: 700;
+  color: var(--urgent);
+  text-align: center;
 }
 
-.shake {
-  animation: shake 0.5s ease-in-out;
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 72px);
+  justify-content: space-between;
+  row-gap: var(--space-4);
+  width: 100%;
+  margin-top: var(--space-4);
+}
+
+.key {
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: var(--outline-w) solid var(--line);
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: var(--lift);
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-variation-settings: var(--display-axes);
+  font-size: 28px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Pressing a key uses the skin's own "pressed" dials (Blocks flattens). */
+.key:active:not(:disabled) {
+  transform: translate(var(--done-press), var(--done-press));
+  box-shadow: var(--done-shadow);
+}
+
+.key:focus-visible {
+  outline: 2.5px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.keyQuiet {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.keyQuiet:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .key { transition: transform 0.12s ease, box-shadow 0.12s ease; }
+  .key:active:not(:disabled) { scale: 0.94; }
+  .dot { transition: background-color 0.12s ease, border-color 0.12s ease; }
+  .shake { animation: shake 0.5s ease-in-out; }
 }
 
 @keyframes shake {
@@ -52,50 +119,4 @@
   40% { transform: translateX(12px); }
   60% { transform: translateX(-8px); }
   80% { transform: translateX(8px); }
-}
-
-.error {
-  color: var(--status-required);
-  font-size: 0.8rem;
-  font-weight: 600;
-  margin: 0.25rem 0 0.5rem;
-  min-height: 1.2rem;
-  text-align: center;
-}
-
-.keypad {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
-  width: 100%;
-  margin-top: 1rem;
-}
-
-.key {
-  height: 64px;
-  border-radius: 16px;
-  background: var(--bg-secondary);
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  transition: all 0.15s ease;
-  cursor: pointer;
-}
-
-.key:hover {
-  background: rgba(56, 189, 248, 0.1);
-  border-color: rgba(56, 189, 248, 0.2);
-}
-
-.key:active {
-  transform: scale(0.95);
-  background: rgba(56, 189, 248, 0.2);
-}
-
-.keyEmpty {
-  height: 64px;
 }

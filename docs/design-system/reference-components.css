@@ -1,0 +1,274 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Figtree:wght@400;500;600;700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..800,0..100;1,9..144,300..800,0..100&family=Instrument+Sans:wght@400..700&family=Onest:wght@400..800&display=swap");
+
+/* ============================================================
+   Theme dials. A theme is its colour/shadow tokens (tokens.css)
+   plus these values. Components read dials only and never test
+   which theme they are in, so nested themes never leak.
+   ============================================================ */
+/* House: the neutral frame for shared screens (picker, family views,
+   grown-up tools, wall display). Never a personal skin. House Dark shares
+   every dial; only its tokens differ. It follows the system setting on
+   personal devices and a schedule on shared ones. */
+:root, [data-theme="house"], [data-theme="house-dark"] {
+  --font-display: Onest, system-ui, sans-serif;
+  --font-text: Onest, system-ui, sans-serif;
+  --display-weight: 600;
+  --display-axes: normal;
+  --display-tracking: -0.03em;
+  --display-italic: normal;
+  --hero-size: 34px; --hero-line: 38px;
+  --title-weight: 600;
+  --label-case: uppercase;
+  --outline-w: 0px;
+  --icon-stroke: 1.75;
+  --r-row: 18px; --r-well: 12px; --r-btn: 999px; --r-chip: 999px;
+  --r-avatar: 50%;
+  --row-pad: 12px 14px 12px 12px; --row-gap: 8px; --row-divider: 0px;
+  --row-meta: initial;
+  --well-size: 40px;
+  --check-size: 30px; --check-bw: 2px; --check-ring: var(--ink-muted); --check-bg: transparent;
+  --done-press: 0px; --done-shadow: var(--lift); --done-strike: none; --row-done-bg: var(--surface-raised);
+  --locked-bw: 1.5px;
+  --mark-stroke: 0; --mark-empty: var(--surface-sunk);
+  --show-arc: none; --show-shapes: flex; --show-ring: none; --show-glow: none;
+  --tab-inset: 24px; --tab-bottom: 26px; --tab-h: 62px; --tab-r: 999px; --tab-dir: row; --tab-top-bw: 0px;
+  --tab-bg: var(--surface-raised); --tab-active-bg: var(--ink); --tab-active-ink: var(--surface); --tab-active-bw: 0px;
+  --tab-label: inline; --tab-dot: none; --tab-shadow: var(--lift);
+  --cele-rays: none; --cele-confetti: none; --cele-ring: none;
+  --stamp-bg: var(--surface-raised); --stamp-rotate: 0deg; --stamp-bw: 0px; --stamp-shadow: var(--lift-lg);
+}
+[data-theme="sunroom"] {
+  --font-display: Fraunces, Georgia, serif;
+  --font-text: Figtree, system-ui, sans-serif;
+  --display-weight: 500;
+  --display-axes: "SOFT" 100;
+  --display-tracking: -0.02em;
+  --display-italic: italic;
+  --hero-size: 34px; --hero-line: 38px;
+  --title-weight: 600;
+  --label-case: uppercase;
+  --outline-w: 0px;
+  --icon-stroke: 1.75;
+  --r-row: 20px; --r-well: 14px; --r-btn: 999px; --r-chip: 999px;
+  --r-avatar: initial;              /* unset: each avatar uses its own blob */
+  --row-pad: 12px 14px 12px 12px; --row-gap: 8px; --row-divider: 0px;
+  --row-meta: initial;              /* unset: ink-muted */
+  --well-size: 42px;
+  --check-size: 30px; --check-bw: 2px; --check-ring: var(--ink-muted); --check-bg: transparent;
+  --done-press: 0px; --done-shadow: var(--lift); --done-strike: none; --row-done-bg: var(--surface-raised);
+  --locked-bw: 1.5px;
+  --mark-stroke: 0; --mark-empty: var(--surface-sunk);
+  --show-arc: block; --show-shapes: none; --show-ring: none; --show-glow: none;
+  --tab-inset: 24px; --tab-bottom: 26px; --tab-h: 62px; --tab-r: 999px; --tab-dir: row; --tab-top-bw: 0px;
+  --tab-active-bg: var(--ink); --tab-active-ink: var(--surface); --tab-active-bw: 0px;
+  --tab-bg: var(--surface-raised); --tab-label: inline; --tab-dot: none; --tab-shadow: var(--lift);
+  --cele-rays: block; --cele-confetti: none; --cele-ring: none;
+  --stamp-bg: var(--surface-raised); --stamp-rotate: 0deg; --stamp-bw: 0px; --stamp-shadow: var(--lift-lg);
+}
+[data-theme="blocks"] {
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-text: "Bricolage Grotesque", system-ui, sans-serif;
+  --display-weight: 800;
+  --display-axes: normal;
+  --display-tracking: -0.04em;
+  --display-italic: normal;
+  --hero-size: 46px; --hero-line: 44px;
+  --title-weight: 750;
+  --label-case: uppercase;
+  --outline-w: 2.5px;
+  --icon-stroke: 2;
+  --r-row: 22px; --r-well: 14px; --r-btn: 16px; --r-chip: 14px;
+  --r-avatar: 30%;
+  --row-pad: 12px 12px 12px 12px; --row-gap: 12px; --row-divider: 0px;
+  --row-meta: currentColor;
+  --well-size: 44px;
+  --check-size: 48px; --check-bw: 2.5px; --check-ring: var(--line); --check-bg: var(--surface-raised);
+  --done-press: 4px; --done-shadow: none; --done-strike: line-through; --row-done-bg: var(--surface-raised);
+  --locked-bw: 2.5px;
+  --mark-stroke: 2; --mark-empty: var(--surface-raised);
+  --show-arc: none; --show-shapes: flex; --show-ring: none; --show-glow: none;
+  --tab-inset: 0px; --tab-bottom: 0px; --tab-h: 84px; --tab-r: 0px; --tab-dir: column; --tab-top-bw: 2.5px;
+  --tab-active-bg: var(--chip); --tab-active-ink: var(--ink); --tab-active-bw: 2px;
+  --tab-bg: var(--surface-raised); --tab-label: block; --tab-dot: none; --tab-shadow: none;
+  --cele-rays: none; --cele-confetti: block; --cele-ring: none;
+  --stamp-bg: var(--surface-raised); --stamp-rotate: -5deg; --stamp-bw: 3px; --stamp-shadow: var(--lift-lg);
+}
+[data-theme="tint"] {
+  --font-display: "Instrument Sans", system-ui, sans-serif;
+  --font-text: "Instrument Sans", system-ui, sans-serif;
+  --display-weight: 600;
+  --display-axes: normal;
+  --display-tracking: -0.03em;
+  --display-italic: normal;
+  --hero-size: 28px; --hero-line: 32px;
+  --title-weight: 500;
+  --label-case: uppercase;
+  --outline-w: 0px;
+  --icon-stroke: 1.75;
+  --r-row: 0px; --r-well: 12px; --r-btn: 999px; --r-chip: 999px;
+  --r-avatar: 50%;
+  --row-pad: 10px 0 10px 0; --row-gap: 0px; --row-divider: 1px;
+  --row-meta: initial;
+  --well-size: 38px;
+  --check-size: 26px; --check-bw: 2px; --check-ring: var(--ink-muted); --check-bg: transparent;
+  --done-press: 0px; --done-shadow: none; --done-strike: none; --row-done-bg: var(--surface);
+  --locked-bw: 0px;
+  --mark-stroke: 0; --mark-empty: var(--surface-sunk);
+  --show-arc: none; --show-shapes: none; --show-ring: block; --show-glow: block;
+  --tab-inset: 0px; --tab-bottom: 0px; --tab-h: 86px; --tab-r: 0px; --tab-dir: column; --tab-top-bw: 0px;
+  --tab-active-bg: transparent; --tab-active-ink: var(--ink); --tab-active-bw: 0px;
+  --tab-bg: var(--surface); --tab-label: none; --tab-dot: block; --tab-shadow: none;
+  --cele-rays: none; --cele-confetti: none; --cele-ring: block;
+  --stamp-bg: transparent; --stamp-rotate: 0deg; --stamp-bw: 0px; --stamp-shadow: none;
+}
+
+/* A person's own colour. On a Tint screen that belongs to one person
+   (data-theme and data-person on the same element), it leads. */
+[data-person="coral"]  { --you: var(--person-coral); }
+[data-person="mint"]   { --you: var(--person-mint); }
+[data-person="butter"] { --you: var(--person-butter); }
+[data-person="sky"]    { --you: var(--person-sky); }
+[data-theme="tint"][data-person] { --accent: var(--you); --highlight: var(--you); --done: var(--you); }
+
+/* ---------- base ---------- */
+.oc-surface { background: var(--surface); color: var(--ink); font-family: var(--font-text); -webkit-font-smoothing: antialiased; }
+.oc-icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: var(--icon-stroke); stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.oc-icon--fill { fill: currentColor; }
+
+/* ---------- Greeting ---------- */
+.oc-greeting { margin: 0; font-family: var(--font-display); font-weight: var(--display-weight); font-variation-settings: var(--display-axes); letter-spacing: var(--display-tracking); font-size: var(--hero-size); line-height: var(--hero-line); color: var(--ink); }
+.oc-greeting em { font-style: var(--display-italic); }
+
+/* ---------- Avatar ---------- */
+.oc-avatar { display: inline-grid; place-items: center; flex: none; box-sizing: border-box; background: var(--you, var(--surface-sunk)); color: var(--on-person); border: var(--outline-w) solid var(--line); border-radius: var(--r-avatar, var(--blob, 50%)); font-family: var(--font-display); font-weight: var(--display-weight); font-variation-settings: var(--display-axes); font-style: var(--display-italic); line-height: 1; }
+.oc-avatar--sm { width: 32px; height: 32px; font-size: 14px; }
+.oc-avatar--md { width: 40px; height: 40px; font-size: 18px; }
+.oc-avatar--lg { width: 96px; height: 96px; font-size: 44px; }
+
+/* ---------- PointsChip ---------- */
+.oc-points { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 10px; box-sizing: border-box; border-radius: var(--r-chip); background: var(--chip); color: var(--on-chip); border: var(--outline-w) solid var(--line); box-shadow: var(--lift); font-family: var(--font-text); font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.oc-points .oc-icon { width: 18px; height: 18px; color: var(--star); fill: var(--star); stroke-width: 1.5; }
+
+/* ---------- CategoryHeader + marks ---------- */
+.oc-mark { width: 10px; height: 10px; flex: none; overflow: visible; }
+.oc-mark * { stroke: var(--line); stroke-width: var(--mark-stroke); stroke-linejoin: round; }
+.oc-mark--essential * { fill: var(--cat-essential); }
+.oc-mark--daily * { fill: var(--cat-daily); }
+.oc-mark--bonus * { fill: var(--cat-bonus); }
+.oc-cathead { display: flex; align-items: center; justify-content: space-between; margin: 20px 2px 8px; font-family: var(--font-text); font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: 0.06em; text-transform: var(--label-case); color: var(--ink); }
+.oc-cathead__l { display: flex; align-items: center; gap: 8px; }
+.oc-cathead__n { color: var(--ink-muted); letter-spacing: 0.02em; }
+
+/* ---------- ChoreRow ---------- */
+.oc-chore { --row-bg: var(--row-daily); --row-ink: var(--on-row-daily); --well-bg: var(--cat-daily-soft); --well-ink: var(--cat-daily-icon);
+  position: relative; display: flex; align-items: center; gap: 12px; box-sizing: border-box; padding: var(--row-pad); border-radius: var(--r-row);
+  background: var(--row-bg); color: var(--row-ink); border: var(--outline-w) solid var(--line); border-bottom-width: max(var(--outline-w), var(--row-divider)); box-shadow: var(--lift); font-family: var(--font-text); }
+.oc-chore + .oc-chore { margin-top: var(--row-gap); }
+.oc-chore[data-cat="essential"] { --row-bg: var(--row-essential); --row-ink: var(--on-row-essential); --well-bg: var(--cat-essential-soft); --well-ink: var(--cat-essential-icon); }
+.oc-chore[data-cat="bonus"] { --row-bg: var(--row-bonus); --row-ink: var(--on-row-bonus); --well-bg: var(--cat-bonus-soft); --well-ink: var(--cat-bonus-icon); }
+.oc-chore__well { width: var(--well-size); height: var(--well-size); border-radius: var(--r-well); display: grid; place-items: center; flex: none; box-sizing: border-box; background: var(--well-bg); color: var(--well-ink); border: var(--outline-w) solid var(--line); }
+.oc-chore__txt { flex: 1; min-width: 0; }
+.oc-chore__title { display: block; font-size: 16px; line-height: 21px; font-weight: var(--title-weight); letter-spacing: -0.005em; }
+.oc-chore__meta { display: flex; align-items: center; gap: 5px; margin-top: 1px; font-size: 13px; line-height: 18px; font-weight: 500; color: var(--row-meta, var(--ink-muted)); }
+.oc-chore__meta .oc-icon { width: 14px; height: 14px; }
+.oc-chore__urgent { color: var(--row-meta, var(--urgent)); font-weight: 700; }
+.oc-chore__waiting { color: var(--row-meta, var(--waiting)); font-weight: 600; }
+.oc-chore__say { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none; box-sizing: border-box; border: 2px solid currentColor; opacity: .9; }
+.oc-chore__say .oc-icon { width: 16px; height: 16px; }
+.oc-chore__check { width: var(--check-size); height: var(--check-size); border-radius: 50%; flex: none; box-sizing: border-box; display: grid; place-items: center; background: var(--check-bg); border: var(--check-bw) solid var(--check-ring); color: var(--ink-muted); }
+.oc-chore__check .oc-icon { width: 55%; height: 55%; stroke-width: 2.75; }
+.oc-chore--done { background: var(--row-done-bg); color: var(--ink); box-shadow: var(--done-shadow); transform: translate(var(--done-press), var(--done-press)); }
+.oc-chore--done .oc-chore__title { color: var(--ink-muted); text-decoration: var(--done-strike); text-decoration-thickness: 2px; }
+.oc-chore--done .oc-chore__meta { color: var(--ink-muted); }
+.oc-chore--done .oc-chore__check { background: var(--done); border-color: var(--done); color: var(--on-done); }
+.oc-chore--done .oc-chore__check { border-color: color-mix(in srgb, var(--line) calc(var(--mark-stroke) * 50%), var(--done)); }
+.oc-chore--waiting .oc-chore__check { border-style: dashed; border-color: var(--waiting); }
+.oc-chore--locked { background: transparent; color: var(--ink); box-shadow: none; border: var(--locked-bw) dashed var(--line); border-bottom: max(var(--locked-bw), var(--row-divider)) dashed var(--line); }
+.oc-chore--locked .oc-chore__title { color: var(--ink-muted); }
+.oc-chore--locked .oc-chore__meta { color: var(--ink-muted); }
+.oc-chore--locked .oc-chore__check { border-color: var(--line); background: transparent; color: var(--ink-muted); }
+.oc-chore--locked .oc-chore__check .oc-icon { stroke-width: 2; }
+
+/* ---------- DayProgress ---------- */
+.oc-prog { position: relative; font-family: var(--font-text); color: var(--ink); }
+.oc-prog__arcwrap { display: var(--show-arc); position: relative; height: 118px; }
+.oc-prog__arc { position: absolute; left: 0; top: 0; width: 100%; max-width: 312px; height: 100px; overflow: visible; }
+.oc-prog__track { fill: none; stroke: var(--line); stroke-width: 2; stroke-dasharray: 1 7; stroke-linecap: round; }
+.oc-prog__fill { fill: none; stroke: var(--highlight); stroke-width: 3; stroke-linecap: round; }
+.oc-prog__pin { fill: var(--done); stroke: var(--surface); stroke-width: 3; }
+.oc-prog__sun { fill: var(--star); stroke: var(--surface); stroke-width: 4; }
+.oc-prog__halo { fill: var(--star); opacity: .22; }
+.oc-prog__arcnum { position: absolute; left: 0; right: 0; top: 46px; text-align: center; max-width: 312px; }
+.oc-prog__arcnum b { font-family: var(--font-display); font-variation-settings: var(--display-axes); font-weight: var(--display-weight); font-size: 30px; letter-spacing: -0.02em; }
+.oc-prog__arcnum b span { color: var(--ink-muted); }
+.oc-prog__arcnum small, .oc-prog__ringnum small { display: block; font-size: 12px; font-weight: 600; color: var(--ink-muted); }
+.oc-prog__ends { position: absolute; left: 0; top: 102px; width: 100%; max-width: 312px; display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: var(--ink-muted); }
+.oc-prog__shapes { display: var(--show-shapes); align-items: center; gap: 6px; padding: 6px 0 2px; }
+.oc-prog__shapes .oc-mark { width: 26px; height: 26px; }
+.oc-prog__shapes .oc-mark * { stroke-width: 2.5; }
+.oc-prog__shapes .oc-mark:not(.is-done) * { fill: var(--mark-empty); }
+.oc-prog__shapes b { margin-left: auto; padding-left: 6px; white-space: nowrap; font-size: 13px; font-weight: 700; }
+.oc-prog__ringwrap { display: var(--show-ring); position: relative; margin: 6px auto 0; width: 212px; height: 212px; }
+.oc-prog__ring { width: 212px; height: 212px; transform: rotate(-90deg); }
+.oc-prog__rtrack { fill: none; stroke: var(--surface-sunk); stroke-width: 16; }
+.oc-prog__rfill { fill: none; stroke: var(--highlight); stroke-width: 16; stroke-linecap: round; }
+.oc-prog__ringnum { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.oc-prog__ringnum b { font-size: 64px; line-height: 64px; font-weight: 600; letter-spacing: -0.04em; }
+.oc-prog__ringnum b span { color: var(--ink-muted); font-weight: 500; }
+.oc-prog__spark { position: absolute; fill: var(--highlight); }
+
+/* ---------- Button ---------- */
+.oc-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 22px; box-sizing: border-box; border-radius: var(--r-btn); border: var(--outline-w) solid var(--line); background: var(--accent); color: var(--on-accent); box-shadow: var(--lift); font-family: var(--font-text); font-size: 16px; font-weight: 700; letter-spacing: -0.01em; cursor: pointer; }
+.oc-btn .oc-icon { width: 18px; height: 18px; }
+.oc-btn--quiet { background: transparent; color: var(--ink); box-shadow: none; border-color: transparent; text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 2px; }
+.oc-btn--block { display: flex; width: 100%; height: 58px; font-size: 17px; }
+
+/* ---------- TabBar ---------- */
+.oc-tabs { position: absolute; z-index: 3; left: var(--tab-inset); right: var(--tab-inset); bottom: var(--tab-bottom); height: var(--tab-h); box-sizing: border-box; border-radius: var(--tab-r); background: var(--tab-bg); border-top: var(--tab-top-bw) solid var(--line); box-shadow: var(--tab-shadow); display: flex; align-items: center; justify-content: space-around; padding: 0 8px; font-family: var(--font-text); }
+.oc-tab { display: flex; flex-direction: var(--tab-dir); align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--ink-muted); }
+.oc-tab__pill { height: 44px; min-width: 44px; padding: 0 14px; box-sizing: border-box; border-radius: 999px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0 solid var(--line); }
+.oc-tab__label { display: var(--tab-label); }
+.oc-tab__dot { display: var(--tab-dot); width: 5px; height: 5px; border-radius: 50%; }
+.oc-tab.is-on { color: var(--ink); }
+.oc-tab.is-on .oc-tab__pill { background: var(--tab-active-bg); color: var(--tab-active-ink); border-width: var(--tab-active-bw); }
+.oc-tab.is-on .oc-tab__dot { background: var(--highlight); }
+
+/* ---------- Celebration ---------- */
+.oc-cele { position: relative; height: 100%; overflow: hidden; background: var(--celebrate); color: var(--ink); font-family: var(--font-text); display: flex; flex-direction: column; align-items: center; }
+.oc-cele__rays, .oc-cele__confetti, .oc-cele__ringdeco { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.oc-cele__rays { display: var(--cele-rays); }
+.oc-cele__confetti { display: var(--cele-confetti); }
+.oc-cele__ringdeco { display: var(--cele-ring); }
+.oc-cele__rays .sun { fill: var(--star); }
+.oc-cele__rays .dash { fill: none; stroke: var(--star); stroke-width: 2; stroke-dasharray: 2 10; stroke-linecap: round; opacity: .8; }
+.oc-cele__confetti * { stroke: var(--line); stroke-width: 2.5; }
+.oc-cele__confetti .c1 { fill: var(--cat-daily); } .oc-cele__confetti .c2 { fill: var(--cat-essential); } .oc-cele__confetti .c3 { fill: var(--person-coral); } .oc-cele__confetti .c4 { fill: var(--done); } .oc-cele__confetti .c5 { fill: var(--surface-raised); }
+.oc-cele__confetti .sq { fill: none; stroke-width: 3; stroke-linecap: round; }
+.oc-cele__ringdeco .glow { fill: var(--highlight); opacity: .14; }
+.oc-cele__ringdeco .trk { fill: none; stroke: var(--surface-sunk); stroke-width: 14; }
+.oc-cele__ringdeco .arc { fill: none; stroke: var(--highlight); stroke-width: 14; stroke-linecap: round; }
+.oc-cele__ringdeco .sp { fill: var(--highlight); }
+.oc-cele__head { position: relative; margin-top: 118px; text-align: center; font-family: var(--font-display); font-weight: var(--display-weight); font-variation-settings: var(--display-axes); letter-spacing: var(--display-tracking); font-size: 52px; line-height: 50px; }
+.oc-cele__head em { font-style: var(--display-italic); }
+.oc-cele__card { position: relative; margin-top: 26px; width: 236px; box-sizing: border-box; padding: 18px 18px 20px; text-align: center; border-radius: var(--radius-xl); background: var(--stamp-bg); border: var(--stamp-bw) solid var(--line); box-shadow: var(--stamp-shadow); transform: rotate(var(--stamp-rotate)); }
+.oc-cele__pts { font-family: var(--font-display); font-weight: var(--display-weight); font-variation-settings: var(--display-axes); font-size: 88px; line-height: 84px; letter-spacing: -0.05em; }
+.oc-cele__what { margin-top: 6px; font-size: 17px; font-weight: 700; }
+.oc-cele__streak { margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; box-sizing: border-box; border-radius: 999px; background: var(--chip); color: var(--on-chip); border: var(--outline-w) solid var(--line); font-size: 13px; font-weight: 700; }
+.oc-cele__streak .oc-icon { width: 15px; height: 15px; color: var(--star); fill: var(--star); stroke-width: 1.5; }
+.oc-cele__foot { position: absolute; left: 20px; right: 20px; bottom: 44px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+/* ---------- FamilyMember ---------- */
+.oc-member { display: flex; align-items: center; gap: 12px; height: 48px; font-family: var(--font-text); color: var(--ink); }
+.oc-member__n { width: 64px; font-size: 15px; font-weight: 700; }
+.oc-member__bar { flex: 1; height: 10px; border-radius: 999px; background: var(--surface-sunk); overflow: hidden; border: var(--outline-w) solid var(--line); }
+.oc-member__bar i { display: block; height: 100%; border-radius: 999px; background: var(--you, var(--highlight)); }
+.oc-member__c { width: 34px; text-align: right; font-size: 13px; font-weight: 600; color: var(--ink-muted); }
+
+/* ---------- DeviceFrame (presentation only) ---------- */
+.oc-device { position: relative; width: 360px; height: 760px; box-sizing: border-box; overflow: hidden; border-radius: var(--radius-device); background: var(--surface); color: var(--ink); border: var(--outline-w) solid var(--line); box-shadow: var(--device); font-family: var(--font-text); -webkit-font-smoothing: antialiased; }
+.oc-device__glow { display: var(--show-glow); position: absolute; z-index: 0; left: 50%; top: -180px; width: 520px; height: 420px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--highlight) 22%, transparent), transparent); }
+.oc-status { position: relative; z-index: 2; height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 4px 30px 0 34px; font-size: 15px; font-weight: 600; }
+.oc-status svg { width: 66px; height: 12px; }
+.oc-device__body { position: relative; z-index: 1; height: calc(100% - 48px); }
+.oc-device__pad { padding: 8px 24px 0; }
+.oc-device__fade { position: absolute; z-index: 2; left: 0; right: 0; bottom: 0; height: 140px; background: linear-gradient(to bottom, color-mix(in srgb, var(--surface) 0%, transparent), var(--surface) 62%); pointer-events: none; }

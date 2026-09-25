@@ -1,23 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
+import { RefreshCw, Loader2 } from 'lucide-react';
 import { api } from '../../api';
 import type { User, ScheduledChore, UserStreakData, PointBalance, PendingCompletion } from '../../types';
-import adminStyles from '../../pages/AdminDashboard.module.css';
-import styles from './KidsStatusTab.module.css';
-import {
-  Check,
-  ChevronDown,
-  Flame,
-  Star,
-  Clock,
-  AlertTriangle,
-  RefreshCw,
-  Circle,
-  ShieldCheck,
-  Loader2,
-} from 'lucide-react';
-import clsx from 'clsx';
+import { Avatar, CategoryHeader, CategoryMark, Icon, catFromCategory } from '../../design';
 import { localDateStr } from '../../utils';
+import { ApprovalList } from './ApprovalList';
+import { IconWell, personColor } from './pickers';
+import ui from './ui.module.css';
+import styles from './KidsStatusTab.module.css';
 
 interface KidStatus {
   user: User;
@@ -76,16 +68,11 @@ function breakdownFor(chores: ScheduledChore[]): Breakdown {
   };
 }
 
-function initialsFor(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-export const KidsStatusTab: React.FC = () => {
-  const { t } = useTranslation();
+export const KidsStatusTab: React.FC<{ onPendingChange?: (count: number) => void }> = ({ onPendingChange }) => {
+  const { t, i18n } = useTranslation();
   const [kids, setKids] = useState<KidStatus[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [pending, setPending] = useState<PendingCompletion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -97,11 +84,14 @@ export const KidsStatusTab: React.FC = () => {
     setRefreshing(true);
     setError(null);
     try {
-      const [users, balances, pending] = await Promise.all([
+      const [users, balances, pendingList] = await Promise.all([
         api.users.list(),
         api.points.getAllBalances().catch(() => [] as PointBalance[]),
         api.chores.listPending().catch(() => [] as PendingCompletion[]),
       ]);
+      setAllUsers(users);
+      setPending(pendingList);
+      onPendingChange?.(pendingList.length);
 
       // Kids first, then parents (who take part too and show up once they
       // have chores of their own).
@@ -113,7 +103,7 @@ export const KidsStatusTab: React.FC = () => {
       // belongs to), not the completer. Matching by name would collapse
       // duplicate names and would miss the sibling-completing case.
       const pendingByAssignee = new Map<number, number>();
-      for (const p of pending) {
+      for (const p of pendingList) {
         pendingByAssignee.set(p.assigned_user_id, (pendingByAssignee.get(p.assigned_user_id) || 0) + 1);
       }
 
@@ -152,13 +142,13 @@ export const KidsStatusTab: React.FC = () => {
       );
 
       setKids(results.filter(k => k.user.role === 'child' || k.chores.length > 0));
-    } catch (e) {
+    } catch {
       setError(t('admin.kidsStatusTab.loadError'));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [today, t]);
+  }, [today, t, onPendingChange]);
 
   const handleExcuse = async (e: React.MouseEvent, chore: ScheduledChore) => {
     e.stopPropagation();
@@ -213,31 +203,46 @@ export const KidsStatusTab: React.FC = () => {
     });
   };
 
-  if (loading) return <p className={adminStyles.emptyText}>{t('admin.kidsStatusTab.loading')}</p>;
+  if (loading) return <p className={ui.emptyInline}>{t('admin.kidsStatusTab.loading')}</p>;
+
+  const dateLabel = new Date().toLocaleDateString(i18n.language, { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <div>
-      <div className={styles.refreshBar}>
+    <div className={ui.page}>
+      <div className={ui.pageHead}>
         <div>
-          <h2 className={adminStyles.sectionTitle}>{t('admin.kidsStatusTab.heading')}</h2>
-          <p className={adminStyles.sectionSubtitle}>
-            {t('admin.kidsStatusTab.subtitle', { date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) })}
-          </p>
+          <h2 className={ui.pageTitle}>{t('admin.kidsStatusTab.heading')}</h2>
+          <p className={ui.pageSub}>{t('admin.kidsStatusTab.subtitle', { date: dateLabel })}</p>
         </div>
         <button
-          className={adminStyles.btnSmall}
+          type="button"
+          className={ui.btnGhost}
           onClick={load}
           disabled={refreshing}
           title={t('admin.kidsStatusTab.refreshTitle')}
         >
-          <RefreshCw size={14} className={refreshing ? adminStyles.spinning : undefined} /> {t('admin.kidsStatusTab.refreshLabel')}
+          <RefreshCw aria-hidden className={refreshing ? ui.spin : undefined} /> {t('admin.kidsStatusTab.refreshLabel')}
         </button>
       </div>
 
-      {error && <div className={styles.error}>{error}</div>}
+      {error && <p className={ui.msgError} role="alert">{error}</p>}
+
+      {pending.length > 0 && (
+        <section className={ui.section} aria-labelledby="waiting-for-you">
+          <div className={ui.sectionHead}>
+            <h3 className={ui.sectionTitle} id="waiting-for-you">
+              <Icon name="clock" />
+              {t('admin.kidsStatusTab.waitingHeading')}
+              <span className={ui.badgeWaiting}>{pending.length}</span>
+            </h3>
+          </div>
+          <ApprovalList pending={pending} users={allUsers} onChanged={load} />
+        </section>
+      )}
 
       {kids.length === 0 && (
-        <div className={adminStyles.emptyState}>
+        <div className={ui.empty}>
+          <Icon name="people" />
           <p>{t('admin.kidsStatusTab.noChildren')}</p>
         </div>
       )}
@@ -245,30 +250,29 @@ export const KidsStatusTab: React.FC = () => {
       <div className={styles.grid}>
         {kids.map(kid => {
           const b = breakdownFor(kid.chores);
-          // Progress bar shows required+core progress only. Bonus is
-          // rendered as a separate secondary bar ONLY when required+core are
-          // complete — per CLAUDE.md bonus points are gated on that, so
-          // showing bonus progress before it's unlocked is misleading.
+          // The bar shows Must do + Every day only. Bonus points are gated on
+          // those (CLAUDE.md), so bonus progress only shows once it's open.
           const gatedTotal = b.requiredTotal + b.coreTotal;
           const gatedCompleted = b.requiredCompleted + b.coreCompleted;
           const gatedPct = gatedTotal > 0 ? (gatedCompleted / gatedTotal) * 100 : 0;
-          const bonusPct = b.bonusTotal > 0 ? (b.bonusCompleted / b.bonusTotal) * 100 : 0;
           const allRequiredAndCoreDone = gatedTotal > 0 && gatedCompleted === gatedTotal;
           const bonusUnlocked = allRequiredAndCoreDone && b.bonusTotal > 0;
           const hasAlert = b.overdue > 0;
           const isExpanded = expanded.has(kid.user.id);
           const totalChores = gatedTotal + b.bonusTotal;
           const detailsId = `kid-${kid.user.id}-details`;
+          const color = personColor(kid.user);
+          const counts: { cat: 'required' | 'core' | 'bonus'; done: number; total: number }[] = [
+            { cat: 'required', done: b.requiredCompleted, total: b.requiredTotal },
+            { cat: 'core', done: b.coreCompleted, total: b.coreTotal },
+            { cat: 'bonus', done: b.bonusCompleted, total: b.bonusTotal },
+          ];
 
           return (
             <div
               key={kid.user.id}
-              className={clsx(
-                styles.card,
-                kid.user.paused && styles.cardPaused,
-                hasAlert && styles.cardAlert,
-                !hasAlert && allRequiredAndCoreDone && styles.cardDone,
-              )}
+              className={clsx(styles.card, kid.user.paused && styles.cardPaused)}
+              data-person={color}
             >
               <button
                 type="button"
@@ -277,204 +281,159 @@ export const KidsStatusTab: React.FC = () => {
                 aria-expanded={isExpanded}
                 aria-controls={detailsId}
               >
-                <div className={styles.avatar}>
-                  {kid.user.avatar_url
-                    ? <img src={kid.user.avatar_url} alt={kid.user.name} />
-                    : <div className={styles.avatarPlaceholder}>{initialsFor(kid.user.name)}</div>}
-                </div>
-
-                <div className={styles.info}>
-                  <div className={styles.nameRow}>
+                <span className={styles.who}>
+                  <Avatar name={kid.user.name} color={color} size="md" />
+                  <span className={styles.nameBlock}>
                     <span className={styles.name}>{kid.user.name}</span>
-                    {kid.user.paused && <span className={styles.pausedTag}>{t('admin.kidsStatusTab.paused')}</span>}
-                    {hasAlert && (
-                      <span className={styles.alertTag}>
-                        <AlertTriangle size={11} /> {t('admin.kidsStatusTab.overdue', { count: b.overdue })}
-                      </span>
-                    )}
-                    {!hasAlert && allRequiredAndCoreDone && (
-                      <span className={styles.doneTag}>
-                        <Check size={11} /> {t('admin.kidsStatusTab.allDone')}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className={styles.progressText}>
-                    {totalChores === 0 ? (
-                      <span className={styles.progressTextMuted}>{t('admin.kidsStatusTab.noChoresScheduled')}</span>
-                    ) : (
-                      <>
-                        {b.requiredTotal > 0 && (
-                          <span>
-                            <strong>{b.requiredCompleted}</strong>
-                            <span className={styles.progressTextMuted}>/{b.requiredTotal}</span> {t('admin.kidsStatusTab.categoryRequired')}
-                          </span>
-                        )}
-                        {b.coreTotal > 0 && (
-                          <span className={b.requiredTotal > 0 ? styles.progressTextMuted : undefined}>
-                            {b.requiredTotal > 0 && '· '}
-                            <strong style={b.requiredTotal > 0 ? { color: 'var(--text-primary)' } : undefined}>
-                              {b.coreCompleted}
-                            </strong>
-                            <span className={styles.progressTextMuted}>/{b.coreTotal}</span> {t('admin.kidsStatusTab.categoryCore')}
-                          </span>
-                        )}
-                        {b.bonusTotal > 0 && (
-                          <span className={styles.progressTextMuted}>
-                            · <strong style={{ color: 'var(--text-primary)' }}>{b.bonusCompleted}</strong>/{b.bonusTotal} {t('admin.kidsStatusTab.categoryBonus')}
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {/*
-                    Main bar fills with required+core completion. Bonus gets
-                    its own secondary bar, only shown once the gate is
-                    cleared (bonus points aren't awarded until then — see
-                    CLAUDE.md — so showing bonus progress earlier would
-                    imply it "counts" when it doesn't).
-                  */}
-                  <div className={styles.progressBar}>
-                    {gatedTotal > 0 && (
-                      <div
-                        className={allRequiredAndCoreDone ? styles.progressFillDone : styles.progressFillCore}
-                        style={{ width: `${gatedPct}%` }}
-                      />
-                    )}
-                  </div>
-                  {b.bonusTotal > 0 && bonusUnlocked && (
-                    <div className={clsx(styles.progressBar, styles.progressBarBonus)}>
-                      <div
-                        className={styles.progressFillBonus}
-                        style={{ width: `${bonusPct}%` }}
-                      />
-                    </div>
-                  )}
-                  {b.bonusTotal > 0 && !bonusUnlocked && (
-                    <div className={styles.bonusHint}>
-                      {t('admin.kidsStatusTab.bonusHint')}
-                    </div>
-                  )}
-
-                  <div className={styles.statsRow}>
-                    <span className={clsx(styles.stat, styles.statStreak)}>
-                      <Flame size={13} /> {t('admin.kidsStatusTab.streak', { count: kid.streak })}
+                    <span className={styles.tags}>
+                      {kid.user.paused && <span className={ui.badgeOutline}>{t('admin.kidsStatusTab.paused')}</span>}
+                      {hasAlert && (
+                        <span className={ui.badgeUrgent}>
+                          <Icon name="clock" /> {t('admin.kidsStatusTab.overdue', { count: b.overdue })}
+                        </span>
+                      )}
+                      {!hasAlert && allRequiredAndCoreDone && (
+                        <span className={ui.badge}>
+                          <Icon name="check" /> {t('admin.kidsStatusTab.allDone')}
+                        </span>
+                      )}
                     </span>
-                    <span className={clsx(styles.stat, styles.statPoints)}>
-                      <Star size={13} /> {t('admin.kidsStatusTab.points', { count: kid.balance })}
-                    </span>
-                    {kid.pendingApprovals > 0 && (
-                      <span className={clsx(styles.stat, styles.statPending)}>
-                        <Clock size={13} /> {t('admin.kidsStatusTab.awaitingApproval', { count: kid.pendingApprovals })}
-                      </span>
-                    )}
-                    {b.pendingOnToday > 0 && b.pendingOnToday !== kid.pendingApprovals && (
-                      <span className={clsx(styles.stat, styles.statPending)}>
-                        <Clock size={13} /> {t('admin.kidsStatusTab.pendingToday', { count: b.pendingOnToday })}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                  </span>
+                  <Icon name="chev" className={clsx(styles.caret, isExpanded && styles.caretOpen)} />
+                </span>
 
-                <ChevronDown
-                  size={20}
-                  className={clsx(styles.caret, isExpanded && styles.caretOpen)}
-                />
+                {totalChores === 0 ? (
+                  <span className={styles.noChores}>{t('admin.kidsStatusTab.noChoresScheduled')}</span>
+                ) : (
+                  <>
+                    <span className={styles.progressRow}>
+                      <span className={styles.bar}>
+                        {gatedTotal > 0 && <i style={{ width: `${gatedPct}%` }} />}
+                      </span>
+                      <span className={styles.progressCount}>
+                        {t('admin.kidsStatusTab.progress', { done: gatedCompleted, total: gatedTotal })}
+                      </span>
+                    </span>
+                    <span className={styles.cats}>
+                      {counts.filter(c => c.total > 0).map(c => (
+                        <span key={c.cat} className={styles.catCount}>
+                          <CategoryMark cat={catFromCategory(c.cat)} done={c.done === c.total} />
+                          <span className={ui.srOnlyText}>{t(`design.category.${catFromCategory(c.cat)}`)}</span>
+                          {c.done}/{c.total}
+                        </span>
+                      ))}
+                    </span>
+                    {b.bonusTotal > 0 && !bonusUnlocked && (
+                      <span className={styles.hint}>
+                        <Icon name="lock" /> {t('admin.kidsStatusTab.bonusHint')}
+                      </span>
+                    )}
+                  </>
+                )}
+
+                <span className={styles.stats}>
+                  <span><Icon name="flame" fill className={styles.flame} /> {t('admin.kidsStatusTab.streak', { count: kid.streak })}</span>
+                  <span><Icon name="star" fill className={styles.star} /> {t('admin.kidsStatusTab.points', { count: kid.balance })}</span>
+                  {kid.pendingApprovals > 0 && (
+                    <span className={styles.waiting}>
+                      <Icon name="clock" /> {t('admin.kidsStatusTab.awaitingApproval', { count: kid.pendingApprovals })}
+                    </span>
+                  )}
+                  {b.pendingOnToday > 0 && b.pendingOnToday !== kid.pendingApprovals && (
+                    <span className={styles.waiting}>
+                      <Icon name="clock" /> {t('admin.kidsStatusTab.pendingToday', { count: b.pendingOnToday })}
+                    </span>
+                  )}
+                </span>
               </button>
 
               {isExpanded && (
                 <div id={detailsId} className={styles.details}>
                   {kid.loadError && (
-                    <div className={styles.error}>{t('admin.kidsStatusTab.childLoadError')}</div>
+                    <p className={ui.msgError}>{t('admin.kidsStatusTab.childLoadError')}</p>
                   )}
                   {!kid.loadError && kid.chores.length === 0 && (
-                    <div className={styles.emptyChore}>{t('admin.kidsStatusTab.noChoresScheduledDetail')}</div>
+                    <p className={ui.emptyInline}>{t('admin.kidsStatusTab.noChoresScheduledDetail')}</p>
                   )}
-                  {!kid.loadError && kid.chores.length > 0 && (
-                    <>
-                      {(['required', 'core', 'bonus'] as const).map(cat => {
-                        const items = kid.chores.filter(c => c.category === cat);
-                        if (items.length === 0) return null;
-                        const label = cat === 'required' ? t('admin.kidsStatusTab.labelRequired') : cat === 'core' ? t('admin.kidsStatusTab.labelCore') : t('admin.kidsStatusTab.labelBonus');
-                        return (
-                          <div key={cat} className={styles.categorySection}>
-                            <span className={styles.categoryLabel}>{label}</span>
-                            <div className={styles.choreList}>
-                              {items.map(c => {
-                                const isOverdue = !c.completed && c.expired && c.category !== 'bonus';
-                                const isPending = c.completion_status === 'pending';
-                                const isExcused = c.completion_status === 'excused';
-                                return (
-                                  <div key={c.schedule_id + '-' + c.date} className={styles.choreItem}>
-                                    {isExcused ? (
-                                      <ShieldCheck size={14} className={clsx(styles.choreIcon, styles.choreIconDone)} />
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        className={styles.toggleBtn}
-                                        onClick={(e) => handleToggle(e, kid, c)}
-                                        disabled={toggling !== null}
-                                        aria-label={c.completed
-                                          ? t('admin.kidsStatusTab.markNotDone', { title: c.title, name: kid.user.name })
-                                          : t('admin.kidsStatusTab.markDone', { title: c.title, name: kid.user.name })}
-                                        title={c.completed
-                                          ? t('admin.kidsStatusTab.markNotDone', { title: c.title, name: kid.user.name })
-                                          : t('admin.kidsStatusTab.markDone', { title: c.title, name: kid.user.name })}
-                                      >
-                                        {toggling === `${c.schedule_id}-${c.date}` ? (
-                                          <Loader2 size={14} className={clsx(styles.choreIcon, styles.spin)} />
-                                        ) : c.completed ? (
-                                          <Check size={14} className={clsx(styles.choreIcon, styles.choreIconDone)} />
-                                        ) : isOverdue ? (
-                                          <AlertTriangle size={14} className={clsx(styles.choreIcon, styles.choreIconOverdue)} />
-                                        ) : (
-                                          <Circle size={14} className={styles.choreIcon} />
-                                        )}
-                                      </button>
-                                    )}
-                                    <span className={clsx(styles.choreTitle, c.completed && styles.choreTitleDone)}>
-                                      {c.title}
+                  {!kid.loadError && (['required', 'core', 'bonus'] as const).map(category => {
+                    const items = kid.chores.filter(c => c.category === category);
+                    if (items.length === 0) return null;
+                    const cat = catFromCategory(category);
+                    const done = items.filter(c => c.completed).length;
+                    return (
+                      <div key={category}>
+                        <CategoryHeader cat={cat} as="h4" count={t('admin.kidsStatusTab.catCount', { done, total: items.length })} className={styles.catHead} />
+                        <ul className={styles.choreList}>
+                          {items.map(c => {
+                            const isOverdue = !c.completed && c.expired && c.category !== 'bonus';
+                            const isPending = c.completion_status === 'pending';
+                            const isExcused = c.completion_status === 'excused';
+                            const key = `${c.schedule_id}-${c.date}`;
+                            const label = c.completed
+                              ? t('admin.kidsStatusTab.markNotDone', { title: c.title, name: kid.user.name })
+                              : t('admin.kidsStatusTab.markDone', { title: c.title, name: kid.user.name });
+                            return (
+                              <li key={key} className={clsx(styles.chore, c.completed && styles.choreDone)}>
+                                {isExcused ? (
+                                  <span className={clsx(styles.ring, styles.ringExcused)} aria-hidden>
+                                    <Icon name="check" />
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className={styles.check}
+                                    onClick={(e) => handleToggle(e, kid, c)}
+                                    disabled={toggling !== null}
+                                    aria-label={label}
+                                    title={label}
+                                  >
+                                    <span className={clsx(
+                                      styles.ring,
+                                      c.completed && !isPending && styles.ringDone,
+                                      isPending && styles.ringWaiting,
+                                    )}>
+                                      {toggling === key
+                                        ? <Loader2 aria-hidden className={ui.spin} />
+                                        : c.completed && <Icon name="check" />}
                                     </span>
-                                    {isExcused && (
-                                      <span className={clsx(styles.choreStatus, styles.statusExcused)} title={c.ai_feedback || undefined}>
-                                        {t('admin.kidsStatusTab.statusExcused')}
-                                      </span>
-                                    )}
-                                    {c.completed && isPending && !isExcused && (
-                                      <span className={clsx(styles.choreStatus, styles.statusPending)}>{t('admin.kidsStatusTab.statusPending')}</span>
-                                    )}
-                                    {c.completed && !isPending && !isExcused && (
-                                      <span className={clsx(styles.choreStatus, styles.statusDone)}>
-                                        {t('admin.kidsStatusTab.statusDone', { points: c.points_value })}
-                                      </span>
-                                    )}
-                                    {!c.completed && isOverdue && (
-                                      <span className={clsx(styles.choreStatus, styles.statusOverdue)}>{t('admin.kidsStatusTab.statusOverdue')}</span>
-                                    )}
-                                    {!c.completed && !isOverdue && (
-                                      <span className={clsx(styles.choreStatus, styles.statusIdle)}>
-                                        {t('admin.kidsStatusTab.statusIdle', { points: c.points_value })}
-                                      </span>
-                                    )}
-                                    {!c.completed && (
-                                      <button
-                                        className={styles.excuseBtn}
-                                        onClick={(e) => handleExcuse(e, c)}
-                                        title={t('admin.kidsStatusTab.excuseButtonTooltip')}
-                                      >
-                                        {t('admin.kidsStatusTab.excuseButton')}
-                                      </button>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </>
-                  )}
+                                  </button>
+                                )}
+                                <IconWell icon={c.icon} cat={cat} className={styles.choreWell} />
+                                <span className={styles.choreText}>
+                                  <span className={styles.choreTitle}>{c.title}</span>
+                                  <span className={clsx(
+                                    styles.choreStatus,
+                                    isOverdue && styles.statusUrgent,
+                                    isPending && styles.statusWaiting,
+                                  )} title={isExcused ? c.ai_feedback || undefined : undefined}>
+                                    {isExcused
+                                      ? t('admin.kidsStatusTab.statusExcused')
+                                      : c.completed && isPending
+                                        ? t('admin.kidsStatusTab.statusPending')
+                                        : c.completed
+                                          ? t('admin.kidsStatusTab.statusDone', { points: c.points_value })
+                                          : isOverdue
+                                            ? t('admin.kidsStatusTab.statusOverdue')
+                                            : t('admin.kidsStatusTab.statusIdle', { points: c.points_value })}
+                                  </span>
+                                </span>
+                                {!c.completed && (
+                                  <button
+                                    type="button"
+                                    className={styles.excuse}
+                                    onClick={(e) => handleExcuse(e, c)}
+                                    title={t('admin.kidsStatusTab.excuseButtonTooltip')}
+                                  >
+                                    {t('admin.kidsStatusTab.excuseButton')}
+                                  </button>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -483,12 +442,10 @@ export const KidsStatusTab: React.FC = () => {
       </div>
 
       {actionError && (
-        <div className={styles.error} role="alert" style={{ marginTop: '1rem' }}>{actionError}</div>
+        <p className={ui.msgError} role="alert">{actionError}</p>
       )}
 
-      <p className={styles.refreshHint} style={{ marginTop: '1rem', textAlign: 'center' }}>
-        {t('admin.kidsStatusTab.tapHint')}
-      </p>
+      <p className={styles.tapHint}>{t('admin.kidsStatusTab.tapHint')}</p>
     </div>
   );
 };

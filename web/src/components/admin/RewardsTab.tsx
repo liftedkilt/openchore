@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
+import { Trash2, Pencil, X } from 'lucide-react';
 import { api } from '../../api';
 import type { User, Reward, StreakRewardItem } from '../../types';
-import styles from '../../pages/AdminDashboard.module.css';
-import { Plus, Trash2, Edit2, X, Save, Users, Star, ChevronDown, ChevronUp, Flame } from 'lucide-react';
-import clsx from 'clsx';
+import { Avatar, Icon } from '../../design';
+import { IconPicker, IconWell, personColor } from './pickers';
+import ui from './ui.module.css';
+import styles from './RewardsTab.module.css';
 
 const RewardAssignmentEditor: React.FC<{
   reward: Reward;
@@ -53,45 +56,48 @@ const RewardAssignmentEditor: React.FC<{
   const anyAssigned = assignments.some(a => a.enabled);
 
   return (
-    <div className={styles.assignmentEditor}>
-      <div className={styles.assignmentHint}>
+    <div className={clsx(ui.inset, styles.assign)}>
+      <p className={ui.help}>
         {anyAssigned ? t('admin.rewardsTab.assignmentHintRestricted') : t('admin.rewardsTab.assignmentHintAll')}
-      </div>
+      </p>
       {assignments.map(a => {
         const user = users.find(u => u.id === a.user_id);
         if (!user) return null;
         return (
-          <div key={a.user_id} className={styles.assignmentRow}>
-            <label className={styles.assignmentCheck}>
+          <div key={a.user_id} className={styles.assignRow}>
+            <label className={ui.check}>
               <input type="checkbox" checked={a.enabled} onChange={() => toggle(a.user_id)} />
-              <span>{user.name}</span>
+              <Avatar name={user.name} color={personColor(user)} size="sm" />
+              <span className={ui.checkLabel}>{user.name}</span>
             </label>
             {a.enabled && (
-              <div className={styles.assignmentCost}>
+              <label className={styles.assignCost}>
                 <input
-                  className={styles.input}
+                  className={ui.input}
                   type="number"
                   min="1"
                   value={a.custom_cost}
                   onChange={e => setCost(a.user_id, e.target.value)}
                   placeholder={t('admin.rewardsTab.customCostPlaceholder', { cost: reward.cost })}
+                  aria-label={t('admin.rewardsTab.customCostLabel', { name: user.name })}
                 />
-                <span className={styles.assignmentCostLabel}>{t('admin.rewardsTab.ptsLabel')}</span>
-              </div>
+                <span>{t('admin.rewardsTab.ptsLabel')}</span>
+              </label>
             )}
           </div>
         );
       })}
-      <button className={styles.btnPrimary} onClick={handleSave} disabled={saving} style={{ marginTop: '0.5rem' }}>
-        <Save size={14} /> {t('admin.rewardsTab.saveAssignments')}
-      </button>
+      <div className={ui.actionsEnd}>
+        <button type="button" className={ui.btnPrimary} onClick={handleSave} disabled={saving}>
+          <Icon name="check" /> {t('admin.rewardsTab.saveAssignments')}
+        </button>
+      </div>
     </div>
   );
 };
 
 const RewardForm: React.FC<{
   reward: Reward | null;
-  users: User[];
   onSave: () => void;
   onCancel: () => void;
 }> = ({ reward, onSave, onCancel }) => {
@@ -130,64 +136,51 @@ const RewardForm: React.FC<{
   };
 
   return (
-    <form className={styles.form} onSubmit={handleSubmit}>
-      <div className={styles.formHeader}>
-        <h3>{reward ? t('admin.rewardsTab.editRewardTitle') : t('admin.rewardsTab.newRewardTitle')}</h3>
-        <button type="button" className={styles.iconBtn} onClick={onCancel}><X size={18} /></button>
+    <form className={clsx(ui.card, ui.formGrid)} onSubmit={handleSubmit}>
+      <div className={ui.sectionHead}>
+        <h3 className={ui.sectionTitle}>{reward ? t('admin.rewardsTab.editRewardTitle') : t('admin.rewardsTab.newRewardTitle')}</h3>
+        <button type="button" className={ui.iconBtn} onClick={onCancel} aria-label={t('admin.rewardsTab.cancel')}><X aria-hidden /></button>
       </div>
 
-      <div className={styles.formGrid}>
-        <div className={styles.formRow}>
-          <div className={styles.formGroup} style={{ flex: 3 }}>
-            <label className={styles.label}>{t('admin.rewardsTab.fieldName')}</label>
-            <input className={styles.input} value={name} onChange={e => setName(e.target.value)} required placeholder={t('admin.rewardsTab.fieldNamePlaceholder')} />
-          </div>
-          <div className={styles.formGroup} style={{ flex: 1 }}>
-            <label className={styles.label}>{t('admin.rewardsTab.fieldIcon')}</label>
-            <input className={styles.input} value={icon} onChange={e => setIcon(e.target.value)} placeholder={t('admin.rewardsTab.fieldIconPlaceholder')} style={{ textAlign: 'center', fontSize: '1.5rem' }} />
-          </div>
-        </div>
+      <label className={ui.field}>
+        <span className={ui.label}>{t('admin.rewardsTab.fieldName')}</span>
+        <input className={ui.input} value={name} onChange={e => setName(e.target.value)} required placeholder={t('admin.rewardsTab.fieldNamePlaceholder')} />
+      </label>
 
-        <div className={styles.formGroup}>
-          <label className={styles.label}>{t('admin.rewardsTab.fieldDescription')}</label>
-          <input className={styles.input} value={description} onChange={e => setDescription(e.target.value)} placeholder={t('admin.rewardsTab.fieldDescriptionPlaceholder')} />
-        </div>
+      <IconPicker value={icon} onChange={setIcon} cat="bonus" label={t('admin.rewardsTab.fieldIcon')} />
 
-        <div className={styles.formRow}>
-          <div className={styles.formGroup}>
-            <label className={styles.label} title={t('admin.rewardsTab.fieldCostTitle')}>{t('admin.rewardsTab.fieldCost')}</label>
-            <input className={styles.input} type="number" min="1" value={cost} onChange={e => setCost(e.target.value)} />
-          </div>
-          <div className={styles.formGroup}>
-            <label className={styles.label} title={t('admin.rewardsTab.fieldStockTitle')}>{t('admin.rewardsTab.fieldStock')}</label>
-            <input className={styles.input} type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} placeholder="∞" />
-          </div>
-        </div>
+      <label className={ui.field}>
+        <span className={ui.label}>{t('admin.rewardsTab.fieldDescription')}</span>
+        <input className={ui.input} value={description} onChange={e => setDescription(e.target.value)} placeholder={t('admin.rewardsTab.fieldDescriptionPlaceholder')} />
+      </label>
 
-        <div className={styles.formGroup}>
-          <label className={styles.label} title={t('admin.rewardsTab.fieldShareableTitle')}>
-            <input
-              type="checkbox"
-              checked={shareable}
-              onChange={e => setShareable(e.target.checked)}
-              style={{ marginRight: '0.5rem' }}
-            />
-            {t('admin.rewardsTab.fieldShareableLabel')}
-          </label>
-        </div>
+      <div className={ui.formRow}>
+        <label className={ui.field}>
+          <span className={ui.label} title={t('admin.rewardsTab.fieldCostTitle')}>{t('admin.rewardsTab.fieldCost')}</span>
+          <input className={ui.input} type="number" min="1" value={cost} onChange={e => setCost(e.target.value)} />
+        </label>
+        <label className={ui.field}>
+          <span className={ui.label} title={t('admin.rewardsTab.fieldStockTitle')}>{t('admin.rewardsTab.fieldStock')}</span>
+          <input className={ui.input} type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} placeholder="∞" />
+        </label>
       </div>
 
-      <div className={styles.formActions}>
-        <button type="button" className={styles.btnSecondary} onClick={onCancel}>{t('admin.rewardsTab.cancel')}</button>
-        <button type="submit" className={styles.btnPrimary} disabled={saving || !name || !cost}>
-          <Save size={16} /> {reward ? t('admin.rewardsTab.update') : t('admin.rewardsTab.create')}
+      <label className={ui.check} title={t('admin.rewardsTab.fieldShareableTitle')}>
+        <input type="checkbox" checked={shareable} onChange={e => setShareable(e.target.checked)} />
+        <span className={ui.checkLabel}>{t('admin.rewardsTab.fieldShareableLabel')}</span>
+      </label>
+
+      <div className={ui.actionsEnd}>
+        <button type="button" className={ui.btnGhost} onClick={onCancel}>{t('admin.rewardsTab.cancel')}</button>
+        <button type="submit" className={ui.btnPrimary} disabled={saving || !name || !cost}>
+          <Icon name="check" /> {reward ? t('admin.rewardsTab.update') : t('admin.rewardsTab.create')}
         </button>
       </div>
     </form>
   );
 };
 
-const StreakRewardForm: React.FC<{ onSave: () => void }> = ({ onSave }) => {
+const StreakRewardForm: React.FC<{ onSave: () => void; onCancel: () => void }> = ({ onSave, onCancel }) => {
   const { t } = useTranslation();
   const [days, setDays] = useState('7');
   const [points, setPoints] = useState('25');
@@ -211,24 +204,25 @@ const StreakRewardForm: React.FC<{ onSave: () => void }> = ({ onSave }) => {
   };
 
   return (
-    <form className={styles.form} onSubmit={handleSubmit}>
-      <div className={styles.formRow}>
-        <div className={styles.formGroup}>
-          <label className={styles.label}>{t('admin.rewardsTab.streakFieldDays')}</label>
-          <input className={styles.input} type="number" min="1" value={days} onChange={e => setDays(e.target.value)} />
-        </div>
-        <div className={styles.formGroup}>
-          <label className={styles.label}>{t('admin.rewardsTab.streakFieldBonusPts')}</label>
-          <input className={styles.input} type="number" min="1" value={points} onChange={e => setPoints(e.target.value)} />
-        </div>
-        <div className={styles.formGroup} style={{ flex: 2 }}>
-          <label className={styles.label}>{t('admin.rewardsTab.streakFieldLabel')}</label>
-          <input className={styles.input} value={label} onChange={e => setLabel(e.target.value)} placeholder={t('admin.rewardsTab.streakFieldLabelPlaceholder')} />
-        </div>
+    <form className={clsx(ui.card, ui.formGrid)} onSubmit={handleSubmit}>
+      <div className={ui.formRow}>
+        <label className={ui.field}>
+          <span className={ui.label}>{t('admin.rewardsTab.streakFieldDays')}</span>
+          <input className={ui.input} type="number" min="1" value={days} onChange={e => setDays(e.target.value)} />
+        </label>
+        <label className={ui.field}>
+          <span className={ui.label}>{t('admin.rewardsTab.streakFieldBonusPts')}</span>
+          <input className={ui.input} type="number" min="1" value={points} onChange={e => setPoints(e.target.value)} />
+        </label>
+        <label className={ui.field}>
+          <span className={ui.label}>{t('admin.rewardsTab.streakFieldLabel')}</span>
+          <input className={ui.input} value={label} onChange={e => setLabel(e.target.value)} placeholder={t('admin.rewardsTab.streakFieldLabelPlaceholder')} />
+        </label>
       </div>
-      <div className={styles.formActions}>
-        <button type="submit" className={styles.btnPrimary} disabled={saving || !days || !points}>
-          <Save size={16} /> {t('admin.rewardsTab.addMilestone')}
+      <div className={ui.actionsEnd}>
+        <button type="button" className={ui.btnGhost} onClick={onCancel}>{t('admin.rewardsTab.cancel')}</button>
+        <button type="submit" className={ui.btnPrimary} disabled={saving || !days || !points}>
+          <Icon name="check" /> {t('admin.rewardsTab.addMilestone')}
         </button>
       </div>
     </form>
@@ -269,99 +263,121 @@ export const RewardsTab: React.FC = () => {
   };
 
   return (
-    <div>
-      {/* Rewards */}
-      <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitle}>{t('admin.rewardsTab.rewardsStoreTitle')}</h2>
-        <button className={styles.addBtn} onClick={() => { setEditingReward(null); setShowForm(true); }}>
-          <Plus size={18} /> {t('admin.rewardsTab.addReward')}
+    <div className={ui.page}>
+      <div className={ui.pageHead}>
+        <div>
+          <h2 className={ui.pageTitle}>{t('admin.rewardsTab.rewardsStoreTitle')}</h2>
+          <p className={ui.pageSub}>{t('admin.rewardsTab.subtitle')}</p>
+        </div>
+        <button type="button" className={ui.btnPrimary} onClick={() => { setEditingReward(null); setShowForm(true); }}>
+          <Icon name="plus" /> {t('admin.rewardsTab.addReward')}
         </button>
       </div>
 
       {showForm && (
         <RewardForm
+          key={editingReward?.id ?? 'new'}
           reward={editingReward}
-          users={users}
           onSave={() => { setShowForm(false); setEditingReward(null); load(); }}
           onCancel={() => { setShowForm(false); setEditingReward(null); }}
         />
       )}
 
-      <div className={styles.list}>
-        {rewards.length === 0 && <p className={styles.emptyText}>{t('admin.rewardsTab.noRewards')}</p>}
-        {rewards.map(r => (
-          <div key={r.id} className={styles.listItem}>
-            <div className={styles.listItemMain}>
-              {r.icon && <span className={styles.rewardIconLg}>{r.icon}</span>}
-              <div className={styles.listItemInfo}>
-                <h3 className={styles.listItemTitle}>{r.name}</h3>
-                {r.description && <p className={styles.listItemDesc}>{r.description}</p>}
-                <div className={styles.listItemMeta}>
-                  <span><Star size={12} /> {r.cost} {t('admin.rewardsTab.pts')}</span>
-                  <span>{r.stock !== null && r.stock !== undefined ? t('admin.rewardsTab.inStock', { count: r.stock }) : t('admin.rewardsTab.unlimited')}</span>
-                  <span className={r.active ? styles.statusActive : styles.statusInactive}>
-                    {r.active ? t('admin.rewardsTab.active') : t('admin.rewardsTab.inactive')}
+      {rewards.length === 0 ? (
+        <p className={ui.emptyInline}>{t('admin.rewardsTab.noRewards')}</p>
+      ) : (
+        <div className={ui.list}>
+          {rewards.map(r => {
+            const assigned = (r.assignments ?? [])
+              .map(a => users.find(u => u.id === a.user_id))
+              .filter((u): u is User => !!u);
+            const open = expandedAssignments === r.id;
+            return (
+              <div key={r.id} className={styles.item}>
+                <div className={clsx(ui.row, !r.active && ui.rowMuted)}>
+                  <IconWell icon={r.icon} cat="bonus" />
+                  <div className={ui.rowMain}>
+                    <span className={ui.rowTitle}>{r.name}</span>
+                    {r.description && <span className={ui.rowDesc}>{r.description}</span>}
+                    <span className={ui.rowMeta}>
+                      <span><Icon name="star" /> {r.cost} {t('admin.rewardsTab.pts')}</span>
+                      <span>{r.stock !== null && r.stock !== undefined ? t('admin.rewardsTab.inStock', { count: r.stock }) : t('admin.rewardsTab.unlimited')}</span>
+                      {r.shareable && <span><Icon name="people" /> {t('admin.rewardsTab.shareable')}</span>}
+                      {!r.active && <span className={ui.badgeOutline}>{t('admin.rewardsTab.inactive')}</span>}
+                    </span>
+                    <button type="button" className={styles.assignToggle} aria-expanded={open} onClick={() => toggleAssignments(r.id)}>
+                      {assigned.length > 0 ? (
+                        <span className={styles.stack} aria-hidden>
+                          {assigned.slice(0, 5).map(u => <Avatar key={u.id} name={u.name} color={personColor(u)} size="sm" />)}
+                        </span>
+                      ) : <Icon name="people" />}
+                      {assigned.length > 0
+                        ? t('admin.rewardsTab.kidsAssigned', { count: assigned.length })
+                        : t('admin.rewardsTab.allKids')}
+                      <Icon name="chev" className={clsx(styles.caret, open && styles.caretOpen)} />
+                    </button>
+                  </div>
+                  <div className={ui.rowActions}>
+                    <button type="button" className={ui.iconBtn} aria-label={t('admin.rewardsTab.ariaEditReward')} title={t('admin.rewardsTab.ariaEditReward')} onClick={() => { setEditingReward(r); setShowForm(true); }}>
+                      <Pencil aria-hidden />
+                    </button>
+                    <button type="button" className={clsx(ui.iconBtn, ui.iconBtnDanger)} aria-label={t('admin.rewardsTab.ariaDeleteReward')} title={t('admin.rewardsTab.ariaDeleteReward')} onClick={() => handleDeleteReward(r.id)}>
+                      <Trash2 aria-hidden />
+                    </button>
+                  </div>
+                </div>
+                {open && (
+                  <div className={styles.assignWrap}>
+                    <RewardAssignmentEditor reward={r} users={users} onSave={load} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <section className={ui.section}>
+        <div className={ui.pageHead}>
+          <div>
+            <h2 className={ui.pageTitle}>{t('admin.rewardsTab.streakMilestonesTitle')}</h2>
+            <p className={ui.pageSub}>{t('admin.rewardsTab.streakSubtitle')}</p>
+          </div>
+          {!showStreakForm && (
+            <button type="button" className={ui.btnPrimary} onClick={() => setShowStreakForm(true)}>
+              <Icon name="plus" /> {t('admin.rewardsTab.addMilestone')}
+            </button>
+          )}
+        </div>
+
+        {showStreakForm && <StreakRewardForm onSave={() => { setShowStreakForm(false); load(); }} onCancel={() => setShowStreakForm(false)} />}
+
+        {streakRewards.length === 0 ? (
+          <p className={ui.emptyInline}>{t('admin.rewardsTab.noStreakMilestones')}</p>
+        ) : (
+          <div className={ui.list}>
+            {streakRewards.map(sr => (
+              <div key={sr.id} className={ui.row}>
+                <span className={styles.streakBadge}>
+                  <Icon name="flame" fill />
+                  {t('admin.rewardsTab.streakDays', { count: sr.streak_days })}
+                </span>
+                <div className={ui.rowMain}>
+                  <span className={ui.rowTitle}>{sr.label || `${sr.streak_days}-Day Streak`}</span>
+                  <span className={ui.rowMeta}>
+                    <span><Icon name="star" /> +{sr.bonus_points} {t('admin.rewardsTab.bonusPts')}</span>
                   </span>
                 </div>
-                <button className={styles.assignmentToggle} onClick={() => toggleAssignments(r.id)}>
-                  <Users size={12} />
-                  {r.assignments && r.assignments.length > 0
-                    ? t('admin.rewardsTab.kidsAssigned', { count: r.assignments.length })
-                    : t('admin.rewardsTab.allKids')}
-                  {expandedAssignments === r.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                </button>
-              </div>
-              <div className={styles.listItemActions}>
-                <button className={styles.iconBtn} aria-label={t('admin.rewardsTab.ariaEditReward')} onClick={() => { setEditingReward(r); setShowForm(true); }}>
-                  <Edit2 size={16} />
-                </button>
-                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} aria-label={t('admin.rewardsTab.ariaDeleteReward')} onClick={() => handleDeleteReward(r.id)}>
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-            {expandedAssignments === r.id && (
-              <RewardAssignmentEditor reward={r} users={users} onSave={load} />
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Streak Milestones */}
-      <div className={styles.sectionHeader} style={{ marginTop: '2rem' }}>
-        <h2 className={styles.sectionTitle}>
-          <Flame size={18} style={{ color: '#f59e0b', marginRight: '0.4rem' }} />
-          {t('admin.rewardsTab.streakMilestonesTitle')}
-        </h2>
-        <button className={styles.addBtn} onClick={() => setShowStreakForm(!showStreakForm)}>
-          {showStreakForm ? <X size={18} /> : <Plus size={18} />}
-          {showStreakForm ? t('admin.rewardsTab.cancel') : t('admin.rewardsTab.add')}
-        </button>
-      </div>
-
-      {showStreakForm && <StreakRewardForm onSave={() => { setShowStreakForm(false); load(); }} />}
-
-      <div className={styles.list}>
-        {streakRewards.length === 0 && <p className={styles.emptyText}>{t('admin.rewardsTab.noStreakMilestones')}</p>}
-        {streakRewards.map(sr => (
-          <div key={sr.id} className={styles.listItem}>
-            <div className={styles.listItemMain}>
-              <div className={styles.streakBadge}>{sr.streak_days}d</div>
-              <div className={styles.listItemInfo}>
-                <h3 className={styles.listItemTitle}>{sr.label || `${sr.streak_days}-Day Streak`}</h3>
-                <div className={styles.listItemMeta}>
-                  <span><Star size={12} /> +{sr.bonus_points} {t('admin.rewardsTab.bonusPts')}</span>
+                <div className={ui.rowActions}>
+                  <button type="button" className={clsx(ui.iconBtn, ui.iconBtnDanger)} aria-label={t('admin.rewardsTab.ariaDeleteStreakReward')} title={t('admin.rewardsTab.ariaDeleteStreakReward')} onClick={() => handleDeleteStreakReward(sr.id)}>
+                    <Trash2 aria-hidden />
+                  </button>
                 </div>
               </div>
-              <div className={styles.listItemActions}>
-                <button className={clsx(styles.iconBtn, styles.iconBtnDanger)} aria-label={t('admin.rewardsTab.ariaDeleteStreakReward')} onClick={() => handleDeleteStreakReward(sr.id)}>
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )}
+      </section>
     </div>
   );
 };

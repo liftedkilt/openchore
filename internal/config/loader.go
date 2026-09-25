@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
@@ -48,10 +49,18 @@ func Apply(ctx context.Context, s *store.Store, cfg *Config) error {
 	// 1. Create users, build name→ID map
 	nameToID := make(map[string]int64, len(cfg.Users))
 	for _, u := range cfg.Users {
+		theme, ok := normalizeTheme(u.Theme)
+		if !ok {
+			return fmt.Errorf("user %q: unknown theme %q", u.Name, u.Theme)
+		}
+		if u.Color != "" && !model.ValidPersonColor(u.Color) {
+			return fmt.Errorf("user %q: unknown color %q", u.Name, u.Color)
+		}
 		user := &model.User{
 			Name:      u.Name,
 			Role:      u.Role,
-			Theme:     u.Theme,
+			Theme:     theme,
+			Color:     u.Color,
 			AvatarURL: u.Avatar,
 		}
 		if u.Pin != "" {
@@ -194,28 +203,15 @@ func Apply(ctx context.Context, s *store.Store, cfg *Config) error {
 	// 6. Apply AI settings (if provided)
 	if cfg.AI != nil {
 		aiSettings := map[string]string{
-			"ai_enabled": "false",
-		}
-		if cfg.AI.Enabled {
-			aiSettings["ai_enabled"] = "true"
-		}
-		if cfg.AI.Endpoint != "" {
-			aiSettings["ai_endpoint"] = cfg.AI.Endpoint
-		}
-		if cfg.AI.Model != "" {
-			aiSettings["ai_model"] = cfg.AI.Model
+			"ai_photo_review":   strconv.FormatBool(cfg.AI.PhotoReview),
+			"ai_auto_approve":   strconv.FormatBool(cfg.AI.AutoApprove),
+			"ai_weekly_summary": strconv.FormatBool(cfg.AI.WeeklySummary),
 		}
 		if cfg.AI.AutoApproveThreshold > 0 {
 			aiSettings["ai_auto_approve_threshold"] = fmt.Sprintf("%.2f", cfg.AI.AutoApproveThreshold)
 		}
-		if cfg.AI.TTSEnabled {
-			aiSettings["ai_tts_enabled"] = "true"
-		}
-		if cfg.AI.TTSEndpoint != "" {
-			aiSettings["ai_tts_endpoint"] = cfg.AI.TTSEndpoint
-		}
 		if cfg.AI.TTSVoice != "" {
-			aiSettings["ai_tts_voice"] = cfg.AI.TTSVoice
+			aiSettings["tts_voice"] = cfg.AI.TTSVoice
 		}
 		for k, v := range aiSettings {
 			if err := s.SetSetting(ctx, k, v); err != nil {
@@ -227,6 +223,26 @@ func Apply(ctx context.Context, s *store.Store, cfg *Config) error {
 
 	log.Println("config: configuration applied successfully")
 	return nil
+}
+
+// legacyThemes maps pre-redesign theme names to skins.
+var legacyThemes = map[string]string{
+	"default": model.ThemeSunroom,
+	"forest":  model.ThemeSunroom,
+	"quest":   model.ThemeBlocks,
+	"galaxy":  model.ThemeTint,
+}
+
+// normalizeTheme returns the skin for a configured theme, mapping legacy
+// names. Empty stays empty. ok is false for an unknown name.
+func normalizeTheme(t string) (string, bool) {
+	if t == "" || model.ValidTheme(t) {
+		return t, true
+	}
+	if mapped, found := legacyThemes[t]; found {
+		return mapped, true
+	}
+	return "", false
 }
 
 func nilStr(s string) *string {

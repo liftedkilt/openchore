@@ -33,14 +33,19 @@ export async function openAdminTab(page: Page, label: RegExp | string) {
   await page.getByRole('button', { name: matcher }).click();
 }
 
+/** The family picker's door button for a person (their name also appears in the family strip). */
+export function profileButton(page: Page, name: string) {
+  return page.getByRole('button', { name: `Select profile for ${name}`, exact: true });
+}
+
 /** Select a user profile by name from the /login screen. */
 export async function selectUser(page: Page, name: string) {
   await page.goto('/login');
-  await page.getByText(name, { exact: true }).click();
+  await profileButton(page, name).click();
   await page.waitForURL('/');
 }
 
-const API_ORIGIN = 'http://localhost:8080';
+const API_ORIGIN = `http://localhost:${process.env.E2E_API_PORT || '8080'}`;
 const tokenCache = new Map<string, string>();
 
 /**

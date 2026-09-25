@@ -6,25 +6,36 @@
 # Admins (parents) manage the household and can also be assigned chores,
 # earn points and redeem rewards. Every admin needs a PIN (4-8 digits) or a
 # linked OIDC account to sign in. Kids may have a PIN too, or none at all.
+#
+# theme: the person's skin: sunroom, blocks or tint. Leave it empty to let
+#   the app pick by age (Blocks under 8, Sunroom otherwise). Legacy names
+#   (default, quest, galaxy, forest) are still accepted and mapped.
+# color: the person's colour: coral, mint, butter, sky, rose, leaf, lilac or
+#   sand. Leave it empty to get the next colour nobody has yet.
 users:
   - name: Alex
     role: admin
     pin: "1234"
+    color: sky
   - name: Jamie
     role: admin
     pin: "5678"
+    color: rose
   - name: Emma
     role: child
     age: 11
-    theme: default
+    theme: sunroom
+    color: coral
   - name: Lily
     role: child
     age: 9
-    theme: default
+    theme: tint
+    color: mint
   - name: Noah
     role: child
     age: 7
-    theme: default
+    theme: blocks
+    color: butter
 
 chores:
   # === Required daily chores ===
@@ -296,19 +307,16 @@ streak_rewards:
 
 settings: {}
 
-# AI-powered features (requires LiteRT + Kokoro sidecars — see compose.yaml)
-# Enable with: docker compose --profile ai up
-# These settings are stored in the database and can be changed from the admin UI.
-# Values here are only applied on first boot (like all config).
-# For existing installs, configure via Admin > Settings > AI Photo Review.
+# Optional AI behaviour. Which model and speech servers to use comes from the
+# environment (AI_BASE_URL, AI_MODEL, TTS_BASE_URL, ...) — see docs/ai.md.
+# Like the rest of this file, these are only applied on first boot; change
+# them later under Admin > Settings.
 ai:
-  enabled: false
-  endpoint: "http://litert:8080"     # LiteRT sidecar (or http://ollama:11434 for Ollama)
-  model: "gemma4:e4b"              # Vision + text model
-  auto_approve_threshold: 0.85
-  tts_enabled: false
-  tts_endpoint: "http://kokoro:8880"  # Kokoro-FastAPI (OpenAI-compatible TTS)
-  tts_voice: "af_heart"               # Warm, kid-friendly voice
+  photo_review: false          # AI adds a note to photo chores awaiting approval
+  auto_approve: false          # ...and approves them itself when clearly done
+  auto_approve_threshold: 0.85 # confidence needed to auto-approve
+  weekly_summary: false        # write each person's week up on Monday
+  tts_voice: "af_heart"        # read-aloud voice (Kokoro; e.g. "alloy" for OpenAI)
 
 # Webhook subsystem tunables.
 # These apply at server startup — changes require a restart.

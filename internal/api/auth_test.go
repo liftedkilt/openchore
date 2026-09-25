@@ -337,7 +337,7 @@ func TestParentCompletesKidsChoreOnTheirBehalf(t *testing.T) {
 	kid := env.createChild(t, "Kid")
 	sched := env.createScheduledChore(t, "Photo chore", kid, map[string]any{"requires_photo": true})
 
-	// The kid still needs a photo...
+	// The kid still needs a photo (or to skip it and wait for approval)...
 	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", sched), map[string]any{},
 		childHeaders(kid), http.StatusBadRequest)
 
@@ -371,7 +371,7 @@ func TestParentsTakePart(t *testing.T) {
 	}
 
 	// Parents can pick a theme like everyone else.
-	env.expectStatus(t, "PUT", "/api/users/1/theme", map[string]any{"theme": "galaxy"},
+	env.expectStatus(t, "PUT", "/api/users/1/theme", map[string]any{"theme": "tint"},
 		adminHeaders(), http.StatusOK)
 }
 
@@ -783,14 +783,14 @@ func TestCrossOriginCookieWritesBlocked(t *testing.T) {
 		return h
 	}
 	// A sibling app on another subdomain can't write with the kid's cookie...
-	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/theme", kid), map[string]any{"theme": "galaxy"},
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/theme", kid), map[string]any{"theme": "tint"},
 		withOrigin("http://evil.home.lan"), http.StatusForbidden)
 	// ...but the app itself (same host, any port) can.
-	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/theme", kid), map[string]any{"theme": "galaxy"},
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/theme", kid), map[string]any{"theme": "tint"},
 		withOrigin("http://"+strings.Split(host, ":")[0]+":5173"), http.StatusOK)
 	// Reads and non-browser clients are unaffected.
 	env.expectStatus(t, "GET", "/api/auth/me", nil, withOrigin("http://evil.home.lan"), http.StatusOK)
 	h := sessionHeaders(kid)
 	h["Origin"] = "http://evil.home.lan"
-	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/theme", kid), map[string]any{"theme": "forest"}, h, http.StatusOK)
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/theme", kid), map[string]any{"theme": "sunroom"}, h, http.StatusOK)
 }

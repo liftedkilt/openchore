@@ -1,26 +1,33 @@
+/* Modal draws its card in the tokens of the scope that opened it, so the
+   body needs no surface of its own. */
 .body {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: var(--space-3);
+  color: var(--ink);
+  font-family: var(--font-text);
 }
 
 .hint {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  line-height: 1.5;
+  margin: 0;
+  font-size: 15px;
+  line-height: var(--type-body-line);
+  font-weight: 500;
+  color: var(--ink-muted);
 }
 
 .empty {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  font-style: italic;
+  margin: 0;
+  font-size: var(--type-meta-size);
+  font-weight: 600;
+  color: var(--ink-muted);
 }
 
 .list {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2);
   padding: 0;
   margin: 0;
 }
@@ -29,28 +36,30 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--oc-radius-md);
+  background: var(--surface-raised);
+  border: var(--outline-w) solid var(--line);
+  box-shadow: var(--lift);
 }
 
 .provider {
   font-weight: 700;
-  color: var(--text-primary);
 }
 
 .detail {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-line);
+  font-weight: 500;
+  color: var(--ink-muted);
   overflow-wrap: anywhere;
 }
 
 .linkButtons {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .linkBtn,
@@ -59,46 +68,53 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  padding: 0.6rem 1rem;
-  border-radius: 12px;
-  font-weight: 600;
-  font-size: 0.9rem;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  box-sizing: border-box;
+  border-radius: var(--r-btn);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 15px;
   text-decoration: none;
   cursor: pointer;
 }
 
 .linkBtn {
-  color: var(--text-primary);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
+  justify-content: space-between;
+  min-height: 48px;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: var(--outline-w) solid var(--line);
+  box-shadow: var(--lift);
 }
 
-.linkBtn:hover {
-  border-color: var(--accent-blue);
-  color: var(--accent-blue);
-}
+.linkBtn :global(.oc-icon) { width: 18px; height: 18px; }
 
 .unlinkBtn {
   flex-shrink: 0;
-  color: #f87171;
+  color: var(--urgent);
   background: transparent;
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  border: 1.5px solid currentColor;
 }
 
 .signOutAll {
-  margin-top: 0.5rem;
-  color: var(--text-secondary);
+  margin-top: var(--space-2);
+  color: var(--ink);
   background: transparent;
-  border: 1px dashed var(--border-subtle);
+  border: 1.5px dashed var(--ink-muted);
 }
 
-.signOutAll:hover {
-  color: var(--text-primary);
+.linkBtn:focus-visible,
+.unlinkBtn:focus-visible,
+.signOutAll:focus-visible {
+  outline: 2.5px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .error {
-  color: #f87171;
-  font-size: 0.85rem;
-  font-weight: 600;
+  margin: 0;
+  color: var(--urgent);
+  font-size: 15px;
+  font-weight: 700;
 }

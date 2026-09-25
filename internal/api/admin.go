@@ -12,13 +12,11 @@ import (
 // writableSettings is the allowlist of setting keys that can be written via
 // the admin API.  Keys not in this set are rejected with 400.
 var writableSettings = map[string]bool{
-	"ai_enabled":                true,
-	"ai_endpoint":               true,
-	"ai_model":                  true,
+	"ai_photo_review":           true,
+	"ai_auto_approve":           true,
 	"ai_auto_approve_threshold": true,
-	"ai_tts_enabled":            true,
-	"ai_tts_endpoint":           true,
-	"ai_tts_voice":              true,
+	"ai_weekly_summary":         true,
+	"tts_voice":                 true,
 	"base_url":                  true,
 	"discord_webhook_url":       true,
 }

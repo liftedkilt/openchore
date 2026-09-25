@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Modal from '../Modal/Modal';
 import { api } from '../../api';
 import { localDateStr, toggleInArray } from '../../utils';
 import type { Chore, User } from '../../types';
+import { PersonToggle } from '../admin/pickers';
 import styles from './QuickAssign.module.css';
-import clsx from 'clsx';
 
 interface Props {
   isOpen: boolean;
@@ -90,22 +89,29 @@ const QuickAssign: React.FC<Props> = ({ isOpen, onClose }) => {
         )
       );
       onClose();
-    } catch (err: any) {
-      setError(err.message || t('dashboard.quickAssign.errorFailed'));
+    } catch (err: unknown) {
+      setError(err instanceof Error && err.message ? err.message : t('dashboard.quickAssign.errorFailed'));
     } finally {
       setAssigning(false);
     }
   };
 
+  const dates: { id: 'today' | 'tomorrow' | 'custom'; label: string }[] = [
+    { id: 'today', label: t('dashboard.quickAssign.dateToday') },
+    { id: 'tomorrow', label: t('dashboard.quickAssign.dateTomorrow') },
+    { id: 'custom', label: t('dashboard.quickAssign.datePickDate') },
+  ];
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t('dashboard.quickAssign.title')} maxWidth="420px">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('dashboard.quickAssign.title')} maxWidth="460px">
       <div className={styles.form}>
-        {error && <div className={styles.error}>{error}</div>}
+        {error && <p className={styles.error} role="alert">{error}</p>}
 
         <div className={styles.section}>
-          <label className={styles.label}>{t('dashboard.quickAssign.labelChore')}</label>
+          <label className={styles.label} htmlFor="quick-assign-chore">{t('dashboard.quickAssign.labelChore')}</label>
           <select
-            className={styles.select}
+            id="quick-assign-chore"
+            className={styles.input}
             value={selectedChoreId}
             onChange={e => {
               const val = e.target.value;
@@ -125,76 +131,62 @@ const QuickAssign: React.FC<Props> = ({ isOpen, onClose }) => {
                 className={styles.input}
                 type="text"
                 placeholder={t('dashboard.quickAssign.choreNamePlaceholder')}
+                aria-label={t('dashboard.quickAssign.choreNamePlaceholder')}
                 value={newTitle}
                 onChange={e => setNewTitle(e.target.value)}
                 autoFocus
               />
-              <div className={styles.pointsRow}>
-                <label className={styles.labelSmall}>{t('dashboard.quickAssign.labelPoints')}</label>
+              <label className={styles.pointsRow}>
+                <span className={styles.labelSmall}>{t('dashboard.quickAssign.labelPoints')}</span>
                 <input
-                  className={clsx(styles.input, styles.pointsInput)}
+                  className={styles.input}
                   type="number"
                   min={0}
                   value={newPoints}
                   onChange={e => setNewPoints(Number(e.target.value))}
                 />
-              </div>
+              </label>
             </div>
           )}
         </div>
 
         <div className={styles.section}>
-          <label className={styles.label}>{t('dashboard.quickAssign.labelWho')}</label>
-          <div className={styles.avatarPicker}>
+          <span className={styles.label}>{t('dashboard.quickAssign.labelWho')}</span>
+          <div className={styles.chips}>
             {users.map(u => (
-              <button
-                key={u.id}
-                className={clsx(styles.avatarBubble, selectedUserIds.includes(u.id) && styles.avatarBubbleActive)}
-                onClick={() => toggleUser(u.id)}
-              >
-                {u.avatar_url
-                  ? <img src={u.avatar_url} alt={u.name} className={styles.avatarImg} />
-                  : <div className={styles.avatarPlaceholder}>{u.name[0]}</div>
-                }
-                <span className={styles.avatarName}>{u.name}</span>
-              </button>
+              <PersonToggle key={u.id} user={u} pressed={selectedUserIds.includes(u.id)} onClick={() => toggleUser(u.id)} />
             ))}
           </div>
         </div>
 
         <div className={styles.section}>
-          <label className={styles.label}>{t('dashboard.quickAssign.labelWhen')}</label>
-          <div className={styles.datePicker}>
-            <button
-              className={clsx(styles.dateChip, dateMode === 'today' && styles.dateChipActive)}
-              onClick={() => setDateMode('today')}
-            >
-              {t('dashboard.quickAssign.dateToday')}
-            </button>
-            <button
-              className={clsx(styles.dateChip, dateMode === 'tomorrow' && styles.dateChipActive)}
-              onClick={() => setDateMode('tomorrow')}
-            >
-              {t('dashboard.quickAssign.dateTomorrow')}
-            </button>
-            <button
-              className={clsx(styles.dateChip, dateMode === 'custom' && styles.dateChipActive)}
-              onClick={() => setDateMode('custom')}
-            >
-              {t('dashboard.quickAssign.datePickDate')}
-            </button>
+          <span className={styles.label}>{t('dashboard.quickAssign.labelWhen')}</span>
+          <div className={styles.chips}>
+            {dates.map(d => (
+              <button
+                key={d.id}
+                type="button"
+                className={styles.chip}
+                aria-pressed={dateMode === d.id}
+                onClick={() => setDateMode(d.id)}
+              >
+                {d.label}
+              </button>
+            ))}
           </div>
           {dateMode === 'custom' && (
             <input
               className={styles.input}
               type="date"
               value={customDate}
+              aria-label={t('dashboard.quickAssign.datePickDate')}
               onChange={e => setCustomDate(e.target.value)}
             />
           )}
         </div>
 
         <button
+          type="button"
           className={styles.assignBtn}
           disabled={!canAssign || assigning}
           onClick={handleAssign}

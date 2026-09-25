@@ -1,139 +1,187 @@
-import React from 'react';
-import { useTranslation } from 'react-i18next';
+import { useId } from 'react';
+import clsx from 'clsx';
+import { useWidth } from './useWidth';
+import { spreadLabels } from './personColor';
+import styles from './Charts.module.css';
 
-export interface LineChartPoint {
+export interface LinePoint {
+  x: number;
+  y: number;
+}
+
+export interface LineSeries {
+  key: string;
+  /** Shown in the legend and at the line's end. */
   label: string;
+  /** Any CSS colour expression, normally a token: `var(--person-mint)`. */
+  color: string;
+  points: LinePoint[];
+  /** Dashed stroke (a second encoding beside colour). */
+  dashed?: boolean;
+  /** Tint the area under the line. */
+  area?: boolean;
+  /** Draw as steps (value holds until the next point). */
+  step?: boolean;
+}
+
+export interface Tick {
   value: number;
+  label: string;
 }
 
-interface LineChartSeries {
-  data: LineChartPoint[];
-  color?: string;
-  label?: string;
-  filled?: boolean;
-}
-
-interface LineChartProps {
-  series: LineChartSeries[];
+export interface LineChartProps {
+  /** The chart's accessible name. */
+  title: string;
+  /** A one- or two-sentence summary for screen readers. */
+  description?: string;
+  series: LineSeries[];
+  xDomain: [number, number];
+  yDomain?: [number, number];
+  xTicks: Tick[];
+  yTicks?: Tick[];
+  /** A vertical "now" rule. */
+  marker?: { x: number; label?: string };
+  /** Hover text for a point. */
+  pointTitle?: (s: LineSeries, p: LinePoint) => string;
+  /** Draw point dots (with hover titles) when a series has this many points or fewer. */
+  maxDots?: number;
   height?: number;
+  /** Hide the legend row (e.g. when the lines are labelled elsewhere). */
+  hideLegend?: boolean;
+  className?: string;
 }
 
-export const LineChart: React.FC<LineChartProps> = ({
-  series,
-  height = 200,
-}) => {
-  const { t } = useTranslation();
-  if (series.length === 0 || series.every(s => s.data.length === 0)) {
-    return (
-      <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-        {t('reports.lineChart.noData')}
-      </div>
-    );
-  }
+/** A round step (1, 2 or 5 × 10^n, at least 1) near `raw`. */
+export function niceStep(raw: number): number {
+  if (!(raw > 1)) return 1;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const f = raw / mag;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * mag;
+}
 
-  const allValues = series.flatMap(s => s.data.map(d => d.value));
-  const maxValue = Math.max(...allValues, 1);
-  const maxLen = Math.max(...series.map(s => s.data.length));
-  const labels = series[0]?.data.map(d => d.label) || [];
+const PAD_T = 12;
+const PAD_B = 26;
+const PAD_L = 40;
+const LABEL_GAP = 16;
 
-  const padding = { top: 10, right: 15, bottom: 40, left: 35 };
-  const chartWidth = 400;
-  const chartHeight = height;
-  const innerWidth = chartWidth - padding.left - padding.right;
-  const innerHeight = chartHeight - padding.top - padding.bottom;
+/**
+ * A line chart drawn in the current theme's tokens: gridlines in `--line`,
+ * axis text in `--ink-muted`, series in whatever colour they carry (people's
+ * colours for per-person series). Every series is named twice — in the legend
+ * and at the end of its line — so no one has to match colours.
+ */
+export function LineChart({
+  title, description, series, xDomain, yDomain, xTicks, yTicks, marker, pointTitle,
+  maxDots = 40, height = 220, hideLegend, className,
+}: LineChartProps) {
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const uid = useId();
+  const titleId = `${uid}-t`;
+  const descId = `${uid}-d`;
 
-  const getX = (i: number) => padding.left + (maxLen > 1 ? (i / (maxLen - 1)) * innerWidth : innerWidth / 2);
-  const getY = (v: number) => padding.top + innerHeight - (v / maxValue) * innerHeight;
+  const longest = Math.max(0, ...series.map((s) => s.label.length));
+  const padR = series.length ? Math.min(140, 22 + longest * 7.5) : 12;
+  const innerW = Math.max(40, width - PAD_L - padR);
+  const innerH = Math.max(40, height - PAD_T - PAD_B);
 
-  // Show at most ~8 labels
-  const labelStep = Math.max(1, Math.ceil(maxLen / 8));
+  const allY = series.flatMap((s) => s.points.map((p) => p.y));
+  const autoStep = niceStep(Math.max(1, ...allY) / 4);
+  const [y0, y1] = yDomain ?? [0, Math.ceil(Math.max(1, ...allY) / autoStep) * autoStep];
+  const [x0, x1] = xDomain;
+  const sx = (x: number) => PAD_L + ((Math.min(Math.max(x, x0), x1) - x0) / Math.max(1e-9, x1 - x0)) * innerW;
+  const sy = (y: number) => PAD_T + innerH - ((Math.min(Math.max(y, y0), y1) - y0) / Math.max(1e-9, y1 - y0)) * innerH;
+  const baseY = PAD_T + innerH;
+
+  const grid: Tick[] = yTicks ?? Array.from({ length: Math.round((y1 - y0) / autoStep) + 1 }, (_, i) => {
+    const v = y0 + i * autoStep;
+    return { value: v, label: String(v) };
+  });
+
+  const paths = series.map((s) => {
+    const pts: [number, number][] = [];
+    s.points.forEach((p, i) => {
+      if (s.step && i > 0) pts.push([sx(p.x), sy(s.points[i - 1].y)]);
+      pts.push([sx(p.x), sy(p.y)]);
+    });
+    const d = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
+    const area = s.area && pts.length > 1
+      ? `${d} L${pts[pts.length - 1][0].toFixed(1)} ${baseY} L${pts[0][0].toFixed(1)} ${baseY} Z`
+      : null;
+    const last = pts[pts.length - 1];
+    return { s, d, area, last };
+  });
+
+  const ends = paths.filter((p) => p.last);
+  const labelYs = spreadLabels(ends.map((p) => p.last![1]), LABEL_GAP, PAD_T + 4, baseY);
 
   return (
-    <svg width="100%" height={chartHeight} viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMidYMid meet">
-      {/* Grid lines */}
-      {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
-        const y = padding.top + innerHeight * (1 - frac);
-        const val = Math.round(maxValue * frac);
-        return (
-          <g key={frac}>
-            <line
-              x1={padding.left}
-              y1={y}
-              x2={chartWidth - padding.right}
-              y2={y}
-              stroke="var(--text-secondary)"
-              strokeOpacity={0.1}
-              strokeDasharray="3,3"
-            />
-            <text
-              x={padding.left - 6}
-              y={y + 3}
-              textAnchor="end"
-              fill="var(--text-secondary)"
-              fontSize="9"
-            >
-              {val}
-            </text>
-          </g>
-        );
-      })}
+    <figure className={clsx(styles.figure, className)}>
+      {!hideLegend && series.length > 1 && (
+        <ul className={styles.legend} aria-hidden>
+          {series.map((s) => (
+            <li key={s.key}>
+              <svg width="18" height="10" aria-hidden focusable="false">
+                <line x1="1" y1="5" x2="17" y2="5" style={{ stroke: s.color }} strokeWidth="3" strokeLinecap="round"
+                  strokeDasharray={s.dashed ? '3 4' : undefined} />
+              </svg>
+              {s.label}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div ref={ref} className={styles.plot}>
+        <svg
+          className={styles.svg}
+          width={width}
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-labelledby={titleId}
+          aria-describedby={description ? descId : undefined}
+        >
+          <title id={titleId}>{title}</title>
+          {description && <desc id={descId}>{description}</desc>}
 
-      {/* Series */}
-      {series.map((s, si) => {
-        const color = s.color || 'var(--accent-blue)';
-        const points = s.data.map((d, i) => `${getX(i)},${getY(d.value)}`);
+          {grid.map((t) => (
+            <g key={t.value}>
+              <line className={styles.grid} x1={PAD_L} x2={PAD_L + innerW} y1={sy(t.value)} y2={sy(t.value)} />
+              <text className={styles.axis} x={PAD_L - 8} y={sy(t.value)} textAnchor="end" dominantBaseline="middle">{t.label}</text>
+            </g>
+          ))}
+          {xTicks.map((t, i) => (
+            <text key={i} className={styles.axis} x={sx(t.value)} y={height - 8} textAnchor="middle">{t.label}</text>
+          ))}
 
-        if (points.length === 0) return null;
+          {marker && marker.x >= x0 && marker.x <= x1 && (
+            <g>
+              <line className={styles.marker} x1={sx(marker.x)} x2={sx(marker.x)} y1={PAD_T} y2={baseY} />
+              {marker.label && (
+                <text className={styles.axis} x={sx(marker.x)} y={PAD_T - 2} textAnchor="middle">{marker.label}</text>
+              )}
+            </g>
+          )}
 
-        const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p}`).join(' ');
+          {paths.map(({ s, area }) => area && (
+            <path key={`${s.key}-a`} d={area} className={styles.area} style={{ fill: s.color }} />
+          ))}
+          {paths.map(({ s, d }) => (
+            <path key={s.key} d={d} className={styles.line} style={{ stroke: s.color }}
+              strokeDasharray={s.dashed ? '5 5' : undefined} />
+          ))}
+          {series.map((s) => s.points.length <= maxDots && s.points.map((p, i) => (
+            <circle key={`${s.key}-${i}`} className={styles.dot} cx={sx(p.x)} cy={sy(p.y)} r={4} style={{ fill: s.color }}>
+              {pointTitle && <title>{pointTitle(s, p)}</title>}
+            </circle>
+          )))}
 
-        // Area fill
-        const areaD = s.filled !== false
-          ? `${pathD} L ${getX(s.data.length - 1)},${padding.top + innerHeight} L ${getX(0)},${padding.top + innerHeight} Z`
-          : '';
-
-        return (
-          <g key={si}>
-            {s.filled !== false && (
-              <path d={areaD} fill={color} opacity={0.1} />
-            )}
-            <path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            {s.data.map((d, i) => (
-              <circle key={i} cx={getX(i)} cy={getY(d.value)} r={3} fill={color} />
-            ))}
-          </g>
-        );
-      })}
-
-      {/* X-axis labels */}
-      {labels.map((label, i) => {
-        if (i % labelStep !== 0 && i !== labels.length - 1) return null;
-        // Format: show just month/day for dates
-        const short = label.length === 10 ? label.slice(5) : label;
-        return (
-          <text
-            key={i}
-            x={getX(i)}
-            y={chartHeight - padding.bottom + 16}
-            textAnchor="middle"
-            fill="var(--text-secondary)"
-            fontSize="9"
-          >
-            {short}
-          </text>
-        );
-      })}
-
-      {/* Legend */}
-      {series.length > 1 && series.map((s, si) => {
-        const color = s.color || 'var(--accent-blue)';
-        return (
-          <g key={si} transform={`translate(${padding.left + si * 90}, ${chartHeight - 6})`}>
-            <rect width={10} height={3} rx={1.5} fill={color} />
-            <text x={14} y={3} fill="var(--text-secondary)" fontSize="9">{s.label || t('reports.lineChart.seriesFallback', { index: si + 1 })}</text>
-          </g>
-        );
-      })}
-    </svg>
+          {ends.map(({ s, last }, i) => (
+            <g key={`${s.key}-end`}>
+              <circle className={styles.dot} cx={last![0]} cy={last![1]} r={5} style={{ fill: s.color }} />
+              <text className={styles.endLabel} x={last![0] + 12} y={labelYs[i]} dominantBaseline="middle">{s.label}</text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    </figure>
   );
-};
+}

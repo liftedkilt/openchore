@@ -1,0 +1,35 @@
+<!-- @dsCard group="Screens" page width=1288 height=900 subtitle="Lily's Today in each skin: same components, same data" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Today in three skins</title><style>/*PVSTYLE*/</style></head>
+<body>
+<div id="root"></div>
+<script>
+/*HELPERS*/
+document.documentElement.style.background = document.body.style.background = 'var(--surface-sunk)';
+var items = [{cat:'essential',done:true,at:.04},{cat:'daily',done:true,at:.1},{cat:'essential',done:true,at:.17},{cat:'daily',done:true,at:.33},{cat:'daily',done:true,at:.44},{cat:'daily',done:true,at:.52},{cat:'daily'},{cat:'bonus'}];
+function Today() {
+  return h(React.Fragment, null,
+    h('div', { className: 'oc-device__pad' },
+      h('div', { className: 'pv-top' }, h('span', { className: 'pv-me' }, h(O.Avatar, { name: 'Lily', color: 'mint', size: 'md' }), 'Thursday'), h(O.PointsChip, { points: 185 })),
+      h('div', { style: { marginTop: 16 } }, h(O.Greeting, { salutation: 'Afternoon', name: 'Lily' })),
+      h('div', { style: { marginTop: 12 } }, h(O.DayProgress, { items: items, now: .66 })),
+      h(O.CategoryHeader, { cat: 'essential', count: '2 of 2' }),
+      h(O.ChoreRow, { cat: 'essential', icon: 'toy', title: 'Tidy your room', meta: 'Waiting for Mom to check', state: 'waiting' }),
+      h(O.ChoreRow, { cat: 'essential', icon: 'bed', title: 'Make your bed', meta: 'Done at 7:32 am', state: 'done' }),
+      h(O.CategoryHeader, { cat: 'daily', count: '4 of 5' }),
+      h(O.ChoreRow, { cat: 'daily', icon: 'piano', title: 'Practice piano', meta: '44 min left', urgent: true, points: 10 }),
+      h(O.ChoreRow, { cat: 'daily', icon: 'shirt', title: 'Fold your laundry', meta: 'Photo check', photo: true, points: 10 }),
+      h(O.CategoryHeader, { cat: 'bonus', count: '+15' }),
+      h(O.ChoreRow, { cat: 'bonus', icon: 'sprout', title: 'Water the garden', state: 'locked' })),
+    h('div', { className: 'oc-device__fade' }),
+    h(O.TabBar, { active: 'today' }));
+}
+mount(h('div', { style: { display: 'flex', gap: 48, padding: '48px 56px 40px', width: 1288, boxSizing: 'border-box' } }, THEMES.map(function (t, i) {
+  return h('div', { key: t[0], className: 'pv-dev' },
+    h(O.DeviceFrame, { theme: t[0], person: 'mint', time: '4:15' }, h(Today)),
+    h('div', { className: 'pv-cap' }, h('b', null, '0' + (i + 1)), t[1] + [' — sun arc, serif, soft cards', ' — shapes, outlines, press-flat blocks', ' — one ring, lit in Lily\'s mint'][i]));
+})));
+</script>
+</body>
+</html>

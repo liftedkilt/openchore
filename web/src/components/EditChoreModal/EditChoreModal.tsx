@@ -1,9 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Save, Check, Play, Pause, RefreshCw, Sparkles } from 'lucide-react';
+import { Pause, Play, RefreshCw } from 'lucide-react';
 import Modal from '../Modal/Modal';
 import { api, APIError } from '../../api';
 import type { Chore, User } from '../../types';
+import { Icon, catFromCategory } from '../../design';
+import { CategoryPicker, IconPicker } from '../admin/pickers';
+import { useAIStatus } from '../../hooks/useAIStatus';
 import styles from './EditChoreModal.module.css';
 
 interface Props {
@@ -34,12 +37,12 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
-  // TTS editing state
-  const [ttsDescription, setTtsDescription] = useState(chore.tts_description || '');
+  // Read-aloud audio (only when the server has a speech service configured).
+  // The server re-records it whenever the title or description changes, and
+  // the URL carries a version so browsers don't replay stale audio.
+  const aiStatus = useAIStatus();
   const [ttsAudioURL, setTtsAudioURL] = useState(chore.tts_audio_url || '');
-  const [ttsCacheBust, setTtsCacheBust] = useState(() => Date.now());
   const [ttsRegenerating, setTtsRegenerating] = useState(false);
-  const [ttsGenerating, setTtsGenerating] = useState(false);
   const [ttsSaved, setTtsSaved] = useState(false);
   const [ttsError, setTtsError] = useState('');
   const [ttsPlaying, setTtsPlaying] = useState(false);
@@ -61,8 +64,6 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
     };
   }, [ttsAudioURL]);
 
-  const audioSrc = ttsAudioURL ? `${ttsAudioURL}?v=${ttsCacheBust}` : '';
-
   const handlePlayPause = () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -80,10 +81,8 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
     setTtsError('');
     setTtsSaved(false);
     try {
-      const resp = await api.chores.regenerateTTS(chore.id, ttsDescription.trim());
-      setTtsDescription(resp.tts_description);
+      const resp = await api.chores.regenerateTTS(chore.id);
       setTtsAudioURL(resp.tts_audio_url);
-      setTtsCacheBust(Date.now());
       setTtsSaved(true);
       onSaved();
       setTimeout(() => setTtsSaved(false), 2000);
@@ -92,19 +91,6 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
       setTtsError(msg);
     }
     setTtsRegenerating(false);
-  };
-
-  const handleGenerateTTSDescription = async () => {
-    setTtsGenerating(true);
-    setTtsError('');
-    try {
-      const resp = await api.chores.generateTTSDescription(chore.id);
-      setTtsDescription(resp.description);
-    } catch (e) {
-      const msg = e instanceof APIError ? (e.data?.error || e.message) : (e instanceof Error ? e.message : t('admin.editChore.ttsGenerateDescError'));
-      setTtsError(msg);
-    }
-    setTtsGenerating(false);
   };
 
   const handleSave = async () => {
@@ -127,161 +113,130 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
       setSaved(true);
       onSaved();
       setTimeout(() => setSaved(false), 2000);
-    } catch (e: any) {
-      setError(e.message || t('admin.editChore.saveError'));
+    } catch (e: unknown) {
+      setError(e instanceof Error && e.message ? e.message : t('admin.editChore.saveError'));
     }
     setSaving(false);
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t('admin.editChore.modalTitle', { title: chore.title })} maxWidth="600px">
-      {/* --- Chore Details --- */}
-      <div className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <span className={styles.sectionTitle}>{t('admin.editChore.sectionDetails')}</span>
-        </div>
+    <Modal isOpen={isOpen} onClose={onClose} title={t('admin.editChore.modalTitle', { title: chore.title })} maxWidth="640px">
+      {/* --- Chore details --- */}
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>{t('admin.editChore.sectionDetails')}</h3>
         <div className={styles.formGrid}>
-          <div className={styles.formRow}>
-            <div className={styles.formGroup} style={{ flex: 3 }}>
-              <label className={styles.label}>{t('admin.editChore.labelTitle')}</label>
-              <input className={styles.input} value={title} onChange={e => setTitle(e.target.value)} />
-            </div>
-            <div className={styles.formGroup} style={{ flex: 0, minWidth: '65px' }}>
-              <label className={styles.label}>{t('admin.editChore.labelIcon')}</label>
-              <input className={styles.input} value={icon} onChange={e => setIcon(e.target.value)} style={{ textAlign: 'center' }} />
-            </div>
-          </div>
+          <label className={styles.formGroup}>
+            <span className={styles.label}>{t('admin.editChore.labelTitle')}</span>
+            <input className={styles.input} value={title} onChange={e => setTitle(e.target.value)} />
+          </label>
 
-          <div className={styles.formGroup}>
-            <label className={styles.label}>{t('admin.editChore.labelDescription')}</label>
+          <IconPicker value={icon} onChange={setIcon} cat={catFromCategory(category)} label={t('admin.editChore.labelIcon')} />
+
+          <label className={styles.formGroup}>
+            <span className={styles.label}>{t('admin.editChore.labelDescription')}</span>
             <input className={styles.input} value={description} onChange={e => setDescription(e.target.value)} />
-          </div>
+          </label>
+
+          <CategoryPicker value={category} onChange={setCategory} label={t('admin.editChore.labelCategory')} />
 
           <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>{t('admin.editChore.labelCategory')}</label>
-              <select className={styles.input} value={category} onChange={e => setCategory(e.target.value as Chore['category'])}>
-                <option value="required">{t('admin.editChore.categoryRequired')}</option>
-                <option value="core">{t('admin.editChore.categoryCore')}</option>
-                <option value="bonus">{t('admin.editChore.categoryBonus')}</option>
-              </select>
-            </div>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>{t('admin.editChore.labelPoints')}</label>
+            <label className={styles.formGroup}>
+              <span className={styles.label}>{t('admin.editChore.labelPoints')}</span>
               <input className={styles.input} type="number" min={0} value={points} onChange={e => setPoints(parseInt(e.target.value) || 0)} />
-            </div>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>{t('admin.editChore.labelPenalty')}</label>
+            </label>
+            <label className={styles.formGroup}>
+              <span className={styles.label}>{t('admin.editChore.labelPenalty')}</span>
               <input className={styles.input} type="number" min={0} value={missedPenalty} onChange={e => setMissedPenalty(parseInt(e.target.value) || 0)} placeholder="0" />
-            </div>
-            <div className={styles.formGroup}>
-              <label className={styles.label}>{t('admin.editChore.labelMinutes')}</label>
+            </label>
+            <label className={styles.formGroup}>
+              <span className={styles.label}>{t('admin.editChore.labelMinutes')}</span>
               <input className={styles.input} type="number" min={0} value={minutes} onChange={e => setMinutes(parseInt(e.target.value) || 0)} />
-            </div>
+            </label>
           </div>
 
-          <div className={styles.checkRow}>
-            <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)} />
-            <span className={styles.checkLabel}>{t('admin.editChore.requiresApproval')}</span>
-          </div>
-          <div className={styles.checkRow}>
-            <input type="checkbox" checked={requiresPhoto} onChange={e => setRequiresPhoto(e.target.checked)} />
-            <span className={styles.checkLabel}>{t('admin.editChore.requiresPhoto')}</span>
+          <div>
+            <label className={styles.checkRow}>
+              <input type="checkbox" checked={requiresApproval} onChange={e => setRequiresApproval(e.target.checked)} />
+              <span className={styles.checkLabel}>{t('admin.editChore.requiresApproval')}</span>
+            </label>
+            <label className={styles.checkRow}>
+              <input type="checkbox" checked={requiresPhoto} onChange={e => setRequiresPhoto(e.target.checked)} />
+              <span className={styles.checkLabel}>{t('admin.editChore.requiresPhoto')}</span>
+            </label>
           </div>
           {requiresPhoto && (
-            <div className={styles.formGroup}>
-              <label className={styles.label}>{t('admin.editChore.labelPhotoSource')}</label>
+            <label className={styles.formGroup}>
+              <span className={styles.label}>{t('admin.editChore.labelPhotoSource')}</span>
               <select className={styles.input} value={photoSource} onChange={e => setPhotoSource(e.target.value as 'child' | 'external' | 'both')}>
                 <option value="child">{t('admin.editChore.photoSourceChild')}</option>
                 <option value="external">{t('admin.editChore.photoSourceExternal')}</option>
                 <option value="both">{t('admin.editChore.photoSourceBoth')}</option>
               </select>
-            </div>
+            </label>
           )}
 
           <div className={styles.saveRow}>
-            {saved && <span className={styles.saved}><Check size={14} /> {t('admin.editChore.savedLabel')}</span>}
-            {error && <span className={styles.error}>{error}</span>}
-            <button className={styles.btnPrimary} onClick={handleSave} disabled={saving || !title.trim()}>
-              <Save size={14} /> {saving ? t('admin.editChore.savingLabel') : t('admin.editChore.saveDetailsBtn')}
+            {saved && <span className={styles.saved} role="status"><Icon name="check" /> {t('admin.editChore.savedLabel')}</span>}
+            {error && <span className={styles.error} role="alert">{error}</span>}
+            <button type="button" className={styles.btnPrimary} onClick={handleSave} disabled={saving || !title.trim()}>
+              <Icon name="check" /> {saving ? t('admin.editChore.savingLabel') : t('admin.editChore.saveDetailsBtn')}
             </button>
           </div>
         </div>
-      </div>
+      </section>
 
       <hr className={styles.divider} />
 
-      {/* --- TTS Audio --- */}
-      <div className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <span className={styles.sectionTitle}>{t('admin.editChore.sectionTTS')}</span>
-        </div>
-        <div className={styles.formGrid}>
-          {ttsAudioURL ? (
-            <div className={styles.ttsPlayerRow}>
-              <button
-                type="button"
-                className={styles.ttsPlayBtn}
-                onClick={handlePlayPause}
-                aria-label={ttsPlaying ? t('admin.editChore.ttsPauseAriaLabel') : t('admin.editChore.ttsPlayAriaLabel')}
-                title={ttsPlaying ? t('admin.editChore.ttsPauseTitle') : t('admin.editChore.ttsPlayTitle')}
-              >
-                {ttsPlaying ? <Pause size={18} /> : <Play size={18} />}
-              </button>
-              <audio ref={audioRef} src={audioSrc} preload="none" />
-              <span className={styles.ttsHint}>
-                {ttsPlaying ? t('admin.editChore.ttsPlaying') : t('admin.editChore.ttsClickPreview')}
-              </span>
+      {aiStatus.tts.configured && (
+        <>
+          {/* --- Read aloud (TTS) --- */}
+          <section className={styles.section}>
+            <h3 className={styles.sectionTitle}><Icon name="sound" /> {t('admin.editChore.sectionTTS')}</h3>
+            <div className={styles.formGrid}>
+              {ttsAudioURL ? (
+                <div className={styles.ttsPlayerRow}>
+                  <button
+                    type="button"
+                    className={styles.ttsPlayBtn}
+                    onClick={handlePlayPause}
+                    aria-label={ttsPlaying ? t('admin.editChore.ttsPauseAriaLabel') : t('admin.editChore.ttsPlayAriaLabel')}
+                    title={ttsPlaying ? t('admin.editChore.ttsPauseTitle') : t('admin.editChore.ttsPlayTitle')}
+                  >
+                    {ttsPlaying ? <Pause aria-hidden /> : <Play aria-hidden />}
+                  </button>
+                  <audio ref={audioRef} src={ttsAudioURL} preload="none" />
+                  <span className={styles.ttsHint}>
+                    {ttsPlaying ? t('admin.editChore.ttsPlaying') : t('admin.editChore.ttsClickPreview')}
+                  </span>
+                </div>
+              ) : (
+                <p className={styles.ttsHint}>{t('admin.editChore.ttsNoAudio')}</p>
+              )}
+
+              <div className={styles.saveRow}>
+                {ttsSaved && <span className={styles.saved} role="status"><Icon name="check" /> {t('admin.editChore.ttsRegeneratedLabel')}</span>}
+                {ttsError && <span className={styles.error} role="alert">{ttsError}</span>}
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  onClick={handleRegenerateTTS}
+                  disabled={ttsRegenerating}
+                >
+                  <RefreshCw aria-hidden className={ttsRegenerating ? styles.spin : undefined} />
+                  {ttsRegenerating ? t('admin.editChore.regeneratingLabel') : t('admin.editChore.regenerateAudioBtn')}
+                </button>
+              </div>
             </div>
-          ) : (
-            <div className={styles.ttsHint}>{t('admin.editChore.ttsNoAudio')}</div>
-          )}
+          </section>
 
-          <div className={styles.formGroup}>
-            <label className={styles.label}>{t('admin.editChore.labelTTSDescription')}</label>
-            <textarea
-              className={styles.textarea}
-              value={ttsDescription}
-              onChange={e => setTtsDescription(e.target.value)}
-              placeholder={t('admin.editChore.ttsDescriptionPlaceholder')}
-              rows={3}
-            />
-          </div>
+          <hr className={styles.divider} />
+        </>
+      )}
 
-          <div className={styles.saveRow}>
-            {ttsSaved && <span className={styles.saved}><Check size={14} /> {t('admin.editChore.ttsRegeneratedLabel')}</span>}
-            {ttsError && <span className={styles.error}>{ttsError}</span>}
-            <button
-              type="button"
-              className={styles.btnSecondary}
-              onClick={handleGenerateTTSDescription}
-              disabled={ttsGenerating || ttsRegenerating}
-              title={t('admin.editChore.suggestTextTitle')}
-            >
-              <Sparkles size={14} /> {ttsGenerating ? t('admin.editChore.generatingLabel') : t('admin.editChore.suggestTextBtn')}
-            </button>
-            <button
-              type="button"
-              className={styles.btnPrimary}
-              onClick={handleRegenerateTTS}
-              disabled={ttsRegenerating || ttsGenerating || !ttsDescription.trim()}
-            >
-              <RefreshCw size={14} className={ttsRegenerating ? styles.spin : ''} />
-              {' '}
-              {ttsRegenerating ? t('admin.editChore.regeneratingLabel') : t('admin.editChore.regenerateAudioBtn')}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <hr className={styles.divider} />
-
-      {/* --- Schedules --- */}
       {renderSchedules(chore.id, users)}
 
       <hr className={styles.divider} />
 
-      {/* --- Triggers --- */}
       {renderTriggers(chore.id, users)}
     </Modal>
   );

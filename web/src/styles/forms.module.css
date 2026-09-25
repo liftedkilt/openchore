@@ -1,78 +1,137 @@
-/* Shared form styles — composed by CreateChoreWizard and EditChoreModal via CSS Modules.
- * Contains only the parts that are identical between the two components.
- * Component-specific overrides (e.g. different padding or font-size) remain in
- * each component's own .module.css file.
+/* Shared form styles for the grown-up screens (House / House Dark).
+ * Composed by CreateChoreWizard, EditChoreModal, QuickAssign and the admin UI
+ * kit (components/admin/ui.module.css) via CSS Modules `composes:`.
+ * Tokens only: every colour comes from the scope the form renders in.
  */
 
 .formGrid {
   display: flex;
   flex-direction: column;
+  gap: var(--space-4);
 }
 
 .formRow {
   display: flex;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.formRow > * {
+  flex: 1 1 140px;
+  min-width: 0;
 }
 
 .formGroup {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  gap: 6px;
+  min-width: 0;
 }
 
 .label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-secondary, #94a3b8);
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.help {
+  font-size: 12.5px;
+  line-height: 17px;
+  color: var(--ink-muted);
 }
 
 .input {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
-  background: rgba(0, 0, 0, 0.2);
-  color: var(--text-primary, #e2e8f0);
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background-color: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 15px;
+  line-height: 20px;
   box-sizing: border-box;
 }
 
-.input:focus {
-  outline: none;
-  border-color: var(--accent-blue, #38bdf8);
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+.input::placeholder {
+  color: var(--ink-muted);
+  opacity: 1;
+}
+
+.input:disabled {
+  opacity: 0.55;
+}
+
+textarea.input {
+  padding: 10px 12px;
+  resize: vertical;
+  min-height: 88px;
+}
+
+/* A caret drawn in currentColor, so it follows the theme. */
+select.input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 36px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 19px) 50%, calc(100% - 14px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
 }
 
 .checkRow {
   display: flex;
   align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
 }
 
 .checkRow input[type="checkbox"] {
-  accent-color: var(--accent-blue, #38bdf8);
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--accent);
 }
 
 .checkLabel {
-  color: var(--text-primary, #e2e8f0);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--ink);
 }
 
 .btnPrimary {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  border: none;
-  border-radius: var(--radius-md);
-  background: var(--accent-blue, #38bdf8);
-  color: var(--bg-primary);
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: var(--outline-w) solid var(--line);
+  border-radius: var(--r-btn);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--lift);
+  font-family: var(--font-text);
+  font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-}
-
-.btnPrimary:hover {
-  opacity: 0.9;
+  white-space: nowrap;
 }
 
 .btnPrimary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btnPrimary svg {
+  width: 18px;
+  height: 18px;
 }

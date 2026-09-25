@@ -17,7 +17,6 @@ const (
 	StatusPending    = "pending"
 	StatusApproved   = "approved"
 	StatusRejected   = "rejected"
-	StatusAIRejected = "ai_rejected"
 	StatusExcused    = "excused"
 )
 
@@ -74,6 +73,7 @@ type User struct {
 	Age            *int      `json:"age,omitempty"`
 	Theme          string    `json:"theme,omitempty"`
 	LineColor      string    `json:"line_color,omitempty"`
+	Color          string    `json:"color,omitempty"`
 	Paused         bool      `json:"paused"`
 	HasPin         bool      `json:"has_pin"`
 	PinHash        string    `json:"-"`
@@ -88,6 +88,50 @@ const (
 	RoleAdmin = "admin"
 	RoleChild = "child"
 )
+
+// Skins, stored in users.theme. An empty theme means "not chosen"; the
+// client resolves it by age.
+const (
+	ThemeSunroom = "sunroom"
+	ThemeBlocks  = "blocks"
+	ThemeTint    = "tint"
+)
+
+// ValidTheme reports whether t is one of the skins the API accepts.
+func ValidTheme(t string) bool {
+	return t == ThemeSunroom || t == ThemeBlocks || t == ThemeTint
+}
+
+// PersonColors are the keys stored in users.color, in assignment order.
+// They are keys, not hex values: each theme defines its own shade.
+var PersonColors = []string{"coral", "mint", "butter", "sky", "rose", "leaf", "lilac", "sand"}
+
+// ValidPersonColor reports whether c is one of PersonColors.
+func ValidPersonColor(c string) bool {
+	for _, k := range PersonColors {
+		if k == c {
+			return true
+		}
+	}
+	return false
+}
+
+// NextPersonColor picks a colour for a new person given the colours already
+// in use: the first unused one in palette order, or once all are taken the
+// least-used one (so assignment keeps cycling round-robin).
+func NextPersonColor(used []string) string {
+	counts := make(map[string]int, len(PersonColors))
+	for _, c := range used {
+		counts[c]++
+	}
+	best := PersonColors[0]
+	for _, c := range PersonColors[1:] {
+		if counts[c] < counts[best] {
+			best = c
+		}
+	}
+	return best
+}
 
 // UserIdentity is an external OIDC identity linked to a profile.
 type UserIdentity struct {
@@ -115,7 +159,6 @@ type Chore struct {
 	PhotoSource        string    `json:"photo_source"`
 	Source             string    `json:"source"`
 	ExternalID         string    `json:"external_id,omitempty"`
-	TTSDescription     string    `json:"tts_description,omitempty"`
 	TTSAudioURL        string    `json:"tts_audio_url,omitempty"`
 	CreatedBy          int64     `json:"created_by"`
 	CreatedAt          time.Time `json:"created_at"`
@@ -145,14 +188,17 @@ type ChoreCompletion struct {
 	ID              int64      `json:"id"`
 	ChoreScheduleID int64     `json:"chore_schedule_id"`
 	CompletedBy     int64      `json:"completed_by"`
-	Status          string     `json:"status"` // approved, pending, rejected, ai_rejected
+	Status          string     `json:"status"` // approved, pending, rejected, excused
 	PhotoURL        string     `json:"photo_url,omitempty"`
 	ApprovedBy      *int64     `json:"approved_by,omitempty"`
 	ApprovedAt      *time.Time `json:"approved_at,omitempty"`
 	CompletedAt     time.Time  `json:"completed_at"`
 	CompletionDate  string     `json:"completion_date"`
+	// AIFeedback is the AI photo reviewer's note for the approving parent
+	// (or, on an excused completion, the excuse reason).
 	AIFeedback      string     `json:"ai_feedback,omitempty"`
 	AIConfidence    float64    `json:"ai_confidence,omitempty"`
+	AIComplete      *bool      `json:"ai_complete,omitempty"`
 	// UncompletedAt, when non-nil, marks a soft-deleted completion. The row
 	// is preserved (photo + AI metadata + approval) so a kid can un-check and
 	// re-check a chore without losing the approved state. Reader queries
@@ -381,12 +427,11 @@ type ScheduledChore struct {
 	AIFeedback         *string    `json:"ai_feedback,omitempty"`
 	CompletedByName    string     `json:"completed_by_name,omitempty"`
 	CompletedBySibling bool       `json:"completed_by_sibling,omitempty"`
-	TTSDescription     string     `json:"tts_description,omitempty"`
 	TTSAudioURL        string     `json:"tts_audio_url,omitempty"`
 	Date               string     `json:"date"`
 }
 
-// AIReviewResult holds the parsed response from an AI photo review.
+// AIReviewResult is an AI photo review: advice for a parent, never a verdict.
 type AIReviewResult struct {
 	Complete   bool    `json:"complete"`
 	Confidence float64 `json:"confidence"`

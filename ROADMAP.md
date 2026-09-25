@@ -115,7 +115,11 @@
 - [x] AI Chore Checker — admin tool to test photo review and TTS with any photo
 - [x] Lazy TTS reconnection — Kokoro auto-discovered if it starts after the API server
 - [x] TTS retry endpoint — retry audio synthesis without re-analyzing photos
-- [ ] Configurable model idle unload — release LiteRT model from RAM after idle timeout, reload on next request
+- [x] Simplified to OpenAI-compatible APIs — any local or hosted model via `AI_BASE_URL`/`TTS_BASE_URL`; the LiteRT sidecar image is retired
+- [x] Photo review is advisory — notes on pending approvals plus optional auto-approve; no more AI rejections
+- [x] Weekly AI summaries generated once, kept, and shared via Discord and webhook
+- [x] Read-aloud audio recorded on chore save (replaces the TTS sync loop and LLM-rewritten spoken text)
+- [x] Removed AI point/time suggestions
 - [ ] Reference photo comparison — compare submissions against known-good reference photos
 - [ ] Auto-evolving reference photos — approved photos become new references over time
 - [ ] Voice cloning — personalized TTS per kid

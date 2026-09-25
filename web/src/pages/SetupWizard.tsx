@@ -1,22 +1,22 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
 import { useAuth } from '../AuthContext';
 import { api } from '../api';
+import {
+  Avatar, BLOCKS_UNDER_AGE, Button, CategoryMark, DayProgress, HouseScope, Icon, PERSON_COLORS, SKINS, SkinScope,
+  catFromCategory, resolveChoreIcon, resolveSkin, type DayProgressItem, type PersonColor, type Skin,
+} from '../design';
+import { BrandMark } from '../components/BrandMark/BrandMark';
+import { firstFreeColor } from './SetupWizard.data';
 import styles from './SetupWizard.module.css';
-import { UserPlus, Check, ArrowRight, Sparkles, Trash2 } from 'lucide-react';
 
-type Step = 'welcome' | 'parent' | 'children' | 'themes' | 'chores' | 'finish';
+type Step = 'welcome' | 'parent' | 'children' | 'looks' | 'chores' | 'finish';
 
-const STEPS: Step[] = ['welcome', 'parent', 'children', 'themes', 'chores', 'finish'];
+const STEPS: Step[] = ['welcome', 'parent', 'children', 'looks', 'chores', 'finish'];
 
-const THEMES = [
-  { id: 'default', nameKey: 'themeClassicBlue', color: '#3b82f6' },
-  { id: 'quest', nameKey: 'themeQuestAdventure', color: '#f59e0b' },
-  { id: 'galaxy', nameKey: 'themeGalaxyPurple', color: '#8b5cf6' },
-  { id: 'forest', nameKey: 'themeNatureForest', color: '#10b981' },
-];
-
+// Chore presets are data: title, icon and category are stored as given.
 const CHORE_PRESETS = [
   { title: 'Brush Teeth', icon: '🪥', category: 'required', points: 5 },
   { title: 'Make Bed', icon: '🛏️', category: 'core', points: 10 },
@@ -26,10 +26,101 @@ const CHORE_PRESETS = [
   { title: 'Read 20 Mins', icon: '📚', category: 'bonus', points: 15 },
 ];
 
+// A sample day for the skin previews: two of four done.
+const PREVIEW_DAY: DayProgressItem[] = [
+  { cat: 'essential', done: true, at: 0.1 },
+  { cat: 'daily', done: true, at: 0.35 },
+  { cat: 'daily' },
+  { cat: 'bonus' },
+];
+
+interface Child {
+  name: string;
+  theme: Skin;
+  color: PersonColor;
+}
+
+interface ColorPickerProps {
+  name: string;
+  legend: string;
+  value: PersonColor;
+  onChange: (c: PersonColor) => void;
+}
+
+/** Eight person colours as a radio group. */
+function ColorPicker({ name, legend, value, onChange }: ColorPickerProps) {
+  const { t } = useTranslation();
+  return (
+    <fieldset className={styles.fieldset}>
+      <legend className={styles.legend}>{legend}</legend>
+      <div className={styles.swatches}>
+        {PERSON_COLORS.map((c) => (
+          <label key={c} className={styles.swatch} data-person={c}>
+            <input
+              type="radio"
+              name={name}
+              value={c}
+              checked={value === c}
+              onChange={() => onChange(c)}
+              aria-label={t(`entry.setup.colors.${c}`)}
+            />
+            <span aria-hidden><Icon name="check" /></span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+interface SkinPickerProps {
+  child: Child;
+  index: number;
+  onChange: (s: Skin) => void;
+}
+
+/** Three small doors, one per skin, each drawn in that skin. */
+function SkinPicker({ child, index, onChange }: SkinPickerProps) {
+  const { t } = useTranslation();
+  // Setup doesn't ask ages, so both suggestions show; the preselected skin is
+  // what an unset skin resolves to (see resolveSkin).
+  const suggestion = (s: Skin) => (s === 'blocks'
+    ? t('entry.setup.suggestUnder', { age: BLOCKS_UNDER_AGE })
+    : t('entry.setup.suggestFrom', { age: BLOCKS_UNDER_AGE }));
+  return (
+    <fieldset className={styles.fieldset}>
+      <legend className={styles.legend}>{t('entry.setup.skin')}</legend>
+      <div className={styles.skins}>
+        {SKINS.map((s) => (
+          <label key={s} className={styles.skinOption}>
+            <input
+              type="radio"
+              name={`skin-${index}`}
+              value={s}
+              checked={child.theme === s}
+              onChange={() => onChange(s)}
+            />
+            <SkinScope skin={s} color={child.color} door className={styles.miniDoor}>
+              <Avatar name={child.name} color={child.color} size="sm" />
+              <span className={styles.miniName}>{t(`entry.setup.skins.${s}`)}</span>
+              <span className={styles.miniZone} aria-hidden>
+                <span className={styles.miniHero}>
+                  <DayProgress items={PREVIEW_DAY} now={0.5} />
+                </span>
+              </span>
+              {child.theme === s && <span className={styles.miniCheck} aria-hidden><Icon name="check" /></span>}
+            </SkinScope>
+            <span className={styles.suggest}>{suggestion(s)}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 export const SetupWizard: React.FC = () => {
   const { t } = useTranslation();
   const [step, setStep] = useState<Step>('welcome');
-  const [children, setChildren] = useState<{ name: string; age?: number; theme: string; id?: number }[]>([]);
+  const [children, setChildren] = useState<Child[]>([]);
   const [newName, setNewName] = useState('');
   const [selectedPresets, setSelectedPresets] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
@@ -37,9 +128,10 @@ export const SetupWizard: React.FC = () => {
   const [parentName, setParentName] = useState('');
   const [parentPin, setParentPin] = useState('');
   const [parentPinConfirm, setParentPinConfirm] = useState('');
+  const [parentColor, setParentColor] = useState<PersonColor>(PERSON_COLORS[0]);
   const [parentError, setParentError] = useState('');
   const navigate = useNavigate();
-  const { refresh } = useAuth();
+  const { refresh, session } = useAuth();
 
   const submitParent = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +149,8 @@ export const SetupWizard: React.FC = () => {
 
   const addChild = () => {
     if (!newName.trim()) return;
-    setChildren([...children, { name: newName, theme: 'default' }]);
+    const color = firstFreeColor([parentColor, ...children.map(c => c.color)]);
+    setChildren([...children, { name: newName, theme: resolveSkin(''), color }]);
     setNewName('');
   };
 
@@ -65,10 +158,8 @@ export const SetupWizard: React.FC = () => {
     setChildren(children.filter((_, i) => i !== index));
   };
 
-  const updateChildTheme = (index: number, theme: string) => {
-    const newChildren = [...children];
-    newChildren[index].theme = theme;
-    setChildren(newChildren);
+  const updateChild = (index: number, patch: Partial<Child>) => {
+    setChildren(children.map((c, i) => (i === index ? { ...c, ...patch } : c)));
   };
 
   const handleFinish = async () => {
@@ -76,8 +167,8 @@ export const SetupWizard: React.FC = () => {
     setError('');
     try {
       await api.setup({
-        parent: { name: parentName.trim() || t('setup.parentDefaultName'), pin: parentPin },
-        children: children.map(c => ({ name: c.name, theme: c.theme })),
+        parent: { name: parentName.trim() || t('setup.parentDefaultName'), pin: parentPin, color: parentColor },
+        children: children.map(c => ({ name: c.name, theme: c.theme, color: c.color })),
         chores: selectedPresets.map(idx => {
           const preset = CHORE_PRESETS[idx];
           return {
@@ -101,202 +192,244 @@ export const SetupWizard: React.FC = () => {
     }
   };
 
+  const back = (to: Step) => (
+    <Button variant="quiet" onClick={() => setStep(to)}>{t('setup.back')}</Button>
+  );
+
   const renderStep = () => {
     switch (step) {
       case 'welcome':
         return (
-          <div className={styles.stepContent}>
-            <div className={styles.iconCircle}><Sparkles size={48} /></div>
-            <h1>{t('setup.welcomeTitle')}</h1>
-            <p>{t('setup.welcomeDescription')}</p>
-            <button className={styles.primaryBtn} onClick={() => setStep('parent')}>
-              {t('setup.getStarted')} <ArrowRight size={20} />
-            </button>
+          <div className={clsx(styles.step, styles.center)}>
+            <span className={styles.bigMark} aria-hidden><BrandMark wordmark={false} /></span>
+            <h1 className={styles.title}>{t('setup.welcomeTitle')}</h1>
+            <p className={styles.lead}>{t('setup.welcomeDescription')}</p>
+            <div className={styles.nav}>
+              <Button icon="chev" onClick={() => setStep('parent')}>{t('setup.getStarted')}</Button>
+            </div>
           </div>
         );
 
       case 'parent':
         return (
-          <form className={styles.stepContent} onSubmit={submitParent}>
-            <h1>{t('setup.parentTitle')}</h1>
-            <p>{t('setup.parentDescription')}</p>
-            <div className={styles.fieldStack}>
-              <input
-                type="text"
-                placeholder={t('setup.parentNamePlaceholder')}
-                value={parentName}
-                onChange={e => setParentName(e.target.value)}
-                aria-label={t('setup.parentNamePlaceholder')}
-              />
-              <input
-                type="password"
-                inputMode="numeric"
-                autoComplete="new-password"
-                placeholder={t('setup.parentPinPlaceholder')}
-                value={parentPin}
-                onChange={e => setParentPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                aria-label={t('setup.parentPinPlaceholder')}
-                required
-              />
-              <input
-                type="password"
-                inputMode="numeric"
-                autoComplete="new-password"
-                placeholder={t('setup.parentPinConfirmPlaceholder')}
-                value={parentPinConfirm}
-                onChange={e => setParentPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                aria-label={t('setup.parentPinConfirmPlaceholder')}
-                required
+          <form className={styles.step} onSubmit={submitParent}>
+            <h1 className={styles.title}>{t('setup.parentTitle')}</h1>
+            <p className={styles.lead}>{t('setup.parentDescription')}</p>
+            <div className={styles.fields}>
+              <label className={styles.field}>
+                <span>{t('setup.parentNamePlaceholder')}</span>
+                <input
+                  type="text"
+                  value={parentName}
+                  onChange={e => setParentName(e.target.value)}
+                  autoComplete="given-name"
+                />
+              </label>
+              <label className={styles.field}>
+                <span>{t('setup.parentPinPlaceholder')}</span>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="new-password"
+                  value={parentPin}
+                  onChange={e => setParentPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                  required
+                />
+              </label>
+              <label className={styles.field}>
+                <span>{t('setup.parentPinConfirmPlaceholder')}</span>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="new-password"
+                  value={parentPinConfirm}
+                  onChange={e => setParentPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                  required
+                />
+              </label>
+              <ColorPicker
+                name="parent-color"
+                legend={t('entry.setup.yourColor')}
+                value={parentColor}
+                onChange={setParentColor}
               />
             </div>
-            {parentError && <p style={{ color: '#ef4444', fontSize: '0.9rem', marginTop: '0.5rem' }}>{parentError}</p>}
-            <div className={styles.navBtns}>
-              <button type="button" className={styles.secondaryBtn} onClick={() => setStep('welcome')}>{t('setup.back')}</button>
-              <button type="submit" className={styles.primaryBtn}>
-                {t('setup.next')} <ArrowRight size={20} />
-              </button>
+            {parentError && <p className={styles.error} role="alert">{parentError}</p>}
+            <div className={styles.nav}>
+              {back('welcome')}
+              <Button type="submit" icon="chev">{t('setup.next')}</Button>
             </div>
           </form>
         );
 
       case 'children':
         return (
-          <div className={styles.stepContent}>
-            <h1>{t('setup.childrenTitle')}</h1>
-            <p>{t('setup.childrenDescription')}</p>
+          <div className={styles.step}>
+            <h1 className={styles.title}>{t('setup.childrenTitle')}</h1>
+            <p className={styles.lead}>{t('setup.childrenDescription')}</p>
 
-            <div className={styles.inputRow}>
+            <div className={styles.addRow}>
               <input
                 type="text"
+                className={styles.input}
                 placeholder={t('setup.childNamePlaceholder')}
+                aria-label={t('setup.childNamePlaceholder')}
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addChild()}
               />
-              <button className={styles.addBtn} onClick={addChild} disabled={!newName.trim()}>
-                <UserPlus size={20} /> {t('setup.addButton')}
+              <button type="button" className={styles.addBtn} onClick={addChild} disabled={!newName.trim()}>
+                <Icon name="plus" /> {t('setup.addButton')}
               </button>
             </div>
 
-            <div className={styles.list}>
-              {children.map((c, i) => (
-                <div key={i} className={styles.listItem}>
-                  <span>{c.name}</span>
-                  <button onClick={() => removeChild(i)} className={styles.removeBtn}>
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              ))}
-            </div>
+            {children.length > 0 && (
+              <ul className={styles.people}>
+                {children.map((c, i) => (
+                  <li key={i} className={styles.person}>
+                    <Avatar name={c.name} color={c.color} size="md" />
+                    <span className={styles.personName}>{c.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeChild(i)}
+                      className={styles.removeBtn}
+                      aria-label={t('entry.setup.remove', { name: c.name })}
+                    >
+                      <Icon name="plus" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
 
-            <div className={styles.navBtns}>
-              <button className={styles.secondaryBtn} onClick={() => setStep('parent')}>{t('setup.back')}</button>
-              <button
-                className={styles.primaryBtn}
-                disabled={children.length === 0}
-                onClick={() => setStep('themes')}
-              >
-                {t('setup.next')} <ArrowRight size={20} />
-              </button>
+            <div className={styles.nav}>
+              {back('parent')}
+              <Button icon="chev" disabled={children.length === 0} onClick={() => setStep('looks')}>
+                {t('setup.next')}
+              </Button>
             </div>
           </div>
         );
 
-      case 'themes':
+      case 'looks':
         return (
-          <div className={styles.stepContent}>
-            <h1>{t('setup.themesTitle')}</h1>
-            <p>{t('setup.themesDescription')}</p>
-            
-            <div className={styles.themeGrid}>
+          <div className={styles.step}>
+            <h1 className={styles.title}>{t('entry.setup.looksTitle')}</h1>
+            <p className={styles.lead}>{t('entry.setup.looksDescription')}</p>
+
+            <div className={styles.looks}>
               {children.map((c, i) => (
-                <div key={i} className={styles.themeCard}>
-                  <span className={styles.childName}>{c.name}</span>
-                  <div className={styles.themeOptions}>
-                    {THEMES.map(theme => (
-                      <button
-                        key={theme.id}
-                        className={`${styles.themeOption} ${c.theme === theme.id ? styles.activeTheme : ''}`}
-                        style={{ backgroundColor: theme.color }}
-                        onClick={() => updateChildTheme(i, theme.id)}
-                        title={t(`setup.${theme.nameKey}`)}
-                      >
-                        {c.theme === theme.id && <Check size={16} color="white" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <section key={i} className={styles.lookCard} aria-labelledby={`look-${i}`}>
+                  <h2 id={`look-${i}`} className={styles.lookName}>
+                    <Avatar name={c.name} color={c.color} size="md" />
+                    {c.name}
+                  </h2>
+                  <SkinPicker child={c} index={i} onChange={(theme) => updateChild(i, { theme })} />
+                  <ColorPicker
+                    name={`color-${i}`}
+                    legend={t('entry.setup.color')}
+                    value={c.color}
+                    onChange={(color) => updateChild(i, { color })}
+                  />
+                </section>
               ))}
             </div>
 
-            <div className={styles.navBtns}>
-              <button className={styles.secondaryBtn} onClick={() => setStep('children')}>{t('setup.back')}</button>
-              <button className={styles.primaryBtn} onClick={() => setStep('chores')}>
-                {t('setup.next')} <ArrowRight size={20} />
-              </button>
+            <div className={styles.nav}>
+              {back('children')}
+              <Button icon="chev" onClick={() => setStep('chores')}>{t('setup.next')}</Button>
             </div>
           </div>
         );
 
       case 'chores':
         return (
-          <div className={styles.stepContent}>
-            <h1>{t('setup.choresTitle')}</h1>
-            <p>{t('setup.choresDescription')}</p>
-            
-            <div className={styles.presetGrid}>
-              {CHORE_PRESETS.map((p, i) => (
-                <button 
-                  key={i} 
-                  className={`${styles.presetCard} ${selectedPresets.includes(i) ? styles.activePreset : ''}`}
-                  onClick={() => {
-                    if (selectedPresets.includes(i)) {
-                      setSelectedPresets(selectedPresets.filter(idx => idx !== i));
-                    } else {
-                      setSelectedPresets([...selectedPresets, i]);
-                    }
-                  }}
-                >
-                  <span className={styles.presetIcon}>{p.icon}</span>
-                  <span className={styles.presetTitle}>{p.title}</span>
-                  <span className={styles.presetTag} data-category={p.category}>{p.category}</span>
-                </button>
-              ))}
+          <div className={styles.step}>
+            <h1 className={styles.title}>{t('setup.choresTitle')}</h1>
+            <p className={styles.lead}>{t('setup.choresDescription')}</p>
+
+            <div className={styles.presets}>
+              {CHORE_PRESETS.map((p, i) => {
+                const cat = catFromCategory(p.category);
+                const on = selectedPresets.includes(i);
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-pressed={on}
+                    className={clsx(styles.preset, on && styles.presetOn)}
+                    onClick={() => {
+                      if (on) {
+                        setSelectedPresets(selectedPresets.filter(idx => idx !== i));
+                      } else {
+                        setSelectedPresets([...selectedPresets, i]);
+                      }
+                    }}
+                  >
+                    <span className={styles.presetWell}><Icon name={resolveChoreIcon(p.icon, cat)} /></span>
+                    <span className={styles.presetText}>
+                      <span className={styles.presetTitle}>{p.title}</span>
+                      <span className={styles.presetCat}>
+                        <CategoryMark cat={cat} />
+                        {t(`design.category.${cat}`)}
+                      </span>
+                    </span>
+                    <span className={styles.presetCheck} aria-hidden>{on && <Icon name="check" />}</span>
+                  </button>
+                );
+              })}
             </div>
 
-            {error && <p style={{ color: '#ef4444', fontSize: '0.9rem', marginTop: '0.5rem' }}>{error}</p>}
+            {error && <p className={styles.error} role="alert">{error}</p>}
 
-            <div className={styles.navBtns}>
-              <button className={styles.secondaryBtn} onClick={() => setStep('themes')}>{t('setup.back')}</button>
-              <button className={styles.primaryBtn} onClick={handleFinish} disabled={loading}>
+            <div className={styles.nav}>
+              {back('looks')}
+              <Button onClick={handleFinish} disabled={loading}>
                 {loading ? t('setup.settingUp') : t('setup.finishSetup')}
-              </button>
+              </Button>
             </div>
           </div>
         );
 
       case 'finish':
         return (
-          <div className={styles.stepContent}>
-            <div className={styles.iconCircle} style={{ backgroundColor: '#10b981' }}><Check size={48} color="white" /></div>
-            <h1>{t('setup.finishTitle')}</h1>
-            <p>{t('setup.finishDescription')}</p>
-            <button className={styles.primaryBtn} onClick={() => navigate('/admin/dashboard')}>
-              {t('setup.goToDashboard')}
-            </button>
+          <div className={clsx(styles.step, styles.center)}>
+            <span className={styles.doneMark} aria-hidden><Icon name="check" /></span>
+            <h1 className={styles.title}>{t('setup.finishTitle')}</h1>
+            <p className={styles.lead}>{t('setup.finishDescription')}</p>
+            <div className={styles.nav}>
+              <Button icon="chev" onClick={() => navigate('/admin/dashboard')}>
+                {t('setup.goToDashboard')}
+              </Button>
+            </div>
           </div>
         );
     }
   };
 
+  const index = STEPS.indexOf(step);
+
   return (
-    <div className={styles.container}>
-      <div className={styles.card}>
-        <div className={styles.progress}>
-          <div className={styles.progressBar} style={{ width: `${(STEPS.indexOf(step) / (STEPS.length - 1)) * 100}%` }} />
+    <HouseScope persistent={session?.persistent ?? false} className={styles.screen}>
+      <div className={styles.wrap}>
+        <header className={styles.top}>
+          <BrandMark />
+          <span className={styles.stepOf}>
+            {t('entry.setup.stepOf', { step: index + 1, total: STEPS.length })}
+          </span>
+        </header>
+        <div
+          className={styles.progress}
+          role="progressbar"
+          aria-label={t('entry.setup.progress')}
+          aria-valuemin={1}
+          aria-valuemax={STEPS.length}
+          aria-valuenow={index + 1}
+        >
+          <i style={{ width: `${(index / (STEPS.length - 1)) * 100}%` }} />
         </div>
-        {renderStep()}
+        <main className={styles.card}>{renderStep()}</main>
       </div>
-    </div>
+    </HouseScope>
   );
 };
