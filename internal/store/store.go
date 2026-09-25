@@ -1469,9 +1469,34 @@ func (s *Store) UpdateReward(ctx context.Context, r *model.Reward) error {
 	return tx.Commit()
 }
 
+// DeleteReward removes a reward. A reward that has been redeemed or saved
+// toward is referenced by that history (and the point ledger points at the
+// history), so instead of deleting it we deactivate it: it disappears from
+// kids' lists but past redemptions and goals keep their reward.
 func (s *Store) DeleteReward(ctx context.Context, id int64) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM rewards WHERE id = ?`, id)
-	return err
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var referenced bool
+	if err := tx.QueryRowContext(ctx,
+		`SELECT EXISTS (SELECT 1 FROM reward_redemptions WHERE reward_id = ?)
+		     OR EXISTS (SELECT 1 FROM reward_commitments WHERE reward_id = ?)
+		     OR EXISTS (SELECT 1 FROM shared_commitment_pools WHERE reward_id = ?)`,
+		id, id, id).Scan(&referenced); err != nil {
+		return err
+	}
+	if referenced {
+		_, err = tx.ExecContext(ctx, `UPDATE rewards SET active = 0 WHERE id = ?`, id)
+	} else {
+		_, err = tx.ExecContext(ctx, `DELETE FROM rewards WHERE id = ?`, id)
+	}
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) RedeemReward(ctx context.Context, userID, rewardID int64) (*model.RewardRedemption, error) {
