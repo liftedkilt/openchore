@@ -144,7 +144,7 @@ Requires an authenticated caller with the `admin` role.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/completions/pending` | Completions awaiting review, newest first: the chore (`chore_id`, `chore_title`, `category`, `icon`, `points_value`), whose it is (`assigned_user_id`) and who ticked it off (`completed_by`, `child_name`), `photo_url`, `completion_date`, `completed_at`, and the AI photo review's advisory note once it has run (`ai_feedback`, `ai_confidence`, `ai_complete`) |
+| `GET` | `/api/completions/pending` | Completions awaiting review, newest first: the chore (`chore_id`, `chore_title`, `category`, `icon`, `points_value`), whose it is (`assigned_user_id`) and who ticked it off (`completed_by`, `child_name`), `photo_url` with the chore's `requires_photo` and `photo_source` (an empty `photo_url` on a `child` photo chore means the photo was skipped; for `external`/`both` it may still arrive), `completion_date`, `completed_at`, and the AI photo review's advisory note once it has run (`ai_feedback`, `ai_confidence`, `ai_complete`) |
 | `POST` | `/api/completions/{id}/approve` | Approve, releasing points |
 | `POST` | `/api/completions/{id}/reject` | Reject |
 

@@ -941,6 +941,10 @@ type PendingCompletionRow struct {
 	Category    string `json:"category"`
 	Icon        string `json:"icon"`
 	PointsValue int    `json:"points_value"`
+	// RequiresPhoto / PhotoSource let the card explain a missing photo: for
+	// "child" chores it was skipped, otherwise it may still arrive.
+	RequiresPhoto bool   `json:"requires_photo"`
+	PhotoSource   string `json:"photo_source"`
 	// AIFeedback / AIConfidence carry the AI photo reviewer's note, if a
 	// review has run. AIComplete is its yes/no read on the photo (nil until
 	// reviewed). The review is advisory: the parent still decides.
@@ -953,6 +957,7 @@ func (s *Store) ListPendingCompletions(ctx context.Context) ([]PendingCompletion
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT cc.id, c.id, c.title, u.name, cs.assigned_to, cc.photo_url, cc.completion_date, cc.completed_at,
 		       cc.completed_by, c.category, COALESCE(c.icon, ''), c.points_value,
+		       c.requires_photo, COALESCE(NULLIF(c.photo_source, ''), 'child'),
 		       cc.ai_feedback, cc.ai_confidence, cc.ai_complete
 		FROM chore_completions cc
 		JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
@@ -971,6 +976,7 @@ func (s *Store) ListPendingCompletions(ctx context.Context) ([]PendingCompletion
 		var p PendingCompletionRow
 		if err := rows.Scan(&p.ID, &p.ChoreID, &p.ChoreTitle, &p.ChildName, &p.AssignedUserID, &p.PhotoURL, &p.CompletionDate, &p.CompletedAt,
 			&p.CompletedByID, &p.Category, &p.Icon, &p.PointsValue,
+			&p.RequiresPhoto, &p.PhotoSource,
 			&p.AIFeedback, &p.AIConfidence, &p.AIComplete); err != nil {
 			return nil, err
 		}

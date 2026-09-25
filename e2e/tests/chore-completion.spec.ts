@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { selectUser, authHeaders } from './helpers/setup';
+import { selectUser, authHeaders, loginAsAdmin } from './helpers/setup';
 
 /**
  * Each test gets its own kid with windowless chores scheduled for today, so
@@ -88,6 +88,13 @@ test.describe('Chore Completion', () => {
       const pending = await (await page.request.get('/api/completions/pending', { headers: await authHeaders(1) })).json();
       return pending.find((p: { chore_title: string }) => p.chore_title === CHORE)?.photo_url;
     }, { timeout: 5_000 }).toBe('');
+
+    // The grown-up's approval card says the photo was skipped.
+    await page.context().clearCookies();
+    await loginAsAdmin(page);
+    await page.getByRole('button', { name: /Approvals/i }).click();
+    const card = page.getByRole('article', { name: `${CHORE} for ${kid.name}` });
+    await expect(card).toContainText('Finished without a photo', { timeout: 5_000 });
   });
 
   test('bonus chores open once every Must do and Every day chore is done', async ({ page }) => {

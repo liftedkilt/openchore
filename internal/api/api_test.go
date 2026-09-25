@@ -2638,6 +2638,9 @@ func TestListPendingCompletions(t *testing.T) {
 	if _, ok := pending[0]["points_value"]; !ok {
 		t.Errorf("expected points_value on pending response, got %+v", pending[0])
 	}
+	if pending[0]["requires_photo"] != false || pending[0]["photo_source"] != "child" {
+		t.Errorf("expected requires_photo=false, photo_source=child, got %+v", pending[0])
+	}
 }
 
 func TestApproveCompletion(t *testing.T) {
@@ -3134,6 +3137,17 @@ func TestRequiresPhotoChoreCompletion(t *testing.T) {
 	decodeBody(t, resp, &cc)
 	if cc["status"] != model.StatusPending {
 		t.Fatalf("expected pending without a photo, got %v", cc["status"])
+	}
+
+	// The approval card can tell a skipped photo from one still to come.
+	resp = env.expectStatus(t, "GET", "/api/completions/pending", nil, adminHeaders(), http.StatusOK)
+	var pending []map[string]any
+	decodeBody(t, resp, &pending)
+	if len(pending) != 1 {
+		t.Fatalf("expected 1 pending completion, got %d", len(pending))
+	}
+	if pending[0]["requires_photo"] != true || pending[0]["photo_source"] != "child" || pending[0]["photo_url"] != "" {
+		t.Errorf("expected requires_photo=true, photo_source=child, no photo; got %+v", pending[0])
 	}
 }
 

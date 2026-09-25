@@ -338,6 +338,11 @@ export interface PendingCompletion {
   category?: 'required' | 'core' | 'bonus';
   icon?: string;
   points_value?: number;
+  // Whether the chore needs a photo, and who takes it. A "child" chore
+  // pending without a photo was finished via "No photo? Finish anyway";
+  // for "external"/"both" the photo can still be attached later.
+  requires_photo?: boolean;
+  photo_source?: 'child' | 'external' | 'both';
   // The AI photo reviewer's advisory note, once a review has run.
   // ai_complete is its read on the photo (absent until reviewed).
   ai_feedback?: string;

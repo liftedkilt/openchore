@@ -77,6 +77,26 @@ export const ApprovalList: React.FC<Props> = ({ pending, users, onChanged }) => 
               </a>
             )}
 
+            {p.requires_photo && !p.photo_url && (
+              // A "child" photo chore pending without a photo was finished
+              // with "No photo? Finish anyway"; otherwise it may still come.
+              <div className={styles.ai}>
+                <Icon name="camera" />
+                <div>
+                  <span className={styles.aiLabel}>
+                    {p.photo_source === 'child' || !p.photo_source
+                      ? t('admin.approvalsTab.noPhotoSkipped')
+                      : t('admin.approvalsTab.noPhotoYet')}
+                  </span>
+                  <p className={styles.aiText}>
+                    {p.photo_source === 'child' || !p.photo_source
+                      ? t('admin.approvalsTab.noPhotoSkippedHint', { name: p.child_name })
+                      : t('admin.approvalsTab.noPhotoYetHint')}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {p.ai_feedback && p.ai_complete != null && (
               // The photo check only advises; the parent still decides.
               <div className={styles.ai}>
