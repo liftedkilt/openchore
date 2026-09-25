@@ -185,6 +185,12 @@ Requires an authenticated caller with the `admin` role.
 | `GET` `PUT` | `/api/admin/settings/{key}` | Read / write a setting (secrets such as `session_secret` are not readable) |
 | `GET` | `/api/admin/export-config` | Export current configuration as YAML |
 | `GET` | `/api/admin/ai/status` | Which optional AI services are configured (`{"ai": {"configured", "model"}, "tts": {...}}`) |
+| `GET` `PUT` | `/api/admin/ai/config` | Where the AI model and speech service live: `{"ai": {"base_url", "model", "api_key"}, "tts": {...}}`. Keys are write-only (`api_key_set`); omit `api_key` to keep it, `""` clears it. Sections set by environment variables return 409 |
+| `GET` | `/api/admin/auth/config` | Sign-in providers (with `source`: `config` or `settings`, linked-account counts and redirect URIs) and session lengths |
+| `POST` | `/api/admin/auth/providers` | Add an OIDC provider: `id`, `name`, `issuer`, `client_id`, `client_secret`, `scopes`, `prompt` |
+| `PUT` `DELETE` | `/api/admin/auth/providers/{id}` | Edit (omit `client_secret` to keep it) / remove a provider added here. 409 for config providers, or when removal would lock someone out |
+| `POST` | `/api/admin/auth/providers/{id}/test` | Run OIDC discovery against the provider's issuer |
+| `PUT` | `/api/admin/auth/sessions` | `{"kiosk_session_hours", "personal_session_hours"}`; `null` restores the default |
 | `POST` | `/api/admin/ai/test` | Run photo review on an uploaded image without saving anything |
 | `POST` | `/api/admin/ai/generate-description` | Draft a kid-friendly chore description |
 | `POST` | `/api/admin/tts/regenerate` | Re-record every chore's read-aloud audio (e.g. after a voice change) |

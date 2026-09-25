@@ -19,16 +19,16 @@ type ReportsHandler struct {
 	store      *store.Store
 	dispatcher *webhook.Dispatcher
 	discord    *discord.Notifier
-	ai         *llm.Client // nil when AI_BASE_URL is unset
+	aiSvc      *AIServices // optional AI used for narrative summaries
 }
 
-func NewReportsHandler(s *store.Store, d *webhook.Dispatcher, dn *discord.Notifier) *ReportsHandler {
-	return &ReportsHandler{store: s, dispatcher: d, discord: dn}
+func NewReportsHandler(s *store.Store, d *webhook.Dispatcher, dn *discord.Notifier, ai *AIServices) *ReportsHandler {
+	return &ReportsHandler{store: s, dispatcher: d, discord: dn, aiSvc: ai}
 }
 
-// SetAI wires in the optional AI client used for narrative summaries.
+// SetAI replaces the AI client directly (tests), keeping read-aloud audio.
 func (h *ReportsHandler) SetAI(ai *llm.Client) {
-	h.ai = ai
+	h.aiSvc.set(ai, h.aiSvc.Audio())
 }
 
 // ReportsResponse is the full payload returned by GET /api/admin/reports.
@@ -281,7 +281,8 @@ func periodRange(period string, ref time.Time) (time.Time, time.Time) {
 // of finished weeks are generated once and kept; anything else is written
 // on demand.
 func (h *ReportsHandler) GetAISummary(w http.ResponseWriter, r *http.Request) {
-	if h.ai == nil {
+	ai := h.aiSvc.AI()
+	if ai == nil {
 		writeError(w, http.StatusServiceUnavailable, "AI is not configured")
 		return
 	}
@@ -331,7 +332,7 @@ func (h *ReportsHandler) GetAISummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	summary, err := h.ai.WeeklySummary(r.Context(), *stats)
+	summary, err := ai.WeeklySummary(r.Context(), *stats)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "AI summary generation failed: "+err.Error())
 		return
@@ -396,9 +397,6 @@ func (h *ReportsHandler) summaryStats(ctx context.Context, userID int64, startSt
 // over and shares it via webhooks and Discord. It only acts while AI is
 // configured and the ai_weekly_summary setting is on. Blocks until ctx ends.
 func (h *ReportsHandler) StartWeeklySummaries(ctx context.Context) {
-	if h.ai == nil {
-		return
-	}
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 	for {
@@ -415,6 +413,10 @@ func (h *ReportsHandler) StartWeeklySummaries(ctx context.Context) {
 // now. It waits until Monday noon so late approvals for Sunday count.
 // StartWeeklySummaries calls it hourly.
 func (h *ReportsHandler) WriteWeeklySummaries(ctx context.Context, now time.Time) {
+	ai := h.aiSvc.AI()
+	if ai == nil {
+		return
+	}
 	if on, _ := h.store.GetSetting(ctx, "ai_weekly_summary"); on != "true" {
 		return
 	}
@@ -445,7 +447,7 @@ func (h *ReportsHandler) WriteWeeklySummaries(ctx context.Context, now time.Time
 		if err != nil || stats == nil {
 			continue
 		}
-		summary, err := h.ai.WeeklySummary(ctx, *stats)
+		summary, err := ai.WeeklySummary(ctx, *stats)
 		if err != nil {
 			log.Printf("ai: weekly summary for %s failed: %v", kid.Name, err)
 			continue

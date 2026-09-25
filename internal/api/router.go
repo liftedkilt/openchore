@@ -25,7 +25,8 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 	discordNotifier := discord.NewNotifier(s)
 
 	users := NewUserHandler(s, dispatcher)
-	chores := NewChoreHandler(s, dispatcher, discordNotifier)
+	aiSvc := NewAIServices(s)
+	chores := NewChoreHandler(s, dispatcher, discordNotifier, aiSvc)
 	admin := NewAdminHandler(s, dispatcher)
 	points := NewPointsHandler(s)
 	rewards := NewRewardHandler(s, dispatcher)
@@ -34,7 +35,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 	triggers := NewTriggerHandler(s)
 	tokens := NewTokenHandler(s)
 	setup := NewSetupHandler(s, auth.Sessions)
-	reports := NewReportsHandler(s, dispatcher, discordNotifier)
+	reports := NewReportsHandler(s, dispatcher, discordNotifier, aiSvc)
 	authH := NewAuthHandler(s, auth.Sessions, dispatcher, auth.OIDC)
 	oidcH := auth.OIDC
 
@@ -183,8 +184,18 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 				r.Post("/admin/tokens", tokens.Create)
 				r.Delete("/admin/tokens/{id}", tokens.Revoke)
 
+				// Sign-in settings
+				r.Get("/admin/auth/config", oidcH.AdminConfig)
+				r.Put("/admin/auth/sessions", oidcH.UpdateSessionTTLs)
+				r.Post("/admin/auth/providers", oidcH.CreateProvider)
+				r.Put("/admin/auth/providers/{id}", oidcH.UpdateProvider)
+				r.Delete("/admin/auth/providers/{id}", oidcH.DeleteProvider)
+				r.Post("/admin/auth/providers/{id}/test", oidcH.TestProvider)
+
 				// Optional AI and read-aloud audio
 				r.Get("/admin/ai/status", chores.AIStatus)
+				r.Get("/admin/ai/config", aiSvc.GetConfig)
+				r.Put("/admin/ai/config", aiSvc.UpdateConfig)
 				r.Post("/admin/ai/test", chores.TestAIReview)
 				r.Post("/admin/ai/generate-description", chores.GenerateDescription)
 				r.Get("/admin/reports/ai-summary", reports.GetAISummary)

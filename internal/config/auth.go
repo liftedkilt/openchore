@@ -49,7 +49,7 @@ func ResolveAuth(cfg *Config) (*AuthConfig, error) {
 			Prompt:       os.Getenv("OIDC_PROMPT"),
 		}
 		if s := os.Getenv("OIDC_SCOPES"); s != "" {
-			p.Scopes = strings.Fields(strings.ReplaceAll(s, ",", " "))
+			p.Scopes = ParseScopes(s)
 		}
 		replaced := false
 		for i := range out.OIDC {
@@ -66,7 +66,7 @@ func ResolveAuth(cfg *Config) (*AuthConfig, error) {
 	seen := map[string]bool{}
 	for i := range out.OIDC {
 		p := &out.OIDC[i]
-		if !providerIDPattern.MatchString(p.ID) {
+		if !ValidProviderID(p.ID) {
 			return nil, fmt.Errorf("auth.oidc[%d]: id %q must be lowercase letters, digits, '-' or '_'", i, p.ID)
 		}
 		if seen[p.ID] {
@@ -79,12 +79,7 @@ func ResolveAuth(cfg *Config) (*AuthConfig, error) {
 		if p.Name == "" {
 			p.Name = p.ID
 		}
-		if len(p.Scopes) == 0 {
-			p.Scopes = []string{"openid", "profile", "email"}
-		}
-		if !contains(p.Scopes, "openid") {
-			p.Scopes = append([]string{"openid"}, p.Scopes...)
-		}
+		p.Scopes = NormalizeScopes(p.Scopes)
 	}
 
 	for _, d := range []struct{ name, v string }{
@@ -99,6 +94,27 @@ func ResolveAuth(cfg *Config) (*AuthConfig, error) {
 		}
 	}
 	return out, nil
+}
+
+// ValidProviderID reports whether id can name an OIDC provider: it appears
+// in the callback URL and is stored with linked identities.
+func ValidProviderID(id string) bool { return providerIDPattern.MatchString(id) }
+
+// ParseScopes splits a space- or comma-separated scope list.
+func ParseScopes(s string) []string {
+	return strings.Fields(strings.ReplaceAll(s, ",", " "))
+}
+
+// NormalizeScopes applies the default scopes and makes sure "openid" is
+// requested.
+func NormalizeScopes(scopes []string) []string {
+	if len(scopes) == 0 {
+		return []string{"openid", "profile", "email"}
+	}
+	if !contains(scopes, "openid") {
+		return append([]string{"openid"}, scopes...)
+	}
+	return scopes
 }
 
 // SessionTTLs returns the parsed session lifetimes (zero means default).

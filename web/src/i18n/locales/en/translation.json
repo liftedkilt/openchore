@@ -471,10 +471,9 @@
     },
     "settingsTab": {
       "ai": {
-        "aiNotConfigured": "Only a speech service is set up (TTS_BASE_URL). Set AI_BASE_URL and AI_MODEL to use photo review and summaries.",
+        "aiNotConfigured": "Only a speech service is connected. Add an AI model above to use photo review, chore descriptions and summaries.",
         "autoApproveLabel": "Approve clear passes automatically",
         "description": "Using {{model}}. The AI only ever advises: it never rejects a chore.",
-        "notConfigured": "No AI service is set up. To use photo review, chore descriptions, weekly summaries or recorded read-aloud voices, point the server at an OpenAI-compatible model (AI_BASE_URL and AI_MODEL) or speech service (TTS_BASE_URL). Without them, chores are read aloud by the device's own voice.",
         "photoReviewHelp": "When a chore that needs approval comes in with a photo, the AI adds a note to it in Approvals.",
         "photoReviewLabel": "Review photos awaiting approval",
         "saveButton": "Save AI Settings",
@@ -514,9 +513,66 @@
       "pageTitle": "Settings",
       "signIn": {
         "description": "Each parent signs in to their own profile with a PIN or a linked account; the Manage button then appears on their dashboard. Set or change your PIN with the key icon on your dashboard.",
-        "noProviders": "No single sign-on (OIDC) providers are configured. Add them under auth.oidc in config.yaml or with the OIDC_* environment variables.",
-        "providersConfigured": "Single sign-on providers configured on this server:",
-        "title": "Sign-in"
+        "noProviders": "No single sign-on providers yet.",
+        "title": "Sign-in",
+        "providersIntro": "Single sign-on lets people link an account from an OpenID Connect provider (Pocket ID, Authelia, Authentik, Keycloak, Google, Microsoft…) and use it instead of a PIN.",
+        "addButton": "Add provider",
+        "addTitle": "Add a sign-in provider",
+        "editTitle": "Edit {{name}}",
+        "editButton": "Edit",
+        "testButton": "Test",
+        "testing": "Testing...",
+        "testSuccess": "{{name}} is reachable.",
+        "testError": "Couldn't reach {{name}}. {{detail}}",
+        "fromConfig": "config.yaml",
+        "linkedAccounts_one": "{{count}} linked account",
+        "linkedAccounts_other": "{{count}} linked accounts",
+        "removeAriaLabel": "Remove {{name}}",
+        "confirmRemove": "Remove {{name}}?",
+        "confirmRemoveLinked_one": "Remove {{name}}? {{count}} person has linked it and won't be able to use it to sign in. Adding it back with the same ID restores the link.",
+        "confirmRemoveLinked_other": "Remove {{name}}? {{count}} people have linked it and won't be able to use it to sign in. Adding it back with the same ID restores the links.",
+        "removed": "{{name}} removed",
+        "removeError": "Couldn't remove the provider. {{detail}}",
+        "saveSuccess": "{{name}} saved",
+        "saveError": "Couldn't save the provider. {{detail}}",
+        "form": {
+          "name": "Button label",
+          "id": "ID",
+          "idHelp": "Lowercase letters, digits, - or _. It's part of the redirect URI and can't be changed later.",
+          "redirectUri": "Redirect URI",
+          "redirectUriHelp": "Register this at your provider. If it shows the wrong address, set the System Base URL.",
+          "issuer": "Issuer URL",
+          "issuerChangeWarning_one": "{{count}} person linked this provider. Accounts are tied to the issuer, so they'll need to link again if it changes.",
+          "issuerChangeWarning_other": "{{count}} people linked this provider. Accounts are tied to the issuer, so they'll need to link again if it changes.",
+          "clientId": "Client ID",
+          "clientSecret": "Client secret",
+          "clientSecretSaved": "Saved. Leave blank to keep it",
+          "scopes": "Scopes",
+          "prompt": "Ask to sign in",
+          "promptHelp": "\"Every time\" is recommended on a shared tablet, so a parent's session left open at the provider isn't reused.",
+          "prompts": {
+            "default": "Only when needed (provider default)",
+            "login": "Every time",
+            "select_account": "Choose an account each time",
+            "consent": "Ask for consent each time"
+          },
+          "cancel": "Cancel",
+          "add": "Add provider",
+          "save": "Save"
+        },
+        "sessions": {
+          "title": "Session length",
+          "kioskLabel": "Tap and PIN sign-ins",
+          "kioskHelp": "Default {{hours}} hours. They also end after 5 minutes idle.",
+          "personalLabel": "Linked-account sign-ins",
+          "personalHelp": "Default {{days}} days, so people stay signed in on their own phones.",
+          "hours": "hours",
+          "days": "days",
+          "fromConfig": "Set in config.yaml on the server.",
+          "saveButton": "Save",
+          "saveSuccess": "Saved. New sign-ins use it.",
+          "saveError": "Couldn't save. {{detail}}"
+        }
       },
       "subtitle": "Server, notifications, photo check and integrations.",
       "webhooks": {
@@ -565,6 +621,34 @@
         "inactive": "Off",
         "signed": "Signed",
         "title": "Webhooks"
+      },
+      "aiConnection": {
+        "title": "AI connections",
+        "description": "OpenChore works with any OpenAI-compatible server: a local one like Ollama, llama.cpp or LM Studio, or a hosted provider. Leave a base URL blank to turn that service off. Changes apply straight away.",
+        "baseUrlLabel": "Base URL",
+        "modelLabel": "Model",
+        "apiKeyLabel": "API key",
+        "apiKeyPlaceholder": "Leave blank for local servers",
+        "apiKeySavedPlaceholder": "Saved. Leave blank to keep it",
+        "clearKey": "Remove the saved API key",
+        "saveButton": "Save connections",
+        "savingButton": "Saving...",
+        "saveSuccess": "Connections saved",
+        "saveError": "Couldn't save the connections. {{detail}}",
+        "ai": {
+          "title": "AI model",
+          "help": "Used for photo review, chore descriptions and weekly summaries. Include the /v1 suffix. Photos are sent to this server, so a hosted provider sees them.",
+          "baseUrlPlaceholder": "http://ollama:11434/v1",
+          "modelPlaceholder": "gemma4:e4b",
+          "fromEnv": "Set by the AI_BASE_URL environment variable on the server. Change it there."
+        },
+        "tts": {
+          "title": "Speech service",
+          "help": "Records each chore in a natural voice, e.g. Kokoro. Without it, chores are read aloud by the device's own voice.",
+          "baseUrlPlaceholder": "http://kokoro:8880/v1",
+          "modelPlaceholder": "kokoro",
+          "fromEnv": "Set by the TTS_BASE_URL environment variable on the server. Change it there."
+        }
       }
     },
     "skins": {

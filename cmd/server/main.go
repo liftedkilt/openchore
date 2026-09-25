@@ -14,7 +14,6 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/liftedkilt/openchore/internal/api"
 	"github.com/liftedkilt/openchore/internal/config"
-	"github.com/liftedkilt/openchore/internal/llm"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/tts"
 	"github.com/liftedkilt/openchore/internal/webhook"
@@ -101,21 +100,29 @@ func main() {
 		log.Fatalf("failed to load session secret: %v", err)
 	}
 	sessions := api.NewSessionManager(secret)
-	sessions.SetTTLs(authCfg.SessionTTLs())
 	oidcSvc := api.NewOIDCService(s, sessions, dispatcher, authCfg)
 	for _, p := range authCfg.OIDC {
 		log.Printf("auth: OIDC provider %q (%s) enabled", p.ID, p.Issuer)
 	}
+	// Adds providers and session lengths saved under Manage → Settings.
+	if err := oidcSvc.Reload(context.Background()); err != nil {
+		log.Fatalf("failed to load sign-in settings: %v", err)
+	}
 
 	router, choreHandler, reportsHandler := api.NewRouter(s, dispatcher, api.Auth{Sessions: sessions, OIDC: oidcSvc})
 
-	// Optional AI and read-aloud audio. Each is off unless its base URL is set.
-	aiClient, audio := configureAI(s)
-	choreHandler.SetAI(aiClient, audio)
-	reportsHandler.SetAI(aiClient)
+	// Optional AI and read-aloud audio: off unless a base URL is set, either
+	// in the environment or under Manage → Settings → AI.
+	for _, legacy := range []string{"AI_ENDPOINT", "OLLAMA_ENDPOINT", "TTS_ENDPOINT"} {
+		if os.Getenv(legacy) != "" {
+			log.Printf("WARNING: %s is no longer used; set AI_BASE_URL / TTS_BASE_URL (with the /v1 suffix) instead — see docs/ai.md", legacy)
+		}
+	}
+	aiServices := choreHandler.AIServices()
+	aiServices.Reload(context.Background())
 	go func() {
 		tts.CleanOrphans(context.Background(), s)
-		if audio != nil {
+		if audio := aiServices.Audio(); audio != nil {
 			audio.Sync(context.Background(), false)
 		}
 	}()
@@ -125,36 +132,6 @@ func main() {
 	if err := http.ListenAndServe(":"+port, router); err != nil {
 		log.Fatalf("server failed: %v", err)
 	}
-}
-
-// configureAI builds the optional AI and text-to-speech clients from the
-// environment. Both speak the OpenAI API, so any compatible server works:
-// Ollama, llama.cpp's llama-server, LiteRT-LM, Kokoro-FastAPI, or a hosted
-// provider.
-func configureAI(s *store.Store) (*llm.Client, *tts.ChoreAudio) {
-	for _, legacy := range []string{"AI_ENDPOINT", "OLLAMA_ENDPOINT", "TTS_ENDPOINT"} {
-		if os.Getenv(legacy) != "" {
-			log.Printf("WARNING: %s is no longer used; set AI_BASE_URL / TTS_BASE_URL (with the /v1 suffix) instead — see docs/ai.md", legacy)
-		}
-	}
-
-	var aiClient *llm.Client
-	if base := os.Getenv("AI_BASE_URL"); base != "" {
-		model := os.Getenv("AI_MODEL")
-		if model == "" {
-			log.Printf("WARNING: AI_BASE_URL is set but AI_MODEL is not; AI features stay off")
-		} else {
-			aiClient = llm.New(base, os.Getenv("AI_API_KEY"), model)
-			log.Printf("ai: using model %s at %s", model, base)
-		}
-	}
-
-	var audio *tts.ChoreAudio
-	if base := os.Getenv("TTS_BASE_URL"); base != "" {
-		audio = tts.NewChoreAudio(tts.NewClient(base, os.Getenv("TTS_API_KEY"), os.Getenv("TTS_MODEL")), s)
-		log.Printf("tts: using %s", base)
-	}
-	return aiClient, audio
 }
 
 func runMigrations(db *sql.DB) error {

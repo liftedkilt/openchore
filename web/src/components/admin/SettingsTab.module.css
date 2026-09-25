@@ -25,19 +25,36 @@
   font-variant-numeric: tabular-nums;
 }
 
-.providers {
+/* AI connection: one group per service. */
+.connection {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-3);
+  min-width: 0;
   margin: 0;
-  padding: 0;
-  list-style: none;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: 14px;
 }
 
-.providers li {
+.connection legend {
+  padding: 0 6px;
+}
+
+.wrapCode {
+  overflow-wrap: anywhere;
+}
+
+.numberInput {
+  max-width: 8rem;
+}
+
+.sessions {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
 }
 
 .labelNote {

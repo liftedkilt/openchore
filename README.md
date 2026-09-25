@@ -252,11 +252,11 @@ skin.
 | `CONFIG_PATH` | `config/config.yaml` | Seed configuration |
 | `TZ` | system | **Set this** — deadlines and time locks depend on it |
 | `WEB_PORT` | `8080` | Host port for the web container |
-| `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY` | — | OpenAI-compatible model for AI features; off when unset. See [AI features](docs/ai.md) |
-| `TTS_BASE_URL`, `TTS_MODEL`, `TTS_API_KEY` | — | OpenAI-compatible speech service for read-aloud audio; the browser's voice is used when unset |
+| `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY` | — | OpenAI-compatible model for AI features. Can also be set under Manage → Settings; the variable wins. See [AI features](docs/ai.md) |
+| `TTS_BASE_URL`, `TTS_MODEL`, `TTS_API_KEY` | — | OpenAI-compatible speech service for read-aloud audio (or set it under Manage → Settings); the browser's voice is used when neither is set |
 | `POINTS_DECAY_INTERVAL` | `15m` | How often the decay worker checks (the e2e suite shortens it) |
 | `OPENCHORE_PUBLIC_URL` | request host | External URL used for OIDC redirect URIs |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, … | — | One OIDC provider without editing config; see [Signing in](docs/authentication.md) |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, … | — | One OIDC provider without editing config (providers can also be added under Manage → Settings); see [Signing in](docs/authentication.md) |
 | `OPENCHORE_SESSION_SECRET` | generated | Session signing key (≥32 chars); otherwise generated once and stored in the database |
 
 ## Development

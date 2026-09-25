@@ -241,6 +241,115 @@ func (s *Store) TouchIdentityLogin(ctx context.Context, id int64, email, display
 	return err
 }
 
+// --- OIDC providers (added from the admin UI) ---
+
+const oidcProviderColumns = `id, name, issuer, client_id, client_secret, scopes, prompt, created_at`
+
+func scanOIDCProvider(row interface{ Scan(...any) error }) (*model.OIDCProvider, error) {
+	p := &model.OIDCProvider{}
+	err := row.Scan(&p.ID, &p.Name, &p.Issuer, &p.ClientID, &p.ClientSecret, &p.Scopes, &p.Prompt, &p.CreatedAt)
+	return p, err
+}
+
+func (s *Store) ListOIDCProviders(ctx context.Context) ([]model.OIDCProvider, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+oidcProviderColumns+` FROM oidc_providers ORDER BY created_at, id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []model.OIDCProvider{}
+	for rows.Next() {
+		p, err := scanOIDCProvider(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *p)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) GetOIDCProvider(ctx context.Context, id string) (*model.OIDCProvider, error) {
+	p, err := scanOIDCProvider(s.db.QueryRowContext(ctx, `SELECT `+oidcProviderColumns+` FROM oidc_providers WHERE id = ?`, id))
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+// CreateOIDCProvider fails with a UNIQUE constraint error when the id exists.
+func (s *Store) CreateOIDCProvider(ctx context.Context, p *model.OIDCProvider) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO oidc_providers (id, name, issuer, client_id, client_secret, scopes, prompt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.Name, p.Issuer, p.ClientID, p.ClientSecret, p.Scopes, p.Prompt)
+	return err
+}
+
+// UpdateOIDCProvider rewrites everything but the id.
+func (s *Store) UpdateOIDCProvider(ctx context.Context, p *model.OIDCProvider) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE oidc_providers SET name = ?, issuer = ?, client_id = ?, client_secret = ?, scopes = ?, prompt = ? WHERE id = ?`,
+		p.Name, p.Issuer, p.ClientID, p.ClientSecret, p.Scopes, p.Prompt, p.ID)
+	return err
+}
+
+// DeleteOIDCProvider removes a provider. Identities linked through it are
+// kept, so re-adding a provider with the same id restores them.
+func (s *Store) DeleteOIDCProvider(ctx context.Context, id string) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM oidc_providers WHERE id = ?`, id)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// UsersSignedInOnlyWith lists the names of profiles that have no PIN and no
+// linked identity other than one from provider: removing the provider would
+// lock them out.
+func (s *Store) UsersSignedInOnlyWith(ctx context.Context, provider string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT u.name FROM users u
+		WHERE COALESCE(u.pin_hash, '') = ''
+		  AND EXISTS (SELECT 1 FROM user_identities i WHERE i.user_id = u.id AND i.provider = ?)
+		  AND NOT EXISTS (SELECT 1 FROM user_identities i WHERE i.user_id = u.id AND i.provider <> ?)
+		ORDER BY u.name`, provider, provider)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+// CountIdentitiesByProvider maps provider id -> number of linked identities.
+func (s *Store) CountIdentitiesByProvider(ctx context.Context) (map[string]int, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT provider, COUNT(*) FROM user_identities GROUP BY provider`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var p string
+		var n int
+		if err := rows.Scan(&p, &n); err != nil {
+			return nil, err
+		}
+		out[p] = n
+	}
+	return out, rows.Err()
+}
+
 // --- Chores ---
 
 func (s *Store) CreateChore(ctx context.Context, c *model.Chore) error {

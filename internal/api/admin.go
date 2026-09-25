@@ -34,6 +34,8 @@ func NewAdminHandler(s *store.Store, dispatcher *webhook.Dispatcher) *AdminHandl
 var secretSettings = map[string]bool{
 	legacyPasscodeSetting: true,
 	sessionSecretSetting:  true,
+	settingAIAPIKey:       true,
+	settingTTSAPIKey:      true,
 }
 
 func (h *AdminHandler) GetSetting(w http.ResponseWriter, r *http.Request) {

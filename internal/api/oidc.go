@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -86,15 +87,25 @@ func (p *oidcProvider) discover(ctx context.Context) (*oidc.Provider, *oidc.IDTo
 }
 
 // OIDCService holds the configured providers and handles the redirect flow.
+//
+// Providers come from two places: auth.oidc in config.yaml or the OIDC_*
+// environment variables (fixed until restart), and ones added under
+// Manage → Settings (stored in the database, picked up by Reload). A
+// config provider wins over a stored one with the same id.
 type OIDCService struct {
 	store      *store.Store
 	sessions   *SessionManager
 	dispatcher *webhook.Dispatcher
 	publicURL  string
-	providers  map[string]*oidcProvider
-	order      []string
+	static     []config.OIDCProviderConfig
+	staticTTL  struct{ kiosk, personal string } // from config.yaml; "" = not set
 	flowKey    []byte
 	httpClient *http.Client
+
+	mu        sync.RWMutex
+	providers map[string]*oidcProvider
+	order     []string
+	fromDB    map[string]bool
 }
 
 // NewOIDCService builds the service. It performs no network I/O.
@@ -111,12 +122,81 @@ func NewOIDCService(s *store.Store, sm *SessionManager, d *webhook.Dispatcher, a
 	svc.flowKey = mac.Sum(nil)
 	if auth != nil {
 		svc.publicURL = auth.PublicURL
-		for _, pc := range auth.OIDC {
-			svc.providers[pc.ID] = &oidcProvider{cfg: pc}
-			svc.order = append(svc.order, pc.ID)
-		}
+		svc.static = auth.OIDC
+		svc.staticTTL.kiosk = auth.KioskSessionTTL
+		svc.staticTTL.personal = auth.PersonalSessionTTL
 	}
+	svc.setProviders(nil)
 	return svc
+}
+
+// setProviders installs the config providers followed by stored ones,
+// keeping the discovery cache of any provider whose settings didn't change.
+func (o *OIDCService) setProviders(stored []config.OIDCProviderConfig) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	old := o.providers
+	o.providers = map[string]*oidcProvider{}
+	o.order = nil
+	o.fromDB = map[string]bool{}
+	add := func(pc config.OIDCProviderConfig, fromDB bool) {
+		if _, dup := o.providers[pc.ID]; dup {
+			return
+		}
+		p := old[pc.ID]
+		if p == nil || !reflect.DeepEqual(p.cfg, pc) {
+			p = &oidcProvider{cfg: pc}
+		}
+		o.providers[pc.ID] = p
+		o.order = append(o.order, pc.ID)
+		o.fromDB[pc.ID] = fromDB
+	}
+	for _, pc := range o.static {
+		add(pc, false)
+	}
+	for _, pc := range stored {
+		add(pc, true)
+	}
+}
+
+// Reload picks up providers and session lifetimes saved from the admin UI.
+func (o *OIDCService) Reload(ctx context.Context) error {
+	rows, err := o.store.ListOIDCProviders(ctx)
+	if err != nil {
+		return err
+	}
+	stored := make([]config.OIDCProviderConfig, 0, len(rows))
+	for _, r := range rows {
+		stored = append(stored, storedProviderConfig(r))
+	}
+	o.setProviders(stored)
+
+	kiosk, personal := o.sessionTTLs(ctx)
+	o.sessions.SetTTLs(kiosk.value, personal.value)
+	return nil
+}
+
+func storedProviderConfig(r model.OIDCProvider) config.OIDCProviderConfig {
+	name := r.Name
+	if name == "" {
+		name = r.ID
+	}
+	return config.OIDCProviderConfig{
+		ID:           r.ID,
+		Name:         name,
+		Issuer:       r.Issuer,
+		ClientID:     r.ClientID,
+		ClientSecret: r.ClientSecret,
+		Scopes:       config.NormalizeScopes(config.ParseScopes(r.Scopes)),
+		Prompt:       r.Prompt,
+	}
+}
+
+// provider returns the provider with the given id, or nil.
+func (o *OIDCService) provider(id string) *oidcProvider {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	return o.providers[id]
 }
 
 // SetHTTPClient overrides the client used to talk to providers (tests).
@@ -134,9 +214,11 @@ type providerInfo struct {
 // Providers lists the configured providers (public, for the login screen).
 func (o *OIDCService) Providers(w http.ResponseWriter, r *http.Request) {
 	out := []providerInfo{}
+	o.mu.RLock()
 	for _, id := range o.order {
 		out = append(out, providerInfo{ID: id, Name: o.providers[id].cfg.Name})
 	}
+	o.mu.RUnlock()
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -271,7 +353,7 @@ func redirectError(w http.ResponseWriter, r *http.Request, mode, returnPath, pro
 // login_hint with the linked email. Linking requires an existing session.
 func (o *OIDCService) Start(w http.ResponseWriter, r *http.Request) {
 	id := urlParam(r, "provider")
-	p := o.providers[id]
+	p := o.provider(id)
 	if p == nil {
 		writeError(w, http.StatusNotFound, "unknown provider")
 		return
@@ -377,7 +459,7 @@ type idClaims struct {
 // Callback completes the flow started by Start.
 func (o *OIDCService) Callback(w http.ResponseWriter, r *http.Request) {
 	id := urlParam(r, "provider")
-	p := o.providers[id]
+	p := o.provider(id)
 	if p == nil {
 		writeError(w, http.StatusNotFound, "unknown provider")
 		return
