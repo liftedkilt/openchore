@@ -3,6 +3,16 @@
 -- never earned points, so they are removed rather than converted.
 DELETE FROM chore_completions WHERE status = 'ai_rejected';
 
+-- Older versions deleted schedules and users without cascading, leaving
+-- completions that point at missing rows. Copying those into the rebuilt
+-- table below fails the foreign key checks, so drop them (and clear
+-- approvers that no longer exist) first.
+DELETE FROM chore_completions
+ WHERE chore_schedule_id NOT IN (SELECT id FROM chore_schedules)
+    OR completed_by NOT IN (SELECT id FROM users);
+UPDATE chore_completions SET approved_by = NULL
+ WHERE approved_by IS NOT NULL AND approved_by NOT IN (SELECT id FROM users);
+
 -- SQLite does not support ALTER CHECK, so we recreate the table.
 CREATE TABLE chore_completions_new (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
