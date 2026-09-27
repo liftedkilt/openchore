@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -16,6 +17,8 @@ var providerIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
 // Environment variables:
 //
 //	OPENCHORE_PUBLIC_URL                      overrides auth.public_url
+//	OPENCHORE_PIN_SIGN_IN                     overrides auth.pin_sign_in (true/false)
+//	OPENCHORE_START_PAGE                      overrides auth.start_page
 //	OIDC_ISSUER, OIDC_CLIENT_ID,              add (or replace) one provider
 //	OIDC_CLIENT_SECRET, OIDC_PROVIDER_ID,     without editing the file
 //	OIDC_PROVIDER_NAME, OIDC_SCOPES, OIDC_PROMPT
@@ -31,6 +34,21 @@ func ResolveAuth(cfg *Config) (*AuthConfig, error) {
 		out.PublicURL = v
 	}
 	out.PublicURL = strings.TrimRight(out.PublicURL, "/")
+
+	if v := os.Getenv("OPENCHORE_PIN_SIGN_IN"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("OPENCHORE_PIN_SIGN_IN: must be true or false, got %q", v)
+		}
+		out.PinSignIn = &b
+	}
+	if v := os.Getenv("OPENCHORE_START_PAGE"); v != "" {
+		out.StartPage = v
+	}
+	out.StartPage = strings.TrimSpace(out.StartPage)
+	if out.StartPage != "" && !ValidStartPage(out.StartPage) {
+		return nil, fmt.Errorf("auth.start_page: %q must be picker, wall or provider:<id>", out.StartPage)
+	}
 
 	for i := range out.OIDC {
 		p := &out.OIDC[i]
@@ -94,6 +112,24 @@ func ResolveAuth(cfg *Config) (*AuthConfig, error) {
 		}
 	}
 	return out, nil
+}
+
+// Start pages for someone who opens OpenChore signed out (auth.start_page).
+const (
+	StartPagePicker   = "picker"
+	StartPageWall     = "wall"
+	StartPageProvider = "provider:" // followed by a provider id
+)
+
+// ValidStartPage reports whether v is picker, wall or provider:<id>. It
+// doesn't check that the provider exists; an unknown one falls back to the
+// picker.
+func ValidStartPage(v string) bool {
+	if v == StartPagePicker || v == StartPageWall {
+		return true
+	}
+	id, ok := strings.CutPrefix(v, StartPageProvider)
+	return ok && ValidProviderID(id)
 }
 
 // ValidProviderID reports whether id can name an OIDC provider: it appears

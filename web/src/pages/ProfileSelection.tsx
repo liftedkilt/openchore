@@ -178,7 +178,7 @@ export const ProfileSelection: React.FC = () => {
   const [legacyPasscode, setLegacyPasscode] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const { signIn, session } = useAuth();
+  const { signIn, session, signInOptions } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const clock = useMinuteClock();
@@ -208,7 +208,13 @@ export const ProfileSelection: React.FC = () => {
 
   // A provider removed in Settings keeps its links (re-adding it restores
   // them), so only offer the ones that still exist.
-  const linkedProviders = (pendingUser?.auth_providers ?? []).filter(id => providers.some(p => p.id === id));
+  const usableProviders = (user: User) => user.auth_providers.filter(id => providers.some(p => p.id === id));
+  const linkedProviders = pendingUser ? usableProviders(pendingUser) : [];
+  // With PIN sign-in turned off, someone who can use a linked account must.
+  const pinAllowed = (user: User) => signInOptions.pin_sign_in || usableProviders(user).length === 0;
+  const startProvider = signInOptions.start_page === 'provider'
+    ? providers.find(p => p.id === signInOptions.start_provider)
+    : undefined;
 
   const reset = () => {
     setPendingUser(null);
@@ -234,6 +240,8 @@ export const ProfileSelection: React.FC = () => {
 
   const attemptLogin = async (user: User, extra: { pin?: string; legacy_passcode?: string; new_pin?: string } = {}) => {
     setBusy(true);
+    // Clear first so a repeated error (a second wrong PIN) still resets the pad.
+    setError('');
     try {
       const auth = await api.auth.login({ user_id: user.id, ...extra });
       signIn(auth);
@@ -257,7 +265,7 @@ export const ProfileSelection: React.FC = () => {
     setError('');
     if (authError) setSearchParams({}, { replace: true });
     setPendingUser(user);
-    if (user.has_pin) {
+    if (user.has_pin && pinAllowed(user)) {
       setStep({ kind: 'pin' });
       return;
     }
@@ -305,6 +313,7 @@ export const ProfileSelection: React.FC = () => {
             <PinPad
               prompt={t('profile.enterPin')}
               error={error}
+              length={pendingUser.pin_length}
               onSubmit={(pin) => attemptLogin(pendingUser, { pin })}
             />
           )}
@@ -449,6 +458,12 @@ export const ProfileSelection: React.FC = () => {
         )}
 
         <footer className={styles.foot}>
+          {startProvider && (
+            <a className={styles.wall} href={api.auth.oidcLoginURL(startProvider.id)}>
+              <Icon name="lock" />
+              {t('profile.continueWith', { provider: startProvider.name })}
+            </a>
+          )}
           <button type="button" className={styles.wall} onClick={() => navigate('/ambient')}>
             <Icon name="screen" />
             {t('entry.picker.wallDisplay')}

@@ -20,14 +20,17 @@ header is **ignored**. Admin endpoints need a session for a profile with the
 for the full model.
 
 `POST /api/auth/login` takes `{"user_id": 3, "pin": "1234"}` (omit `pin` for
-profiles without one) and returns `{"user", "session", "token"}`. On failure
+profiles without one) and returns `{"user", "session", "token"}`. PINs are
+4-8 digits; a user's `pin_length` says how many, so a PIN pad can submit on
+the last digit (it is absent for PINs set before lengths were recorded,
+until the next PIN sign-in). On failure
 the body includes a `code`:
 
 | Code | Status | Meaning |
 |------|--------|---------|
 | `incorrect_pin` | 401 | Wrong PIN |
 | `locked_out` | 429 | Too many wrong PINs; see `retry_after_seconds` |
-| `oidc_required` | 403 | The profile signs in with a linked account; see `providers` |
+| `oidc_required` | 403 | The profile signs in with a linked account (it has no PIN, or PIN sign-in is turned off); see `providers` |
 | `admin_setup_required` | 403 | Parent profile without a credential; resend with `new_pin` (plus `legacy_passcode` when `legacy_passcode: true`) |
 | `incorrect_passcode` | 401 | Wrong legacy household passcode |
 
@@ -50,7 +53,8 @@ No authentication required.
 | `POST` | `/api/auth/login` | Sign in to a profile (see above) |
 | `POST` | `/api/auth/logout` | Clear the session cookie |
 | `GET` | `/api/auth/providers` | Configured OIDC providers (`id`, `name`) |
-| `GET` | `/api/auth/oidc/{provider}/start?mode=login&user_id=…&return=/path` | Browser redirect to the provider; `user_id` is the tapped profile |
+| `GET` | `/api/auth/options` | `{"pin_sign_in", "start_page", "start_provider"}`: whether people with a linked account may use a PIN, and where a signed-out visitor lands (`picker`, `wall` or `provider`) |
+| `GET` | `/api/auth/oidc/{provider}/start?mode=login&user_id=…&return=/path` | Browser redirect to the provider; `user_id` is the tapped profile (optional: without it, the linked account decides who signs in) |
 | `GET` | `/api/auth/oidc/{provider}/start?mode=link&return=/path` | Link the provider to the signed-in profile |
 | `GET` | `/api/auth/oidc/{provider}/callback` | Provider redirect target; errors come back as `?auth_error=<code>` |
 | `POST` | `/api/setup` | First-run setup: `{"parent": {"name", "pin"}, "children", "chores"}`. Only succeeds while no users exist, and signs the parent in |
@@ -186,11 +190,12 @@ Requires an authenticated caller with the `admin` role.
 | `GET` | `/api/admin/export-config` | Export current configuration as YAML |
 | `GET` | `/api/admin/ai/status` | Which optional AI services are configured (`{"ai": {"configured", "model"}, "tts": {...}}`) |
 | `GET` `PUT` | `/api/admin/ai/config` | Where the AI model and speech service live: `{"ai": {"base_url", "model", "api_key"}, "tts": {...}}`. Keys are write-only (`api_key_set`); omit `api_key` to keep it, `""` clears it. Sections set by environment variables return 409 |
-| `GET` | `/api/admin/auth/config` | Sign-in providers (with `source`: `config` or `settings`, linked-account counts and redirect URIs) and session lengths |
+| `GET` | `/api/admin/auth/config` | Sign-in providers (with `source`: `config` or `settings`, linked-account counts and redirect URIs), session lengths and sign-in options (`sign_in`) |
 | `POST` | `/api/admin/auth/providers` | Add an OIDC provider: `id`, `name`, `issuer`, `client_id`, `client_secret`, `scopes`, `prompt` |
 | `PUT` `DELETE` | `/api/admin/auth/providers/{id}` | Edit (omit `client_secret` to keep it) / remove a provider added here. 409 for config providers, or when removal would lock someone out |
 | `POST` | `/api/admin/auth/providers/{id}/test` | Run OIDC discovery against the provider's issuer |
 | `PUT` | `/api/admin/auth/sessions` | `{"kiosk_session_hours", "personal_session_hours"}`; `null` restores the default |
+| `PUT` | `/api/admin/auth/options` | `{"pin_sign_in": bool, "start_page": "picker" \| "wall" \| "provider:<id>"}`; either may be omitted. Options set in config.yaml or the environment are left unchanged |
 | `POST` | `/api/admin/ai/test` | Run photo review on an uploaded image without saving anything |
 | `POST` | `/api/admin/ai/generate-description` | Draft a kid-friendly chore description |
 | `POST` | `/api/admin/tts/regenerate` | Re-record every chore's read-aloud audio (e.g. after a voice change) |

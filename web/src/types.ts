@@ -112,6 +112,9 @@ export interface User {
   color?: PersonColor;
   paused: boolean;
   has_pin: boolean;
+  // Digits in the PIN, so the PIN pad submits on the last one. Absent when
+  // there's no PIN or it was set before lengths were recorded.
+  pin_length?: number;
   // IDs of OIDC providers linked to this profile ("Continue with ...").
   auth_providers: string[];
   created_at: string;
@@ -133,6 +136,15 @@ export interface AuthSession {
 export interface AuthProvider {
   id: string;
   name: string;
+}
+
+/** Shapes the sign-in screen; readable before anyone signs in. */
+export interface SignInOptions {
+  /** False: people with a linked account must use it instead of a PIN. */
+  pin_sign_in: boolean;
+  /** Where a signed-out visitor to / lands. /login and /ambient always work. */
+  start_page: 'picker' | 'wall' | 'provider';
+  start_provider?: string;
 }
 
 export interface LinkedIdentity {
@@ -462,6 +474,15 @@ export interface AdminAuthConfig {
   public_url_from_config: boolean;
   kiosk_session: SessionLength;
   personal_session: SessionLength;
+  sign_in: AdminSignInOptions;
+}
+
+export interface AdminSignInOptions {
+  pin_sign_in: boolean;
+  pin_sign_in_from_config: boolean;
+  /** 'picker', 'wall' or 'provider:<id>'. */
+  start_page: string;
+  start_page_from_config: boolean;
 }
 
 /** Body of create/update provider. Omit client_secret on update to keep it. */

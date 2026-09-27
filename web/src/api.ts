@@ -1,4 +1,4 @@
-import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput } from './types';
+import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput, SignInOptions } from './types';
 
 const API_BASE = '/api';
 
@@ -116,15 +116,17 @@ export const api = {
     logoutEverywhere: () => fetchWithAuth('/auth/logout-everywhere', { method: 'POST' }),
     me: () => fetchPublic<AuthSession>('/auth/me'),
     providers: () => fetchPublic<AuthProvider[]>('/auth/providers'),
+    options: () => fetchPublic<SignInOptions>('/auth/options'),
     uploadLink: (scheduleId: number) =>
       fetchWithAuth<{ token: string; expires_at: string }>('/auth/upload-link', {
         method: 'POST',
         body: JSON.stringify({ schedule_id: scheduleId }),
       }),
     // Full-page navigations: the provider redirects back to the app.
-    oidcLoginURL: (providerId: string, userId?: number) =>
+    oidcLoginURL: (providerId: string, userId?: number, returnPath?: string) =>
       `${API_BASE}/auth/oidc/${encodeURIComponent(providerId)}/start?mode=login` +
-      (userId ? `&user_id=${userId}` : ''),
+      (userId ? `&user_id=${userId}` : '') +
+      (returnPath ? `&return=${encodeURIComponent(returnPath)}` : ''),
     oidcLinkURL: (providerId: string, returnPath: string) =>
       `${API_BASE}/auth/oidc/${encodeURIComponent(providerId)}/start?mode=link&return=${encodeURIComponent(returnPath)}`,
     identities: (userId: number) => fetchWithAuth<LinkedIdentity[]>(`/users/${userId}/identities`),
@@ -164,7 +166,7 @@ export const api = {
         body: JSON.stringify({ color }),
       }),
     setPin: (id: number, newPin: string, currentPin?: string) =>
-      fetchWithAuth<{ has_pin: boolean }>(`/users/${id}/pin`, {
+      fetchWithAuth<{ has_pin: boolean; pin_length: number }>(`/users/${id}/pin`, {
         method: 'PUT',
         body: JSON.stringify({ new_pin: newPin, current_pin: currentPin ?? '' }),
       }),
@@ -321,6 +323,8 @@ export const api = {
     authConfig: () => fetchWithAuth<AdminAuthConfig>('/admin/auth/config'),
     updateSessionLengths: (data: { kiosk_session_hours: number | null; personal_session_hours: number | null }) =>
       fetchWithAuth<AdminAuthConfig>('/admin/auth/sessions', { method: 'PUT', body: JSON.stringify(data) }),
+    updateSignInOptions: (data: { pin_sign_in?: boolean; start_page?: string }) =>
+      fetchWithAuth<AdminAuthConfig>('/admin/auth/options', { method: 'PUT', body: JSON.stringify(data) }),
     createAuthProvider: (data: AuthProviderInput) =>
       fetchWithAuth<AdminAuthConfig>('/admin/auth/providers', { method: 'POST', body: JSON.stringify(data) }),
     updateAuthProvider: (id: string, data: AuthProviderInput) =>

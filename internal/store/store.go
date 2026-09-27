@@ -49,8 +49,8 @@ func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
 	}
 	paused := boolToInt(u.Paused)
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO users (name, avatar_url, role, age, theme, line_color, color, paused, pin_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.LineColor, u.Color, paused, u.PinHash)
+		`INSERT INTO users (name, avatar_url, role, age, theme, line_color, color, paused, pin_hash, pin_length) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.Name, u.AvatarURL, u.Role, u.Age, u.Theme, u.LineColor, u.Color, paused, u.PinHash, u.PinLength)
 	if err != nil {
 		return err
 	}
@@ -84,8 +84,8 @@ func (s *Store) GetUser(ctx context.Context, id int64) (*model.User, error) {
 	u := &model.User{}
 	var paused int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, line_color, color, paused, pin_hash, session_version, created_at FROM users WHERE id = ?`, id).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &u.Color, &paused, &u.PinHash, &u.SessionVersion, &u.CreatedAt)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, color, paused, pin_hash, pin_length, session_version, created_at FROM users WHERE id = ?`, id).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &u.Color, &paused, &u.PinHash, &u.PinLength, &u.SessionVersion, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -112,7 +112,7 @@ func (s *Store) GetUser(ctx context.Context, id int64) (*model.User, error) {
 
 func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, line_color, color, paused, pin_hash, session_version, created_at FROM users ORDER BY name`)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, color, paused, pin_hash, pin_length, session_version, created_at FROM users ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 	for rows.Next() {
 		var u model.User
 		var paused int
-		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &u.Color, &paused, &u.PinHash, &u.SessionVersion, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &u.Color, &paused, &u.PinHash, &u.PinLength, &u.SessionVersion, &u.CreatedAt); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -3402,8 +3402,8 @@ func (s *Store) GetUserByName(ctx context.Context, name string) (*model.User, er
 	u := &model.User{}
 	var paused int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, avatar_url, role, age, theme, line_color, color, paused, pin_hash, created_at FROM users WHERE LOWER(name) = LOWER(?)`, name).
-		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &u.Color, &paused, &u.PinHash, &u.CreatedAt)
+		`SELECT id, name, avatar_url, role, age, theme, line_color, color, paused, pin_hash, pin_length, created_at FROM users WHERE LOWER(name) = LOWER(?)`, name).
+		Scan(&u.ID, &u.Name, &u.AvatarURL, &u.Role, &u.Age, &u.Theme, &u.LineColor, &u.Color, &paused, &u.PinHash, &u.PinLength, &u.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -3412,10 +3412,20 @@ func (s *Store) GetUserByName(ctx context.Context, name string) (*model.User, er
 	return u, err
 }
 
-// SetUserPin stores a bcrypt-hashed PIN for the user. Pass an empty string to clear the PIN.
-func (s *Store) SetUserPin(ctx context.Context, userID int64, pinHash string) error {
+// SetUserPin stores a bcrypt-hashed PIN and its number of digits. Pass an
+// empty hash (and 0) to clear the PIN.
+func (s *Store) SetUserPin(ctx context.Context, userID int64, pinHash string, pinLength int) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE users SET pin_hash = ? WHERE id = ?`, pinHash, userID)
+		`UPDATE users SET pin_hash = ?, pin_length = ? WHERE id = ?`, pinHash, pinLength, userID)
+	return err
+}
+
+// SetUserPinLength records the length of a PIN set before lengths were
+// stored, once it has been used to sign in. It only fills in an unknown
+// length, so it can't clobber a PIN changed in the meantime.
+func (s *Store) SetUserPinLength(ctx context.Context, userID int64, pinHash string, pinLength int) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET pin_length = ? WHERE id = ? AND pin_hash = ? AND pin_length = 0`, pinLength, userID, pinHash)
 	return err
 }
 

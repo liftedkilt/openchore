@@ -63,6 +63,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 		r.Post("/auth/login", authH.Login)
 		r.Post("/auth/logout", authH.Logout)
 		r.Get("/auth/providers", oidcH.Providers)
+		r.Get("/auth/options", oidcH.SignInOptions)
 		r.Get("/auth/oidc/{provider}/start", oidcH.Start)
 		r.Get("/auth/oidc/{provider}/callback", oidcH.Callback)
 
@@ -187,6 +188,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 				// Sign-in settings
 				r.Get("/admin/auth/config", oidcH.AdminConfig)
 				r.Put("/admin/auth/sessions", oidcH.UpdateSessionTTLs)
+				r.Put("/admin/auth/options", oidcH.UpdateSignInOptions)
 				r.Post("/admin/auth/providers", oidcH.CreateProvider)
 				r.Put("/admin/auth/providers/{id}", oidcH.UpdateProvider)
 				r.Delete("/admin/auth/providers/{id}", oidcH.DeleteProvider)

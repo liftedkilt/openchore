@@ -108,6 +108,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		user.PinHash = string(hash)
+		user.PinLength = len(req.Pin)
 	}
 	if err := h.store.CreateUser(r.Context(), user); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create user")
@@ -544,7 +545,7 @@ func (h *UserHandler) SetPin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to hash pin")
 		return
 	}
-	if err := h.store.SetUserPin(r.Context(), id, string(newHash)); err != nil {
+	if err := h.store.SetUserPin(r.Context(), id, string(newHash), len(req.NewPin)); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save pin")
 		return
 	}
@@ -562,7 +563,7 @@ func (h *UserHandler) SetPin(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	writeJSON(w, http.StatusOK, map[string]bool{"has_pin": true})
+	writeJSON(w, http.StatusOK, map[string]any{"has_pin": true, "pin_length": len(req.NewPin)})
 }
 
 type clearPinRequest struct {
@@ -643,7 +644,7 @@ func (h *UserHandler) ClearPin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.SetUserPin(r.Context(), id, ""); err != nil {
+	if err := h.store.SetUserPin(r.Context(), id, "", 0); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to clear pin")
 		return
 	}

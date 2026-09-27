@@ -158,7 +158,8 @@ type loginRequest struct {
 
 // Login starts a session for a profile tapped on the login screen.
 //
-//   - Profile with a PIN: the PIN is required.
+//   - Profile with a PIN: the PIN is required, unless PIN sign-in is turned
+//     off and the profile has a linked account, which it must use instead.
 //   - Profile linked to OIDC and without a PIN: must use the provider.
 //   - Admin profile with no credential at all: must set a PIN first (using
 //     the legacy household passcode when one exists).
@@ -181,6 +182,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	ip := clientIP(r)
 
 	switch {
+	case user.HasPin && !h.oidc.pinSignInAllowed(r.Context(), user):
+		writeAuthError(w, http.StatusForbidden, authCodeOIDCRequired,
+			"this profile signs in with a linked account", map[string]any{"providers": user.AuthProviders})
+
 	case user.HasPin:
 		if d := h.limiter.retryAfter(user.ID); d > 0 {
 			writeAuthError(w, http.StatusTooManyRequests, authCodeLockedOut,
@@ -197,6 +202,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.limiter.succeed(user.ID)
+		if user.PinLength == 0 {
+			// A PIN set before lengths were recorded: remember it now so
+			// the pad submits on the last digit from next time.
+			if err := h.store.SetUserPinLength(r.Context(), user.ID, user.PinHash, len(req.Pin)); err != nil {
+				log.Printf("auth: recording pin length for user %d: %v", user.ID, err)
+			} else {
+				user.PinLength = len(req.Pin)
+			}
+		}
 		log.Printf("auth: user %d (%s) signed in with pin from %s", user.ID, user.Name, ip)
 		h.fire(webhook.EventProfilePinVerified, map[string]any{
 			"user_id": user.ID, "user_name": user.Name, "ip_address": ip,
@@ -263,11 +277,12 @@ func (h *AuthHandler) claimAdminPin(w http.ResponseWriter, r *http.Request, user
 		writeError(w, http.StatusInternalServerError, "failed to hash pin")
 		return
 	}
-	if err := h.store.SetUserPin(r.Context(), user.ID, string(hash)); err != nil {
+	if err := h.store.SetUserPin(r.Context(), user.ID, string(hash), len(req.NewPin)); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save pin")
 		return
 	}
 	user.PinHash = string(hash)
+	user.PinLength = len(req.NewPin)
 	user.HasPin = true
 	log.Printf("auth: admin user %d (%s) claimed a pin from %s", user.ID, user.Name, ip)
 	h.fire(webhook.EventProfilePinChanged, map[string]any{

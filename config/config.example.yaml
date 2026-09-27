@@ -345,6 +345,8 @@ auth:
   # public_url: "https://chores.example.com"
   # kiosk_session_ttl: 12h        # tap/PIN sign-ins on shared devices
   # personal_session_ttl: 720h    # OIDC sign-ins, e.g. on a parent's phone
+  # start_page: picker            # signed-out visitors: picker, wall or provider:<id>
+  # pin_sign_in: true             # false: people with a linked account must use it
   oidc: []
   # oidc:
   #   - id: pocketid                # stable; stored with linked accounts

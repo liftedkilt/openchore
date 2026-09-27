@@ -369,7 +369,9 @@
 .foot {
   margin-top: var(--space-5);
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
+  gap: var(--space-2);
 }
 
 .wall {
@@ -385,6 +387,7 @@
   font-family: var(--font-text);
   font-size: 15px;
   font-weight: 700;
+  text-decoration: none;
   cursor: pointer;
 }
 

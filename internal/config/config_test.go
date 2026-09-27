@@ -563,3 +563,34 @@ func TestWebhookCleanupIntervalHours(t *testing.T) {
 		})
 	}
 }
+
+// --- Auth ---
+
+func TestResolveAuthSignInOptions(t *testing.T) {
+	for _, v := range []string{"picker", "wall", "provider:pocket-id"} {
+		if _, err := ResolveAuth(&Config{Auth: &AuthConfig{StartPage: v}}); err != nil {
+			t.Errorf("start_page %q: unexpected error %v", v, err)
+		}
+	}
+	for _, v := range []string{"home", "provider:", "provider:Pocket ID", "pocket"} {
+		if _, err := ResolveAuth(&Config{Auth: &AuthConfig{StartPage: v}}); err == nil {
+			t.Errorf("start_page %q: expected an error", v)
+		}
+	}
+
+	t.Setenv("OPENCHORE_PIN_SIGN_IN", "false")
+	t.Setenv("OPENCHORE_START_PAGE", "wall")
+	on := true
+	auth, err := ResolveAuth(&Config{Auth: &AuthConfig{PinSignIn: &on, StartPage: "picker"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if auth.PinSignIn == nil || *auth.PinSignIn || auth.StartPage != "wall" {
+		t.Fatalf("environment should win, got pin_sign_in=%v start_page=%q", auth.PinSignIn, auth.StartPage)
+	}
+
+	t.Setenv("OPENCHORE_PIN_SIGN_IN", "sometimes")
+	if _, err := ResolveAuth(nil); err == nil {
+		t.Fatal("expected an error for a malformed OPENCHORE_PIN_SIGN_IN")
+	}
+}

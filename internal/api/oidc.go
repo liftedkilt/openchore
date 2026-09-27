@@ -93,14 +93,16 @@ func (p *oidcProvider) discover(ctx context.Context) (*oidc.Provider, *oidc.IDTo
 // Manage → Settings (stored in the database, picked up by Reload). A
 // config provider wins over a stored one with the same id.
 type OIDCService struct {
-	store      *store.Store
-	sessions   *SessionManager
-	dispatcher *webhook.Dispatcher
-	publicURL  string
-	static     []config.OIDCProviderConfig
-	staticTTL  struct{ kiosk, personal string } // from config.yaml; "" = not set
-	flowKey    []byte
-	httpClient *http.Client
+	store       *store.Store
+	sessions    *SessionManager
+	dispatcher  *webhook.Dispatcher
+	publicURL   string
+	static      []config.OIDCProviderConfig
+	staticTTL   struct{ kiosk, personal string } // from config.yaml; "" = not set
+	staticPin   *bool                            // auth.pin_sign_in; nil = not set
+	staticStart string                           // auth.start_page; "" = not set
+	flowKey     []byte
+	httpClient  *http.Client
 
 	mu        sync.RWMutex
 	providers map[string]*oidcProvider
@@ -125,6 +127,8 @@ func NewOIDCService(s *store.Store, sm *SessionManager, d *webhook.Dispatcher, a
 		svc.static = auth.OIDC
 		svc.staticTTL.kiosk = auth.KioskSessionTTL
 		svc.staticTTL.personal = auth.PersonalSessionTTL
+		svc.staticPin = auth.PinSignIn
+		svc.staticStart = auth.StartPage
 	}
 	svc.setProviders(nil)
 	return svc

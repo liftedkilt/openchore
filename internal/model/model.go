@@ -77,6 +77,7 @@ type User struct {
 	Paused         bool      `json:"paused"`
 	HasPin         bool      `json:"has_pin"`
 	PinHash        string    `json:"-"`
+	PinLength      int       `json:"pin_length,omitempty"` // digits in the PIN; 0 = no PIN or not known yet
 	AuthProviders  []string  `json:"auth_providers"`
 	SessionVersion int64     `json:"-"`
 	CreatedAt      time.Time `json:"created_at"`

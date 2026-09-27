@@ -72,6 +72,7 @@ func Apply(ctx context.Context, s *store.Store, cfg *Config) error {
 				return fmt.Errorf("hashing pin for %q: %w", u.Name, err)
 			}
 			user.PinHash = string(hash)
+			user.PinLength = len(u.Pin)
 		}
 		if u.Age > 0 {
 			age := u.Age

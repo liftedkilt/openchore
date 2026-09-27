@@ -18,6 +18,8 @@ import (
 const (
 	settingKioskSessionTTL    = "kiosk_session_ttl"
 	settingPersonalSessionTTL = "personal_session_ttl"
+	settingPinSignIn          = "pin_sign_in" // "off" turns it off
+	settingStartPage          = "start_page"  // see config.ValidStartPage
 
 	minSessionTTL = 5 * time.Minute
 	maxSessionTTL = 365 * 24 * time.Hour
@@ -60,6 +62,129 @@ func (t sessionTTL) view(def time.Duration) sessionTTLView {
 		d = def
 	}
 	return sessionTTLView{Hours: d.Hours(), DefaultHours: def.Hours(), FromConfig: t.fromConfig}
+}
+
+// signInOptions shape the sign-in screen. The login screen reads them
+// before anyone has signed in (GET /api/auth/options).
+type signInOptions struct {
+	// PinSignIn false means people with a linked account must use it; a
+	// profile with no usable linked account still signs in with its PIN.
+	PinSignIn bool `json:"pin_sign_in"`
+	// StartPage is where a signed-out visitor to / lands: picker, wall or
+	// provider (with StartProvider set). /login and /ambient always work.
+	StartPage     string `json:"start_page"`
+	StartProvider string `json:"start_provider,omitempty"`
+}
+
+// signInOptions resolves the options: config.yaml / environment, then
+// settings. A start provider that no longer exists falls back to the picker.
+func (o *OIDCService) signInOptions(ctx context.Context) signInOptions {
+	opts := signInOptions{PinSignIn: true, StartPage: config.StartPagePicker}
+	if o.staticPin != nil {
+		opts.PinSignIn = *o.staticPin
+	} else if v, _ := o.store.GetSetting(ctx, settingPinSignIn); v == "off" {
+		opts.PinSignIn = false
+	}
+	start := o.staticStart
+	if start == "" {
+		start, _ = o.store.GetSetting(ctx, settingStartPage)
+	}
+	if start == config.StartPageWall {
+		opts.StartPage = config.StartPageWall
+	} else if id, ok := strings.CutPrefix(start, config.StartPageProvider); ok && o.provider(id) != nil {
+		opts.StartPage, opts.StartProvider = "provider", id
+	}
+	return opts
+}
+
+// pinSignInAllowed reports whether user may sign in with their PIN. With
+// PIN sign-in turned off, someone who can use a linked account must; a
+// link to a provider that has since been removed doesn't count.
+func (o *OIDCService) pinSignInAllowed(ctx context.Context, user *model.User) bool {
+	if o.signInOptions(ctx).PinSignIn {
+		return true
+	}
+	for _, id := range user.AuthProviders {
+		if o.provider(id) != nil {
+			return false
+		}
+	}
+	return true
+}
+
+// SignInOptions returns the options the login screen needs (public).
+func (o *OIDCService) SignInOptions(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, o.signInOptions(r.Context()))
+}
+
+// signInOptionsView is the admin view: the stored start page is flattened
+// back to picker, wall or provider:<id>.
+type signInOptionsView struct {
+	PinSignIn           bool   `json:"pin_sign_in"`
+	PinSignInFromConfig bool   `json:"pin_sign_in_from_config"`
+	StartPage           string `json:"start_page"`
+	StartPageFromConfig bool   `json:"start_page_from_config"`
+}
+
+func (o *OIDCService) signInOptionsView(ctx context.Context) signInOptionsView {
+	opts := o.signInOptions(ctx)
+	start := opts.StartPage
+	if start == "provider" {
+		start = config.StartPageProvider + opts.StartProvider
+	}
+	return signInOptionsView{
+		PinSignIn:           opts.PinSignIn,
+		PinSignInFromConfig: o.staticPin != nil,
+		StartPage:           start,
+		StartPageFromConfig: o.staticStart != "",
+	}
+}
+
+// UpdateSignInOptions saves the start page and whether PINs are accepted
+// from people with a linked account. Options set in config.yaml or the
+// environment are left alone.
+func (o *OIDCService) UpdateSignInOptions(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PinSignIn *bool   `json:"pin_sign_in"`
+		StartPage *string `json:"start_page"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	ctx := r.Context()
+	if req.StartPage != nil && o.staticStart == "" {
+		start := strings.TrimSpace(*req.StartPage)
+		if start == "" {
+			start = config.StartPagePicker
+		}
+		if !config.ValidStartPage(start) {
+			writeError(w, http.StatusBadRequest, "start_page must be picker, wall or provider:<id>")
+			return
+		}
+		if id, ok := strings.CutPrefix(start, config.StartPageProvider); ok && o.provider(id) == nil {
+			writeError(w, http.StatusBadRequest, "unknown sign-in provider "+id)
+			return
+		}
+		if start == config.StartPagePicker {
+			start = "" // the default
+		}
+		if err := o.store.SetSetting(ctx, settingStartPage, start); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to save setting")
+			return
+		}
+	}
+	if req.PinSignIn != nil && o.staticPin == nil {
+		value := ""
+		if !*req.PinSignIn {
+			value = "off"
+		}
+		if err := o.store.SetSetting(ctx, settingPinSignIn, value); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to save setting")
+			return
+		}
+	}
+	o.AdminConfig(w, r)
 }
 
 type adminProviderView struct {
@@ -121,6 +246,7 @@ func (o *OIDCService) writeAdminConfig(w http.ResponseWriter, r *http.Request, s
 		"public_url_from_config": o.publicURL != "",
 		"kiosk_session":          kiosk.view(DefaultKioskSessionTTL),
 		"personal_session":       personal.view(DefaultOIDCSessionTTL),
+		"sign_in":                o.signInOptionsView(ctx),
 	})
 }
 

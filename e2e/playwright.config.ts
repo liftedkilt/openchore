@@ -22,12 +22,13 @@ export default defineConfig({
     {
       name: 'main',
       use: { browserName: 'chromium' },
-      testIgnore: /admin-pin-change/,
+      testIgnore: /admin-pin-change|sign-in-options/,
     },
     {
+      // Specs that change household-wide sign-in state, run after the rest.
       name: 'pin-change',
       use: { browserName: 'chromium' },
-      testMatch: /admin-pin-change/,
+      testMatch: /admin-pin-change|sign-in-options/,
       dependencies: ['main'],
     },
   ],

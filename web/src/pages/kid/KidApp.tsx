@@ -233,8 +233,9 @@ export const KidApp: React.FC = () => {
         <PinSettingsModal
           userId={user.id}
           hasPin={user.has_pin}
+          pinLength={user.pin_length}
           onClose={() => setPinOpen(false)}
-          onChanged={(hasPin) => setUser({ ...user, has_pin: hasPin })}
+          onChanged={(hasPin, pinLength) => setUser({ ...user, has_pin: hasPin, pin_length: pinLength })}
         />
       )}
 

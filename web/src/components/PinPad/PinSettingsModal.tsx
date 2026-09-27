@@ -9,8 +9,10 @@ import styles from './PinSettingsModal.module.css';
 interface PinSettingsModalProps {
   userId: number;
   hasPin: boolean;
+  /** Digits in the current PIN, when known, so it submits on the last one. */
+  pinLength?: number;
   onClose: () => void;
-  onChanged: (hasPin: boolean) => void;
+  onChanged: (hasPin: boolean, pinLength?: number) => void;
 }
 
 type Step =
@@ -21,7 +23,7 @@ type Step =
   | 'removeConfirm' // confirm current PIN for removal
   | 'done';
 
-export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasPin, onClose, onChanged }) => {
+export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasPin, pinLength, onClose, onChanged }) => {
   const { t } = useTranslation();
   const [step, setStep] = useState<Step>(hasPin ? 'menu' : 'new');
   const [intent, setIntent] = useState<'set' | 'change' | 'remove'>(hasPin ? 'change' : 'set');
@@ -67,10 +69,10 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
     }
     setSaving(true);
     try {
-      await api.users.setPin(userId, pin, currentPin || undefined);
+      const res = await api.users.setPin(userId, pin, currentPin || undefined);
       setSuccessMsg(intent === 'set' ? t('common.pinSettings.successPinSet') : t('common.pinSettings.successPinUpdated'));
       setStep('done');
-      onChanged(true);
+      onChanged(true, res.pin_length);
     } catch (e) {
       if (e instanceof APIError && e.status === 401) {
         setError(t('common.pinSettings.errorIncorrectCurrentPin'));
@@ -124,6 +126,7 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
           <PinPad
             prompt={t('common.pinSettings.promptEnterCurrent')}
             error={error}
+            length={pinLength}
             onSubmit={handleCurrentPin}
           />
         )}
@@ -131,6 +134,7 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
         {step === 'new' && (
           <PinPad
             prompt={intent === 'set' ? t('common.pinSettings.promptChooseNew') : t('common.pinSettings.promptEnterNew')}
+            hint={t('common.pinSettings.hintLength')}
             error={error}
             onSubmit={handleNewPin}
           />
@@ -140,6 +144,7 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
           <PinPad
             prompt={t('common.pinSettings.promptConfirm')}
             error={error}
+            length={firstPin.length}
             onSubmit={handleConfirmPin}
           />
         )}
@@ -148,6 +153,7 @@ export const PinSettingsModal: React.FC<PinSettingsModalProps> = ({ userId, hasP
           <PinPad
             prompt={t('common.pinSettings.promptEnterCurrentToRemove')}
             error={error}
+            length={pinLength}
             onSubmit={handleRemoveSubmit}
           />
         )}
