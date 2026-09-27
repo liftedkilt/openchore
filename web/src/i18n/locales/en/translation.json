@@ -560,6 +560,20 @@
           "add": "Add provider",
           "save": "Save"
         },
+        "options": {
+          "title": "Signing in",
+          "startLabel": "When someone opens OpenChore signed out",
+          "startPicker": "Show the family picker",
+          "startWall": "Show the wall display",
+          "startProvider": "Sign in with {{name}}",
+          "startHelp": "Signing in with a provider takes people on their own phones straight to their chores. A shared tablet can always open /login for the family picker or /ambient for the wall display.",
+          "pinLabel": "Allow PINs for people with a linked account",
+          "pinHelp": "Turn off so people who've linked an account always use it. Anyone without a linked account keeps signing in with their PIN.",
+          "fromConfig": "Set in config.yaml or the environment on the server.",
+          "saveButton": "Save",
+          "saveSuccess": "Saved.",
+          "saveError": "Couldn't save. {{detail}}"
+        },
         "sessions": {
           "title": "Session length",
           "kioskLabel": "Tap and PIN sign-ins",
@@ -755,7 +769,8 @@
     "loading": "Loading…",
     "modal": {},
     "pinPad": {
-      "deleteAriaLabel": "Delete"
+      "deleteAriaLabel": "Delete",
+      "submitAriaLabel": "Done"
     },
     "pinSettings": {
       "btnChange": "Change PIN",
@@ -768,11 +783,12 @@
       "errorInvalidPin": "Invalid PIN",
       "errorPinsMismatch": "PINs don't match",
       "menuHint": "Your profile is protected by a PIN.",
-      "promptChooseNew": "Choose a 4-digit PIN",
+      "promptChooseNew": "Choose a PIN",
+      "hintLength": "4 to 8 digits",
       "promptConfirm": "Enter the same PIN again to confirm",
       "promptEnterCurrent": "Enter your current PIN",
       "promptEnterCurrentToRemove": "Enter your current PIN to remove it",
-      "promptEnterNew": "Enter a new 4-digit PIN",
+      "promptEnterNew": "Enter a new PIN",
       "saving": "Saving…",
       "successPinRemoved": "PIN removed",
       "successPinSet": "PIN set",
@@ -883,7 +899,9 @@
     },
     "pinPad": {
       "progress_one": "{{count}} of {{total}} digits entered",
-      "progress_other": "{{count}} of {{total}} digits entered"
+      "progress_other": "{{count}} of {{total}} digits entered",
+      "progressOpen_one": "{{count}} digit entered",
+      "progressOpen_other": "{{count}} digits entered"
     },
     "setup": {
       "color": "Colour",

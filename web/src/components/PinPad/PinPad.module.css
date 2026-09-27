@@ -19,6 +19,14 @@
   text-align: center;
 }
 
+.hint {
+  margin: calc(-1 * var(--space-3)) 0 var(--space-4);
+  font-size: 15px;
+  line-height: var(--type-body-line);
+  color: var(--ink-muted);
+  text-align: center;
+}
+
 .dots {
   display: flex;
   gap: var(--space-4);
@@ -99,6 +107,13 @@
   background: transparent;
   border-color: transparent;
   box-shadow: none;
+}
+
+/* The check key, once the entry is long enough to submit. */
+.keySubmit {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
 }
 
 .keyQuiet:disabled {

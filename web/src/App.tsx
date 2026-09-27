@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { api } from './api';
+import { claimAutoSignIn } from './signInRedirect';
 import { ProfileSelection } from './pages/ProfileSelection';
 import { Dashboard } from './pages/Dashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
@@ -23,6 +25,27 @@ const RequireAdmin: React.FC<{ children: React.ReactElement }> = ({ children }) 
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== 'admin') return <Navigate to="/" replace />;
   return children;
+};
+
+// Where someone who opens the app signed out lands: the family picker, the
+// wall display, or straight to a sign-in provider (Manage → Settings →
+// Sign-in). /login and /ambient always work, so a shared tablet can be
+// pointed at either whatever this is set to.
+const SignedOut: React.FC = () => {
+  const { signInOptions, signedOutHere } = useAuth();
+  const location = useLocation();
+  const provider = signInOptions.start_page === 'provider' && !signedOutHere ? signInOptions.start_provider : undefined;
+  // Decided once per visit, so a re-render doesn't re-check the loop guard.
+  const [redirect] = useState(() => !!provider && claimAutoSignIn());
+
+  useEffect(() => {
+    if (redirect && provider) {
+      window.location.replace(api.auth.oidcLoginURL(provider, undefined, location.pathname + location.search));
+    }
+  }, [redirect, provider, location.pathname, location.search]);
+
+  if (redirect) return null;
+  return <Navigate to={signInOptions.start_page === 'wall' ? '/ambient' : '/login'} replace />;
 };
 
 export const App: React.FC = () => {
@@ -54,7 +77,7 @@ export const App: React.FC = () => {
       <Route path="/ambient" element={<AmbientDashboard />} />
       <Route
         path="/*"
-        element={user ? <Dashboard /> : <Navigate to="/login" />}
+        element={user ? <Dashboard /> : <SignedOut />}
       />
     </Routes>
   );

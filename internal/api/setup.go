@@ -89,7 +89,7 @@ func (h *SetupHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. Create the parent (admin) profile
-	admin := &model.User{Name: parentName, Role: model.RoleAdmin, PinHash: string(pinHash), Color: req.Parent.Color}
+	admin := &model.User{Name: parentName, Role: model.RoleAdmin, PinHash: string(pinHash), PinLength: len(req.Parent.Pin), Color: req.Parent.Color}
 	if err := h.store.CreateUser(r.Context(), admin); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create admin user")
 		return

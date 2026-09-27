@@ -492,6 +492,13 @@ func (f *fakeIdP) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // at a fake IdP.
 func setupTestWithOIDC(t *testing.T, prompt string) (*testEnv, *fakeIdP) {
 	t.Helper()
+	return setupTestWithAuth(t, prompt, nil)
+}
+
+// setupTestWithAuth is setupTestWithOIDC with further auth: settings, as if
+// they were set in config.yaml.
+func setupTestWithAuth(t *testing.T, prompt string, extra func(*config.AuthConfig)) (*testEnv, *fakeIdP) {
+	t.Helper()
 	idp := newFakeIdP(t)
 
 	db, err := sql.Open("sqlite", ":memory:?_foreign_keys=on&_busy_timeout=5000")
@@ -518,11 +525,15 @@ func setupTestWithOIDC(t *testing.T, prompt string) (*testEnv, *fakeIdP) {
 	s := store.New(db)
 	d := webhook.NewDispatcher(s)
 	sessions := api.NewSessionManager(testSessionSecret)
-	authCfg, err := config.ResolveAuth(&config.Config{Auth: &config.AuthConfig{
+	auth := &config.AuthConfig{
 		OIDC: []config.OIDCProviderConfig{{
 			ID: "pocket", Name: "Pocket ID", Issuer: idp.srv.URL, ClientID: idp.client, ClientSecret: "s3cret", Prompt: prompt,
 		}},
-	}})
+	}
+	if extra != nil {
+		extra(auth)
+	}
+	authCfg, err := config.ResolveAuth(&config.Config{Auth: auth})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -793,4 +804,276 @@ func TestCrossOriginCookieWritesBlocked(t *testing.T) {
 	h := sessionHeaders(kid)
 	h["Origin"] = "http://evil.home.lan"
 	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/theme", kid), map[string]any{"theme": "sunroom"}, h, http.StatusOK)
+}
+
+// =================== PIN LENGTH ===================
+
+func pinLength(t *testing.T, env *testEnv, userID int) int {
+	t.Helper()
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d", userID), nil, nil, http.StatusOK)
+	var u map[string]any
+	decodeBody(t, resp, &u)
+	n, _ := u["pin_length"].(float64)
+	return int(n)
+}
+
+// PINs can be 4-8 digits; the PIN pad needs the length to know when the
+// PIN is complete (issue #99).
+func TestPinLengthIsRecorded(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kid := env.createChild(t, "Kid")
+
+	resp := env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kid),
+		map[string]any{"new_pin": "123456"}, childHeaders(kid), http.StatusOK)
+	var set map[string]any
+	decodeBody(t, resp, &set)
+	if set["pin_length"] != float64(6) {
+		t.Fatalf("expected pin_length 6 in the response, got %v", set)
+	}
+	if n := pinLength(t, env, kid); n != 6 {
+		t.Fatalf("expected pin_length 6, got %d", n)
+	}
+	env.login(t, kid, "1234", http.StatusUnauthorized)
+	env.login(t, kid, "123456", http.StatusOK)
+
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kid),
+		map[string]any{"new_pin": "87654321", "current_pin": "123456"}, childHeaders(kid), http.StatusOK)
+	if n := pinLength(t, env, kid); n != 8 {
+		t.Fatalf("expected pin_length 8 after a change, got %d", n)
+	}
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kid),
+		map[string]any{"new_pin": "123456789"}, adminHeaders(), http.StatusBadRequest)
+
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/users/%d/pin", kid), nil, adminHeaders(), http.StatusOK)
+	if n := pinLength(t, env, kid); n != 0 {
+		t.Fatalf("expected no pin_length once the PIN is removed, got %d", n)
+	}
+
+	// Parents created with a PIN, and at setup, get it too.
+	resp = env.expectStatus(t, "POST", "/api/users", map[string]any{"name": "Sam", "role": "admin", "pin": "24680"},
+		adminHeaders(), http.StatusCreated)
+	var created map[string]any
+	decodeBody(t, resp, &created)
+	if created["pin_length"] != float64(5) {
+		t.Fatalf("expected pin_length 5 on create, got %v", created["pin_length"])
+	}
+}
+
+func TestSetupRecordsParentPinLength(t *testing.T) {
+	env := setupTest(t)
+	resp := env.expectStatus(t, "POST", "/api/setup", map[string]any{
+		"parent":   map[string]any{"name": "Robin", "pin": "246810"},
+		"children": []map[string]any{{"name": "Kid"}},
+	}, nil, http.StatusCreated)
+	var setup map[string]any
+	decodeBody(t, resp, &setup)
+	parentID := int(setup["admin"].(map[string]any)["id"].(float64))
+	if n := pinLength(t, env, parentID); n != 6 {
+		t.Fatalf("expected pin_length 6, got %d", n)
+	}
+}
+
+// PINs set before lengths were stored have an unknown length until the
+// next successful sign-in.
+func TestLegacyPinLengthLearnedAtSignIn(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kid := env.createChild(t, "Kid")
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kid),
+		map[string]any{"new_pin": "135790"}, childHeaders(kid), http.StatusOK)
+	if _, err := env.db.Exec(`UPDATE users SET pin_length = 0 WHERE id = ?`, kid); err != nil {
+		t.Fatal(err)
+	}
+	if n := pinLength(t, env, kid); n != 0 {
+		t.Fatalf("expected an unknown length, got %d", n)
+	}
+
+	env.login(t, kid, "1357", http.StatusUnauthorized)
+	if n := pinLength(t, env, kid); n != 0 {
+		t.Fatalf("a wrong PIN must not record a length, got %d", n)
+	}
+	resp := env.login(t, kid, "135790", http.StatusOK)
+	var body map[string]any
+	decodeBody(t, resp, &body)
+	if body["user"].(map[string]any)["pin_length"] != float64(6) {
+		t.Fatalf("expected the signed-in user to carry pin_length 6, got %v", body["user"])
+	}
+	if n := pinLength(t, env, kid); n != 6 {
+		t.Fatalf("expected pin_length 6 after signing in, got %d", n)
+	}
+}
+
+// =================== SIGN-IN OPTIONS ===================
+
+type signInOptionsResp struct {
+	PinSignIn     bool   `json:"pin_sign_in"`
+	StartPage     string `json:"start_page"`
+	StartProvider string `json:"start_provider"`
+}
+
+func (e *testEnv) signInOptions(t *testing.T) signInOptionsResp {
+	t.Helper()
+	resp := e.expectStatus(t, "GET", "/api/auth/options", nil, nil, http.StatusOK)
+	var opts signInOptionsResp
+	decodeBody(t, resp, &opts)
+	return opts
+}
+
+func TestSignInOptionsDefaults(t *testing.T) {
+	env := setupTest(t)
+	if opts := env.signInOptions(t); !opts.PinSignIn || opts.StartPage != "picker" || opts.StartProvider != "" {
+		t.Fatalf("unexpected defaults: %+v", opts)
+	}
+}
+
+func TestStartPageFromUI(t *testing.T) {
+	env, _ := setupTestWithOIDC(t, "")
+	env.createAdmin(t)
+	kid := env.createChild(t, "Kid")
+
+	env.expectStatus(t, "PUT", "/api/admin/auth/options", map[string]any{"start_page": "wall"}, childHeaders(kid), http.StatusForbidden)
+	for _, bad := range []string{"bogus", "provider:", "provider:nope", "provider:Bad ID"} {
+		env.expectStatus(t, "PUT", "/api/admin/auth/options", map[string]any{"start_page": bad}, adminHeaders(), http.StatusBadRequest)
+	}
+
+	env.expectStatus(t, "PUT", "/api/admin/auth/options", map[string]any{"start_page": "wall"}, adminHeaders(), http.StatusOK)
+	if opts := env.signInOptions(t); opts.StartPage != "wall" || !opts.PinSignIn {
+		t.Fatalf("expected the wall display, got %+v", opts)
+	}
+
+	resp := env.expectStatus(t, "PUT", "/api/admin/auth/options", map[string]any{"start_page": "provider:pocket"}, adminHeaders(), http.StatusOK)
+	var cfg struct {
+		SignIn struct {
+			StartPage           string `json:"start_page"`
+			StartPageFromConfig bool   `json:"start_page_from_config"`
+		} `json:"sign_in"`
+	}
+	decodeBody(t, resp, &cfg)
+	if cfg.SignIn.StartPage != "provider:pocket" || cfg.SignIn.StartPageFromConfig {
+		t.Fatalf("unexpected admin view: %+v", cfg.SignIn)
+	}
+	if opts := env.signInOptions(t); opts.StartPage != "provider" || opts.StartProvider != "pocket" {
+		t.Fatalf("expected to start at pocket, got %+v", opts)
+	}
+
+	// Sending someone straight to the provider needs no tapped profile: the
+	// linked account decides who signs in.
+	b := newBrowser(t, env)
+	b.expect("POST", "/api/auth/login", map[string]any{"user_id": kid}, http.StatusOK)
+	b.get("/api/auth/oidc/pocket/start?mode=link")
+	phone := newBrowser(t, env)
+	if loc := phone.get("/api/auth/oidc/pocket/start?return=%2F%3Fview%3Dweek"); loc != "/?view=week" {
+		t.Fatalf("expected to land back where the visitor started, got %s", loc)
+	}
+	resp = phone.expect("GET", "/api/auth/me", nil, http.StatusOK)
+	var me map[string]any
+	decodeBody(t, resp, &me)
+	if me["user"].(map[string]any)["name"] != "Kid" {
+		t.Fatalf("expected Kid's session, got %v", me["user"])
+	}
+
+	env.expectStatus(t, "PUT", "/api/admin/auth/options", map[string]any{"start_page": "picker"}, adminHeaders(), http.StatusOK)
+	if opts := env.signInOptions(t); opts.StartPage != "picker" {
+		t.Fatalf("expected the picker again, got %+v", opts)
+	}
+}
+
+// A start provider that is later removed falls back to the family picker.
+func TestStartPageFallsBackWhenProviderRemoved(t *testing.T) {
+	env := setupTest(t)
+	idp := newFakeIdP(t)
+	env.createAdmin(t)
+	env.expectStatus(t, "POST", "/api/admin/auth/providers", map[string]any{
+		"id": "pocket", "name": "Pocket ID", "issuer": idp.srv.URL, "client_id": idp.client,
+	}, adminHeaders(), http.StatusCreated)
+	env.expectStatus(t, "PUT", "/api/admin/auth/options", map[string]any{"start_page": "provider:pocket"}, adminHeaders(), http.StatusOK)
+	env.expectStatus(t, "DELETE", "/api/admin/auth/providers/pocket", nil, adminHeaders(), http.StatusOK)
+	if opts := env.signInOptions(t); opts.StartPage != "picker" || opts.StartProvider != "" {
+		t.Fatalf("expected the picker, got %+v", opts)
+	}
+}
+
+func TestPinSignInOff(t *testing.T) {
+	env, _ := setupTestWithOIDC(t, "")
+	env.createAdmin(t)
+	linked := env.createChild(t, "Linked")
+	pinOnly := env.createChild(t, "PinOnly")
+	for _, id := range []int{linked, pinOnly} {
+		env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", id),
+			map[string]any{"new_pin": "123456"}, childHeaders(id), http.StatusOK)
+	}
+	b := newBrowser(t, env)
+	b.expect("POST", "/api/auth/login", map[string]any{"user_id": linked, "pin": "123456"}, http.StatusOK)
+	b.get("/api/auth/oidc/pocket/start?mode=link")
+
+	env.expectStatus(t, "PUT", "/api/admin/auth/options", map[string]any{"pin_sign_in": false}, childHeaders(linked), http.StatusForbidden)
+	env.expectStatus(t, "PUT", "/api/admin/auth/options", map[string]any{"pin_sign_in": false}, adminHeaders(), http.StatusOK)
+	if opts := env.signInOptions(t); opts.PinSignIn || opts.StartPage != "picker" {
+		t.Fatalf("expected PIN sign-in off and the start page untouched, got %+v", opts)
+	}
+
+	// Someone with a linked account must use it, even with the right PIN...
+	resp := env.login(t, linked, "123456", http.StatusForbidden)
+	if code := errorCode(t, resp); code != "oidc_required" {
+		t.Fatalf("expected oidc_required, got %q", code)
+	}
+	// ...and still can.
+	if loc := newBrowser(t, env).get(fmt.Sprintf("/api/auth/oidc/pocket/start?user_id=%d", linked)); loc != "/" {
+		t.Fatalf("expected the linked account to sign in, got %s", loc)
+	}
+	// Someone without one keeps their PIN, so nobody is locked out.
+	env.login(t, pinOnly, "123456", http.StatusOK)
+
+	env.expectStatus(t, "PUT", "/api/admin/auth/options", map[string]any{"pin_sign_in": true}, adminHeaders(), http.StatusOK)
+	env.login(t, linked, "123456", http.StatusOK)
+}
+
+// A link to a provider that no longer exists doesn't count: the PIN stays
+// usable so the person isn't stranded.
+func TestPinSignInOffIgnoresRemovedProvider(t *testing.T) {
+	env := setupTest(t)
+	idp := newFakeIdP(t)
+	env.createAdmin(t)
+	kid := env.createChild(t, "Kid")
+	env.expectStatus(t, "PUT", fmt.Sprintf("/api/users/%d/pin", kid),
+		map[string]any{"new_pin": "4321"}, childHeaders(kid), http.StatusOK)
+	env.expectStatus(t, "POST", "/api/admin/auth/providers", map[string]any{
+		"id": "pocket", "name": "Pocket ID", "issuer": idp.srv.URL, "client_id": idp.client,
+	}, adminHeaders(), http.StatusCreated)
+	b := newBrowser(t, env)
+	b.expect("POST", "/api/auth/login", map[string]any{"user_id": kid, "pin": "4321"}, http.StatusOK)
+	b.get("/api/auth/oidc/pocket/start?mode=link")
+	env.expectStatus(t, "PUT", "/api/admin/auth/options", map[string]any{"pin_sign_in": false}, adminHeaders(), http.StatusOK)
+	env.login(t, kid, "4321", http.StatusForbidden)
+
+	env.expectStatus(t, "DELETE", "/api/admin/auth/providers/pocket", nil, adminHeaders(), http.StatusOK)
+	env.login(t, kid, "4321", http.StatusOK)
+}
+
+func TestSignInOptionsFromConfigAreReadOnly(t *testing.T) {
+	off := false
+	env, _ := setupTestWithAuth(t, "", func(a *config.AuthConfig) {
+		a.PinSignIn = &off
+		a.StartPage = "provider:pocket"
+	})
+	env.createAdmin(t)
+
+	if opts := env.signInOptions(t); opts.PinSignIn || opts.StartPage != "provider" || opts.StartProvider != "pocket" {
+		t.Fatalf("expected the config options, got %+v", opts)
+	}
+	resp := env.expectStatus(t, "PUT", "/api/admin/auth/options",
+		map[string]any{"pin_sign_in": true, "start_page": "wall"}, adminHeaders(), http.StatusOK)
+	var cfg struct {
+		SignIn struct {
+			PinSignIn           bool   `json:"pin_sign_in"`
+			PinSignInFromConfig bool   `json:"pin_sign_in_from_config"`
+			StartPage           string `json:"start_page"`
+			StartPageFromConfig bool   `json:"start_page_from_config"`
+		} `json:"sign_in"`
+	}
+	decodeBody(t, resp, &cfg)
+	if cfg.SignIn.PinSignIn || !cfg.SignIn.PinSignInFromConfig || cfg.SignIn.StartPage != "provider:pocket" || !cfg.SignIn.StartPageFromConfig {
+		t.Fatalf("config options should win, got %+v", cfg.SignIn)
+	}
 }

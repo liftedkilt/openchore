@@ -24,8 +24,15 @@ type AuthConfig struct {
 	// KioskSessionTTL bounds tap/PIN sessions (default 12h).
 	KioskSessionTTL string `yaml:"kiosk_session_ttl,omitempty"`
 	// PersonalSessionTTL bounds OIDC sessions on personal devices (default 720h).
-	PersonalSessionTTL string               `yaml:"personal_session_ttl,omitempty"`
-	OIDC               []OIDCProviderConfig `yaml:"oidc,omitempty"`
+	PersonalSessionTTL string `yaml:"personal_session_ttl,omitempty"`
+	// PinSignIn set to false makes people with a linked account sign in
+	// with it instead of their PIN. Profiles without one keep their PIN.
+	PinSignIn *bool `yaml:"pin_sign_in,omitempty"`
+	// StartPage is where someone who opens OpenChore signed out lands:
+	// "picker" (the family picker, default), "wall" (the read-only wall
+	// display) or "provider:<id>" (straight to that sign-in provider).
+	StartPage string               `yaml:"start_page,omitempty"`
+	OIDC      []OIDCProviderConfig `yaml:"oidc,omitempty"`
 }
 
 // OIDCProviderConfig describes one OpenID Connect provider (Pocket ID,

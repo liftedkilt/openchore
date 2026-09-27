@@ -16,9 +16,40 @@ and get a **Manage** button on their own dashboard; there is no separate
 household passcode. Parents take part like everyone else: they can be
 assigned chores, earn points, redeem rewards and pick a theme.
 
+PINs are 4 to 8 digits. The PIN pad shows one dot per digit and signs in as
+soon as the last one is entered. A PIN set before OpenChore recorded PIN
+lengths shows a **✓** key instead, until the first time it's used to sign in.
+
 Every **parent profile must have a PIN or a linked account**. The server
 refuses to create a parent without a PIN, to promote someone without one, or
 to remove a parent's last way to sign in.
+
+## Phones first: skipping the picker
+
+By default, opening OpenChore signed out shows the family picker. Under
+**Manage → Settings → Sign-in → Signing in** you can change that:
+
+| When someone opens OpenChore signed out | What happens |
+|---|---|
+| Show the family picker (default) | The picker, as above |
+| Show the wall display | The read-only wall display (`/ambient`) |
+| Sign in with *provider* | Straight to that provider. After signing in, people land on their own chores |
+
+Whichever you choose, a shared tablet can always open `/login` for the family
+picker or `/ambient` for the wall display, so point it at one of those.
+Signing out goes to the family picker rather than back to the provider, which
+could otherwise sign the person straight back in. With the provider option,
+the picker also shows a **Continue with …** button that needs no profile
+tapped first: the linked account decides who signs in.
+
+**Allow PINs for people with a linked account** (on by default) can be turned
+off, so anyone who has linked an account must use it, even on the tablet.
+People with no linked account (or whose provider has been removed) keep
+signing in with their PIN, so nobody is locked out.
+
+Both options can be fixed in `config.yaml` (`auth.start_page`,
+`auth.pin_sign_in`) or with `OPENCHORE_START_PAGE` and `OPENCHORE_PIN_SIGN_IN`;
+they then show read-only in Settings.
 
 ## Sessions
 
@@ -99,6 +130,8 @@ added in Settings takes its place.
 ```yaml
 auth:
   public_url: "https://chores.example.com"   # used to build the redirect URI
+  start_page: provider:pocketid  # optional: picker (default), wall or provider:<id>
+  pin_sign_in: false             # optional: people with a linked account must use it
   oidc:
     - id: pocketid             # appears in the callback URL; don't change it once people have linked
       name: "Pocket ID"        # button label: "Continue with Pocket ID"
@@ -119,6 +152,8 @@ Or configure a single provider with environment variables only:
 | `OIDC_SCOPES` | Space- or comma-separated, default `openid profile email` |
 | `OIDC_PROMPT` | Passed through as the `prompt` parameter, e.g. `login` |
 | `OPENCHORE_PUBLIC_URL` | Overrides `auth.public_url` |
+| `OPENCHORE_START_PAGE` | Overrides `auth.start_page`: `picker`, `wall` or `provider:<id>` |
+| `OPENCHORE_PIN_SIGN_IN` | Overrides `auth.pin_sign_in`: `true` or `false` |
 | `OPENCHORE_SESSION_SECRET` | Optional; at least 32 characters. Otherwise a secret is generated and stored in the database |
 
 **Set `public_url`** (or the *System Base URL* under Manage → Settings) when

@@ -560,6 +560,20 @@
           "add": "Anbieter hinzufügen",
           "save": "Speichern"
         },
+        "options": {
+          "title": "Anmelden",
+          "startLabel": "Wenn jemand OpenChore abgemeldet öffnet",
+          "startPicker": "Familienauswahl zeigen",
+          "startWall": "Wandanzeige zeigen",
+          "startProvider": "Mit {{name}} anmelden",
+          "startHelp": "Mit einem Anbieter anmelden bringt Leute auf ihrem eigenen Handy direkt zu ihren Aufgaben. Ein gemeinsames Tablet kann immer /login für die Familienauswahl oder /ambient für die Wandanzeige öffnen.",
+          "pinLabel": "PINs für Personen mit verknüpftem Konto erlauben",
+          "pinHelp": "Ausschalten, damit Personen mit verknüpftem Konto immer dieses verwenden. Wer kein verknüpftes Konto hat, meldet sich weiter mit seiner PIN an.",
+          "fromConfig": "Auf dem Server in config.yaml oder der Umgebung festgelegt.",
+          "saveButton": "Speichern",
+          "saveSuccess": "Gespeichert.",
+          "saveError": "Konnte nicht speichern. {{detail}}"
+        },
         "sessions": {
           "title": "Sitzungsdauer",
           "kioskLabel": "Antippen und PIN",
@@ -755,7 +769,8 @@
     "loading": "Wird geladen…",
     "modal": {},
     "pinPad": {
-      "deleteAriaLabel": "Löschen"
+      "deleteAriaLabel": "Löschen",
+      "submitAriaLabel": "Fertig"
     },
     "pinSettings": {
       "btnChange": "PIN ändern",
@@ -768,11 +783,12 @@
       "errorInvalidPin": "Ungültige PIN",
       "errorPinsMismatch": "PINs stimmen nicht überein",
       "menuHint": "Dein Profil ist durch eine PIN geschützt.",
-      "promptChooseNew": "Wähle eine 4-stellige PIN",
+      "promptChooseNew": "Wähle eine PIN",
+      "hintLength": "4 bis 8 Ziffern",
       "promptConfirm": "Gib zur Bestätigung dieselbe PIN erneut ein",
       "promptEnterCurrent": "Gib deine aktuelle PIN ein",
       "promptEnterCurrentToRemove": "Gib deine aktuelle PIN ein, um sie zu entfernen",
-      "promptEnterNew": "Gib eine neue 4-stellige PIN ein",
+      "promptEnterNew": "Gib eine neue PIN ein",
       "saving": "Wird gespeichert…",
       "successPinRemoved": "PIN entfernt",
       "successPinSet": "PIN gesetzt",
@@ -883,7 +899,9 @@
     },
     "pinPad": {
       "progress_one": "{{count}} von {{total}} Ziffern eingegeben",
-      "progress_other": "{{count}} von {{total}} Ziffern eingegeben"
+      "progress_other": "{{count}} von {{total}} Ziffern eingegeben",
+      "progressOpen_one": "{{count}} Ziffer eingegeben",
+      "progressOpen_other": "{{count}} Ziffern eingegeben"
     },
     "setup": {
       "color": "Farbe",

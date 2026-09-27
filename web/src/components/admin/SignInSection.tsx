@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { Pencil, Trash2, X } from 'lucide-react';
 import { api, APIError } from '../../api';
+import { useAuth } from '../../AuthContext';
 import type { AdminAuthConfig, AdminAuthProvider, AuthProviderInput } from '../../types';
 import { Icon } from '../../design';
 import { FormMessage, type Msg } from './FormMessage';
@@ -29,10 +30,11 @@ export const slugifyProviderId = (name: string) =>
 
 const errorText = (err: unknown) => (err instanceof APIError ? err.message : '');
 
-/** Single sign-on providers and session lengths. Anything set in config.yaml
- * or the OIDC_* environment variables is shown read-only. */
+/** Single sign-on providers, how people sign in, and session lengths.
+ * Anything set in config.yaml or the environment is shown read-only. */
 export const SignInSection: React.FC = () => {
   const { t } = useTranslation();
+  const { reloadSignInOptions } = useAuth();
   const [cfg, setCfg] = useState<AdminAuthConfig | null>(null);
   const [editing, setEditing] = useState<string | null>(null); // provider id, '' = new
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -46,8 +48,15 @@ export const SignInSection: React.FC = () => {
   const [sessionSaving, setSessionSaving] = useState(false);
   const [sessionMessage, setSessionMessage] = useState<Msg>(null);
 
+  const [startPage, setStartPage] = useState('picker');
+  const [pinSignIn, setPinSignIn] = useState(true);
+  const [optionsSaving, setOptionsSaving] = useState(false);
+  const [optionsMessage, setOptionsMessage] = useState<Msg>(null);
+
   const apply = (c: AdminAuthConfig) => {
     setCfg(c);
+    setStartPage(c.sign_in.start_page);
+    setPinSignIn(c.sign_in.pin_sign_in);
     setKioskHours(String(+c.kiosk_session.hours.toFixed(2)));
     setPersonalDays(String(+(c.personal_session.hours / 24).toFixed(2)));
   };
@@ -147,6 +156,20 @@ export const SignInSection: React.FC = () => {
       setSessionMessage({ type: 'error', text: t('admin.settingsTab.signIn.sessions.saveError', { detail: errorText(err) }) });
     }
     setSessionSaving(false);
+  };
+
+  const handleSaveOptions = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOptionsSaving(true);
+    setOptionsMessage(null);
+    try {
+      apply(await api.admin.updateSignInOptions({ start_page: startPage, pin_sign_in: pinSignIn }));
+      await reloadSignInOptions();
+      setOptionsMessage({ type: 'success', text: t('admin.settingsTab.signIn.options.saveSuccess') });
+    } catch (err) {
+      setOptionsMessage({ type: 'error', text: t('admin.settingsTab.signIn.options.saveError', { detail: errorText(err) }) });
+    }
+    setOptionsSaving(false);
   };
 
   const editingProvider = cfg.providers.find(p => p.id === editing);
@@ -336,6 +359,56 @@ export const SignInSection: React.FC = () => {
       )}
 
       <FormMessage msg={message} />
+
+      <form onSubmit={handleSaveOptions} className={styles.sessions}>
+        <h4 className={ui.eyebrow}>{t('admin.settingsTab.signIn.options.title')}</h4>
+        <label className={ui.field}>
+          <span className={ui.label}>{t('admin.settingsTab.signIn.options.startLabel')}</span>
+          <select
+            className={ui.input}
+            value={startPage}
+            onChange={e => setStartPage(e.target.value)}
+            disabled={cfg.sign_in.start_page_from_config}
+          >
+            <option value="picker">{t('admin.settingsTab.signIn.options.startPicker')}</option>
+            <option value="wall">{t('admin.settingsTab.signIn.options.startWall')}</option>
+            {cfg.providers.map(p => (
+              <option key={p.id} value={`provider:${p.id}`}>
+                {t('admin.settingsTab.signIn.options.startProvider', { name: p.name })}
+              </option>
+            ))}
+          </select>
+          <span className={ui.help}>
+            {cfg.sign_in.start_page_from_config
+              ? t('admin.settingsTab.signIn.options.fromConfig')
+              : t('admin.settingsTab.signIn.options.startHelp')}
+          </span>
+        </label>
+        <div className={ui.field}>
+          <label className={ui.check}>
+            <input
+              type="checkbox"
+              checked={pinSignIn}
+              onChange={e => setPinSignIn(e.target.checked)}
+              disabled={cfg.sign_in.pin_sign_in_from_config}
+            />
+            <span className={ui.checkLabel}>{t('admin.settingsTab.signIn.options.pinLabel')}</span>
+          </label>
+          <span className={ui.help}>
+            {cfg.sign_in.pin_sign_in_from_config
+              ? t('admin.settingsTab.signIn.options.fromConfig')
+              : t('admin.settingsTab.signIn.options.pinHelp')}
+          </span>
+        </div>
+        <FormMessage msg={optionsMessage} />
+        {!(cfg.sign_in.start_page_from_config && cfg.sign_in.pin_sign_in_from_config) && (
+          <div className={ui.actionsEnd}>
+            <button type="submit" className={ui.btnPrimary} disabled={optionsSaving}>
+              <Icon name="check" /> {t('admin.settingsTab.signIn.options.saveButton')}
+            </button>
+          </div>
+        )}
+      </form>
 
       <form onSubmit={handleSaveSessions} className={styles.sessions}>
         <h4 className={ui.eyebrow}>{t('admin.settingsTab.signIn.sessions.title')}</h4>
