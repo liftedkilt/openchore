@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../../api';
 import type { ScheduledChore } from '../../types';
 import { Icon } from '../../design';
 import { Sheet } from './Sheet';
 import s from './kid.module.css';
+
+// Only this sheet draws a QR code; keep the encoder out of the main bundle.
+const QRCodeSVG = React.lazy(() => import('qrcode.react').then(m => ({ default: m.QRCodeSVG })));
 
 interface PhotoSheetProps {
   chore: ScheduledChore;
@@ -116,9 +118,11 @@ export function PhotoSheet({ chore, userId, baseUrl, onClose, onComplete }: Phot
 
       {/* The code sits on a House "paper" in every skin: scanners need dark on light. */}
       <div className={s.qrPaper} data-theme="house">
-        {uploadToken
-          ? <QRCodeSVG value={uploadUrl} size={224} marginSize={2} bgColor="transparent" fgColor="currentColor" title={t('kid.photo.qrLabel')} />
-          : <span className={s.spinner} role="status" aria-label={t('kid.photo.preparing')} />}
+        <React.Suspense fallback={<span className={s.spinner} role="status" aria-label={t('kid.photo.preparing')} />}>
+          {uploadToken
+            ? <QRCodeSVG value={uploadUrl} size={224} marginSize={2} bgColor="transparent" fgColor="currentColor" title={t('kid.photo.qrLabel')} />
+            : <span className={s.spinner} role="status" aria-label={t('kid.photo.preparing')} />}
+        </React.Suspense>
       </div>
 
       <div className={s.sheetActions}>
