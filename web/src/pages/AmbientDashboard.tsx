@@ -54,6 +54,25 @@ const hoursOf = (d: Date) => d.getHours() + d.getMinutes() / 60;
 const dayFraction = (d: Date) => (hoursOf(d) - DAY_FROM_H) / (DAY_TO_H - DAY_FROM_H);
 
 /**
+ * Doors fit together: every request made in the same tick is handled in one
+ * pass (show all, measure all, then hide), so the page lays out once rather
+ * than once per door.
+ */
+type Fitter = { reset: () => void; measure: () => () => void };
+const fitQueue = new Set<Fitter>();
+function requestFit(f: Fitter) {
+  if (fitQueue.size === 0) {
+    queueMicrotask(() => {
+      const batch = [...fitQueue];
+      fitQueue.clear();
+      batch.forEach((x) => x.reset());
+      batch.map((x) => x.measure()).forEach((apply) => apply());
+    });
+  }
+  fitQueue.add(f);
+}
+
+/**
  * Hide the rows of a door's "Next up" list that don't fully fit, so a door
  * shows as many whole rows as its height allows and never a clipped one.
  * When not even one fits, the section (and its label) hides.
@@ -70,23 +89,36 @@ function useFitRows<T extends HTMLElement>(deps: unknown[]) {
     const door = box?.closest<HTMLElement>(`.${styles.door}`);
     if (!box || !section || !door) return;
     let alive = true;
-    const fit = () => {
-      if (!alive) return;
-      const kids = Array.from(box.children) as HTMLElement[];
-      section.hidden = false;
-      kids.forEach((k) => { k.hidden = false; });
-      const bottom = box.getBoundingClientRect().bottom;
-      kids.forEach((k) => { k.hidden = k.getBoundingClientRect().bottom > bottom + 1; });
-      section.hidden = kids.length > 0 && kids.every((k) => k.hidden);
+    const kids = () => Array.from(box.children) as HTMLElement[];
+    const fitter: Fitter = {
+      reset: () => {
+        section.hidden = false;
+        kids().forEach((k) => { k.hidden = false; });
+      },
+      // Rows show as a prefix: stop at the first that spills.
+      measure: () => {
+        const rows = kids();
+        // Rows may not reach into the padding kept for their shadows.
+        const bottom = box.getBoundingClientRect().bottom - parseFloat(getComputedStyle(box).paddingBottom || '0');
+        const spill = rows.findIndex((k) => k.getBoundingClientRect().bottom > bottom + 1);
+        const shown = spill < 0 ? rows.length : spill;
+        return () => {
+          rows.forEach((k, i) => { k.hidden = i >= shown; });
+          section.hidden = rows.length > 0 && shown === 0;
+        };
+      },
     };
+    const fit = () => { if (alive) requestFit(fitter); };
     fit();
     document.fonts?.ready.then(fit).catch(() => {});
     let ro: ResizeObserver | undefined;
     if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(fit);
+      // The first callback reports the size just fitted; only re-fit on change.
+      let seen = false;
+      ro = new ResizeObserver(() => { if (seen) fit(); seen = true; });
       ro.observe(door);
     }
-    return () => { alive = false; ro?.disconnect(); };
+    return () => { alive = false; fitQueue.delete(fitter); ro?.disconnect(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return ref;

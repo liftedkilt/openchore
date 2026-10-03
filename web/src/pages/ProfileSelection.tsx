@@ -114,11 +114,15 @@ function Door({ user, today, now, disabled, onSelect }: DoorProps) {
           )}
         </h2>
         <DoorMeta user={user} today={today} />
-        {!user.paused && today && today.total > 0 && (
+        {/* Hold the hero's room while today's chores load, so the doors
+            don't grow (and push the row below) when they arrive. */}
+        {!user.paused && (!today || today.total > 0) && (
           <div className={styles.heroZone}>
-            <div className={clsx(styles.hero, HERO_CLASS[skin])}>
-              <DayProgress items={today.items} now={now} />
-            </div>
+            {today && (
+              <div className={clsx(styles.hero, HERO_CLASS[skin])}>
+                <DayProgress items={today.items} now={now} />
+              </div>
+            )}
           </div>
         )}
       </SkinScope>
@@ -407,7 +411,10 @@ export const ProfileSelection: React.FC = () => {
     date: clock.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' }),
     time: clock.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }),
   });
-  const strip = stripMembers([...kids, ...parents], today);
+  // Until today's chores arrive, hold the strip's room with the kids (who
+  // nearly always have chores) so it doesn't push the footer down when it fills.
+  const todayLoading = users.length > 0 && Object.keys(today).length === 0;
+  const strip = todayLoading ? kids.filter(u => !u.paused) : stripMembers([...kids, ...parents], today);
 
   return (
     <HouseScope persistent={persistent} className={styles.screen}>
@@ -443,17 +450,23 @@ export const ProfileSelection: React.FC = () => {
         </ul>
 
         {strip.length > 0 && (
-          <section className={styles.family} aria-labelledby="family-today">
+          <section
+            className={clsx(styles.family, todayLoading && styles.familyPending)}
+            aria-labelledby="family-today"
+            aria-hidden={todayLoading || undefined}
+          >
             <h2 id="family-today" className={styles.familyTitle}>{t('entry.picker.familyToday')}</h2>
-            {strip.map(u => (
-              <FamilyMember
-                key={u.id}
-                name={u.name}
-                color={u.color}
-                done={today[u.id].done}
-                total={today[u.id].total}
-              />
-            ))}
+            {todayLoading
+              ? strip.map(u => <div key={u.id} className="oc-member" />)
+              : strip.map(u => (
+                <FamilyMember
+                  key={u.id}
+                  name={u.name}
+                  color={u.color}
+                  done={today[u.id].done}
+                  total={today[u.id].total}
+                />
+              ))}
           </section>
         )}
 
