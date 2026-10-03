@@ -145,7 +145,9 @@
 
 /* ---------- Celebration ---------- */
 .oc-cele { position: relative; height: 100%; min-height: 560px; overflow: hidden; background: var(--celebrate); color: var(--ink); font-family: var(--font-text); display: flex; flex-direction: column; align-items: center; }
-.oc-cele__rays, .oc-cele__confetti, .oc-cele__ringdeco { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.oc-cele__rays, .oc-cele__confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+/* Drawn around the card (centred on it), not across the screen, so it never drifts off the points as the viewport resizes. */
+.oc-cele__ringdeco { position: absolute; left: 50%; top: 50%; width: 400px; height: 400px; margin: -200px 0 0 -200px; overflow: visible; pointer-events: none; z-index: -1; }
 .oc-cele__rays { display: var(--cele-rays); }
 .oc-cele__confetti { display: var(--cele-confetti); }
 .oc-cele__ringdeco { display: var(--cele-ring); }
@@ -158,14 +160,16 @@
 .oc-cele__ringdeco .trk { fill: none; stroke: var(--surface-sunk); stroke-width: 14; }
 .oc-cele__ringdeco .arc { fill: none; stroke: var(--highlight); stroke-width: 14; stroke-linecap: round; }
 .oc-cele__ringdeco .sp { fill: var(--highlight); }
-.oc-cele__head { position: relative; margin: 118px 0 0; text-align: center; font-family: var(--font-display); font-weight: var(--display-weight); font-variation-settings: var(--display-axes); letter-spacing: var(--display-tracking); font-size: 52px; line-height: 50px; }
+/* Headline and card centre in the space above the buttons on any screen height. */
+.oc-cele__body { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: max(32px, env(safe-area-inset-top, 0px)) 20px 24px; box-sizing: border-box; }
+.oc-cele__head { position: relative; margin: 0; text-align: center; font-family: var(--font-display); font-weight: var(--display-weight); font-variation-settings: var(--display-axes); letter-spacing: var(--display-tracking); font-size: 52px; line-height: 50px; }
 .oc-cele__head em { font-style: var(--display-italic); }
-.oc-cele__card { position: relative; margin-top: 26px; width: 236px; box-sizing: border-box; padding: 18px 18px 20px; text-align: center; border-radius: var(--oc-radius-xl); background: var(--stamp-bg); border: var(--stamp-bw) solid var(--line); box-shadow: var(--stamp-shadow); transform: rotate(var(--stamp-rotate)); }
-.oc-cele__pts { font-family: var(--font-display); font-weight: var(--display-weight); font-variation-settings: var(--display-axes); font-size: 88px; line-height: 84px; letter-spacing: -0.05em; }
+.oc-cele__card { position: relative; isolation: isolate; margin-top: var(--cele-card-gap, 26px); width: var(--cele-card-size, 236px); min-height: var(--cele-card-size, 0px); display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; padding: 18px 18px 20px; text-align: center; border-radius: var(--oc-radius-xl); background: var(--stamp-bg); border: var(--stamp-bw) solid var(--line); box-shadow: var(--stamp-shadow); transform: rotate(var(--stamp-rotate)); }
+.oc-cele__pts { font-family: var(--font-display); font-weight: var(--display-weight); font-variation-settings: var(--display-axes); font-size: 88px; line-height: 84px; letter-spacing: -0.05em; padding-right: 0.05em; }
 .oc-cele__what { margin-top: 6px; font-size: 17px; font-weight: 700; }
 .oc-cele__streak { margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; box-sizing: border-box; border-radius: 999px; background: var(--chip); color: var(--on-chip); border: var(--outline-w) solid var(--line); font-size: 13px; font-weight: 700; }
 .oc-cele__streak .oc-icon { width: 15px; height: 15px; color: var(--star); fill: var(--star); stroke-width: 1.5; }
-.oc-cele__foot { position: absolute; left: 20px; right: 20px; bottom: 44px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.oc-cele__foot { position: relative; align-self: stretch; padding: 0 20px calc(44px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; align-items: center; gap: 14px; }
 
 @media (prefers-reduced-motion: no-preference) {
   .oc-cele__head { animation: oc-rise .42s cubic-bezier(.2, .8, .2, 1) both; }

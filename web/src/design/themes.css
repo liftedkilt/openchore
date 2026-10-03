@@ -138,6 +138,7 @@
   --tab-active-bg: transparent; --tab-active-ink: var(--ink); --tab-active-bw: 0px;
   --tab-bg: var(--surface); --tab-label: none; --tab-dot: block; --tab-shadow: none;
   --cele-rays: none; --cele-confetti: none; --cele-ring: block;
+  --cele-card-size: 286px; --cele-card-gap: 64px; /* fits inside the ring (r150, 14px stroke) */
   --stamp-bg: transparent; --stamp-rotate: 0deg; --stamp-bw: 0px; --stamp-shadow: none;
 }
 
