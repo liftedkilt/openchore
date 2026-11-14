@@ -491,6 +491,34 @@ func TestMCPUnassignPartialFailure(t *testing.T) {
 	}
 }
 
+func TestMCPBatchLimit(t *testing.T) {
+	env := setupMCP(t)
+	batch := func(n int) []any {
+		b := make([]any, n)
+		for i := range b {
+			b[i] = map[string]any{"jsonrpc": "2.0", "id": i + 1, "method": "ping"}
+		}
+		return b
+	}
+
+	resp := env.request(t, http.MethodPost, "/api/mcp", batch(50), adminHeaders())
+	var ok []map[string]any
+	decodeBody(t, resp, &ok)
+	if len(ok) != 50 {
+		t.Errorf("batch of 50 answered %d", len(ok))
+	}
+
+	resp = env.request(t, http.MethodPost, "/api/mcp", batch(51), adminHeaders())
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("oversized batch status = %d, want 400", resp.StatusCode)
+	}
+	var out map[string]any
+	decodeBody(t, resp, &out)
+	if e, _ := out["error"].(map[string]any); e == nil || e["code"].(float64) != -32600 {
+		t.Errorf("oversized batch: %v", out)
+	}
+}
+
 // TestMCPCoversAPI keeps the MCP server complete: every REST route must be
 // used by some tool or listed here with the reason it isn't.
 func TestMCPCoversAPI(t *testing.T) {
