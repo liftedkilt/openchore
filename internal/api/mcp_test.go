@@ -519,6 +519,29 @@ func TestMCPBatchLimit(t *testing.T) {
 	}
 }
 
+func TestMCPRejectsCrossOriginCookie(t *testing.T) {
+	env := setupMCP(t)
+	ping := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "ping"}
+	cookie := "openchore_session=" + sessionToken(1)
+
+	resp := env.request(t, http.MethodPost, "/api/mcp", ping, map[string]string{
+		"Cookie": cookie, "Origin": "https://evil.example",
+	})
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("cross-origin cookie status = %d, want 403", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// The same cookie from the app's own origin is fine.
+	resp = env.request(t, http.MethodPost, "/api/mcp", ping, map[string]string{
+		"Cookie": cookie, "Origin": env.server.URL,
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("same-origin cookie status = %d, want 200", resp.StatusCode)
+	}
+	resp.Body.Close()
+}
+
 // TestMCPCoversAPI keeps the MCP server complete: every REST route must be
 // used by some tool or listed here with the reason it isn't.
 func TestMCPCoversAPI(t *testing.T) {
