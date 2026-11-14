@@ -22,9 +22,12 @@ type Tool struct {
 	Title       string
 	Description string
 	Schema      map[string]any
-	// Hints for the client (MCP tool annotations).
-	ReadOnly    bool
-	Destructive bool
+	// Hints for the client (MCP tool annotations). A tool that isn't
+	// ReadOnly is announced as destructive unless it opts out with Safe:
+	// some clients and gateways auto-approve non-destructive tools, so only
+	// additive, easily undone writes (marking a chore done) may set it.
+	ReadOnly bool
+	Safe     bool
 	// Covers lists the REST routes the tool uses, as "METHOD /path" relative
 	// to the API prefix with parameters written {}. A test checks that every
 	// route in the router is covered by some tool or deliberately excluded.
@@ -39,7 +42,7 @@ func (t *Tool) describe() map[string]any {
 		"openWorldHint": false,
 	}
 	if !t.ReadOnly {
-		ann["destructiveHint"] = t.Destructive
+		ann["destructiveHint"] = !t.Safe
 	}
 	return map[string]any{
 		"name":        t.Name,
@@ -221,7 +224,7 @@ type endpoint struct {
 	props             map[string]any
 	required          []string
 	readOnly          bool
-	destructive       bool
+	safe              bool // see Tool.Safe
 }
 
 func (e endpoint) tool() *Tool {
@@ -242,7 +245,7 @@ func (e endpoint) tool() *Tool {
 		Description: e.desc,
 		Schema:      obj(props, required...),
 		ReadOnly:    e.readOnly,
-		Destructive: e.destructive,
+		Safe:        e.safe,
 		Covers:      []string{e.method + " " + pathParamRe.ReplaceAllString(e.path, "{}")},
 		Run: func(ctx context.Context, c *caller, a Args) (any, error) {
 			path := e.path

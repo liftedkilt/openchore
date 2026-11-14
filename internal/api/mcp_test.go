@@ -409,6 +409,59 @@ func TestMCPUpdatePerson(t *testing.T) {
 	}
 }
 
+func TestMCPToolAnnotations(t *testing.T) {
+	env := setupMCP(t)
+	list := env.mcpRPC(t, adminHeaders(), "tools/list", nil)
+	ann := map[string]map[string]any{}
+	for _, raw := range list["tools"].([]any) {
+		tool := raw.(map[string]any)
+		ann[tool["name"].(string)], _ = tool["annotations"].(map[string]any)
+	}
+
+	// Writes are destructive unless explicitly marked safe; these in
+	// particular must never look auto-approvable to a client or gateway.
+	sensitive := []string{
+		"create_api_token", "create_webhook", "update_webhook", "set_setting",
+		"update_ai_config", "add_sign_in_provider", "update_sign_in_provider",
+		"set_sign_in_options", "set_session_lengths", "adjust_points", "set_decay_settings",
+	}
+	for name := range ann {
+		if strings.HasPrefix(name, "delete_") {
+			sensitive = append(sensitive, name)
+		}
+	}
+	for _, name := range sensitive {
+		a, ok := ann[name]
+		if !ok {
+			t.Errorf("%s: no such tool", name)
+			continue
+		}
+		if a["readOnlyHint"] != false || a["destructiveHint"] != true {
+			t.Errorf("%s annotations = %v, want readOnlyHint false, destructiveHint true", name, a)
+		}
+	}
+
+	for name, a := range ann {
+		switch {
+		case a["readOnlyHint"] == true:
+			if _, ok := a["destructiveHint"]; ok {
+				t.Errorf("%s is read-only but has destructiveHint", name)
+			}
+		case a["destructiveHint"] == false:
+			if name != "complete_chore" {
+				t.Errorf("%s is marked non-destructive; only complete_chore opts in", name)
+			}
+		case a["destructiveHint"] != true:
+			t.Errorf("%s: write tool without destructiveHint: %v", name, a)
+		}
+	}
+	for _, name := range []string{"list_people", "household_overview", "export_config", "get_setting"} {
+		if ann[name]["readOnlyHint"] != true {
+			t.Errorf("%s should be read-only: %v", name, ann[name])
+		}
+	}
+}
+
 // TestMCPCoversAPI keeps the MCP server complete: every REST route must be
 // used by some tool or listed here with the reason it isn't.
 func TestMCPCoversAPI(t *testing.T) {

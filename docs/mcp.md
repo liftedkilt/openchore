@@ -96,7 +96,12 @@ neither a tool nor a reason here, so the MCP server keeps up with the API.
 
 - Protocol revisions 2025-11-25, 2025-06-18, 2025-03-26 and 2024-11-05.
 - `POST` only; `GET` returns 405 because there's no server-initiated stream.
-- Capabilities: tools. Tool annotations mark read-only and destructive tools.
+- Capabilities: tools. Tool annotations set `readOnlyHint: true` on read-only
+  tools. Every other tool is `destructiveHint: true` (the MCP default), because
+  some clients and gateways auto-approve tools marked non-destructive. The one
+  exception is `complete_chore`, which is additive and undone with
+  `uncomplete_chore`. Keep approval prompts on for everything else, especially
+  API tokens, webhooks, settings, sign-in and AI configuration.
 - Tool failures (bad arguments, API errors such as "category must be required,
   core, or bonus") come back as results with `isError: true`, so the assistant
   can read the message and correct itself.
