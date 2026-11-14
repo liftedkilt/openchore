@@ -348,6 +348,7 @@ type ChoreTrigger struct {
 	Enabled            bool    `json:"enabled"`
 	CooldownMinutes    int     `json:"cooldown_minutes"`
 	AssignmentType     string  `json:"assignment_type"`
+	AllowRepeat        bool    `json:"allow_repeat"`
 	LastTriggeredAt    *string `json:"last_triggered_at,omitempty"`
 	CreatedAt          string  `json:"created_at"`
 }

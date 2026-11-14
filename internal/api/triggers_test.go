@@ -312,3 +312,91 @@ func TestFireTrigger_NoAssignee(t *testing.T) {
 	}
 }
 
+
+// ===== allow_repeat: post a chore more than once a day =====
+
+func fireTriggerStatus(t *testing.T, env *testEnv, uuid string) int {
+	t.Helper()
+	resp := env.request(t, "POST", fmt.Sprintf("/api/hooks/trigger/%s", uuid), nil, nil)
+	resp.Body.Close()
+	return resp.StatusCode
+}
+
+func TestFireTrigger_SameDayDuplicateRejectedByDefault(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	env.createChild(t, "Alice")
+	env.createChild(t, "Bob")
+	choreID := env.createChore(t, "Put away laundry")
+
+	individual := env.createTrigger(t, choreID, map[string]any{"default_assigned_to": env.createChild(t, "Cara")})
+	if got := fireTriggerStatus(t, env, individual["uuid"].(string)); got != http.StatusCreated {
+		t.Fatalf("individual first fire: expected 201, got %d", got)
+	}
+	if got := fireTriggerStatus(t, env, individual["uuid"].(string)); got != http.StatusConflict {
+		t.Fatalf("individual second fire: expected 409, got %d", got)
+	}
+
+	fcfsChore := env.createChore(t, "Empty dryer")
+	fcfs := env.createTrigger(t, fcfsChore, map[string]any{"assignment_type": "fcfs"})
+	if got := fireTriggerStatus(t, env, fcfs["uuid"].(string)); got != http.StatusCreated {
+		t.Fatalf("fcfs first fire: expected 201, got %d", got)
+	}
+	if got := fireTriggerStatus(t, env, fcfs["uuid"].(string)); got != http.StatusConflict {
+		t.Fatalf("fcfs second fire: expected 409, got %d", got)
+	}
+}
+
+func TestFireTrigger_AllowRepeat(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	aliceID := env.createChild(t, "Alice")
+	env.createChild(t, "Bob")
+
+	// FCFS: every fire makes a new group for all children
+	choreID := env.createChore(t, "Put away laundry")
+	fcfs := env.createTrigger(t, choreID, map[string]any{"assignment_type": "fcfs", "allow_repeat": true})
+	if fcfs["allow_repeat"] != true {
+		t.Fatalf("expected allow_repeat true in create response, got %v", fcfs["allow_repeat"])
+	}
+	for i := 0; i < 3; i++ {
+		if got := fireTriggerStatus(t, env, fcfs["uuid"].(string)); got != http.StatusCreated {
+			t.Fatalf("fcfs fire %d: expected 201, got %d", i+1, got)
+		}
+	}
+	resp := env.request(t, "GET", fmt.Sprintf("/api/chores/%d/schedules", choreID), nil, adminHeaders())
+	var schedules []map[string]any
+	decodeBody(t, resp, &schedules)
+	if len(schedules) != 6 { // 3 fires x 2 children
+		t.Fatalf("expected 6 schedules, got %d", len(schedules))
+	}
+	groups := map[string]bool{}
+	for _, s := range schedules {
+		groups[s["fcfs_group_id"].(string)] = true
+	}
+	if len(groups) != 3 {
+		t.Fatalf("expected 3 separate FCFS groups, got %d", len(groups))
+	}
+
+	// Individual: the same child can get it twice
+	soloChore := env.createChore(t, "Fold towels")
+	solo := env.createTrigger(t, soloChore, map[string]any{"default_assigned_to": aliceID, "allow_repeat": true})
+	for i := 0; i < 2; i++ {
+		if got := fireTriggerStatus(t, env, solo["uuid"].(string)); got != http.StatusCreated {
+			t.Fatalf("individual fire %d: expected 201, got %d", i+1, got)
+		}
+	}
+
+	// The flag survives a list and can be switched off with an update
+	resp = env.request(t, "GET", fmt.Sprintf("/api/chores/%d/triggers", choreID), nil, adminHeaders())
+	var listed []map[string]any
+	decodeBody(t, resp, &listed)
+	if len(listed) != 1 || listed[0]["allow_repeat"] != true {
+		t.Fatalf("expected listed trigger with allow_repeat true, got %v", listed)
+	}
+	resp = env.request(t, "PUT", fmt.Sprintf("/api/triggers/%v", fcfs["id"]), map[string]any{"assignment_type": "fcfs", "allow_repeat": false}, adminHeaders())
+	resp.Body.Close()
+	if got := fireTriggerStatus(t, env, fcfs["uuid"].(string)); got != http.StatusConflict {
+		t.Fatalf("after turning allow_repeat off: expected 409, got %d", got)
+	}
+}
