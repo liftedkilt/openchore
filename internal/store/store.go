@@ -451,6 +451,21 @@ func (s *Store) DeleteSchedule(ctx context.Context, id int64) error {
 	return err
 }
 
+// UpdateSchedule rewrites a schedule's timing and scoring fields. Who it is
+// assigned to and which days it lands on are its identity and stay fixed; to
+// change those, end this schedule (end_date) and create a new one, which
+// keeps the completion history that deleting would cascade away.
+func (s *Store) UpdateSchedule(ctx context.Context, cs *model.ChoreSchedule) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE chore_schedules
+		    SET available_at = ?, due_by = ?, expiry_penalty = ?, expiry_penalty_value = ?,
+		        points_multiplier = ?, start_date = ?, end_date = ?
+		  WHERE id = ?`,
+		cs.AvailableAt, cs.DueBy, cs.ExpiryPenalty, cs.ExpiryPenaltyValue,
+		cs.PointsMultiplier, cs.StartDate, cs.EndDate, cs.ID)
+	return err
+}
+
 // ScheduleExistsForDate checks if a one-off schedule already exists for a chore + user + date.
 func (s *Store) ScheduleExistsForDate(ctx context.Context, choreID, userID int64, date string) (bool, error) {
 	var exists bool

@@ -1,9 +1,11 @@
 package api
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"net/http"
 
 	"github.com/liftedkilt/openchore/internal/model"
@@ -82,4 +84,29 @@ func (h *TokenHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked"})
+}
+
+// recordedBy is the profile an admin action is stored against. A session's
+// own user, normally; an API token has no profile (its synthetic user is id
+// 0), so its actions are recorded against the household's first parent.
+// Columns such as chores.created_by and chore_completions.approved_by
+// reference users, and foreign keys are enforced.
+func recordedBy(ctx context.Context, s *store.Store, caller *model.User) (int64, error) {
+	if caller != nil && caller.ID != 0 {
+		return caller.ID, nil
+	}
+	users, err := s.ListUsers(ctx)
+	if err != nil {
+		return 0, err
+	}
+	var first int64
+	for _, u := range users {
+		if u.Role == model.RoleAdmin && (first == 0 || u.ID < first) {
+			first = u.ID
+		}
+	}
+	if first == 0 {
+		return 0, errors.New("no parent profile to record this action against")
+	}
+	return first, nil
 }
