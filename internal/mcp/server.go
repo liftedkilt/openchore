@@ -210,15 +210,23 @@ func (h *Handler) runTool(ctx context.Context, call *caller, t *Tool, args map[s
 	if err != nil {
 		return errorResult(err.Error())
 	}
+	isError := false
+	if f, ok := out.(partialFailure); ok {
+		out, isError = f.result, true
+	}
 	text, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
 		return errorResult("could not encode result")
 	}
 	return map[string]any{
 		"content": []map[string]any{{"type": "text", "text": string(text)}},
-		"isError": false,
+		"isError": isError,
 	}
 }
+
+// partialFailure wraps a tool's output to report it with isError set, for tools
+// that did part of their work and need to say what did and didn't happen.
+type partialFailure struct{ result any }
 
 func errorResult(msg string) map[string]any {
 	return map[string]any{

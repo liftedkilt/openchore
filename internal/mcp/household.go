@@ -442,6 +442,9 @@ func unassign(ctx context.Context, c *caller, a Args) (any, error) {
 	if len(retired)+len(deleted)+len(skipped)+len(failed) == 0 {
 		res["note"] = "no matching schedules"
 	}
+	if len(failed) > 0 {
+		return partialFailure{res}, nil
+	}
 	return res, nil
 }
 

@@ -105,3 +105,6 @@ neither a tool nor a reason here, so the MCP server keeps up with the API.
 - Tool failures (bad arguments, API errors such as "category must be required,
   core, or bonus") come back as results with `isError: true`, so the assistant
   can read the message and correct itself.
+- A tool that did only part of its work (e.g. `unassign_chore` when some
+  schedules couldn't be changed) also sets `isError: true`; its result lists
+  what succeeded and an `errors` list for what didn't.

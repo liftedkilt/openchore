@@ -462,6 +462,35 @@ func TestMCPToolAnnotations(t *testing.T) {
 	}
 }
 
+func TestMCPUnassignPartialFailure(t *testing.T) {
+	env := setupMCP(t)
+	zoe := env.mustTool(t, "create_person", map[string]any{"name": "Zoe", "role": "child"})
+	nat := env.mustTool(t, "create_person", map[string]any{"name": "Natalie", "role": "child"})
+	out := env.mustTool(t, "create_chore", map[string]any{
+		"title": "Feed the cat", "category": "core",
+		"user_ids": []any{zoe["id"], nat["id"]}, "days": []any{"monday"},
+	})
+	choreID := out["chore"].(map[string]any)["id"].(float64)
+
+	// Corrupt Natalie's schedule so the API refuses to update it.
+	if _, err := env.db.Exec(`UPDATE chore_schedules SET expiry_penalty = 'bogus' WHERE chore_id = ? AND assigned_to = ?`,
+		int(choreID), int(nat["id"].(float64))); err != nil {
+		t.Fatal(err)
+	}
+
+	text, isErr := env.callTool(t, adminHeaders(), "unassign_chore", map[string]any{"chore_id": choreID})
+	if !isErr {
+		t.Fatalf("partial failure should set isError: %v", text)
+	}
+	var res map[string]any
+	if err := json.Unmarshal([]byte(text.(string)), &res); err != nil {
+		t.Fatalf("result is not JSON: %v", text)
+	}
+	if len(res["retired"].([]any)) != 1 || len(res["errors"].([]any)) != 1 {
+		t.Errorf("unassign = %v, want one retired and one error", res)
+	}
+}
+
 // TestMCPCoversAPI keeps the MCP server complete: every REST route must be
 // used by some tool or listed here with the reason it isn't.
 func TestMCPCoversAPI(t *testing.T) {
