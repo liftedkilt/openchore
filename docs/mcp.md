@@ -102,6 +102,8 @@ neither a tool nor a reason here, so the MCP server keeps up with the API.
   exception is `complete_chore`, which is additive and undone with
   `uncomplete_chore`. Keep approval prompts on for everything else, especially
   API tokens, webhooks, settings, sign-in and AI configuration.
+- Batches (accepted for older clients) are limited to 50 messages; larger ones
+  get a JSON-RPC `-32600` error.
 - Tool failures (bad arguments, API errors such as "category must be required,
   core, or bonus") come back as results with `isError: true`, so the assistant
   can read the message and correct itself.

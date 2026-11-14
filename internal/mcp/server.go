@@ -27,6 +27,10 @@ var supportedVersions = []string{"2025-11-25", "2025-06-18", "2025-03-26", "2024
 
 const maxBodyBytes = 4 << 20
 
+// maxBatch caps the calls in one JSON-RPC batch, so a single request can't
+// queue an unbounded run of tool calls against the single-writer database.
+const maxBatch = 50
+
 // Handler is the /api/mcp endpoint.
 type Handler struct {
 	api    http.Handler
@@ -101,6 +105,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var batch []json.RawMessage
 		if err := json.Unmarshal(body, &batch); err != nil || len(batch) == 0 {
 			writeJSON(w, http.StatusBadRequest, rpcResponse{JSONRPC: "2.0", ID: json.RawMessage("null"), Error: &rpcError{codeParse, "invalid JSON"}})
+			return
+		}
+		if len(batch) > maxBatch {
+			writeJSON(w, http.StatusBadRequest, rpcResponse{JSONRPC: "2.0", ID: json.RawMessage("null"),
+				Error: &rpcError{codeInvalidRequest, fmt.Sprintf("batch too large: at most %d messages", maxBatch)}})
 			return
 		}
 		var out []rpcResponse
