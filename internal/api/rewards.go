@@ -59,7 +59,11 @@ func (h *RewardHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "name and positive cost required")
 		return
 	}
-	user := UserFromContext(r.Context())
+	createdBy, err := recordedBy(r.Context(), h.store, UserFromContext(r.Context()))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create reward")
+		return
+	}
 	reward := &model.Reward{
 		Name:        req.Name,
 		Description: req.Description,
@@ -68,7 +72,7 @@ func (h *RewardHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Stock:       req.Stock,
 		Active:      true,
 		Shareable:   req.Shareable,
-		CreatedBy:   user.ID,
+		CreatedBy:   createdBy,
 	}
 	if err := h.store.CreateReward(r.Context(), reward); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create reward")

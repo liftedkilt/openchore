@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/liftedkilt/openchore/internal/discord"
+	"github.com/liftedkilt/openchore/internal/mcp"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/webhook"
 )
@@ -38,6 +39,9 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 	reports := NewReportsHandler(s, dispatcher, discordNotifier, aiSvc)
 	authH := NewAuthHandler(s, auth.Sessions, dispatcher, auth.OIDC)
 	oidcH := auth.OIDC
+	// The MCP endpoint runs each tool through this same router, so it gets
+	// the REST API's validation and permissions for free.
+	mcpH := mcp.NewHandler(r, "/api")
 
 	// Serve uploaded photos
 	_ = os.MkdirAll("data/uploads", 0750)
@@ -131,6 +135,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 				r.Get("/chores/{id}/schedules", chores.ListSchedules)
 				r.Post("/chores/{id}/schedules", chores.CreateSchedule)
 				r.Delete("/chores/{id}/schedules/{scheduleID}", chores.DeleteSchedule)
+				r.Put("/schedules/{scheduleID}", chores.UpdateSchedule)
 				r.Post("/schedules/{scheduleID}/excuse", chores.Excuse)
 
 				// Chore triggers
@@ -206,6 +211,9 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 
 				// Integration discovery: chores with triggers
 				r.Get("/chores/triggerable", triggers.ListTriggerable)
+
+				// Model Context Protocol endpoint for AI assistants (docs/mcp.md)
+				r.Handle("/mcp", mcpH)
 			})
 		})
 	})

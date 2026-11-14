@@ -221,6 +221,7 @@ skin.
 - Per-chore trigger URLs
 - Bearer API tokens
 - Home Assistant integration
+- MCP server for AI assistants
 
 </td><td valign="top">
 
@@ -284,6 +285,7 @@ and `httptest`, no mocks.
 - [Signing in](docs/authentication.md) — PINs, parents, sessions, OIDC providers, upgrading
 - [AI features](docs/ai.md) — photo review, summaries, read-aloud voices, choosing a model, upgrading
 - [API reference](docs/api.md) — endpoints, auth, and webhook events
+- [AI assistants (MCP)](docs/mcp.md) — manage the household from Claude or another MCP client
 - [Roadmap](ROADMAP.md) — shipped and planned
 - [CLAUDE.md](CLAUDE.md) — architecture notes and conventions
 

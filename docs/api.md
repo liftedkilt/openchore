@@ -13,6 +13,10 @@ A request identifies itself in one of three ways:
 | API token | `Authorization: Bearer <token>` | Integrations (Home Assistant, scripts); acts as an admin |
 | None | — | Public endpoints only |
 
+An API token has no profile of its own; where an action records who did it
+(a chore or reward's `created_by`, a completion's `approved_by`), token
+actions are recorded against the household's first parent.
+
 Sessions are HMAC-signed and issued by the server: `POST /api/auth/login`
 (tap or PIN), an OIDC sign-in, or `POST /api/setup`. The legacy `X-User-ID`
 header is **ignored**. Admin endpoints need a session for a profile with the
@@ -141,7 +145,8 @@ Requires an authenticated caller with the `admin` role.
 | `GET` `POST` | `/api/chores` | List / create chores |
 | `GET` `PUT` `DELETE` | `/api/chores/{id}` | Read / update / delete a chore |
 | `GET` `POST` | `/api/chores/{id}/schedules` | List / create schedules |
-| `DELETE` | `/api/chores/{id}/schedules/{scheduleID}` | Delete a schedule |
+| `DELETE` | `/api/chores/{id}/schedules/{scheduleID}` | Delete a schedule (and its completion history) |
+| `PUT` | `/api/schedules/{scheduleID}` | Edit a schedule's `available_at`, `due_by`, `expiry_penalty`, `expiry_penalty_value`, `points_multiplier`, `start_date` or `end_date`. Omitted fields are kept and `null` clears. The assignee and days can't change; set `end_date` and create a new schedule to keep history |
 | `POST` | `/api/schedules/{scheduleID}/excuse` | Excuse a chore and waive its penalty |
 
 ### Approvals
@@ -174,6 +179,7 @@ Requires an authenticated caller with the `admin` role.
 | `GET` `POST` | `/api/chores/{id}/triggers` | List / create per-chore trigger URLs |
 | `PUT` `DELETE` | `/api/triggers/{id}` | Update / delete a trigger |
 | `GET` | `/api/chores/triggerable` | Discovery: chores with triggers, plus the user list |
+| `POST` | `/api/mcp` | [Model Context Protocol](mcp.md) endpoint for AI assistants |
 | `GET` `POST` | `/api/admin/webhooks` | List / create outbound webhooks |
 | `PUT` `DELETE` | `/api/admin/webhooks/{id}` | Update / delete a webhook |
 | `GET` | `/api/admin/webhooks/{id}/deliveries` | Delivery log with response bodies |

@@ -116,7 +116,11 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := UserFromContext(r.Context())
+	createdBy, err := recordedBy(r.Context(), h.store, UserFromContext(r.Context()))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create chore")
+		return
+	}
 	chore := &model.Chore{
 		Title:              req.Title,
 		Description:        req.Description,
@@ -129,7 +133,7 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		RequiresPhoto:      req.RequiresPhoto,
 		PhotoSource:        photoSource,
 		Source:             "manual",
-		CreatedBy:          user.ID,
+		CreatedBy:          createdBy,
 	}
 	if err := h.store.CreateChore(r.Context(), chore); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create chore")
@@ -437,6 +441,15 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := UserFromContext(r.Context())
+	// A parent's completion is approved on the spot; record who approved it
+	// (an API token has no profile of its own, see recordedBy).
+	var approverID int64
+	if user != nil && user.Role == model.RoleAdmin {
+		if approverID, err = recordedBy(r.Context(), h.store, user); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to complete chore")
+			return
+		}
+	}
 
 	// Check if already completed
 	existing, err := h.store.GetCompletionForScheduleDate(r.Context(), scheduleID, req.CompletionDate)
@@ -470,10 +483,10 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 				}
 				if user != nil && user.Role == "admin" && existing.Status == model.StatusPending {
 					existing.Status = model.StatusApproved
-					existing.ApprovedBy = &user.ID
+					existing.ApprovedBy = &approverID
 					now := time.Now()
 					existing.ApprovedAt = &now
-					_ = h.store.UpdateCompletionStatus(r.Context(), existing.ID, model.StatusApproved, user.ID)
+					_ = h.store.UpdateCompletionStatus(r.Context(), existing.ID, model.StatusApproved, approverID)
 				}
 				if existing.Status == model.StatusApproved {
 					// Bonus chores that were originally credited 0 points (because
@@ -564,7 +577,7 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	var approvedBy *int64
 	var approvedAt *time.Time
 	if status == model.StatusApproved && user != nil && user.Role == "admin" {
-		approvedBy = &user.ID
+		approvedBy = &approverID
 		now := time.Now()
 		approvedAt = &now
 	}
@@ -849,8 +862,12 @@ func (h *ChoreHandler) Approve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	admin := UserFromContext(r.Context())
-	if err := h.approveCompletion(r.Context(), completion, &admin.ID); err != nil {
+	approver, err := recordedBy(r.Context(), h.store, UserFromContext(r.Context()))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to approve")
+		return
+	}
+	if err := h.approveCompletion(r.Context(), completion, &approver); err != nil {
 		if errors.Is(err, store.ErrNotPending) {
 			writeError(w, http.StatusBadRequest, "completion is not pending")
 			return
@@ -1143,7 +1160,12 @@ func (h *ChoreHandler) Excuse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	completion, err := h.store.ExcuseChoreAndRefundPenalty(r.Context(), scheduleID, req.Date, admin.ID, req.Reason)
+	excusedBy, err := recordedBy(r.Context(), h.store, admin)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to excuse chore")
+		return
+	}
+	completion, err := h.store.ExcuseChoreAndRefundPenalty(r.Context(), scheduleID, req.Date, excusedBy, req.Reason)
 	if err != nil {
 		log.Printf("error excusing chore schedule %d: %v", scheduleID, err)
 		writeError(w, http.StatusInternalServerError, "failed to excuse chore")
@@ -1166,7 +1188,7 @@ func (h *ChoreHandler) Excuse(w http.ResponseWriter, r *http.Request) {
 		"schedule_id":     scheduleID,
 		"completion_id":   completion.ID,
 		"completion_date": req.Date,
-		"excused_by":      admin.ID,
+		"excused_by":      excusedBy,
 		"reason":          req.Reason,
 	})
 
