@@ -20,6 +20,7 @@ export const TriggerManager: React.FC<{
   const [defaultAvailableAt, setDefaultAvailableAt] = useState('');
   const [cooldownMinutes, setCooldownMinutes] = useState('0');
   const [assignmentType, setAssignmentType] = useState('individual');
+  const [allowRepeat, setAllowRepeat] = useState(false);
   const [copied, setCopied] = useState<number | null>(null);
 
   const { t } = useTranslation();
@@ -38,6 +39,7 @@ export const TriggerManager: React.FC<{
       default_available_at: defaultAvailableAt || undefined,
       cooldown_minutes: parseInt(cooldownMinutes) || 0,
       assignment_type: assignmentType,
+      allow_repeat: allowRepeat,
     });
     setAdding(false);
     resetForm();
@@ -51,6 +53,7 @@ export const TriggerManager: React.FC<{
       default_available_at: defaultAvailableAt || undefined,
       cooldown_minutes: parseInt(cooldownMinutes) || 0,
       assignment_type: assignmentType,
+      allow_repeat: allowRepeat,
     });
     setEditingId(null);
     resetForm();
@@ -64,6 +67,7 @@ export const TriggerManager: React.FC<{
       default_available_at: trigger.default_available_at,
       cooldown_minutes: trigger.cooldown_minutes,
       assignment_type: trigger.assignment_type,
+      allow_repeat: trigger.allow_repeat,
       enabled: !trigger.enabled,
     });
     load();
@@ -82,6 +86,7 @@ export const TriggerManager: React.FC<{
     setDefaultAvailableAt(trigger.default_available_at ?? '');
     setCooldownMinutes(String(trigger.cooldown_minutes));
     setAssignmentType(trigger.assignment_type || 'individual');
+    setAllowRepeat(!!trigger.allow_repeat);
   };
 
   const resetForm = () => {
@@ -90,6 +95,7 @@ export const TriggerManager: React.FC<{
     setDefaultAvailableAt('');
     setCooldownMinutes('0');
     setAssignmentType('individual');
+    setAllowRepeat(false);
   };
 
   const copyUrl = (uuid: string, id: number) => {
@@ -137,6 +143,11 @@ export const TriggerManager: React.FC<{
         <input className={ui.input} type="number" min="0" value={cooldownMinutes} onChange={e => setCooldownMinutes(e.target.value)} />
         <span className={ui.help}>{t('admin.triggerManager.cooldownHelp')}</span>
       </label>
+      <label className={ui.check}>
+        <input type="checkbox" checked={allowRepeat} onChange={e => setAllowRepeat(e.target.checked)} />
+        <span className={ui.checkLabel}>{t('admin.triggerManager.allowRepeatLabel')}</span>
+      </label>
+      <span className={ui.help}>{t('admin.triggerManager.allowRepeatHelp')}</span>
     </>
   );
 
@@ -199,6 +210,7 @@ export const TriggerManager: React.FC<{
                     {trigger.assignment_type === 'fcfs' && <span className={ui.badge}>FCFS</span>}
                     {trigger.default_assigned_to && <span>{t('admin.triggerManager.metaAssigned', { name: getUserName(trigger.default_assigned_to) })}</span>}
                     {trigger.default_due_by && <span>{t('admin.triggerManager.metaDue', { time: trigger.default_due_by })}</span>}
+                    {trigger.allow_repeat && <span>{t('admin.triggerManager.metaAllowRepeat')}</span>}
                     {trigger.cooldown_minutes > 0 && <span>{t('admin.triggerManager.metaCooldown', { minutes: trigger.cooldown_minutes })}</span>}
                     {!trigger.enabled && <span className={ui.badgeOutline}>{t('admin.triggerManager.paused')}</span>}
                   </div>

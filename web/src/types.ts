@@ -388,6 +388,7 @@ export interface ChoreTrigger {
   enabled: boolean;
   cooldown_minutes: number;
   assignment_type: string;
+  allow_repeat?: boolean;
   last_triggered_at?: string;
   created_at: string;
 }

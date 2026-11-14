@@ -100,7 +100,11 @@ func (h *TriggerHandler) FireTrigger(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Dedup check: if any child already has this chore today, reject
+		// (unless the trigger allows repeats, e.g. one chore per dryer load)
 		for _, child := range children {
+			if trigger.AllowRepeat {
+				break
+			}
 			exists, err := h.store.ScheduleExistsForDate(ctx, trigger.ChoreID, child.ID, today)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "failed to check existing schedules")
@@ -209,11 +213,14 @@ func (h *TriggerHandler) FireTrigger(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check for duplicate: same chore + user + today
-	exists, err := h.store.ScheduleExistsForDate(ctx, trigger.ChoreID, assignedUserID, today)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to check existing schedules")
-		return
+	// Check for duplicate: same chore + user + today (unless the trigger allows repeats)
+	exists := false
+	if !trigger.AllowRepeat {
+		exists, err = h.store.ScheduleExistsForDate(ctx, trigger.ChoreID, assignedUserID, today)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to check existing schedules")
+			return
+		}
 	}
 	if exists {
 		writeJSON(w, http.StatusConflict, map[string]string{
@@ -322,6 +329,7 @@ func (h *TriggerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Enabled            *bool   `json:"enabled"`
 		CooldownMinutes    int     `json:"cooldown_minutes"`
 		AssignmentType     string  `json:"assignment_type"`
+		AllowRepeat        bool    `json:"allow_repeat"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		// Allow empty body — all fields are optional
@@ -332,6 +340,7 @@ func (h *TriggerHandler) Create(w http.ResponseWriter, r *http.Request) {
 			Enabled            *bool   `json:"enabled"`
 			CooldownMinutes    int     `json:"cooldown_minutes"`
 			AssignmentType     string  `json:"assignment_type"`
+			AllowRepeat        bool    `json:"allow_repeat"`
 		}{}
 	}
 
@@ -360,6 +369,7 @@ func (h *TriggerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Enabled:            enabled,
 		CooldownMinutes:    req.CooldownMinutes,
 		AssignmentType:     assignmentType,
+		AllowRepeat:        req.AllowRepeat,
 	}
 
 	if err := h.store.CreateChoreTrigger(r.Context(), trigger); err != nil {
@@ -384,6 +394,7 @@ func (h *TriggerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Enabled            *bool   `json:"enabled"`
 		CooldownMinutes    *int    `json:"cooldown_minutes"`
 		AssignmentType     string  `json:"assignment_type"`
+		AllowRepeat        bool    `json:"allow_repeat"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -402,6 +413,7 @@ func (h *TriggerHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.CooldownMinutes != nil {
 		trigger.CooldownMinutes = *req.CooldownMinutes
 	}
+	trigger.AllowRepeat = req.AllowRepeat
 	if req.AssignmentType != "" {
 		trigger.AssignmentType = req.AssignmentType
 	} else {
