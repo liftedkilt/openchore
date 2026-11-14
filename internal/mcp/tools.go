@@ -55,7 +55,7 @@ func allTools() []*Tool {
 			"color":      enum("Person colour.", "coral", "mint", "butter", "sky", "rose", "leaf", "lilac", "sand"),
 		}})
 	ts = append(ts, updatePersonTool())
-	add(endpoint{name: "delete_person", title: "Remove a person", destructive: true,
+	add(endpoint{name: "delete_person", title: "Remove a person",
 		desc:   "Delete a person and all of their schedules, completions and points. The last parent can't be removed. Prefer pause_person for a temporary break.",
 		method: http.MethodDelete, path: "/users/{id}", props: map[string]any{"id": integer("Person id.")}})
 	add(endpoint{name: "pause_person", title: "Pause a person",
@@ -72,14 +72,14 @@ func allTools() []*Tool {
 			"new_pin":     str("New PIN, 4-8 digits."),
 			"current_pin": str("Current PIN, only needed when changing your own."),
 		}})
-	add(endpoint{name: "clear_person_pin", title: "Remove a PIN", destructive: true,
+	add(endpoint{name: "clear_person_pin", title: "Remove a PIN",
 		desc:   "Remove someone's PIN so their profile opens with a tap. Parents always need a PIN or linked account.",
 		method: http.MethodDelete, path: "/users/{id}/pin",
 		props: map[string]any{"id": integer("Person id."), "current_pin": str("Current PIN, only needed for your own.")}})
 	add(endpoint{name: "list_linked_accounts", title: "List linked accounts", readOnly: true,
 		desc:   "List the single sign-on accounts linked to a profile.",
 		method: http.MethodGet, path: "/users/{id}/identities", props: map[string]any{"id": integer("Person id.")}})
-	add(endpoint{name: "unlink_account", title: "Unlink an account", destructive: true,
+	add(endpoint{name: "unlink_account", title: "Unlink an account",
 		desc:   "Unlink a single sign-on account from a profile (signs that person out everywhere).",
 		method: http.MethodDelete, path: "/users/{id}/identities/{identity_id}",
 		props: map[string]any{"id": integer("Person id."), "identity_id": integer("Linked account id from list_linked_accounts.")}})
@@ -107,7 +107,7 @@ func allTools() []*Tool {
 	add(endpoint{name: "get_chore", title: "Get a chore", readOnly: true,
 		desc:   "Get one chore's full definition.",
 		method: http.MethodGet, path: "/chores/{id}", props: map[string]any{"id": integer("Chore id.")}})
-	add(endpoint{name: "delete_chore", title: "Delete a chore", destructive: true,
+	add(endpoint{name: "delete_chore", title: "Delete a chore",
 		desc:   "Delete a chore with all its schedules, triggers and completion history (points already earned stay). To stop it without losing history, use unassign_chore instead.",
 		method: http.MethodDelete, path: "/chores/{id}", props: map[string]any{"id": integer("Chore id.")}})
 	add(endpoint{name: "list_schedules", title: "List a chore's schedules", readOnly: true,
@@ -127,7 +127,7 @@ func allTools() []*Tool {
 			"start_date":           nullable(str("First day it applies, YYYY-MM-DD.")),
 			"end_date":             nullable(str("Last day it applies, YYYY-MM-DD.")),
 		}})
-	add(endpoint{name: "delete_schedule", title: "Delete a schedule", destructive: true,
+	add(endpoint{name: "delete_schedule", title: "Delete a schedule",
 		desc:   "Delete one schedule row and its completion history. Prefer unassign_chore with mode retire.",
 		method: http.MethodDelete, path: "/chores/{chore_id}/schedules/{schedule_id}",
 		props: map[string]any{"chore_id": integer("Chore id."), "schedule_id": integer("Schedule id.")}})
@@ -139,7 +139,7 @@ func allTools() []*Tool {
 			"view": enum("daily (default) or weekly.", "daily", "weekly"),
 			"date": str("YYYY-MM-DD, default today."),
 		}})
-	add(endpoint{name: "complete_chore", title: "Mark a chore done",
+	add(endpoint{name: "complete_chore", title: "Mark a chore done", safe: true,
 		desc:   "Tick off a chore for its assignee (by schedule_id from get_person_chores). Points go to the assignee; a parent doesn't need a photo.",
 		method: http.MethodPost, path: "/schedules/{schedule_id}/complete",
 		props: map[string]any{
@@ -147,7 +147,7 @@ func allTools() []*Tool {
 			"completion_date": str("YYYY-MM-DD, default today."),
 			"skip_photo":      boolean("Finish a photo chore without a photo (it then waits for approval)."),
 		}})
-	add(endpoint{name: "uncomplete_chore", title: "Undo a completion", destructive: true,
+	add(endpoint{name: "uncomplete_chore", title: "Undo a completion",
 		desc:   "Un-tick a chore for a date and take back its points.",
 		method: http.MethodDelete, path: "/schedules/{schedule_id}/complete", query: []string{"date"},
 		props: map[string]any{"schedule_id": integer("Schedule id."), "date": str("YYYY-MM-DD, default today.")}})
@@ -167,7 +167,7 @@ func allTools() []*Tool {
 	add(endpoint{name: "approve_completion", title: "Approve",
 		desc:   "Approve a pending completion and release its points.",
 		method: http.MethodPost, path: "/completions/{completion_id}/approve", props: map[string]any{"completion_id": integer("Completion id.")}})
-	add(endpoint{name: "reject_completion", title: "Reject", destructive: true,
+	add(endpoint{name: "reject_completion", title: "Reject",
 		desc:   "Reject a pending completion (no points).",
 		method: http.MethodPost, path: "/completions/{completion_id}/reject", props: map[string]any{"completion_id": integer("Completion id.")}})
 
@@ -212,7 +212,7 @@ func allTools() []*Tool {
 			"bonus_points": integer("Points paid."),
 			"label":        str("Name, e.g. \"One week!\"."),
 		}})
-	add(endpoint{name: "delete_streak_milestone", title: "Remove a streak milestone", destructive: true,
+	add(endpoint{name: "delete_streak_milestone", title: "Remove a streak milestone",
 		desc:   "Delete a streak milestone.",
 		method: http.MethodDelete, path: "/admin/streak-rewards/{id}", props: map[string]any{"id": integer("Milestone id.")}})
 
@@ -244,7 +244,7 @@ func allTools() []*Tool {
 			"active":      boolean("Shown to kids."),
 			"shareable":   boolean("Kids can pool points toward it."),
 		}})
-	add(endpoint{name: "delete_reward", title: "Delete a reward", destructive: true,
+	add(endpoint{name: "delete_reward", title: "Delete a reward",
 		desc:   "Delete a reward. Setting active=false with update_reward hides it instead.",
 		method: http.MethodDelete, path: "/rewards/{id}", props: map[string]any{"id": integer("Reward id.")}})
 	add(endpoint{name: "set_reward_visibility", title: "Who sees a reward",
@@ -265,7 +265,7 @@ func allTools() []*Tool {
 	add(endpoint{name: "list_redemptions", title: "A person's redemptions", readOnly: true,
 		desc:   "Rewards a person has bought.",
 		method: http.MethodGet, path: "/users/{id}/redemptions", props: map[string]any{"id": integer("Person id.")}})
-	add(endpoint{name: "undo_redemption", title: "Undo a redemption", destructive: true,
+	add(endpoint{name: "undo_redemption", title: "Undo a redemption",
 		desc:   "Cancel a reward purchase and refund the points.",
 		method: http.MethodDelete, path: "/redemptions/{redemption_id}", props: map[string]any{"redemption_id": integer("Redemption id.")}})
 	add(endpoint{name: "list_savings_goals", title: "A person's savings goals", readOnly: true,
@@ -296,7 +296,7 @@ func allTools() []*Tool {
 		desc:   "Change a trigger's settings; omitted fields are kept.",
 		method: http.MethodPut, path: "/triggers/{id}",
 		props: merge(map[string]any{"id": integer("Trigger id (not the uuid).")}, triggerProps)})
-	add(endpoint{name: "delete_trigger", title: "Delete a trigger", destructive: true,
+	add(endpoint{name: "delete_trigger", title: "Delete a trigger",
 		desc:   "Delete a trigger; its URL stops working.",
 		method: http.MethodDelete, path: "/triggers/{id}", props: map[string]any{"id": integer("Trigger id.")}})
 	add(endpoint{name: "list_triggerable_chores", title: "Chores with triggers", readOnly: true,
@@ -365,7 +365,7 @@ func allTools() []*Tool {
 			"events": str("Events, comma-separated, or *."),
 			"active": boolean("Enabled."),
 		}})
-	add(endpoint{name: "delete_webhook", title: "Delete a webhook", destructive: true,
+	add(endpoint{name: "delete_webhook", title: "Delete a webhook",
 		desc:   "Delete a webhook.",
 		method: http.MethodDelete, path: "/admin/webhooks/{id}", props: map[string]any{"id": integer("Webhook id.")}})
 	add(endpoint{name: "list_webhook_deliveries", title: "Webhook delivery log", readOnly: true,
@@ -378,7 +378,7 @@ func allTools() []*Tool {
 		desc:   "Create an API token for an integration. It has full parent access and is shown only once.",
 		method: http.MethodPost, path: "/admin/tokens", required: []string{"name"},
 		props: map[string]any{"name": str("What it's for.")}})
-	add(endpoint{name: "revoke_api_token", title: "Revoke an API token", destructive: true,
+	add(endpoint{name: "revoke_api_token", title: "Revoke an API token",
 		desc:   "Revoke an API token. Revoking the one this connection uses disconnects you.",
 		method: http.MethodDelete, path: "/admin/tokens/{id}", props: map[string]any{"id": integer("Token id.")}})
 
@@ -416,7 +416,7 @@ func allTools() []*Tool {
 		desc:   "Edit a provider added in the app (not ones from config.yaml).",
 		method: http.MethodPut, path: "/admin/auth/providers/{id}",
 		props: merge(map[string]any{"id": str("Provider id.")}, providerProps)})
-	add(endpoint{name: "remove_sign_in_provider", title: "Remove a sign-in provider", destructive: true,
+	add(endpoint{name: "remove_sign_in_provider", title: "Remove a sign-in provider",
 		desc:   "Remove a provider added in the app. Refused if it would lock someone out.",
 		method: http.MethodDelete, path: "/admin/auth/providers/{id}", props: map[string]any{"id": str("Provider id.")}})
 	add(endpoint{name: "test_sign_in_provider", title: "Test a sign-in provider", readOnly: true,

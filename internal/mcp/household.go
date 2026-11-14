@@ -340,10 +340,9 @@ func householdTools() []*Tool {
 			},
 		},
 		{
-			Name:        "unassign_chore",
-			Covers:      []string{"GET /chores/{}/schedules", "PUT /schedules/{}", "DELETE /chores/{}/schedules/{}"},
-			Title:       "Unassign a chore",
-			Destructive: true,
+			Name:   "unassign_chore",
+			Covers: []string{"GET /chores/{}/schedules", "PUT /schedules/{}", "DELETE /chores/{}/schedules/{}"},
+			Title:  "Unassign a chore",
 			Description: "Stop a chore for some or all of its people. mode \"retire\" (default) ends the schedules after last_day " +
 				"(default yesterday, so it's gone from today) and keeps their history and reports; schedules that never started " +
 				"are simply removed. mode \"delete\" removes them and their completion history. Narrow it with user_ids or schedule_ids.",
