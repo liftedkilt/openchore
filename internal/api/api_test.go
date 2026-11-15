@@ -1595,6 +1595,7 @@ func TestRedemptionUndoRequiresAdmin(t *testing.T) {
 // =================== EXPIRY PENALTY TESTS ===================
 
 func TestExpiryPenaltyBlock(t *testing.T) {
+	ensureAfterMidnight(t)
 	env := setupTest(t)
 	env.createAdmin(t)
 	kidID := env.createChild(t, "Kid")
@@ -1619,6 +1620,7 @@ func TestExpiryPenaltyBlock(t *testing.T) {
 }
 
 func TestExpiryPenaltyNoPoints(t *testing.T) {
+	ensureAfterMidnight(t)
 	env := setupTest(t)
 	env.createAdmin(t)
 	kidID := env.createChild(t, "Kid")
@@ -1651,6 +1653,7 @@ func TestExpiryPenaltyNoPoints(t *testing.T) {
 }
 
 func TestExpiryPenaltyDeduction(t *testing.T) {
+	ensureAfterMidnight(t)
 	env := setupTest(t)
 	env.createAdmin(t)
 	kidID := env.createChild(t, "Kid")
@@ -1838,6 +1841,7 @@ func TestDecayConfigValidation(t *testing.T) {
 }
 
 func TestUncompleteExpiryPenaltyRefund(t *testing.T) {
+	ensureAfterMidnight(t)
 	env := setupTest(t)
 	env.createAdmin(t)
 	kidID := env.createChild(t, "Kid")
@@ -4885,5 +4889,17 @@ func TestPointsDecayLeavesGoalAloneWhenChoresDone(t *testing.T) {
 		if raw.(map[string]any)["reason"] == "points_decay" {
 			t.Fatal("expected no decay for a kid who finished yesterday's chores")
 		}
+	}
+}
+
+// ensureAfterMidnight blocks until the local clock is past 00:01 so schedules
+// with due_by "00:01" are reliably overdue "today" (avoids flakes in the
+// first minute after midnight).
+func ensureAfterMidnight(t *testing.T) {
+	t.Helper()
+	now := time.Now()
+	cutoff := time.Date(now.Year(), now.Month(), now.Day(), 0, 1, 1, 0, now.Location())
+	if now.Before(cutoff) {
+		time.Sleep(cutoff.Sub(now))
 	}
 }

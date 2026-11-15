@@ -513,6 +513,7 @@ func TestFiredKey(t *testing.T) {
 }
 
 func TestFiredKeyDeduplication(t *testing.T) {
+	ensureAfterMidnight(t)
 	env := setupTest(t)
 
 	var mu sync.Mutex
@@ -1505,5 +1506,17 @@ func TestPointsDecayChecker_IdempotentDebit(t *testing.T) {
 	balance, _ = env.store.GetPointBalance(ctx, childID)
 	if balance != 90 {
 		t.Errorf("expected balance to remain 90 (idempotent), got %d", balance)
+	}
+}
+
+// ensureAfterMidnight blocks until the local clock is past 00:01 so schedules
+// with due_by "00:01" are reliably overdue "today" (avoids flakes in the
+// first minute after midnight).
+func ensureAfterMidnight(t *testing.T) {
+	t.Helper()
+	now := time.Now()
+	cutoff := time.Date(now.Year(), now.Month(), now.Day(), 0, 1, 1, 0, now.Location())
+	if now.Before(cutoff) {
+		time.Sleep(cutoff.Sub(now))
 	}
 }
