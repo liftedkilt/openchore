@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ScheduledChore, User } from '../types';
-import { dayFraction, orderFamily, stripMembers, summarizeDay } from './ProfileSelection.data';
+import { dayFraction, findUserBySlug, orderFamily, slugify, stripMembers, summarizeDay } from './ProfileSelection.data';
 import { firstFreeColor } from './SetupWizard.data';
 
 function chore(category: ScheduledChore['category'], completed: boolean, completed_at?: string): ScheduledChore {
@@ -76,5 +76,37 @@ describe('firstFreeColor', () => {
 
   it('falls back to the first colour when all are taken', () => {
     expect(firstFreeColor(['coral', 'mint', 'butter', 'sky', 'rose', 'leaf', 'lilac', 'sand'])).toBe('coral');
+  });
+});
+
+describe('slugify', () => {
+  it('lowercases, drops accents and joins words with dashes', () => {
+    expect(slugify('Emma')).toBe('emma');
+    expect(slugify('Mary Jo')).toBe('mary-jo');
+    expect(slugify('  José  ')).toBe('jose');
+    expect(slugify("O'Brien-Smith")).toBe('o-brien-smith');
+    expect(slugify('!!!')).toBe('');
+  });
+});
+
+describe('findUserBySlug', () => {
+  const family = [user(1, 'Emma', 'child'), user(2, 'Mary Jo', 'child'), user(3, 'Alex', 'admin')];
+
+  it('finds a person whatever the case or spacing of the link', () => {
+    expect(findUserBySlug(family, 'emma')?.id).toBe(1);
+    expect(findUserBySlug(family, 'EMMA')?.id).toBe(1);
+    expect(findUserBySlug(family, 'mary-jo')?.id).toBe(2);
+    expect(findUserBySlug(family, 'Mary Jo')?.id).toBe(2);
+    expect(findUserBySlug(family, 'alex')?.id).toBe(3);
+  });
+
+  it('finds nobody for an unknown or empty slug', () => {
+    expect(findUserBySlug(family, 'zed')).toBeUndefined();
+    expect(findUserBySlug(family, '')).toBeUndefined();
+  });
+
+  it('finds nobody when two people share a slug', () => {
+    const twins = [...family, user(4, 'emma', 'child')];
+    expect(findUserBySlug(twins, 'emma')).toBeUndefined();
   });
 });

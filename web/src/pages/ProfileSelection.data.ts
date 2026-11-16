@@ -54,6 +54,27 @@ export function orderFamily(users: User[]): { kids: User[]; parents: User[] } {
 }
 
 /**
+ * The URL form of a name, for /u/:slug links: lowercase, accents dropped,
+ * anything that isn't a letter or digit collapsed to "-" ("Mary Jo" -> "mary-jo").
+ */
+export function slugify(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** The one person a /u/:slug link names, or undefined when none or several match. */
+export function findUserBySlug(users: User[], slug: string): User | undefined {
+  const want = slugify(slug);
+  if (!want) return undefined;
+  const hits = users.filter((u) => slugify(u.name) === want);
+  return hits.length === 1 ? hits[0] : undefined;
+}
+
+/**
  * The family strip: everyone not paused who has chores today. Parents take
  * part, so they show whenever they have chores of their own.
  */

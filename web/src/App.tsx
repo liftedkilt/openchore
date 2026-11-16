@@ -80,6 +80,7 @@ export const App: React.FC = () => {
     <React.Suspense fallback={null}>
       <Routes>
         <Route path="/login" element={<ProfileSelection />} />
+        <Route path="/u/:slug" element={<ProfileSelection />} />
         <Route path="/setup" element={<SetupWizard />} />
         <Route path="/upload" element={<PhotoUpload />} />
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />

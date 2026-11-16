@@ -42,6 +42,14 @@ could otherwise sign the person straight back in. With the provider option,
 the picker also shows a **Continue with …** button that needs no profile
 tapped first: the linked account decides who signs in.
 
+**Links to one person.** `/u/<name>` opens that person's chores, for a home
+dashboard or a bookmark: `/u/emma`, or `/u/mary-jo` for "Mary Jo" (lowercase,
+accents dropped, other characters become `-`). It starts that person's normal
+sign-in, so someone with no PIN goes straight to their list, and a PIN or linked
+account is still asked for. Already signed in as them, it just opens their
+list. Signed in as someone else, or with a name that matches nobody (or two
+people), it shows the family picker rather than switching anyone.
+
 **Allow PINs for people with a linked account** (on by default) can be turned
 off, so anyone who has linked an account must use it, even on the tablet.
 People with no linked account (or whose provider has been removed) keep
