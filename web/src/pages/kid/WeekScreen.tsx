@@ -5,7 +5,7 @@ import { Icon } from '../../design';
 import type { ScheduledChore, User } from '../../types';
 import { localDateStr } from '../../utils';
 import { isDone, type ChoreView } from './choreView';
-import { ChoreGroups, Notice, PausedNotice } from './parts';
+import { ChoreGroups, Notice, OwnTaskEntry, PausedNotice } from './parts';
 import type { KidData } from './useKidData';
 import s from './kid.module.css';
 
@@ -61,9 +61,11 @@ interface WeekProps {
   onToggle: (c: ScheduledChore, view: ChoreView) => void;
   onPhoto: (c: ScheduledChore) => void;
   onSpeak: (text: string, audioUrl?: string) => void;
+  /** Open "my own tasks": a new one for `date`, or the list. */
+  onOwnTasks?: (date?: string) => void;
 }
 
-export function WeekScreen({ user, data, topBar, viewOf, tts, onToggle, onPhoto, onSpeak }: WeekProps) {
+export function WeekScreen({ user, data, topBar, viewOf, tts, onToggle, onPhoto, onSpeak, onOwnTasks }: WeekProps) {
   const { t, i18n } = useTranslation();
   const [selected, setSelected] = useState(data.today);
   const dates = weekDates(data.today);
@@ -141,6 +143,9 @@ export function WeekScreen({ user, data, topBar, viewOf, tts, onToggle, onPhoto,
           onSpeak={onSpeak}
           headingLevel="h3"
         />
+      )}
+      {!user.paused && data.weekChores != null && onOwnTasks && (
+        <OwnTaskEntry onAdd={() => onOwnTasks(day >= data.today ? day : data.today)} onList={() => onOwnTasks()} />
       )}
     </div>
   );

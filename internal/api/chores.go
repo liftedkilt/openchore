@@ -102,8 +102,8 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Category == "" {
 		req.Category = model.CategoryCore
 	}
-	if req.Category != model.CategoryRequired && req.Category != model.CategoryCore && req.Category != model.CategoryBonus {
-		writeError(w, http.StatusBadRequest, "category must be required, core, or bonus")
+	if !model.ValidCategory(req.Category) {
+		writeError(w, http.StatusBadRequest, "category must be required, core, bonus, or optional")
 		return
 	}
 
@@ -176,8 +176,8 @@ func (h *ChoreHandler) Update(w http.ResponseWriter, r *http.Request) {
 		existing.Description = req.Description
 	}
 	if req.Category != "" {
-		if req.Category != model.CategoryRequired && req.Category != model.CategoryCore && req.Category != model.CategoryBonus {
-			writeError(w, http.StatusBadRequest, "category must be required, core, or bonus")
+		if !model.ValidCategory(req.Category) {
+			writeError(w, http.StatusBadRequest, "category must be required, core, bonus, or optional")
 			return
 		}
 		existing.Category = req.Category
@@ -726,7 +726,7 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				allDone := len(todayChores) > 0
 				for _, c := range todayChores {
-					if !c.Completed && c.Category != model.CategoryBonus {
+					if !c.Completed && model.CountsTowardDay(c.Category) {
 						allDone = false
 						break
 					}

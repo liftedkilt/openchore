@@ -26,11 +26,11 @@ export function isPersonColor(v: unknown): v is PersonColor {
   return typeof v === 'string' && (PERSON_COLORS as readonly string[]).includes(v);
 }
 
-/** Design category names. The DB uses required / core / bonus. */
-export type Cat = 'essential' | 'daily' | 'bonus';
-export const CATS: readonly Cat[] = ['essential', 'daily', 'bonus'];
+/** Design category names. The DB uses required / core / bonus / optional. */
+export type Cat = 'essential' | 'daily' | 'bonus' | 'optional';
+export const CATS: readonly Cat[] = ['essential', 'daily', 'bonus', 'optional'];
 
-/** Map a DB chore category (`required` | `core` | `bonus`) to a design category. */
+/** Map a DB chore category (`required` | `core` | `bonus` | `optional`) to a design category. */
 export function catFromCategory(category: string | null | undefined): Cat {
   switch (category) {
     case 'required':
@@ -38,6 +38,8 @@ export function catFromCategory(category: string | null | undefined): Cat {
       return 'essential';
     case 'bonus':
       return 'bonus';
+    case 'optional':
+      return 'optional';
     default:
       return 'daily';
   }

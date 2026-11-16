@@ -20,6 +20,7 @@ import { WeekScreen } from './WeekScreen';
 import { RewardsScreen } from './RewardsScreen';
 import { PhotoSheet } from './PhotoSheet';
 import { MeSheet } from './MeSheet';
+import { OwnTasksSheet } from './OwnTasksSheet';
 import { CelebrationLayer } from './CelebrationLayer';
 import { choreDomId } from './ChoreItem';
 import { catFromCategory } from '../../design';
@@ -60,6 +61,8 @@ export const KidApp: React.FC = () => {
   const [linkedOpen, setLinkedOpen] = useState(false);
   const [photoChore, setPhotoChore] = useState<ScheduledChore | null>(null);
   const [celebrating, setCelebrating] = useState<Celebrating | null>(null);
+  // "My own tasks": open on the list (date undefined) or a new task for a day.
+  const [ownTasks, setOwnTasks] = useState<{ date?: string } | null>(null);
   const [baseUrl, setBaseUrl] = useState('');
 
   // The household's public URL for QR links (a grown-up setting; kids fall
@@ -97,8 +100,10 @@ export const KidApp: React.FC = () => {
   }), [now, data.today, bonusOpen, requiredDone, t]);
 
   // The whole day done: the skin's fanfare (not on first load).
-  const doneCount = todayChores.filter(isDone).length;
-  const allDone = todayChores.length > 0 && doneCount === todayChores.length;
+  // Optional chores never hold up the fanfare (unless they're all there is).
+  const expected = todayChores.some(c => c.category !== 'optional')
+    ? todayChores.filter(c => c.category !== 'optional') : todayChores;
+  const allDone = expected.length > 0 && expected.every(isDone);
   const prevDone = useRef<boolean | null>(null);
   useEffect(() => {
     if (data.chores == null) return;
@@ -180,7 +185,8 @@ export const KidApp: React.FC = () => {
       onManage={isAdmin ? toManage : undefined}
     />
   );
-  const shared = { user, data, topBar, viewOf, tts, onToggle, onPhoto: setPhotoChore, onSpeak: speakOrPlay };
+  const onOwnTasks = (date?: string) => setOwnTasks({ date });
+  const shared = { user, data, topBar, viewOf, tts, onToggle, onPhoto: setPhotoChore, onSpeak: speakOrPlay, onOwnTasks };
 
   return (
     <SkinScope skin={skin} color={color} className={s.root}>
@@ -246,6 +252,15 @@ export const KidApp: React.FC = () => {
           onClose={() => setLinkedOpen(false)}
           onChanged={(providers) => setUser({ ...user, auth_providers: providers })}
           onSignedOutEverywhere={logout}
+        />
+      )}
+
+      {ownTasks && (
+        <OwnTasksSheet
+          today={data.today}
+          startWith={ownTasks.date ? { date: ownTasks.date } : null}
+          onClose={() => setOwnTasks(null)}
+          onChanged={() => { data.refreshAll(); }}
         />
       )}
 

@@ -32,3 +32,10 @@ describe('dayGates', () => {
     expect(dayGates([]).requiredDone).toBe(true);
   });
 });
+
+describe('optional chores', () => {
+  it('never hold the bonus gate', () => {
+    expect(dayGates([c('required', done), c('optional'), c('bonus')]).bonusOpen).toBe(true);
+    expect(dayGates([c('optional')]).requiredDone).toBe(true);
+  });
+});

@@ -42,6 +42,7 @@
 .oc-mark--essential * { fill: var(--cat-essential); }
 .oc-mark--daily * { fill: var(--cat-daily); }
 .oc-mark--bonus * { fill: var(--cat-bonus); }
+.oc-mark--optional * { fill: var(--cat-optional); }
 .oc-cathead { display: flex; align-items: center; justify-content: space-between; margin: 20px 2px 8px; font-family: var(--font-text); font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: 0.06em; text-transform: var(--label-case); color: var(--ink); }
 .oc-cathead__l { display: flex; align-items: center; gap: 8px; margin: 0; font: inherit; }
 .oc-cathead__n { color: var(--ink-muted); letter-spacing: 0.02em; }
@@ -53,6 +54,7 @@
 .oc-chore + .oc-chore { margin-top: var(--row-gap); }
 .oc-chore[data-cat="essential"] { --row-bg: var(--row-essential); --row-ink: var(--on-row-essential); --well-bg: var(--cat-essential-soft); --well-ink: var(--cat-essential-icon); }
 .oc-chore[data-cat="bonus"] { --row-bg: var(--row-bonus); --row-ink: var(--on-row-bonus); --well-bg: var(--cat-bonus-soft); --well-ink: var(--cat-bonus-icon); }
+.oc-chore[data-cat="optional"] { --row-bg: var(--row-optional); --row-ink: var(--on-row-optional); --well-bg: var(--cat-optional-soft); --well-ink: var(--cat-optional-icon); }
 .oc-chore__well { width: var(--well-size); height: var(--well-size); border-radius: var(--r-well); display: grid; place-items: center; flex: none; box-sizing: border-box; background: var(--well-bg); color: var(--well-ink); border: var(--outline-w) solid var(--line); }
 .oc-chore__txt { flex: 1; min-width: 0; }
 .oc-chore__title { display: block; font-size: 16px; line-height: 21px; font-weight: var(--title-weight); letter-spacing: -0.005em; overflow-wrap: anywhere; }

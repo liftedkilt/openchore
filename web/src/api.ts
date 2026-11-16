@@ -1,4 +1,4 @@
-import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput, SignInOptions } from './types';
+import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, OwnChore, OwnChoreInput, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput, SignInOptions } from './types';
 
 const API_BASE = '/api';
 
@@ -181,6 +181,19 @@ export const api = {
       fetchWithAuth<User>(`/users/${id}/unpause`, { method: 'PUT' }),
     getChores: (id: number, view: 'daily' | 'weekly', date: string) =>
       fetchWithAuth<ScheduledChore[]>(`/users/${id}/chores?view=${view}&date=${date}`),
+  },
+  /** The signed-in person's own tasks (Optional, 0 points). */
+  ownChores: {
+    list: () => fetchWithAuth<OwnChore[]>('/me/chores'),
+    create: (data: OwnChoreInput) => fetchWithAuth<OwnChore>('/me/chores', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    update: (id: number, data: OwnChoreInput) => fetchWithAuth<OwnChore>(`/me/chores/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+    delete: (id: number) => fetchWithAuth(`/me/chores/${id}`, { method: 'DELETE' }),
   },
   chores: {
     list: () => fetchWithAuth<Chore[]>('/chores'),

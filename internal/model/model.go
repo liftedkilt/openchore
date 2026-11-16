@@ -10,7 +10,31 @@ const (
 	CategoryRequired = "required"
 	CategoryCore     = "core"
 	CategoryBonus    = "bonus"
+	// CategoryOptional chores are never expected: they don't count toward
+	// finishing the day (streaks, missed-chore penalties, decay, the bonus
+	// gate) and their points, if any, are paid straight away. Kids can add
+	// their own, always worth 0 points.
+	CategoryOptional = "optional"
 )
+
+// ValidCategory reports whether c is a known chore category.
+func ValidCategory(c string) bool {
+	switch c {
+	case CategoryRequired, CategoryCore, CategoryBonus, CategoryOptional:
+		return true
+	}
+	return false
+}
+
+// CountsTowardDay reports whether a chore of this category has to be done
+// for the day to count as complete (streaks, penalties, decay, bonus gate).
+func CountsTowardDay(c string) bool {
+	return c == CategoryRequired || c == CategoryCore
+}
+
+// ChoreSourceSelf marks a chore a person added for themselves (kid
+// self-service). Such chores are always optional and worth 0 points.
+const ChoreSourceSelf = "self"
 
 // Completion statuses
 const (
@@ -196,6 +220,16 @@ type ChoreSchedule struct {
 	ExpiryPenalty       string   `json:"expiry_penalty"`
 	ExpiryPenaltyValue  int      `json:"expiry_penalty_value"`
 	CreatedAt           string   `json:"created_at"`
+}
+
+// OwnChore is a chore a person added for themselves (Source "self"), with
+// its schedules, as returned by GET /api/me/chores.
+type OwnChore struct {
+	Chore
+	Schedules []ChoreSchedule `json:"schedules"`
+	// Editable is false once a grown-up has changed it into something the
+	// owner may not manage (points added, or a different category).
+	Editable bool `json:"editable"`
 }
 
 type ChoreCompletion struct {

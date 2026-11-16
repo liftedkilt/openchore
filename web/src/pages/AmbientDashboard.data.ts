@@ -5,7 +5,7 @@ import type { ScheduledChore } from '../types';
 import { catFromCategory, type Cat, type ChoreState } from '../design';
 import { dayGates, isChoreDone } from '../choreRules';
 
-export const CAT_ORDER: Record<Cat, number> = { essential: 0, daily: 1, bonus: 2 };
+export const CAT_ORDER: Record<Cat, number> = { essential: 0, daily: 1, bonus: 2, optional: 3 };
 
 /** What the meta line says: a deadline, an opening time or a missed deadline. */
 export type NextMeta =

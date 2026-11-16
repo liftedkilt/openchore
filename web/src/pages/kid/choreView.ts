@@ -70,6 +70,8 @@ export function choreView(c: ScheduledChore, ctx: ChoreViewContext): ChoreView {
   const cat = catFromCategory(c.category);
   const isToday = c.date === ctx.today;
   const photo = !!c.requires_photo && (c.photo_source ?? 'child') !== 'external';
+  // An optional chore worth nothing (e.g. a kid's own reminder) shows no "0 pts".
+  const pts = c.category === 'optional' && !c.points_value ? undefined : c.points_value;
   const base: ChoreView = {
     cat, state: 'todo', urgent: false, photo, canToggle: isToday, retry: false, needsPhotoProof: false,
   };
@@ -92,7 +94,7 @@ export function choreView(c: ScheduledChore, ctx: ChoreViewContext): ChoreView {
       case 'rejected':
         return {
           ...base, state: 'todo', urgent: true, meta: t('kid.chore.rejected'), retry: true,
-          checkLabel: t('design.chore.markComplete'), points: c.points_value,
+          checkLabel: t('design.chore.markComplete'), points: pts,
         };
       case 'excused':
         return { ...base, state: 'done', meta: t('kid.chore.excused') };
@@ -108,7 +110,7 @@ export function choreView(c: ScheduledChore, ctx: ChoreViewContext): ChoreView {
   if (!isToday) {
     const span = timeWindow(c, now, t, lang);
     if (c.date < ctx.today) return { ...base, canToggle: false, meta: t('kid.chore.notDone') };
-    return { ...base, canToggle: false, meta: span, points: c.points_value };
+    return { ...base, canToggle: false, meta: span, points: pts };
   }
 
   // --- Missed its window ---
@@ -150,13 +152,13 @@ export function choreView(c: ScheduledChore, ctx: ChoreViewContext): ChoreView {
     const due = atTime(c.due_by, now);
     const left = (due.getTime() - now.getTime()) / 60000;
     if (left > 0 && left <= URGENT_MINUTES) {
-      return { ...base, urgent: true, meta: t('kid.chore.left', { time: formatDuration(left, t) }), points: c.points_value };
+      return { ...base, urgent: true, meta: t('kid.chore.left', { time: formatDuration(left, t) }), points: pts };
     }
   }
   let meta = timeWindow(c, now, t, lang);
   if (!meta && photo) meta = t('design.chore.photo');
   if (!meta && c.estimated_minutes) meta = t('kid.chore.about', { time: formatDuration(c.estimated_minutes, t) });
-  return { ...base, meta, points: c.points_value };
+  return { ...base, meta, points: pts };
 }
 
 /** "7:00 – 9:00 am", "Before 9:00 am", "From 5:00 pm" or nothing. */

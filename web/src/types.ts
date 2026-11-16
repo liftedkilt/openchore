@@ -157,11 +157,14 @@ export interface LinkedIdentity {
   last_login_at?: string;
 }
 
+/** A chore's category. Optional chores never count toward the day. */
+export type ChoreCategory = 'required' | 'core' | 'bonus' | 'optional';
+
 export interface Chore {
   id: number;
   title: string;
   description: string;
-  category: 'required' | 'core' | 'bonus';
+  category: ChoreCategory;
   icon?: string;
   points_value: number;
   missed_penalty_value: number;
@@ -170,6 +173,32 @@ export interface Chore {
   requires_photo: boolean;
   photo_source?: 'child' | 'external' | 'both';
   tts_audio_url?: string;
+  /** "manual", "self" (a person added it for themselves), … */
+  source?: string;
+  created_by?: number;
+}
+
+/** A task a person added to their own list (always Optional, 0 points). */
+export interface OwnChore extends Chore {
+  schedules: ChoreSchedule[];
+  /** False once a grown-up has changed it (points or category). */
+  editable: boolean;
+}
+
+/** When an own task shows up: exactly one of the three. */
+export interface OwnChoreWhen {
+  specific_date?: string;
+  days_of_week?: number[];
+  recurrence_interval?: number;
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface OwnChoreInput {
+  title?: string;
+  description?: string;
+  icon?: string;
+  when?: OwnChoreWhen;
 }
 
 export interface ChoreSchedule {
@@ -306,7 +335,7 @@ export interface ScheduledChore {
   chore_id: number;
   title: string;
   description: string;
-  category: 'required' | 'core' | 'bonus';
+  category: ChoreCategory;
   icon?: string;
   points_value: number;
   missed_penalty_value: number;
@@ -347,7 +376,7 @@ export interface PendingCompletion {
   completed_at: string;
   // Who clicked "complete" (child_name is their name).
   completed_by?: number;
-  category?: 'required' | 'core' | 'bonus';
+  category?: ChoreCategory;
   icon?: string;
   points_value?: number;
   // Whether the chore needs a photo, and who takes it. A "child" chore

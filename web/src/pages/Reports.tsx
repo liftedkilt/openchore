@@ -94,7 +94,7 @@ function weekdayName(dow: number, lang: string): string {
 }
 
 const pct = (n: number) => `${Math.round(n)}%`;
-const CAT_ORDER: Record<Cat, number> = { essential: 0, daily: 1, bonus: 2 };
+const CAT_ORDER: Record<Cat, number> = { essential: 0, daily: 1, bonus: 2, optional: 3 };
 
 /** One trend row per day from the period's start to its end or today, whichever is first. */
 function fillDays(data: ReportsData): TrendDay[] {

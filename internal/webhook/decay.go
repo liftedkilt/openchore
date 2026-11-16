@@ -97,7 +97,7 @@ func (pdc *PointsDecayChecker) check(ctx context.Context) {
 		}
 
 		// The rule (see README): decay only if any non-bonus chore was not
-		// completed yesterday. Bonus chores are ignored.
+		// completed yesterday. Bonus and optional chores are ignored.
 		chores, err := pdc.store.GetScheduledChoresForUser(ctx, cfg.UserID, []string{yesterday}, now)
 		if err != nil {
 			log.Printf("points-decay: failed to list chores for user %d: %v", cfg.UserID, err)
@@ -107,7 +107,7 @@ func (pdc *PointsDecayChecker) check(ctx context.Context) {
 		nonBonusCount := 0
 		var missedTitles []string
 		for _, c := range chores {
-			if c.Category == model.CategoryBonus {
+			if !model.CountsTowardDay(c.Category) {
 				continue
 			}
 			nonBonusCount++

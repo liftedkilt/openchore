@@ -85,7 +85,9 @@
       "requiresPhotoLabel": "Foto",
       "requiresPhotoTitle": "Foto erforderlich",
       "subtitle_one": "{{count}} Aufgabe",
-      "subtitle_other": "{{count}} Aufgaben"
+      "subtitle_other": "{{count}} Aufgaben",
+      "addedBy": "Von {{name}} hinzugefügt",
+      "addedByTitle": "Selbst hinzugefügt. Wenn du Punkte vergibst, verwaltest du die Aufgabe."
     },
     "colors": {
       "butter": "Butter",
@@ -827,7 +829,8 @@
     "category": {
       "essential": "Pflicht",
       "daily": "Jeden Tag",
-      "bonus": "Bonus"
+      "bonus": "Bonus",
+      "optional": "Optional"
     },
     "celebration": {
       "back": "Zurück zu meiner Liste",
@@ -1154,6 +1157,64 @@
       "streakDays_one": "{{count}} Tag in Folge",
       "streakDays_other": "{{count}} Tage in Folge",
       "title": "Diese Woche"
+    },
+    "own": {
+      "title": "Meine eigenen Aufgaben",
+      "lead": "Füge Dinge hinzu, an die du denken willst. Sie sind nur für dich und bringen keine Punkte.",
+      "empty": "Noch nichts da. Füge etwas hinzu, das du schaffen willst!",
+      "loadError": "Deine Aufgaben konnten nicht geladen werden.",
+      "add": "Aufgabe hinzufügen",
+      "myTasks": "Meine eigenen Aufgaben",
+      "editLabel": "{{title}} ändern",
+      "locked": "Darum kümmert sich jetzt ein Erwachsener",
+      "backToList": "Zurück zu meinen Aufgaben",
+      "newTitle": "Neue Aufgabe",
+      "editTitle": "Aufgabe ändern",
+      "alwaysOptional": "Optional · nur eine Erinnerung, keine Punkte",
+      "whatLabel": "Was möchtest du machen?",
+      "whatPlaceholder": "Klavier üben",
+      "iconLabel": "Bild",
+      "whenLabel": "Wann",
+      "repeat": {
+        "once": "Ein Tag",
+        "weekly": "Jede Woche",
+        "interval": "Alle paar Tage"
+      },
+      "dayLabel": "Welcher Tag?",
+      "today": "Heute",
+      "tomorrow": "Morgen",
+      "daysLabel": "Welche Tage?",
+      "everyDay": "Jeden Tag",
+      "schoolDays": "Mo – Fr",
+      "weekends": "Wochenende",
+      "everyLabel": "Alle",
+      "days_one": "Tag",
+      "days_other": "Tage",
+      "startLabel": "Ab",
+      "endLabel": "Bis (optional)",
+      "save": "Aufgabe hinzufügen",
+      "saveChanges": "Speichern",
+      "delete": "Diese Aufgabe entfernen",
+      "deleteConfirm": "Wirklich entfernen?",
+      "deleteYes": "Ja, entfernen",
+      "deleteNo": "Behalten",
+      "problem": {
+        "title": "Gib deiner Aufgabe einen Namen.",
+        "date": "Wähle einen Tag.",
+        "past": "Wähle heute oder einen späteren Tag.",
+        "days": "Wähle mindestens einen Tag.",
+        "interval": "Wähle, alle wie viele Tage (1 bis 365).",
+        "end": "Der letzte Tag kann nicht vor dem ersten liegen."
+      },
+      "summary": {
+        "none": "An keinem Tag",
+        "today": "Heute",
+        "everyDay": "Jeden Tag",
+        "everyN_one": "Jeden Tag",
+        "everyN_other": "Alle {{count}} Tage",
+        "from": "ab {{date}}",
+        "until": "bis {{date}}"
+      }
     }
   },
   "linkedAccounts": {

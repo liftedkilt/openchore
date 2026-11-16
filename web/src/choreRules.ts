@@ -15,11 +15,18 @@ export function isChoreDone(c: Chore): boolean {
  * credits held-back points once a later chore closes it.
  * - `requiredDone`: every Must do is done, so Every day points pay out.
  * - `bonusOpen`: every Must do and Every day chore is done, so Bonus opens.
+ * Optional chores never hold a gate.
  */
 export function dayGates(todayChores: readonly Chore[]): { requiredDone: boolean; bonusOpen: boolean } {
   const open = todayChores.filter(c => c.available || c.completed);
   return {
     requiredDone: open.filter(c => c.category === 'required').every(isChoreDone),
-    bonusOpen: open.filter(c => c.category !== 'bonus').every(isChoreDone),
+    bonusOpen: open.filter(c => countsTowardDay(c.category)).every(isChoreDone),
   };
+}
+
+/** Must do and Every day chores have to be done for the day to count;
+ *  Bonus and Optional ones don't. */
+export function countsTowardDay(category: string): boolean {
+  return category === 'required' || category === 'core';
 }
