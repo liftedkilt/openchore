@@ -2653,10 +2653,10 @@ func (s *Store) RecalculateStreak(ctx context.Context, userID int64, today strin
 		if err != nil {
 			return err
 		}
-		// Filter to required + core only
+		// Filter to required + core only (bonus and optional don't count)
 		var nonBonus []model.ScheduledChore
 		for _, c := range chores {
-			if c.Category != model.CategoryBonus {
+			if model.CountsTowardDay(c.Category) {
 				nonBonus = append(nonBonus, c)
 			}
 		}
@@ -2683,7 +2683,7 @@ func (s *Store) RecalculateStreak(ctx context.Context, userID int64, today strin
 	}
 	var todayNonBonus []model.ScheduledChore
 	for _, c := range todayChores {
-		if c.Category != model.CategoryBonus {
+		if model.CountsTowardDay(c.Category) {
 			todayNonBonus = append(todayNonBonus, c)
 		}
 	}

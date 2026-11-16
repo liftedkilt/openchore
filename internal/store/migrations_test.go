@@ -207,3 +207,54 @@ func TestMigration018OrphanedCompletions(t *testing.T) {
 		t.Fatalf("expected completion 4 kept with approved_by cleared, got %v", got)
 	}
 }
+
+// 022 widens the chores category CHECK in place. Rebuilding the table would
+// cascade-delete schedules and completions, so they must all survive, and
+// down turns optional chores into bonus ones.
+func TestMigration022OptionalCategoryKeepsHistory(t *testing.T) {
+	m, db := migrator(t)
+	if err := m.Migrate(21); err != nil {
+		t.Fatalf("migrate to 21: %v", err)
+	}
+	mustExec(t, db, `INSERT INTO users (id, name, role, theme, color) VALUES (1, 'Mia', 'child', 'sunroom', 'mint')`)
+	mustExec(t, db, `INSERT INTO chores (id, title, created_by) VALUES (1, 'Make bed', 1)`)
+	mustExec(t, db, `INSERT INTO chore_schedules (id, chore_id, assigned_to, day_of_week) VALUES (1, 1, 1, 1)`)
+	mustExec(t, db, `INSERT INTO chore_completions (id, chore_schedule_id, completed_by, completion_date) VALUES (1, 1, 1, '2026-09-21')`)
+	if _, err := db.Exec(`INSERT INTO chores (title, category, created_by) VALUES ('x', 'optional', 1)`); err == nil {
+		t.Fatal("optional accepted before 022")
+	}
+
+	if err := m.Migrate(22); err != nil {
+		t.Fatalf("migrate to 22: %v", err)
+	}
+	var n int
+	db.QueryRow(`SELECT (SELECT count(*) FROM chore_schedules) + (SELECT count(*) FROM chore_completions)`).Scan(&n)
+	if n != 2 {
+		t.Fatalf("schedules/completions lost: %d rows left", n)
+	}
+	mustExec(t, db, `INSERT INTO chores (id, title, category, created_by) VALUES (2, 'Piano', 'optional', 1)`)
+	if _, err := db.Exec(`INSERT INTO chores (title, category, created_by) VALUES ('x', 'nope', 1)`); err == nil {
+		t.Fatal("CHECK no longer enforced")
+	}
+	var ok string
+	db.QueryRow(`PRAGMA integrity_check`).Scan(&ok)
+	if ok != "ok" {
+		t.Fatalf("integrity_check: %s", ok)
+	}
+
+	if err := m.Migrate(21); err != nil {
+		t.Fatalf("down to 21: %v", err)
+	}
+	var cat string
+	db.QueryRow(`SELECT category FROM chores WHERE id = 2`).Scan(&cat)
+	if cat != "bonus" {
+		t.Fatalf("down: want bonus, got %s", cat)
+	}
+	if _, err := db.Exec(`INSERT INTO chores (title, category, created_by) VALUES ('x', 'optional', 1)`); err == nil {
+		t.Fatal("optional still accepted after down")
+	}
+	db.QueryRow(`SELECT count(*) FROM chore_completions`).Scan(&n)
+	if n != 1 {
+		t.Fatalf("down lost completions: %d", n)
+	}
+}

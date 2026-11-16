@@ -68,7 +68,7 @@ type apiTriggerable struct {
 	} `json:"triggers"`
 }
 
-var categoryLabels = map[string]string{"required": "Must do", "core": "Every day", "bonus": "Bonus"}
+var categoryLabels = map[string]string{"required": "Must do", "core": "Every day", "bonus": "Bonus", "optional": "Optional"}
 
 var dayNames = []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
 
@@ -228,7 +228,7 @@ func householdTools() []*Tool {
 	choreProps := map[string]any{
 		"title":                str("Chore name, short (\"Fold laundry\")."),
 		"description":          str("What to do, written for the kid (it's read aloud if audio is set up)."),
-		"category":             enum("required = Must do, core = Every day (default), bonus = Bonus.", "required", "core", "bonus"),
+		"category":             enum("required = Must do, core = Every day (default), bonus = Bonus, optional = Optional (never required; points, if any, paid straight away).", "required", "core", "bonus", "optional"),
 		"icon":                 str("One emoji, e.g. 🧺."),
 		"points_value":         integer("Points earned."),
 		"missed_penalty_value": integer("Points lost if it ends the day undone (0 = none)."),

@@ -56,6 +56,7 @@ export const CATEGORY_ICON: Record<Cat, IconName> = {
   essential: 'home',
   daily: 'cal',
   bonus: 'spark',
+  optional: 'sprout',
 };
 
 /**

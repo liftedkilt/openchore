@@ -87,15 +87,25 @@ Screen**. It runs full-screen like an app.
 ### Must-do first, bonus last
 
 Every chore belongs to one of three tiers, and each tier waits for the one
-before it:
+before it (plus an Optional category that sits outside the tiers):
 
 | Tier | What it means |
 |------|---------------|
 | **Required** | The non-negotiables, like brushing teeth or feeding the dog. |
 | **Core** | The daily routine. Points are held until every required chore is done. |
-| **Bonus** | Optional extras. They only pay out once required *and* core are finished. |
+| **Bonus** | Extras. They only pay out once required *and* core are finished. |
+| **Optional** | Never expected: worth points or nothing, paid straight away, and an undone one never breaks a streak, costs a penalty or holds a gate. |
 
 So nobody can skip the dishes to grab the 15-point bonus chore.
+
+### Kids' own tasks
+
+Kids (and grown-ups) can add their own reminders from **Add a task** under
+their list: for today, a day picked on the calendar, chosen days every week,
+or every few days. These are always Optional and worth no points; the
+add-a-task form has no points field. Parents see them in Manage → Chores
+marked "Added by …" and can give one points, after which the kid can no
+longer edit or reschedule it.
 
 ### The other levers
 

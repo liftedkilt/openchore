@@ -102,13 +102,14 @@ export interface CategoryMarkProps {
   className?: string;
 }
 
-/** The category's shape: Must do ●, Every day ■, Bonus ★. */
+/** The category's shape: Must do ●, Every day ■, Bonus ★, Optional ◆. */
 export function CategoryMark({ cat, done, className }: CategoryMarkProps) {
   return (
     <svg className={clsx('oc-mark', `oc-mark--${cat}`, done && 'is-done', className)} viewBox="0 0 24 24" aria-hidden focusable="false">
       {cat === 'essential' && <circle cx="12" cy="12" r="9.5" />}
       {cat === 'daily' && <rect x="2.5" y="2.5" width="19" height="19" rx="4.5" />}
       {cat === 'bonus' && <path d="M12 1.8l3.1 6.4 7 1-5.1 4.9 1.2 7L12 17.8l-6.2 3.3 1.2-7-5.1-4.9 7-1z" />}
+      {cat === 'optional' && <path d="M12 1.5l10.5 10.5L12 22.5 1.5 12z" />}
     </svg>
   );
 }

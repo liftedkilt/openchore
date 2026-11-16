@@ -85,7 +85,9 @@
       "requiresPhotoLabel": "Photo",
       "requiresPhotoTitle": "Requires Photo",
       "subtitle_one": "{{count}} chore",
-      "subtitle_other": "{{count}} chores"
+      "subtitle_other": "{{count}} chores",
+      "addedBy": "Added by {{name}}",
+      "addedByTitle": "Added by this person for themselves. Give it points and it becomes yours to manage."
     },
     "colors": {
       "butter": "Butter",
@@ -827,7 +829,8 @@
     "category": {
       "essential": "Must do",
       "daily": "Every day",
-      "bonus": "Bonus"
+      "bonus": "Bonus",
+      "optional": "Optional"
     },
     "celebration": {
       "back": "Back to my list",
@@ -1154,6 +1157,64 @@
       "streakDays_one": "{{count}} day in a row",
       "streakDays_other": "{{count}} days in a row",
       "title": "This week"
+    },
+    "own": {
+      "title": "My own tasks",
+      "lead": "Add things you want to remember to do. They're just for you and don't earn points.",
+      "empty": "Nothing yet. Add something you want to get done!",
+      "loadError": "Couldn't load your tasks.",
+      "add": "Add a task",
+      "myTasks": "My own tasks",
+      "editLabel": "Change {{title}}",
+      "locked": "A grown-up looks after this one now",
+      "backToList": "Back to my tasks",
+      "newTitle": "New task",
+      "editTitle": "Change task",
+      "alwaysOptional": "Optional · just a reminder, no points",
+      "whatLabel": "What do you want to do?",
+      "whatPlaceholder": "Practise piano",
+      "iconLabel": "Picture",
+      "whenLabel": "When",
+      "repeat": {
+        "once": "One day",
+        "weekly": "Every week",
+        "interval": "Every few days"
+      },
+      "dayLabel": "Which day?",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "daysLabel": "Which days?",
+      "everyDay": "Every day",
+      "schoolDays": "Mon – Fri",
+      "weekends": "Weekends",
+      "everyLabel": "Every",
+      "days_one": "day",
+      "days_other": "days",
+      "startLabel": "Starting",
+      "endLabel": "Until (optional)",
+      "save": "Add task",
+      "saveChanges": "Save",
+      "delete": "Remove this task",
+      "deleteConfirm": "Remove it?",
+      "deleteYes": "Yes, remove",
+      "deleteNo": "Keep it",
+      "problem": {
+        "title": "Give your task a name.",
+        "date": "Pick a day.",
+        "past": "Pick today or a day after.",
+        "days": "Pick at least one day.",
+        "interval": "Pick how many days, from 1 to 365.",
+        "end": "The last day can't be before the first."
+      },
+      "summary": {
+        "none": "Not on any day",
+        "today": "Today",
+        "everyDay": "Every day",
+        "everyN_one": "Every day",
+        "everyN_other": "Every {{count}} days",
+        "from": "from {{date}}",
+        "until": "until {{date}}"
+      }
     }
   },
   "linkedAccounts": {

@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import Modal from '../Modal/Modal';
 import { api } from '../../api';
 import { DAY_NAMES } from '../../types';
-import type { User } from '../../types';
+import type { ChoreCategory, User } from '../../types';
 import { localDateStr, toggleInArray } from '../../utils';
 import { useAIStatus } from '../../hooks/useAIStatus';
 import { Icon, catFromCategory } from '../../design';
@@ -14,7 +14,7 @@ import styles from './CreateChoreWizard.module.css';
 interface ChoreData {
   title: string;
   description: string;
-  category: 'required' | 'core' | 'bonus';
+  category: ChoreCategory;
   icon: string;
   points: number;
   missedPenalty: number;

@@ -103,6 +103,12 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 			r.Post("/upload", chores.UploadPhoto)
 			r.Put("/completions/{id}/photo", chores.AttachPhoto)
 
+			// Anyone can add Optional, 0-point tasks to their own list
+			r.Get("/me/chores", chores.ListOwn)
+			r.Post("/me/chores", chores.CreateOwn)
+			r.Put("/me/chores/{id}", chores.UpdateOwn)
+			r.Delete("/me/chores/{id}", chores.DeleteOwn)
+
 			// Any user can view and redeem rewards
 			r.Get("/rewards", rewards.List)
 			r.Post("/rewards/{id}/redeem", rewards.Redeem)

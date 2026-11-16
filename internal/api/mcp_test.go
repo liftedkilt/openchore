@@ -561,7 +561,9 @@ func TestMCPCoversAPI(t *testing.T) {
 		// These act as the signed-in kid; an API token has no person behind it.
 		"POST /rewards/{}/redeem": "kid action", "POST /rewards/{}/commit": "kid action",
 		"POST /commitments/{}/contribute": "kid action", "PUT /commitments/{}/auto-contribute": "kid action",
-		"DELETE /commitments/{}": "kid action", "GET /rewards": "kid's reward list; list_rewards shows all",
+		"DELETE /commitments/{}": "kid action",
+		"GET /me/chores":         "kid action", "POST /me/chores": "kid action", "PUT /me/chores/{}": "kid action", "DELETE /me/chores/{}": "kid action",
+		"GET /rewards": "kid's reward list; list_rewards shows all",
 		// Self-service copies of fields update_person sets.
 		"PUT /users/{}/theme": "update_person", "PUT /users/{}/avatar": "update_person", "PUT /users/{}/color": "update_person",
 		"PUT /users/{}/line-color": "only settable by that person",

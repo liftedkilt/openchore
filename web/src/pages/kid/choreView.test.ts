@@ -138,3 +138,10 @@ describe('weekDates', () => {
     expect(weekDates('2026-09-27')[0]).toBe('2026-09-21');
   });
 });
+
+describe('optional chores', () => {
+  it('show no points line when worth nothing', () => {
+    expect(choreView(chore({ category: 'optional', points_value: 0 }), ctx).points).toBeUndefined();
+    expect(choreView(chore({ category: 'optional', points_value: 10 }), ctx).points).toBe(10);
+  });
+});

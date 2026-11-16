@@ -837,3 +837,75 @@
 
   .dayMark { width: 44px; height: 44px; }
 }
+
+/* ---------- My own tasks ---------- */
+.ownEntry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-5);
+}
+.ownEntry .secondaryAction { flex: 0 1 auto; min-height: 48px; }
+.ownItem { list-style: none; border-bottom: 1px solid var(--line); }
+.ownItem:last-child { border-bottom: 0; }
+.ownItem .settingRow { border-bottom: 0; cursor: pointer; text-align: left; }
+.ownItem .settingRow:disabled { cursor: default; opacity: .75; }
+.ownItem .wellSm { background: var(--cat-optional-soft); color: var(--cat-optional-icon); }
+ul.settingsList { margin: 0; padding: 0; }
+.ownCat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.ownField { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); min-width: 0; }
+.ownLabel { font-size: 13px; font-weight: 700; letter-spacing: 0.02em; }
+.ownIcons { grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); max-height: 168px; overflow-y: auto; padding: 2px; }
+.ownIcon { height: 48px; color: var(--ink); }
+.ownSegments {
+  display: flex;
+  padding: 3px;
+  gap: 3px;
+  border-radius: var(--oc-radius-pill);
+  background: var(--surface-sunk);
+}
+.ownSegment, .ownChip, .ownDay {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  box-sizing: border-box;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ownSegment { flex: 1; border-radius: var(--oc-radius-pill); }
+.ownSegmentOn { background: var(--surface); box-shadow: var(--lift); outline: var(--outline-w) solid var(--line); }
+.ownChips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ownChip { min-height: 40px; border-radius: var(--oc-radius-pill); background: var(--surface-sunk); }
+.ownDays { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--space-1); }
+.ownDay { padding: 0; border-radius: var(--oc-radius-md); background: var(--surface-sunk); font-size: 13px; }
+.ownChipOn, .ownDayOn { background: var(--accent); color: var(--on-accent); }
+.ownNumber { flex: 0 0 88px; }
+.ownSuffix { align-self: center; font-weight: 600; }
+.ownRange { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.ownDelete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  font-size: 14px;
+}
+.ownSegment:focus-visible, .ownChip:focus-visible, .ownDay:focus-visible, .ownIcon:focus-visible {
+  outline: 2.5px solid var(--ink);
+  outline-offset: 2px;
+}

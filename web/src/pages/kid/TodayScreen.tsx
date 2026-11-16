@@ -4,7 +4,7 @@ import { DayProgress, Greeting, catFromCategory, salutationFor, type DayProgress
 import type { ScheduledChore, User } from '../../types';
 import { gates, isDone, type ChoreView } from './choreView';
 import { GoalNudge } from './GoalCard';
-import { CAT_ORDER, ChoreGroups, Notice, PausedNotice } from './parts';
+import { CAT_ORDER, ChoreGroups, Notice, OwnTaskEntry, PausedNotice } from './parts';
 import type { KidData } from './useKidData';
 import s from './kid.module.css';
 
@@ -24,9 +24,11 @@ interface TodayProps {
   onToggle: (c: ScheduledChore, view: ChoreView) => void;
   onPhoto: (c: ScheduledChore) => void;
   onSpeak: (text: string, audioUrl?: string) => void;
+  /** Open "my own tasks": a new one for `date`, or the list. */
+  onOwnTasks?: (date?: string) => void;
 }
 
-export function TodayScreen({ user, data, now, topBar, viewOf, tts, onToggle, onPhoto, onSpeak }: TodayProps) {
+export function TodayScreen({ user, data, now, topBar, viewOf, tts, onToggle, onPhoto, onSpeak, onOwnTasks }: TodayProps) {
   const { t } = useTranslation();
   const chores = (data.chores ?? []).filter(c => c.date === data.today);
   const firstName = user.name.split(' ')[0];
@@ -39,7 +41,9 @@ export function TodayScreen({ user, data, now, topBar, viewOf, tts, onToggle, on
       return { cat, done, at: at && !Number.isNaN(at.getTime()) ? dayFraction(at) : undefined };
     }));
   const done = items.filter(i => i.done).length;
-  const allDone = items.length > 0 && done === items.length;
+  // Optional chores never hold up "all done" (unless they're all there is).
+  const expected = items.some(i => i.cat !== 'optional') ? items.filter(i => i.cat !== 'optional') : items;
+  const allDone = expected.length > 0 && expected.every(i => i.done);
 
   // Points today, as the old stats showed them: Every day points wait until
   // every Must do is done.
@@ -89,6 +93,9 @@ export function TodayScreen({ user, data, now, topBar, viewOf, tts, onToggle, on
             onPhoto={onPhoto}
             onSpeak={onSpeak}
           />
+        )}
+        {!user.paused && !loading && onOwnTasks && (
+          <OwnTaskEntry onAdd={() => onOwnTasks(data.today)} onList={() => onOwnTasks()} />
         )}
       </section>
 

@@ -16,7 +16,7 @@ How it fits together:
 - A chore is the definition: title, description, emoji icon, category, points, and whether it needs a parent's approval or a photo.
 - A schedule assigns a chore to ONE person on a pattern: a weekday, every N days from a start date, or one specific date. A chore done by two kids on weekdays is 10 schedules (2 people x 5 days). Use assign_chore to create them in one step, and household_overview to see them grouped into plain language ("Zoe: Mon-Fri").
 - Optional schedule timing: available_at (HH:MM, can't be ticked off before), due_by (HH:MM deadline) with expiry_penalty: "block" (can't be done late), "no_points" (late earns nothing), or "penalty" (late costs expiry_penalty_value points). start_date / end_date limit when a schedule applies.
-- Categories (labels the family sees in the app): "required" = Must do; "core" = Every day; "bonus" = Bonus. Core points are held until that day's Must-do chores are done. Bonus points are only paid once all Must-do and Every-day chores for the day are done. missed_penalty_value is deducted when a chore ends the day undone.
+- Categories (labels the family sees in the app): "required" = Must do; "core" = Every day; "bonus" = Bonus; "optional" = Optional. Core points are held until that day's Must-do chores are done. Bonus points are only paid once all Must-do and Every-day chores for the day are done. Optional chores never count toward the day (no streak, penalty or gate) and pay any points straight away; kids can add their own optional chores (always 0 points). missed_penalty_value is deducted when a chore ends the day undone.
 - Triggers assign a chore on demand, e.g. Home Assistant calling the trigger URL when the dryer finishes. assignment_type "individual" goes to the trigger's default person; "fcfs" (first come, first served) offers it to every kid and the first to finish earns the points. Triggered chores are for today only.
 - Chores needing approval or a photo wait in list_pending_approvals until a parent approves or rejects them.
 - Points live in a ledger (adjust_points for manual changes). Rewards cost points and can be limited or priced per kid. Streak milestones pay bonus points for consecutive complete days. Decay can slowly reduce idle balances.
@@ -442,7 +442,7 @@ func allTools() []*Tool {
 	add(endpoint{name: "draft_chore_description", title: "Draft a description", readOnly: true,
 		desc:   "Have the AI draft a kid-friendly chore description (needs AI configured). Nothing is saved.",
 		method: http.MethodPost, path: "/admin/ai/generate-description", required: []string{"title"},
-		props: map[string]any{"title": str("Chore title."), "category": enum("Chore category.", "required", "core", "bonus")}})
+		props: map[string]any{"title": str("Chore title."), "category": enum("Chore category.", "required", "core", "bonus", "optional")}})
 	add(endpoint{name: "regenerate_all_audio", title: "Re-record all audio",
 		desc:   "Re-record every chore's read-aloud audio (e.g. after changing the voice).",
 		method: http.MethodPost, path: "/admin/tts/regenerate"})

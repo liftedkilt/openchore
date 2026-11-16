@@ -38,6 +38,7 @@ Family chore-tracking PWA: Go API + React/TypeScript frontend, SQLite storage, o
 - **Seed data:** edit `config/config.example.yaml`; the seeder only runs on an empty DB, so `make dev` (which wipes) is the way to re-seed.
 - **Points:** every points change must write a row to `point_transactions`.
 - **Bonus chores:** do not award bonus points unless all `required` and `core` chores for the day are complete.
+- **Optional chores:** never count toward the day (streaks, missed penalties, decay, bonus gate) — use `model.CountsTowardDay`; points, if any, pay immediately. Kids add their own via `/api/me/chores` (`internal/api/ownchores.go`): always `optional`, 0 points, `source = "self"`, and only editable by the owner while still 0 points.
 - **Auth:** server-issued HMAC-signed sessions (`openchore_session` cookie or `Bearer ocs1.…`) from `POST /api/auth/login` (tap/PIN), OIDC (`internal/api/oidc.go`) or setup; API tokens (`Bearer <hex>`) act as admin. `X-User-ID` is **not** trusted. Admin is a role on a profile; every admin needs a PIN or linked identity. Middleware: `RequireSession`, `RequireUserOrToken`, `RequireAdmin`. OIDC providers come from `auth.oidc`/`OIDC_*` (read-only) plus the `oidc_providers` table (Settings UI); `OIDCService.Reload` applies changes without a restart. See `docs/authentication.md`.
 - **Parents take part:** don't filter by `role = 'child'` for chores/points/rewards/streaks; role only gates management.
 - **Errors:** respond with JSON `{"error": "..."}` via `writeError(w, status, msg)`. Log with stdlib `log.Printf`.
@@ -51,6 +52,7 @@ Family chore-tracking PWA: Go API + React/TypeScript frontend, SQLite storage, o
 - Frontend unit: Vitest (see `web/src/**/*.test.ts`).
 
 ## Gotchas
+- Never rebuild `chores` / `chore_schedules` with DROP TABLE in a migration: foreign keys are on, so the drop cascades and deletes schedules/completions. To widen a CHECK, edit `sqlite_schema` in place (see `022_optional_category.up.sql`).
 - SQLite is single-writer — long transactions block everything; keep store methods short.
 - `make dev` **wipes the database**. Don't run it against data you want to keep.
 - No `golangci-lint`/ESLint config in-repo; rely on `go vet`, `tsc`, and tests.

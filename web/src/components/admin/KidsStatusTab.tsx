@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { RefreshCw, Loader2 } from 'lucide-react';
 import { api } from '../../api';
-import type { User, ScheduledChore, UserStreakData, PointBalance, PendingCompletion } from '../../types';
+import type { ChoreCategory, User, ScheduledChore, UserStreakData, PointBalance, PendingCompletion } from '../../types';
 import { Avatar, CategoryHeader, CategoryMark, Icon, catFromCategory } from '../../design';
 import { localDateStr } from '../../utils';
 import { ApprovalList } from './ApprovalList';
@@ -27,6 +27,8 @@ interface Breakdown {
   coreTotal: number;
   bonusCompleted: number;
   bonusTotal: number;
+  optionalCompleted: number;
+  optionalTotal: number;
   // overdue is restricted to required+core (bonus is never "overdue" for the
   // purpose of alerts — it's opt-in and doesn't block the bonus gate).
   overdue: number;
@@ -40,6 +42,8 @@ function breakdownFor(chores: ScheduledChore[]): Breakdown {
   let coreTotal = 0;
   let bonusCompleted = 0;
   let bonusTotal = 0;
+  let optionalCompleted = 0;
+  let optionalTotal = 0;
   let overdue = 0;
   let pendingOnToday = 0;
   for (const c of chores) {
@@ -49,11 +53,14 @@ function breakdownFor(chores: ScheduledChore[]): Breakdown {
     } else if (c.category === 'core') {
       coreTotal += 1;
       if (c.completed) coreCompleted += 1;
+    } else if (c.category === 'optional') {
+      optionalTotal += 1;
+      if (c.completed) optionalCompleted += 1;
     } else {
       bonusTotal += 1;
       if (c.completed) bonusCompleted += 1;
     }
-    if (!c.completed && c.expired && c.category !== 'bonus') overdue += 1;
+    if (!c.completed && c.expired && (c.category === 'required' || c.category === 'core')) overdue += 1;
     if (c.completion_status === 'pending') pendingOnToday += 1;
   }
   return {
@@ -63,6 +70,8 @@ function breakdownFor(chores: ScheduledChore[]): Breakdown {
     coreTotal,
     bonusCompleted,
     bonusTotal,
+    optionalCompleted,
+    optionalTotal,
     overdue,
     pendingOnToday,
   };
@@ -259,13 +268,14 @@ export const KidsStatusTab: React.FC<{ onPendingChange?: (count: number) => void
           const bonusUnlocked = allRequiredAndCoreDone && b.bonusTotal > 0;
           const hasAlert = b.overdue > 0;
           const isExpanded = expanded.has(kid.user.id);
-          const totalChores = gatedTotal + b.bonusTotal;
+          const totalChores = gatedTotal + b.bonusTotal + b.optionalTotal;
           const detailsId = `kid-${kid.user.id}-details`;
           const color = personColor(kid.user);
-          const counts: { cat: 'required' | 'core' | 'bonus'; done: number; total: number }[] = [
+          const counts: { cat: ChoreCategory; done: number; total: number }[] = [
             { cat: 'required', done: b.requiredCompleted, total: b.requiredTotal },
             { cat: 'core', done: b.coreCompleted, total: b.coreTotal },
             { cat: 'bonus', done: b.bonusCompleted, total: b.bonusTotal },
+            { cat: 'optional', done: b.optionalCompleted, total: b.optionalTotal },
           ];
 
           return (
@@ -355,7 +365,7 @@ export const KidsStatusTab: React.FC<{ onPendingChange?: (count: number) => void
                   {!kid.loadError && kid.chores.length === 0 && (
                     <p className={ui.emptyInline}>{t('admin.kidsStatusTab.noChoresScheduledDetail')}</p>
                   )}
-                  {!kid.loadError && (['required', 'core', 'bonus'] as const).map(category => {
+                  {!kid.loadError && (['required', 'core', 'bonus', 'optional'] as const).map(category => {
                     const items = kid.chores.filter(c => c.category === category);
                     if (items.length === 0) return null;
                     const cat = catFromCategory(category);
@@ -365,7 +375,7 @@ export const KidsStatusTab: React.FC<{ onPendingChange?: (count: number) => void
                         <CategoryHeader cat={cat} as="h4" count={t('admin.kidsStatusTab.catCount', { done, total: items.length })} className={styles.catHead} />
                         <ul className={styles.choreList}>
                           {items.map(c => {
-                            const isOverdue = !c.completed && c.expired && c.category !== 'bonus';
+                            const isOverdue = !c.completed && c.expired && (c.category === 'required' || c.category === 'core');
                             const isPending = c.completion_status === 'pending';
                             const isExcused = c.completion_status === 'excused';
                             const key = `${c.schedule_id}-${c.date}`;

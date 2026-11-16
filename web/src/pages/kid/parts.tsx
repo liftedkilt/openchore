@@ -7,7 +7,7 @@ import type { ChoreView } from './choreView';
 import { ChoreItem } from './ChoreItem';
 import s from './kid.module.css';
 
-export const CAT_ORDER: readonly Cat[] = ['essential', 'daily', 'bonus'];
+export const CAT_ORDER: readonly Cat[] = ['essential', 'daily', 'bonus', 'optional'];
 
 /** The row at the top of every personal screen: me (opens settings), Manage, balance. */
 export function TopBar({ user, balance, onMe, onManage }: {
@@ -82,6 +82,19 @@ export function ChoreGroups({ chores, viewOf, togglingIds, tts, onToggle, onPhot
         );
       })}
     </>
+  );
+}
+
+/** "Add a task" + "My tasks", under the chore lists. */
+export function OwnTaskEntry({ onAdd, onList }: { onAdd: () => void; onList: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className={s.ownEntry}>
+      <button type="button" className={s.secondaryAction} onClick={onAdd}>
+        <Icon name="plus" /> {t('kid.own.add')}
+      </button>
+      <button type="button" className={s.linkBtn} onClick={onList}>{t('kid.own.myTasks')}</button>
+    </div>
   );
 }
 
