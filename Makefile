@@ -1,4 +1,4 @@
-.PHONY: all api ui dev dev-ai ai-up ai-down install build test test-e2e test-e2e-install test-all clean help
+.PHONY: all api ui dev dev-ai ai-up ai-down install build test test-e2e test-e2e-install test-all clean help site
 
 # Default target
 all: help
@@ -78,3 +78,9 @@ help:
 	@echo "  test-e2e          - Run e2e tests (starts servers automatically)"
 	@echo "  test-all          - Run Go tests + e2e tests"
 	@echo "  clean             - Clean up build artifacts and database"
+	@echo "  site              - Preview the promo website on :8000"
+
+# Preview the promo website (site/) on http://localhost:8000
+site:
+	rm -rf site/screenshots && cp -r docs/screenshots site/screenshots
+	cd site && python3 -m http.server 8000

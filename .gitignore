@@ -41,3 +41,6 @@ internal/*/data/
 
 # Editor/Agent
 .claude/
+
+# Website preview (copied from docs/screenshots by make site)
+site/screenshots/
