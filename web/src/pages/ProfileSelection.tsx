@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { api, APIError } from '../api';
@@ -12,7 +12,7 @@ import {
 import { BrandMark } from '../components/BrandMark/BrandMark';
 import PinPad from '../components/PinPad/PinPad';
 import {
-  dayFraction, orderFamily, stripMembers, useFamilyToday, type PersonToday,
+  dayFraction, findUserBySlug, orderFamily, stripMembers, useFamilyToday, type PersonToday,
 } from './ProfileSelection.data';
 import styles from './ProfileSelection.module.css';
 
@@ -182,8 +182,11 @@ export const ProfileSelection: React.FC = () => {
   const [legacyPasscode, setLegacyPasscode] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const { signIn, session, signInOptions } = useAuth();
+  const { user: me, signIn, session, signInOptions } = useAuth();
   const navigate = useNavigate();
+  // /u/:slug: a link to one person's list (e.g. from a home dashboard).
+  const { slug } = useParams<{ slug: string }>();
+  const slugHandled = useRef(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const clock = useMinuteClock();
   const today = useFamilyToday(users);
@@ -296,6 +299,19 @@ export const ProfileSelection: React.FC = () => {
       ...(step.legacyPasscode ? { legacy_passcode: legacyPasscode } : {}),
     });
   };
+
+  // Open a /u/:slug link once: signed in as that person already, go to their
+  // list; signed out, start their usual sign-in (straight in, PIN or linked
+  // account). Signed in as someone else, or an unknown slug, shows the picker
+  // so nobody is switched by accident.
+  useEffect(() => {
+    if (!slug || slugHandled.current || users.length === 0) return;
+    slugHandled.current = true;
+    const target = findUserBySlug(users, slug);
+    if (!target) return;
+    if (me?.id === target.id) navigate('/', { replace: true });
+    else if (!me) handleSelect(target);
+  }, [slug, users, me, navigate]);
 
   const { kids, parents } = useMemo(() => orderFamily(users), [users]);
 
