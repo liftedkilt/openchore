@@ -240,7 +240,7 @@ func TestMCPChoreLifecycle(t *testing.T) {
 	out := env.mustTool(t, "create_chore", map[string]any{
 		"title": "Unload dishwasher", "category": "core", "icon": "🍽️", "points_value": 5,
 		"requires_approval": true,
-		"user_ids":          []any{zoeID, natID}, "days": []any{"weekdays"}, "due_by": "09:00",
+		"user_ids":          []any{zoeID, natID}, "days": []any{"weekdays"}, "due_by": "23:59",
 	})
 	chore := out["chore"].(map[string]any)
 	choreID := chore["id"].(float64)
@@ -260,7 +260,7 @@ func TestMCPChoreLifecycle(t *testing.T) {
 	}
 	for _, g := range assigned {
 		g := g.(map[string]any)
-		if g["when"] != "weekdays" || g["due_by"] != "09:00" || g["if_late"] != "can't be done late" {
+		if g["when"] != "weekdays" || g["due_by"] != "23:59" || g["if_late"] != "can't be done late" {
 			t.Errorf("group = %v", g)
 		}
 		if len(g["schedule_ids"].([]any)) != 5 {
@@ -334,14 +334,18 @@ func TestMCPChoreLifecycle(t *testing.T) {
 		t.Errorf("bad day: %v", msg)
 	}
 
-	// A kid completes through the tool and it waits for approval.
+	// A parent ticks it off for Zoe through the tool: a parent's completion is
+	// approved on the spot, so nothing waits in the approval queue.
 	day := time.Now().Weekday()
 	if day != time.Saturday && day != time.Sunday {
 		todays, _ = env.callTool(t, adminHeaders(), "get_person_chores", map[string]any{"id": zoeID})
 		sid := todays.([]any)[0].(map[string]any)["schedule_id"]
-		env.mustTool(t, "complete_chore", map[string]any{"schedule_id": sid})
+		done := env.mustTool(t, "complete_chore", map[string]any{"schedule_id": sid})
+		if done["status"] != "approved" {
+			t.Errorf("parent completion status = %v, want approved", done["status"])
+		}
 		pending, _ := env.callTool(t, adminHeaders(), "list_pending_approvals", nil)
-		if len(pending.([]any)) != 1 {
+		if len(pending.([]any)) != 0 {
 			t.Errorf("pending = %v", pending)
 		}
 	}
