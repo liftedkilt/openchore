@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenChore: the chore chart your kids actually check</title>
+  <meta name="description" content="A free, self-hosted family chore tracker for the kitchen wall. Points, streaks, a rewards store and a look for every kid. No account, no subscription.">
+  <meta name="theme-color" content="#f5f3ef">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="OpenChore: the chore chart your kids actually check">
+  <meta property="og:description" content="A free, self-hosted family chore tracker with points, streaks, rewards and a look for every kid.">
+  <meta property="og:image" content="https://liftedkilt.github.io/openchore/screenshots/ambient-dashboard.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/onest-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/fraunces-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav">
+    <div class="wrap nav__inner">
+      <a class="brand" href="#top" aria-label="OpenChore home">
+        <span class="dots" aria-hidden="true"><i class="coral"></i><i class="mint"></i><i class="butter"></i><i class="sky"></i></span>
+        openchore
+      </a>
+      <nav aria-label="Main">
+        <ul class="nav__links">
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#skins">Skins</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a class="btn btn--small" href="#start">Get started</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap hero__inner">
+        <p class="eyebrow">Free and open source · Runs on your own hardware</p>
+        <h1>The chore chart your kids <em>actually</em> check.</h1>
+        <p class="lede">OpenChore lives on a tablet on the kitchen wall. Kids earn points, keep streaks and spend in a rewards store. You set the rules once and stop nagging.</p>
+        <div class="cta">
+          <a class="btn" href="#start">Set it up in 5 minutes</a>
+          <a class="btn btn--ghost" href="https://github.com/liftedkilt/openchore">View on GitHub</a>
+        </div>
+      </div>
+      <div class="wrap">
+        <figure class="tablet">
+          <img src="screenshots/ambient-dashboard.png" width="2560" height="1600"
+               alt="OpenChore wall display: three kids' days side by side, each in their own skin, with the family's progress below">
+        </figure>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap promises">
+        <div><strong>No account</strong><span>Nothing to sign up for</span></div>
+        <div><strong>No subscription</strong><span>MIT licensed, free forever</span></div>
+        <div><strong>No tracking</strong><span>Your family's data stays home</span></div>
+        <div><strong>One command</strong><span>Starts with Docker Compose</span></div>
+      </div>
+    </section>
+
+    <section class="section" id="how">
+      <div class="wrap">
+        <p class="eyebrow">How it works</p>
+        <h2>Must-do first. Bonus last.</h2>
+        <p class="sub">Every chore sits in one of three tiers, and each tier waits for the one before it. So nobody skips the dishes to grab the fun 15-point chore.</p>
+
+        <ol class="tiers">
+          <li class="tier tier--req">
+            <span class="tier__shape" aria-hidden="true"></span>
+            <h3>Required</h3>
+            <p>The non-negotiables. Brush teeth, feed the dog.</p>
+          </li>
+          <li class="tier tier--core">
+            <span class="tier__shape" aria-hidden="true"></span>
+            <h3>Core</h3>
+            <p>The daily routine. Points are held until every required chore is done.</p>
+          </li>
+          <li class="tier tier--bonus">
+            <span class="tier__shape" aria-hidden="true"></span>
+            <h3>Bonus</h3>
+            <p>Optional extras. They pay out once required and core are finished.</p>
+          </li>
+        </ol>
+
+        <div class="levers">
+          <div><h3>Time windows</h3><p>Chores appear when it's time, grouped into morning, afternoon and evening.</p></div>
+          <div><h3>Deadlines</h3><p>After the deadline, a chore is blocked, worth nothing, or costs points. Your call.</p></div>
+          <div><h3>Streaks</h3><p>Days in a row with everything done, with bonus points at milestones you choose.</p></div>
+          <div><h3>Savings goals</h3><p>Kids save up for something big, alone or pooled with their siblings.</p></div>
+          <div><h3>Photo proof</h3><p>Ask for a photo on any chore, and approve it from your phone.</p></div>
+          <div><h3>Vacation mode</h3><p>Pause a kid's chores when they're sick or away. The schedule stays put.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--sunk" id="skins">
+      <div class="wrap">
+        <p class="eyebrow">Made for each kid</p>
+        <h2>One app. Three skins. Eight colours.</h2>
+        <p class="sub">Every kid picks the look that's theirs. A five-year-old and a teenager see the same chores, the same one-tap check, and a screen that feels made for them.</p>
+
+        <div class="phones">
+          <figure>
+            <img src="screenshots/kid-dashboard.png" width="860" height="1864" loading="lazy"
+                 alt="Emma's Today screen in the Sunroom skin: a sun arc showing 4 of 10 done">
+            <figcaption><b>Sunroom</b>Warm and soft</figcaption>
+          </figure>
+          <figure>
+            <img src="screenshots/kid-today-tint.png" width="860" height="1864" loading="lazy"
+                 alt="Lily's Today screen in the dark Tint skin, lit in her mint colour, with a progress ring">
+            <figcaption><b>Tint</b>Calm and dark, lit in your colour</figcaption>
+          </figure>
+          <figure>
+            <img src="screenshots/kid-today-blocks.png" width="860" height="1864" loading="lazy"
+                 alt="Noah's Today screen in the bold Blocks skin, with a row of category shapes as progress">
+            <figcaption><b>Blocks</b>Bold and graphic</figcaption>
+          </figure>
+        </div>
+
+        <div class="swatches" aria-label="The eight person colours">
+          <i class="coral" title="Coral"></i><i class="mint" title="Mint"></i><i class="butter" title="Butter"></i><i class="sky" title="Sky"></i><i class="rose" title="Rose"></i><i class="leaf" title="Leaf"></i><i class="lilac" title="Lilac"></i><i class="sand" title="Sand"></i>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap split">
+        <div>
+          <p class="eyebrow">Points that mean something</p>
+          <h2>A rewards store kids save up for.</h2>
+          <p>You decide what's on the shelf and what it costs: screen time, picking dinner, a trip for ice cream. Set different prices for different kids, limit stock, or hide rewards that don't fit.</p>
+          <p>Every point earned or spent is recorded, so there's never an argument about the balance.</p>
+        </div>
+        <div class="split__shots">
+          <img src="screenshots/rewards-store.png" width="860" height="1864" loading="lazy"
+               alt="Noah's rewards store in Blocks, with a balance of 40 and how many more points each reward needs">
+          <img src="screenshots/kid-week.png" width="860" height="1864" loading="lazy"
+               alt="Lily's week: a ring for each day, a 6-day streak and the next milestone">
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--sunk">
+      <div class="wrap">
+        <p class="eyebrow">For parents</p>
+        <h2>Everyone's day at a glance.</h2>
+        <p class="sub">Shared screens use a neutral look so no one's skin takes over. Sign in with your own PIN or single sign-on, approve photos, and see how the week went.</p>
+        <div class="wide">
+          <figure>
+            <img src="screenshots/family-picker.png" width="2360" height="1640" loading="lazy"
+                 alt="The family picker: a door for each kid in their own skin, a grown-ups door, and a family progress strip">
+            <figcaption><b>Who's here?</b>Tap your door to start</figcaption>
+          </figure>
+          <figure>
+            <img src="screenshots/approvals.png" width="2360" height="1640" loading="lazy"
+                 alt="The approvals queue: one chore finished without a photo, and one with a photo and an AI note">
+            <figcaption><b>Approvals</b>Photo proof, with an optional AI note</figcaption>
+          </figure>
+          <figure>
+            <img src="screenshots/admin-kids.png" width="2238" height="1830" loading="lazy"
+                 alt="Manage, Today: each kid's chores grouped by category, with streaks and points">
+            <figcaption><b>Manage</b>Tick a chore off for anyone</figcaption>
+          </figure>
+          <figure>
+            <img src="screenshots/reports.png" width="2360" height="1640" loading="lazy"
+                 alt="Reports: a weekly scorecard per kid and a chart of chores done over time">
+            <figcaption><b>Reports</b>Scorecards, trends and what gets missed</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="wrap">
+        <p class="eyebrow">Everything included</p>
+        <h2>Built for real households.</h2>
+        <div class="features">
+          <div>
+            <h3>Scheduling</h3>
+            <ul>
+              <li>Weekly, every N days, or one-off</li>
+              <li>Assign to one kid or several</li>
+              <li>Family and first-come chores</li>
+              <li>Quick-assign for one-off jobs</li>
+            </ul>
+          </div>
+          <div>
+            <h3>For kids</h3>
+            <ul>
+              <li>Chores read aloud for early readers</li>
+              <li>Swipe or tap to complete</li>
+              <li>Shapes as well as colours</li>
+              <li>Installs like an app on any tablet</li>
+            </ul>
+          </div>
+          <div>
+            <h3>For parents</h3>
+            <ul>
+              <li>Parents can join in with their own chores</li>
+              <li>PINs or single sign-on (OIDC)</li>
+              <li>Discord notifications</li>
+              <li>English and German</li>
+            </ul>
+          </div>
+          <div>
+            <h3>For tinkerers</h3>
+            <ul>
+              <li>Signed outbound webhooks</li>
+              <li>Trigger URLs per chore, great with Home Assistant</li>
+              <li>API tokens and a REST API</li>
+              <li>An MCP server for AI assistants</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--dark">
+      <div class="wrap split split--text">
+        <div>
+          <p class="eyebrow">Optional AI</p>
+          <h2>Smart extras, on your terms.</h2>
+          <p>Everything works without AI. If you want it, connect any OpenAI-compatible model, on your own machine or hosted, and turn it off any time.</p>
+        </div>
+        <ul class="ai">
+          <li><b>Photo notes.</b> A vision model takes a first look at photo proof and leaves you a note. It never rejects a chore. You have the final say.</li>
+          <li><b>Weekly summaries</b> of how each kid's week went.</li>
+          <li><b>Chore descriptions</b> drafted for you.</li>
+          <li><b>Natural read-aloud voices</b> for kids who are still learning to read.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" id="start">
+      <div class="wrap start">
+        <p class="eyebrow">Get started</p>
+        <h2>Up and running in three commands.</h2>
+        <p class="sub">All you need is <a href="https://docs.docker.com/get-docker/">Docker</a> on a computer at home. Then open <b>http://localhost:8080</b> and a setup wizard walks you through adding your family.</p>
+
+        <div class="code">
+          <button class="copy" type="button" data-copy="git clone https://github.com/liftedkilt/openchore.git
+cd openchore
+docker compose up -d">Copy</button>
+<pre><code><span class="c"># grab it</span>
+git clone https://github.com/liftedkilt/openchore.git
+cd openchore
+
+<span class="c"># start it</span>
+docker compose up -d</code></pre>
+        </div>
+
+        <ol class="steps">
+          <li><b>Add your family.</b> Parents, kids, skins and colours.</li>
+          <li><b>Pick some chores.</b> Start from the presets or write your own.</li>
+          <li><b>Put it on the wall.</b> Open it on a tablet and choose <i>Add to Home Screen</i>.</li>
+        </ol>
+
+        <div class="cta cta--center">
+          <a class="btn" href="https://github.com/liftedkilt/openchore#quick-start">Read the full guide</a>
+          <a class="btn btn--ghost" href="https://github.com/liftedkilt/openchore/releases">See releases</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer__inner">
+      <a class="brand" href="#top">
+        <span class="dots" aria-hidden="true"><i class="coral"></i><i class="mint"></i><i class="butter"></i><i class="sky"></i></span>
+        openchore
+      </a>
+      <ul>
+        <li><a href="https://github.com/liftedkilt/openchore">GitHub</a></li>
+        <li><a href="https://github.com/liftedkilt/openchore/tree/main/docs">Docs</a></li>
+        <li><a href="https://github.com/liftedkilt/openchore/blob/main/ROADMAP.md">Roadmap</a></li>
+        <li><a href="https://github.com/liftedkilt/openchore/blob/main/LICENSE">MIT License</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelectorAll('.copy').forEach(function (b) {
+      b.addEventListener('click', function () {
+        navigator.clipboard.writeText(b.dataset.copy).then(function () {
+          b.textContent = 'Copied';
+          setTimeout(function () { b.textContent = 'Copy'; }, 1600);
+        });
+      });
+    });
+  </script>
+</body>
+</html>
