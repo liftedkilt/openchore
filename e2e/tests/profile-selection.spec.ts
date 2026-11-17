@@ -58,11 +58,45 @@ test.describe('Profile Selection', () => {
       await expect(profileButton(page, 'Emma')).toBeVisible();
     });
 
-    test('signed in as someone else shows the picker instead of switching', async ({ page }) => {
+    test('signed in as someone else on a shared device switches to them', async ({ page }) => {
       await page.goto('/u/emma');
       await expect(page).toHaveURL('/');
       await page.goto('/u/lily');
+      await expect(page).toHaveURL('/');
+      const me = await page.request.get('/api/auth/me');
+      expect((await me.json()).user.name).toBe('Lily');
+    });
+
+    test('switching to a PIN-protected profile still asks for the PIN', async ({ page }) => {
+      await page.goto('/u/emma');
+      await expect(page).toHaveURL('/');
+      await page.goto('/u/alex');
+      await expect(page).toHaveURL('/u/alex');
+      await enterPin(page, '1234');
+      await expect(page).toHaveURL('/');
+      const me = await page.request.get('/api/auth/me');
+      expect((await me.json()).user.name).toBe('Alex');
+    });
+
+    test('on a personal device it shows the picker instead of switching', async ({ page }) => {
+      await page.goto('/u/emma');
+      await expect(page).toHaveURL('/');
+      // Only linked-account (OIDC) sessions are persistent; the suite has no
+      // IdP, so mark Emma's session as one in what the app is told.
+      await page.route('**/api/auth/me', async route => {
+        const res = await route.fetch();
+        const body = await res.json();
+        body.session = { ...body.session, persistent: true };
+        await route.fulfill({ response: res, json: body });
+      });
+      await page.goto('/u/lily');
+      // The picker paints before the link is handled; let any sign-in settle.
+      await page.waitForLoadState('networkidle');
+      await expect(page).toHaveURL('/u/lily');
       await expect(profileButton(page, 'Lily')).toBeVisible();
+      await page.unroute('**/api/auth/me');
+      const me = await page.request.get('/api/auth/me');
+      expect((await me.json()).user.name).toBe('Emma');
     });
   });
 });

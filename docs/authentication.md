@@ -47,8 +47,10 @@ dashboard or a bookmark: `/u/emma`, or `/u/mary-jo` for "Mary Jo" (lowercase,
 accents dropped, other characters become `-`). It starts that person's normal
 sign-in, so someone with no PIN goes straight to their list, and a PIN or linked
 account is still asked for. Already signed in as them, it just opens their
-list. Signed in as someone else, or with a name that matches nobody (or two
-people), it shows the family picker rather than switching anyone.
+list. Signed in as someone else on a shared device, it switches to them the
+same way (the PIN is still asked for). On a personal device (signed in with a
+linked account), or with a name that matches nobody (or two people), it shows
+the family picker rather than switching anyone.
 
 **Allow PINs for people with a linked account** (on by default) can be turned
 off, so anyone who has linked an account must use it, even on the tablet.
