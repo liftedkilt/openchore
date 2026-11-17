@@ -1,0 +1,157 @@
+/* The family farm scene. Its own palette (sky, grass, barn) on purpose: it
+   should look like the same farm in every skin. */
+.farm {
+  position: relative;
+  height: 300px;
+  overflow: hidden;
+  border-radius: var(--radius-lg, 20px);
+  background: linear-gradient(#bfe3f7 0%, #e8f5fb 42%, #b6dc8e 42%);
+  isolation: isolate;
+}
+.compact { height: 180px; }
+
+.backdrop { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.barn {
+  position: absolute;
+  right: 3%;
+  top: 14%;
+  width: 22%;
+  max-width: 140px;
+  z-index: 1;
+}
+
+.fence {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 47%;
+  height: 22px;
+  z-index: 2;
+  background:
+    linear-gradient(#e9d7b4, #e9d7b4) 0 6px / 100% 3px no-repeat,
+    linear-gradient(#e9d7b4, #e9d7b4) 0 14px / 100% 3px no-repeat,
+    repeating-linear-gradient(90deg, #d8c39b 0 5px, transparent 5px 34px);
+  opacity: 0.9;
+}
+
+/* Hiding animals: shelters along the fence, front and centre. */
+.shelters {
+  position: absolute;
+  left: 3%;
+  top: 22%;
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  z-index: 3;
+}
+.shelterItem { display: block; }
+.shelterBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.shelterBtn:disabled { cursor: default; }
+.shelter { width: 64px; height: 56px; }
+.compact .shelter { width: 50px; height: 44px; }
+
+.animal {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transform: translate(-50%, -100%) scale(var(--depth, 1));
+  transform-origin: 50% 100%;
+  transition-property: left, top;
+  transition-timing-function: linear;
+}
+.animal:disabled { cursor: default; }
+.animal:focus-visible { outline: 3px solid var(--accent, #3b82f6); outline-offset: 2px; border-radius: 12px; }
+
+.body { display: block; transition: transform 200ms; }
+.svg { display: block; width: 96px; height: 77px; }
+.compact .svg { width: 64px; height: 51px; }
+
+.walking .svg { animation: farm-bob 360ms ease-in-out infinite alternate; }
+.sick .svg { filter: saturate(0.55) brightness(0.96); }
+.lying .svg { filter: saturate(0.4) brightness(0.92); }
+
+.badge {
+  position: absolute;
+  top: -6px;
+  right: 4px;
+  font-size: 18px;
+  line-height: 1;
+  animation: farm-float 2.4s ease-in-out infinite;
+}
+.compact .badge { font-size: 14px; }
+
+.tag {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: -4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--tag, #fff);
+  color: var(--on-person, #1a1a1c);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
+}
+.tagOwner { font-size: 10px; font-weight: 500; opacity: 0.8; }
+.compact .tag { font-size: 10px; padding: 0 6px; }
+
+.mine .tag { outline: 2px solid #1d1b1a; outline-offset: 1px; }
+
+.empty {
+  position: absolute;
+  inset: auto 0 12% 0;
+  margin: 0;
+  text-align: center;
+  font-weight: 600;
+  color: #2f4a22;
+}
+
+:global(.farm-peek) { animation: farm-blink 4s infinite; transform-origin: 40px 56px; }
+
+@keyframes farm-bob { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+@keyframes farm-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes farm-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .animal, .walking .svg, .badge, :global(.farm-peek) { animation: none; transition: none; }
+}
+
+/* --- animal art (illustrator) --- */
+/* Legs swing from the hip in diagonal pairs while the animal walks; the dog
+   and cat tails wag gently all the time. */
+:global(.farm-leg-a), :global(.farm-leg-b) { transform-box: fill-box; transform-origin: 50% 0; }
+.walking :global(.farm-leg-a) { animation: farm-step 380ms ease-in-out infinite alternate; }
+.walking :global(.farm-leg-b) { animation: farm-step 380ms ease-in-out infinite alternate-reverse; }
+:global(.farm-tail) { transform-box: fill-box; transform-origin: 100% 100%; animation: farm-wag 900ms ease-in-out infinite alternate; }
+.lying :global(.farm-tail) { animation: none; }
+
+@keyframes farm-step { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
+@keyframes farm-wag { from { transform: rotate(-8deg); } to { transform: rotate(8deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  :global(.farm-leg-a), :global(.farm-leg-b), :global(.farm-tail) { animation: none; }
+}
