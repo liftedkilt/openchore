@@ -291,19 +291,41 @@ export interface Reward {
 
 // --- Farm pets ---
 
-export type PetAction = 'feed' | 'treat' | 'play' | 'accessory';
+export type PetAction = 'feed' | 'treat' | 'play' | 'accessory' | 'new_animal' | 'restyle' | 'design';
+/** What a person picks when redeeming new_animal / restyle / design rewards. */
+export interface PetPick { species?: PetSpecies; color?: string; slot?: PetItemSlot; image?: string }
 export type PetSpecies = 'horse' | 'dog' | 'cat' | 'chicken' | 'cow' | 'pig' | 'sheep' | 'goat';
-export type PetItem = 'straw_hat' | 'cowboy_hat' | 'bandana' | 'flower_crown' | 'bow' | 'bell' | 'sunglasses' | 'scarf';
+/** A built-in accessory key, or a custom emoji accessory `e:<head|face|neck>:<emoji>`. */
+export type PetItem = string;
+export type PetItemSlot = 'head' | 'face' | 'neck';
 export type PetMood = 'hiding' | 'very_sick' | 'sick' | 'hungry' | 'bored' | 'happy' | 'content';
 
 export const PET_SPECIES: PetSpecies[] = ['horse', 'dog', 'cat', 'chicken', 'cow', 'pig', 'sheep', 'goat'];
-export const PET_ITEMS: PetItem[] = ['straw_hat', 'cowboy_hat', 'bandana', 'flower_crown', 'bow', 'bell', 'sunglasses', 'scarf'];
+export const PET_ITEMS: PetItem[] = [
+  'straw_hat', 'cowboy_hat', 'flower_crown', 'crown', 'party_hat', 'top_hat', 'beanie', 'wizard_hat', 'pirate_hat', 'flower', 'bow',
+  'sunglasses', 'round_glasses', 'heart_glasses',
+  'bandana', 'scarf', 'bell', 'bowtie', 'medal',
+];
+export const PET_ITEM_SLOTS: PetItemSlot[] = ['head', 'face', 'neck'];
+/** Each species' coat colours; the first is the default. */
+export const PET_COLORS: Record<PetSpecies, string[]> = {
+  horse: ['chestnut', 'black', 'grey', 'palomino'],
+  dog: ['golden', 'chocolate', 'black', 'white'],
+  cat: ['ginger', 'grey', 'black', 'white'],
+  chicken: ['white', 'brown', 'black', 'golden'],
+  cow: ['holstein', 'jersey', 'black', 'red'],
+  pig: ['pink', 'black', 'ginger', 'spotted'],
+  sheep: ['white', 'cream', 'brown', 'black'],
+  goat: ['white', 'tan', 'brown', 'black'],
+};
 
 export interface Pet {
   id: number;
   user_id: number;
   name: string;
   species: PetSpecies;
+  /** Coat colour from PET_COLORS; empty = the species' default. */
+  color?: string;
   health: number;
   fullness: number;
   joy: number;

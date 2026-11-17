@@ -109,3 +109,84 @@
   font-weight: 700;
   cursor: pointer;
 }
+
+/* New animal / restyle picker, coat swatches, reward previews. */
+.pickPreview { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); }
+.pickArt { width: 180px; height: 144px; }
+.colors { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-2); margin: var(--space-3) 0; }
+.colorBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-1);
+  border: 2px solid transparent;
+  border-radius: var(--oc-radius-md);
+  background: var(--surface-sunk);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.colorArt { width: 64px; height: 51px; }
+.rewardPreview { width: 64px; height: 51px; flex: none; }
+.careArt { grid-row: 1 / 3; width: 52px; height: 42px; }
+.wardrobeChip { display: inline-flex; align-items: center; gap: 4px; }
+.wardrobeArt { width: 36px; height: 29px; }
+.shopItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 2px solid transparent;
+  border-radius: var(--oc-radius-md);
+  background: var(--surface-sunk);
+}
+.tryOnBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.buyBtn {
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--oc-radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.buyBtn:disabled { opacity: 0.45; cursor: default; }
+
+/* Design an accessory. */
+.designRow { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; justify-content: center; margin-top: var(--space-2); }
+.designCanvas {
+  width: min(256px, 70vw);
+  aspect-ratio: 1;
+  border-radius: var(--oc-radius-md);
+  touch-action: none;
+  cursor: crosshair;
+  background:
+    repeating-conic-gradient(#ece6da 0% 25%, #faf7f0 0% 50%) 0 0 / 20px 20px;
+  box-shadow: inset 0 0 0 2px var(--line, #ddd);
+}
+.designSide { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+.designTools { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.swatch { width: 32px; height: 32px; border-radius: 50%; border: 2px solid rgb(0 0 0 / 0.15); cursor: pointer; padding: 0; }
+.swatchOn { outline: 3px solid var(--accent); outline-offset: 2px; }
+.brushDot { display: inline-block; border-radius: 50%; background: currentColor; }
+.uploadBtn { cursor: pointer; }

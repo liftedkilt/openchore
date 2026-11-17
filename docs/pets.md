@@ -7,7 +7,8 @@ animal is sick or hiding is no secret.
 
 Turn it on in **Manage → Settings → Farm pets** (or `PUT /api/admin/pets`,
 or the `set_farm_pets` MCP tool). The first time, a starter set of pet-care
-rewards is added to the store: Feed, Treat, Play, and three accessories.
+rewards is added to the store: Feed, Treat, Play, five accessories, Restyle coat
+and New animal.
 
 ## The one rule
 
@@ -55,6 +56,14 @@ store (ledger row, stock, per-person visibility and pricing all apply):
 | `treat` | Food +15, Joy +20 |
 | `play` | Joy +35, Food −10 (refused while hiding or very sick) |
 | `accessory` | Gives `pet_item` and puts it on (refused if already owned) |
+| `restyle` | New coat colour, picked at redemption (`{"pet": {"color": …}}`) |
+| `new_animal` | A different animal (and coat), picked at redemption (`{"pet": {"species": …, "color": …}}`). Name, health, food, joy and accessories carry over, so it's never a way out of a sick pet |
+
+Accessories (`pet_item`) are one of 19 built-ins (hats, glasses, neckwear) or a
+parent's own emoji accessory written `e:<head|face|neck>:<emoji>`, e.g. `e:head:🎓`.
+Each species has four coat colours (picked free when adopting); see
+`model.PetColors`. The store and farm sheet preview every pet reward on the
+person's own animal, and accessories can be tried on before buying.
 
 Refusals happen before any points move. Pet-care rewards can't be shared or
 saved for, and are hidden while farm pets are off. Owned accessories can be
@@ -66,6 +75,9 @@ redemption refunds the points but leaves the effect.
 - `GET /api/pets` – the farm: `enabled` and every animal with mood and owner.
 - `GET /api/me/pet`, `POST /api/me/pet` (adopt: `name`, `species`),
   `PATCH /api/me/pet` (`name`, `accessory`).
-- `PUT /api/admin/pets` (`enabled`), `DELETE /api/admin/users/{id}/pet`.
+- `PUT /api/admin/pets` (`enabled`), `DELETE /api/admin/users/{id}/pet`
+  (also in Settings → Farm pets).
+- `POST /api/rewards/{id}/redeem` takes an optional `{"pet": {"species", "color"}}`
+  for `new_animal` / `restyle` rewards.
 
 Tunables live in `internal/pet/pet.go`; keep this page in step.

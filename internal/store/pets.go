@@ -11,12 +11,12 @@ import (
 // ErrPetExists is returned when a person who already has a pet adopts another.
 var ErrPetExists = fmt.Errorf("you already have a pet")
 
-const petColumns = `id, user_id, name, species, health, fullness, joy, accessory, last_missed_date, last_day_checked, created_at`
+const petColumns = `id, user_id, name, species, color, health, fullness, joy, accessory, last_missed_date, last_day_checked, created_at`
 
 func scanPet(row interface{ Scan(...any) error }) (*model.Pet, error) {
 	p := &model.Pet{}
 	var missed sql.NullString
-	if err := row.Scan(&p.ID, &p.UserID, &p.Name, &p.Species, &p.Health, &p.Fullness, &p.Joy, &p.Accessory,
+	if err := row.Scan(&p.ID, &p.UserID, &p.Name, &p.Species, &p.Color, &p.Health, &p.Fullness, &p.Joy, &p.Accessory,
 		&missed, &p.LastDayChecked, &p.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -136,9 +136,9 @@ func (s *Store) ListPets(ctx context.Context) ([]model.Pet, error) {
 // first day judged is the next one.
 func (s *Store) CreatePet(ctx context.Context, p *model.Pet) error {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO pets (user_id, name, species, health, fullness, joy, last_day_checked)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		p.UserID, p.Name, p.Species, p.Health, p.Fullness, p.Joy, p.LastDayChecked)
+		`INSERT INTO pets (user_id, name, species, color, health, fullness, joy, last_day_checked)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.UserID, p.Name, p.Species, p.Color, p.Health, p.Fullness, p.Joy, p.LastDayChecked)
 	if err != nil {
 		if isUniqueConstraintErr(err) {
 			return ErrPetExists
@@ -149,10 +149,16 @@ func (s *Store) CreatePet(ctx context.Context, p *model.Pet) error {
 	return nil
 }
 
-// UpdatePetProfile renames the pet or changes its species.
-func (s *Store) UpdatePetProfile(ctx context.Context, userID int64, name, species string) error {
-	_, err := s.db.ExecContext(ctx,
-		`UPDATE pets SET name = ?, species = ? WHERE user_id = ?`, name, species, userID)
+// RenamePet renames a person's pet.
+func (s *Store) RenamePet(ctx context.Context, userID int64, name string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE pets SET name = ? WHERE user_id = ?`, name, userID)
+	return err
+}
+
+// SetPetLook changes the animal and/or coat; health, food, joy, accessories
+// and history stay as they are.
+func (s *Store) SetPetLook(ctx context.Context, userID int64, species, color string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE pets SET species = ?, color = ? WHERE user_id = ?`, species, color, userID)
 	return err
 }
 

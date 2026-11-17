@@ -4,7 +4,9 @@ import clsx from 'clsx';
 import { Trash2, Pencil, X } from 'lucide-react';
 import { api } from '../../api';
 import type { User, Reward, StreakRewardItem, PetAction, PetItem } from '../../types';
-import { PET_ITEMS } from '../../types';
+import { PET_ITEMS, PET_ITEM_SLOTS, type PetItemSlot } from '../../types';
+import { FarmAnimal } from '../../pages/kid/farm/FarmAnimal';
+import { emojiItem } from '../../pages/kid/farm/petLook';
 import { Avatar, Icon } from '../../design';
 import { IconPicker, IconWell, personColor } from './pickers';
 import ui from './ui.module.css';
@@ -110,7 +112,11 @@ const RewardForm: React.FC<{
   const [stock, setStock] = useState(reward?.stock?.toString() || '');
   const [shareable, setShareable] = useState(reward?.shareable ?? false);
   const [petAction, setPetAction] = useState<PetAction | ''>(reward?.pet_action ?? '');
-  const [petItem, setPetItem] = useState<PetItem>(reward?.pet_item ?? 'straw_hat');
+  const initialEmoji = emojiItem(reward?.pet_item);
+  const [petItem, setPetItem] = useState<PetItem>(initialEmoji ? 'custom' : (reward?.pet_item ?? 'straw_hat'));
+  const [emoji, setEmoji] = useState(initialEmoji?.emoji ?? '');
+  const [emojiSlot, setEmojiSlot] = useState<PetItemSlot>((initialEmoji?.slot as PetItemSlot) ?? 'head');
+  const itemValue = petItem === 'custom' ? `e:${emojiSlot}:${emoji.trim()}` : petItem;
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -126,7 +132,7 @@ const RewardForm: React.FC<{
         active: true,
         shareable: petAction ? false : shareable,
         pet_action: petAction,
-        pet_item: petAction === 'accessory' ? petItem : undefined,
+        pet_item: petAction === 'accessory' ? itemValue : undefined,
       };
       if (reward) {
         await api.rewards.update(reward.id, data);
@@ -182,7 +188,7 @@ const RewardForm: React.FC<{
           <span className={ui.label} title={t('admin.rewardsTab.fieldPetActionTitle')}>{t('admin.rewardsTab.fieldPetAction')}</span>
           <select className={ui.input} value={petAction} onChange={e => setPetAction(e.target.value as PetAction | '')}>
             <option value="">{t('admin.rewardsTab.petAction.none')}</option>
-            {(['feed', 'treat', 'play', 'accessory'] as const).map(a => (
+            {(['feed', 'treat', 'play', 'accessory', 'design', 'restyle', 'new_animal'] as const).map(a => (
               <option key={a} value={a}>{t(`admin.rewardsTab.petAction.${a}`)}</option>
             ))}
           </select>
@@ -190,16 +196,40 @@ const RewardForm: React.FC<{
         {petAction === 'accessory' && (
           <label className={ui.field}>
             <span className={ui.label}>{t('admin.rewardsTab.fieldPetItem')}</span>
-            <select className={ui.input} value={petItem} onChange={e => setPetItem(e.target.value as PetItem)}>
+            <select className={ui.input} value={petItem} onChange={e => setPetItem(e.target.value)}>
               {PET_ITEMS.map(it => <option key={it} value={it}>{t(`kid.farm.item.${it}`)}</option>)}
+              <option value="custom">{t('admin.rewardsTab.customEmoji')}</option>
             </select>
           </label>
         )}
       </div>
 
+      {petAction === 'accessory' && petItem === 'custom' && (
+        <div className={ui.formRow}>
+          <label className={ui.field}>
+            <span className={ui.label}>{t('admin.rewardsTab.fieldEmoji')}</span>
+            <input className={ui.input} value={emoji} maxLength={8} onChange={e => setEmoji(e.target.value)} placeholder="🎓" />
+          </label>
+          <label className={ui.field}>
+            <span className={ui.label}>{t('admin.rewardsTab.fieldSlot')}</span>
+            <select className={ui.input} value={emojiSlot} onChange={e => setEmojiSlot(e.target.value as PetItemSlot)}>
+              {PET_ITEM_SLOTS.map(sl => <option key={sl} value={sl}>{t(`admin.rewardsTab.slot.${sl}`)}</option>)}
+            </select>
+          </label>
+        </div>
+      )}
+
+      {petAction === 'accessory' && (petItem !== 'custom' || emoji.trim()) && (
+        <div className={ui.formRow} aria-label={t('admin.rewardsTab.preview')}>
+          {(['dog', 'horse', 'chicken', 'sheep'] as const).map(sp => (
+            <FarmAnimal key={sp} species={sp} mood="happy" accessory={itemValue} className={styles.petPreview} />
+          ))}
+        </div>
+      )}
+
       <div className={ui.actionsEnd}>
         <button type="button" className={ui.btnGhost} onClick={onCancel}>{t('admin.rewardsTab.cancel')}</button>
-        <button type="submit" className={ui.btnPrimary} disabled={saving || !name || !cost}>
+        <button type="submit" className={ui.btnPrimary} disabled={saving || !name || !cost || (petAction === 'accessory' && petItem === 'custom' && !emoji.trim())}>
           <Icon name="check" /> {reward ? t('admin.rewardsTab.update') : t('admin.rewardsTab.create')}
         </button>
       </div>

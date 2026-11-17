@@ -63,6 +63,8 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 		r.Get("/users/{id}/chores", users.GetChores)
 		r.Get("/users/{id}/points", points.GetUserPoints)
 		r.Get("/users/{id}/streak", streaks.GetUserStreak)
+		// The farm is on the wall display (no sign-in), like chores and points.
+		r.Get("/pets", pets.Farm)
 
 		// Sign-in: tap a profile (PIN when set) or continue with an OIDC provider
 		r.Post("/auth/login", authH.Login)
@@ -111,7 +113,6 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 			r.Delete("/me/chores/{id}", chores.DeleteOwn)
 
 			// Any user can view and redeem rewards
-			r.Get("/pets", pets.Farm)
 			r.Get("/me/pet", pets.Mine)
 			r.Post("/me/pet", pets.Adopt)
 			r.Patch("/me/pet", pets.Update)

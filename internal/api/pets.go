@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -63,6 +64,7 @@ func (h *PetHandler) Farm(w http.ResponseWriter, r *http.Request) {
 		"enabled": enabled,
 		"species": model.PetSpecies,
 		"items":   model.PetItems,
+		"colors":  model.PetColors,
 		"pets":    []model.Pet{},
 	}
 	if !enabled {
@@ -143,6 +145,7 @@ func (h *PetHandler) Adopt(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name    string `json:"name"`
 		Species string `json:"species"`
+		Color   string `json:"color"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -157,7 +160,12 @@ func (h *PetHandler) Adopt(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "unknown animal")
 		return
 	}
+	if req.Color != "" && !model.ValidPetColor(req.Species, req.Color) {
+		writeError(w, http.StatusBadRequest, "unknown coat colour")
+		return
+	}
 	p := &model.Pet{
+		Color:    req.Color,
 		UserID:   u.ID,
 		Name:     name,
 		Species:  req.Species,
@@ -214,7 +222,7 @@ func (h *PetHandler) Update(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "name must be 1-24 characters")
 			return
 		}
-		if err := h.store.UpdatePetProfile(ctx, u.ID, name, p.Species); err != nil {
+		if err := h.store.RenamePet(ctx, u.ID, name); err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to rename pet")
 			return
 		}
@@ -253,6 +261,11 @@ var defaultPetRewards = []model.Reward{
 	{Name: "Straw hat", Description: "A straw hat for your farm animal.", Icon: "👒", Cost: 25, PetAction: model.PetActionAccessory, PetItem: "straw_hat"},
 	{Name: "Bandana", Description: "A bandana for your farm animal.", Icon: "🧣", Cost: 20, PetAction: model.PetActionAccessory, PetItem: "bandana"},
 	{Name: "Flower crown", Description: "A flower crown for your farm animal.", Icon: "🌼", Cost: 30, PetAction: model.PetActionAccessory, PetItem: "flower_crown"},
+	{Name: "Party hat", Description: "A party hat for your farm animal.", Icon: "🥳", Cost: 20, PetAction: model.PetActionAccessory, PetItem: "party_hat"},
+	{Name: "Round glasses", Description: "Smart round glasses for your farm animal.", Icon: "👓", Cost: 20, PetAction: model.PetActionAccessory, PetItem: "round_glasses"},
+	{Name: "Restyle coat", Description: "Give your farm animal a new coat colour.", Icon: "🎨", Cost: 30, PetAction: model.PetActionRestyle},
+	{Name: "Design an accessory", Description: "Draw your own accessory, or use a picture, and your animal will wear it.", Icon: "🖍️", Cost: 40, PetAction: model.PetActionDesign},
+	{Name: "New animal", Description: "Trade for a different farm animal. Health, food and joy come along.", Icon: "🔁", Cost: 150, PetAction: model.PetActionNewAnimal},
 }
 
 // SetEnabled turns farm pets on or off (grown-ups). Turning them on the
@@ -314,9 +327,24 @@ func (h *PetHandler) Remove(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// PetChoice is what a person picks when redeeming a "new_animal" or
+// "restyle" reward.
+type PetChoice struct {
+	Species string `json:"species"`
+	Color   string `json:"color"`
+	// For "design": where it's worn and the picture as a data: URL.
+	Slot  string `json:"slot"`
+	Image string `json:"image"`
+
+	png  []byte // the checked, shrunk picture
+	item string // "img:<slot>:<id>" once saved
+}
+
 // checkPetReward refuses a pet-care redemption that can't take effect,
 // before any points move. It returns "" when the redemption may go ahead.
-func (h *PetHandler) checkPetReward(ctx context.Context, u *model.User, rw *model.Reward) (string, error) {
+// choice (may be nil) carries the pick for new_animal / restyle; it is
+// normalised in place.
+func (h *PetHandler) checkPetReward(ctx context.Context, u *model.User, rw *model.Reward, choice *PetChoice) (string, error) {
 	if !petsEnabled(ctx, h.store) {
 		return "pets are turned off", nil
 	}
@@ -346,14 +374,57 @@ func (h *PetHandler) checkPetReward(ctx context.Context, u *model.User, rw *mode
 		if owned {
 			return p.Name + " already has that", nil
 		}
+	case model.PetActionNewAnimal:
+		if choice == nil || !model.ValidPetSpecies(choice.Species) {
+			return "choose an animal", nil
+		}
+		if choice.Color == "" {
+			choice.Color = model.PetColors[choice.Species][0]
+		}
+		if !model.ValidPetColor(choice.Species, choice.Color) {
+			return "choose a coat colour", nil
+		}
+		if choice.Species == p.Species && choice.Color == petColor(p) {
+			return p.Name + " already looks like that", nil
+		}
+	case model.PetActionDesign:
+		if choice == nil || !slices.Contains(model.PetItemSlots, choice.Slot) {
+			return "choose where it goes: head, face or neck", nil
+		}
+		png, err := decodePetImage(choice.Image)
+		if err != nil {
+			return err.Error(), nil
+		}
+		choice.png = png
+	case model.PetActionRestyle:
+		if choice == nil || !model.ValidPetColor(p.Species, choice.Color) {
+			return "choose a coat colour", nil
+		}
+		if choice.Color == petColor(p) {
+			return p.Name + " already has that coat", nil
+		}
+		choice.Species = p.Species
 	}
 	return "", nil
 }
 
+// petColor is the pet's coat, with "" read as its species' default.
+func petColor(p *model.Pet) string {
+	if p.Color == "" {
+		return model.PetColors[p.Species][0]
+	}
+	return p.Color
+}
+
 // applyPetReward gives the pet what a redeemed pet-care reward bought.
-func (h *PetHandler) applyPetReward(ctx context.Context, userID int64, rw *model.Reward) error {
-	if rw.PetAction == model.PetActionAccessory {
+func (h *PetHandler) applyPetReward(ctx context.Context, userID int64, rw *model.Reward, choice *PetChoice) error {
+	switch rw.PetAction {
+	case model.PetActionAccessory:
 		return h.store.AddPetItem(ctx, userID, rw.PetItem)
+	case model.PetActionNewAnimal, model.PetActionRestyle:
+		return h.store.SetPetLook(ctx, userID, choice.Species, choice.Color)
+	case model.PetActionDesign:
+		return h.store.AddPetItem(ctx, userID, choice.item)
 	}
 	f, j := pet.Effect(rw.PetAction)
 	return h.store.AdjustPetNeeds(ctx, userID, f, j)

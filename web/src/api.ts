@@ -1,4 +1,4 @@
-import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, OwnChore, OwnChoreInput, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput, SignInOptions, Farm, Pet, PetItem, PetSpecies } from './types';
+import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, OwnChore, OwnChoreInput, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput, SignInOptions, Farm, Pet, PetItem, PetPick, PetSpecies } from './types';
 
 const API_BASE = '/api';
 
@@ -276,16 +276,19 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ assignments }),
       }),
-    redeem: (id: number) => fetchWithAuth<RewardRedemption>(`/rewards/${id}/redeem`, { method: 'POST' }),
+    redeem: (id: number, pet?: PetPick) => fetchWithAuth<RewardRedemption>(`/rewards/${id}/redeem`, {
+      method: 'POST',
+      ...(pet ? { body: JSON.stringify({ pet }) } : {}),
+    }),
     listRedemptions: (userId: number) => fetchWithAuth<RedemptionHistory[]>(`/users/${userId}/redemptions`),
     undoRedemption: (redemptionId: number) => fetchWithAuth(`/redemptions/${redemptionId}`, { method: 'DELETE' }),
   },
   pets: {
     farm: () => fetchWithAuth<Farm>('/pets'),
     mine: () => fetchWithAuth<{ enabled: boolean; pet: Pet | null }>('/me/pet'),
-    adopt: (name: string, species: PetSpecies) => fetchWithAuth<Pet>('/me/pet', {
+    adopt: (name: string, species: PetSpecies, color?: string) => fetchWithAuth<Pet>('/me/pet', {
       method: 'POST',
-      body: JSON.stringify({ name, species }),
+      body: JSON.stringify({ name, species, color }),
     }),
     update: (data: { name?: string; accessory?: PetItem | '' }) => fetchWithAuth<Pet>('/me/pet', {
       method: 'PATCH',

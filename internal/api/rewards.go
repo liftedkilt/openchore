@@ -250,8 +250,19 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 	if petReward != nil && petReward.PetAction == "" {
 		petReward = nil
 	}
+	// New animal / restyle carry the person's pick in the body.
+	var choice *PetChoice
+	if petReward != nil && (petReward.PetAction == model.PetActionNewAnimal || petReward.PetAction == model.PetActionRestyle || petReward.PetAction == model.PetActionDesign) {
+		r.Body = http.MaxBytesReader(w, r.Body, 5<<20) // room for a drawn picture
+		var body struct {
+			Pet *PetChoice `json:"pet"`
+		}
+		if err := decodeJSON(r, &body); err == nil {
+			choice = body.Pet
+		}
+	}
 	if petReward != nil {
-		msg, err := h.pets.checkPetReward(r.Context(), user, petReward)
+		msg, err := h.pets.checkPetReward(r.Context(), user, petReward, choice)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to check pet")
 			return
@@ -261,13 +272,30 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// A drawn accessory is saved first and removed again if paying fails.
+	if choice != nil && choice.png != nil {
+		id, err := savePetImage(choice.png)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to save picture")
+			return
+		}
+		choice.item = "img:" + choice.Slot + ":" + id
+		defer func() {
+			if choice.item == "" {
+				removePetImage(id)
+			}
+		}()
+	}
 	redemption, err := h.store.RedeemReward(r.Context(), user.ID, rewardID)
 	if err != nil {
+		if choice != nil {
+			choice.item = ""
+		}
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	if petReward != nil {
-		if err := h.pets.applyPetReward(r.Context(), user.ID, petReward); err != nil {
+		if err := h.pets.applyPetReward(r.Context(), user.ID, petReward, choice); err != nil {
 			log.Printf("pets: redemption %d paid but effect failed: %v", redemption.ID, err)
 		}
 	}

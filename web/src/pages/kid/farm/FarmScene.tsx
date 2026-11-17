@@ -167,7 +167,7 @@ export function FarmScene({ pets, meId, compact, onSelect, className }: FarmScen
           >
             {badge && <span className={s.badge} aria-hidden="true">{badge}</span>}
             <span className={s.body} style={{ transform: `scaleX(${sp.face})` }}>
-              <FarmAnimal species={p.species} mood={p.mood} accessory={p.accessory} className={s.svg} />
+              <FarmAnimal species={p.species} color={p.color} mood={p.mood} accessory={p.accessory} className={s.svg} />
             </span>
             {tag(p)}
           </button>

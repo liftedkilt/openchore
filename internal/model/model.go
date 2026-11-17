@@ -1,6 +1,11 @@
 package model
 
-import "time"
+import (
+	"slices"
+	"strings"
+	"time"
+	"unicode/utf8"
+)
 
 // DateFormat is the standard YYYY-MM-DD date layout used throughout the application.
 const DateFormat = "2006-01-02"
@@ -353,28 +358,82 @@ const (
 	PetActionTreat     = "treat"
 	PetActionPlay      = "play"
 	PetActionAccessory = "accessory"
+	PetActionNewAnimal = "new_animal" // swap species (and coat); health, food and joy carry over
+	PetActionRestyle   = "restyle"    // change coat colour
+	PetActionDesign    = "design"     // draw or upload your own accessory
 )
 
 // ValidPetAction reports whether a is a pet action or empty (ordinary reward).
 func ValidPetAction(a string) bool {
 	switch a {
-	case "", PetActionFeed, PetActionTreat, PetActionPlay, PetActionAccessory:
+	case "", PetActionFeed, PetActionTreat, PetActionPlay, PetActionAccessory, PetActionNewAnimal, PetActionRestyle, PetActionDesign:
 		return true
 	}
 	return false
 }
 
-// PetItems are the accessories a pet can wear (drawn by the web app).
-var PetItems = []string{"straw_hat", "cowboy_hat", "bandana", "flower_crown", "bow", "bell", "sunglasses", "scarf"}
+// PetItems are the built-in accessories a pet can wear (drawn by the web app).
+var PetItems = []string{
+	"straw_hat", "cowboy_hat", "flower_crown", "crown", "party_hat", "top_hat", "beanie", "wizard_hat", "pirate_hat", "flower", "bow",
+	"sunglasses", "round_glasses", "heart_glasses",
+	"bandana", "scarf", "bell", "bowtie", "medal",
+}
 
-// ValidPetItem reports whether it is one of PetItems.
+// PetItemSlots are where a custom emoji accessory ("e:<slot>:<emoji>") sits.
+var PetItemSlots = []string{"head", "face", "neck"}
+
+// ValidPetItem reports whether it is a built-in accessory, a custom emoji
+// accessory "e:<slot>:<emoji>" (1-8 characters, no spaces), or a drawn one
+// "img:<slot>:<hex id>".
 func ValidPetItem(it string) bool {
 	for _, v := range PetItems {
 		if v == it {
 			return true
 		}
 	}
-	return false
+	if rest, ok := strings.CutPrefix(it, "img:"); ok {
+		slot, id, ok := strings.Cut(rest, ":")
+		return ok && slices.Contains(PetItemSlots, slot) && validHexID(id)
+	}
+	rest, ok := strings.CutPrefix(it, "e:")
+	if !ok {
+		return false
+	}
+	slot, emoji, ok := strings.Cut(rest, ":")
+	if !ok || !slices.Contains(PetItemSlots, slot) {
+		return false
+	}
+	n := utf8.RuneCountInString(emoji)
+	return n >= 1 && n <= 8 && !strings.ContainsAny(emoji, " \t\n:")
+}
+
+func validHexID(id string) bool {
+	if len(id) < 16 || len(id) > 64 {
+		return false
+	}
+	for _, c := range id {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+// PetColors are each species' coat colours; the first is the default.
+var PetColors = map[string][]string{
+	"horse":   {"chestnut", "black", "grey", "palomino"},
+	"dog":     {"golden", "chocolate", "black", "white"},
+	"cat":     {"ginger", "grey", "black", "white"},
+	"chicken": {"white", "brown", "black", "golden"},
+	"cow":     {"holstein", "jersey", "black", "red"},
+	"pig":     {"pink", "black", "ginger", "spotted"},
+	"sheep":   {"white", "cream", "brown", "black"},
+	"goat":    {"white", "tan", "brown", "black"},
+}
+
+// ValidPetColor reports whether c is one of species' coat colours.
+func ValidPetColor(species, c string) bool {
+	return slices.Contains(PetColors[species], c)
 }
 
 // PetSpecies are the farm animals a person can adopt. Every pet lives on
@@ -401,6 +460,7 @@ type Pet struct {
 	Health         int       `json:"health"`
 	Fullness       int       `json:"fullness"`
 	Joy            int       `json:"joy"`
+	Color          string    `json:"color,omitempty"`     // coat colour (PetColors); "" = default
 	Accessory      string    `json:"accessory,omitempty"` // worn item, from Items
 	Items          []string  `json:"items"`               // owned accessories
 	LastMissedDate *string   `json:"last_missed_date,omitempty"`

@@ -1,11 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { Icon, resolveChoreIcon } from '../../design';
-import type { Reward, User } from '../../types';
+import type { PetPick, Reward, User } from '../../types';
 import { GoalCard } from './GoalCard';
 import { Notice } from './parts';
 import type { KidData } from './useKidData';
+import { FarmAnimal } from './farm/FarmAnimal';
+import { PetLookSheet } from './farm/PetLookSheet';
+import { DesignSheet } from './farm/DesignSheet';
+import { ReactingAnimal, reactionLine, type ReactionEvent } from './farm/PetReaction';
+import { Sheet } from './Sheet';
+import { needsPick, previewLook } from './farm/petLook';
+import fs from './farm/petSheet.module.css';
 import s from './kid.module.css';
 
 const rewardIcon = (icon?: string) => {
@@ -34,8 +41,20 @@ export function RewardsScreen({ user, data, topBar, onRedeemed, onFarm }: Reward
   const petRewards = data.farm?.enabled ? (allRewards ?? []).filter(r => r.pet_action) : [];
   const pet = data.myPet;
 
-  const redeem = async (reward: Reward) => {
-    if (await data.redeem(reward)) onRedeemed();
+  // New animal / restyle: pick the look first.
+  const [picking, setPicking] = useState<Reward | null>(null);
+  // After pet care: show the animal's reaction.
+  const [reacted, setReacted] = useState<ReactionEvent | null>(null);
+  const redeem = async (reward: Reward, pick?: PetPick) => {
+    if (needsPick(reward) && !pick) {
+      setPicking(reward);
+      return;
+    }
+    if (await data.redeem(reward, pick)) {
+      setPicking(null);
+      if (reward.pet_action && pet) setReacted({ kind: reward.pet_action, key: Date.now() });
+      onRedeemed();
+    }
   };
 
   const renderReward = (reward: Reward, petBlocked = false) => {
@@ -68,7 +87,9 @@ export function RewardsScreen({ user, data, topBar, onRedeemed, onFarm }: Reward
 
     return (
       <li key={reward.id} className={s.reward}>
-        <span className={s.well}><Icon name={rewardIcon(reward.icon)} /></span>
+        {reward.pet_action && pet
+          ? <FarmAnimal species={pet.species} color={pet.color} {...previewLook(pet, reward)} className={fs.rewardPreview} title={reward.name} />
+          : <span className={s.well}><Icon name={rewardIcon(reward.icon)} /></span>}
         <div className={s.rewardText}>
           <h3 className={s.rewardName}>
             {reward.name}
@@ -195,6 +216,30 @@ export function RewardsScreen({ user, data, topBar, onRedeemed, onFarm }: Reward
           </section>
         )}
       </div>
+      {picking && pet && picking.pet_action === 'design' && (
+        <DesignSheet pet={pet} reward={picking} busy={data.redeemingId === picking.id}
+          onConfirm={pick => redeem(picking, pick)} onClose={() => setPicking(null)} />
+      )}
+      {picking && pet && picking.pet_action !== 'design' && (
+        <PetLookSheet pet={pet} reward={picking} busy={data.redeemingId === picking.id}
+          onConfirm={pick => redeem(picking, pick)} onClose={() => setPicking(null)} />
+      )}
+      {reacted && pet && (
+        <Sheet title={pet.name} onClose={() => setReacted(null)}>
+          <div className={fs.pickPreview}>
+            <ReactingAnimal pet={pet} reaction={reacted} artClassName={fs.pickArt} />
+            <p className={fs.moodLine}>{reactionLine(t, pet, reacted.kind)}</p>
+          </div>
+          <div className={s.sheetActions}>
+            {onFarm && (
+              <button type="button" className={s.primaryAction} onClick={() => { setReacted(null); onFarm(); }}>
+                {t('kid.farm.open', { name: pet.name })}
+              </button>
+            )}
+            <button type="button" className={s.secondaryAction} onClick={() => setReacted(null)}>{t('kid.farm.close')}</button>
+          </div>
+        </Sheet>
+      )}
     </div>
   );
 }

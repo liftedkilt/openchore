@@ -5,11 +5,15 @@ import { useCallback, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { api, APIError } from '../../../api';
-import { PET_SPECIES, type Pet, type PetItem, type PetSpecies, type Reward, type User } from '../../../types';
+import { PET_COLORS, PET_SPECIES, type Pet, type PetItem, type PetPick, type PetSpecies, type Reward, type User } from '../../../types';
 import { Sheet } from '../Sheet';
 import type { KidData } from '../useKidData';
 import { FarmAnimal } from './FarmAnimal';
 import { FarmScene } from './FarmScene';
+import { ColorPicker, PetLookSheet } from './PetLookSheet';
+import { DesignSheet } from './DesignSheet';
+import { ReactingAnimal, reactionLine, type ReactionEvent } from './PetReaction';
+import { itemLabel, needsPick, previewLook } from './petLook';
 import k from '../kid.module.css';
 import s from './petSheet.module.css';
 
@@ -31,7 +35,7 @@ export function FarmSheet({ user, data, onClose }: FarmSheetProps) {
       <FarmScene pets={pets} meId={user.id} onSelect={setSelected} />
       {other && (
         <div className={s.otherCard} role="status">
-          <FarmAnimal species={other.species} mood={other.mood} accessory={other.accessory} className={s.otherArt} />
+          <FarmAnimal species={other.species} color={other.color} mood={other.mood} accessory={other.accessory} className={s.otherArt} />
           <p>
             <strong>{t('kid.farm.belongsTo', { name: other.name, owner: other.owner_name ?? '' })}</strong>
             <span>{t(`kid.farm.mood.${other.mood}`, { name: other.name })}</span>
@@ -46,6 +50,7 @@ export function FarmSheet({ user, data, onClose }: FarmSheetProps) {
 function Adopt({ data }: { data: KidData }) {
   const { t } = useTranslation();
   const [species, setSpecies] = useState<PetSpecies | null>(null);
+  const [color, setColor] = useState('');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +60,7 @@ function Adopt({ data }: { data: KidData }) {
     setBusy(true);
     setError(null);
     try {
-      await api.pets.adopt(name.trim(), species);
+      await api.pets.adopt(name.trim(), species, color || undefined);
       await data.loadExtras();
     } catch (e) {
       setError(e instanceof APIError ? e.message : t('kid.farm.adoptFailed'));
@@ -76,13 +81,19 @@ function Adopt({ data }: { data: KidData }) {
             role="radio"
             aria-checked={species === sp}
             className={clsx(s.speciesBtn, species === sp && s.speciesOn)}
-            onClick={() => setSpecies(sp)}
+            onClick={() => { setSpecies(sp); setColor(PET_COLORS[sp][0]); }}
           >
-            <FarmAnimal species={sp} mood="happy" className={s.speciesArt} />
+            <FarmAnimal species={sp} color={species === sp ? color : undefined} mood="happy" className={s.speciesArt} />
             <span>{t(`kid.farm.species.${sp}`)}</span>
           </button>
         ))}
       </div>
+      {species && (
+        <>
+          <h4 className={s.subheading}>{t('kid.farm.coat')}</h4>
+          <ColorPicker species={species} value={color} onChange={setColor} />
+        </>
+      )}
       <label className={s.nameRow}>
         <span>{t('kid.farm.nameLabel')}</span>
         <input
@@ -120,6 +131,10 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(pet.name);
   const [busy, setBusy] = useState(false);
+  const [picking, setPicking] = useState<Reward | null>(null);
+  const [tryOn, setTryOn] = useState<string | null>(null);
+  const [reaction, setReaction] = useState<ReactionEvent | null>(null);
+  const react = (kind: ReactionEvent['kind']) => setReaction({ kind, key: Date.now() });
   const balance = data.points?.balance ?? 0;
 
   const loadRewards = useCallback(() => {
@@ -130,8 +145,17 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
   const care = (rewards ?? []).filter(r => r.pet_action && r.pet_action !== 'accessory');
   const shopItems = (rewards ?? []).filter(r => r.pet_action === 'accessory' && r.pet_item && !pet.items.includes(r.pet_item));
 
-  const redeem = async (r: Reward) => {
-    if (await data.redeem(r)) loadRewards();
+  const redeem = async (r: Reward, pick?: PetPick) => {
+    if (needsPick(r) && !pick) {
+      setPicking(r);
+      return;
+    }
+    if (await data.redeem(r, pick)) {
+      setPicking(null);
+      setTryOn(null);
+      if (r.pet_action) react(r.pet_action);
+      loadRewards();
+    }
   };
 
   const wear = async (item: PetItem | '') => {
@@ -139,6 +163,7 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
     try {
       await api.pets.update({ accessory: item });
       await data.loadExtras();
+      if (item) react('wear');
     } catch (e) {
       data.showToast(e instanceof APIError ? e.message : t('kid.farm.saveFailed'));
     } finally {
@@ -169,7 +194,7 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
   return (
     <section className={s.section} aria-labelledby="farm-mine">
       <div className={s.mineHead}>
-        <FarmAnimal species={pet.species} mood={pet.hiding ? 'bored' : pet.mood} accessory={pet.accessory} className={s.mineArt} />
+        <ReactingAnimal pet={pet} reaction={reaction} accessory={tryOn ?? undefined} artClassName={s.mineArt} />
         <div className={s.mineText}>
           {renaming ? (
             <div className={k.addRow}>
@@ -182,7 +207,9 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
               <button type="button" className={s.renameBtn} onClick={() => setRenaming(true)}>{t('kid.farm.rename')}</button>
             </h3>
           )}
-          <p className={s.moodLine}>{t(`kid.farm.mood.${pet.mood}`, { name: pet.name })}</p>
+          <p className={s.moodLine} aria-live="polite">
+            {reaction ? reactionLine(t, pet, reaction.kind) : t(`kid.farm.mood.${pet.mood}`, { name: pet.name })}
+          </p>
           <p className={s.hint}>{hint}</p>
         </div>
       </div>
@@ -208,7 +235,7 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
                 onClick={() => redeem(r)}
                 title={blocked ? (pet.hiding ? t('kid.farm.hint.hiding', { name: pet.name }) : t('kid.farm.tooSick', { name: pet.name })) : undefined}
               >
-                <span className={s.careIcon} aria-hidden="true">{r.icon}</span>
+                <FarmAnimal species={pet.species} color={pet.color} {...previewLook(pet, r)} className={s.careArt} />
                 <span className={s.careName}>{r.name}</span>
                 <span className={s.careCost}>{t('kid.rewards.cost', { count: r.effective_cost })}</span>
               </button>
@@ -223,12 +250,45 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
           {t('kid.farm.item.none')}
         </button>
         {pet.items.map(it => (
-          <button key={it} type="button" className={clsx(k.smallBtn, k.ownChip, pet.accessory === it && k.ownChipOn)} aria-pressed={pet.accessory === it} disabled={busy} onClick={() => wear(it)}>
-            {t(`kid.farm.item.${it}`)}
+          <button key={it} type="button" className={clsx(k.smallBtn, k.ownChip, s.wardrobeChip, pet.accessory === it && k.ownChipOn)} aria-pressed={pet.accessory === it} disabled={busy} onClick={() => wear(it)}>
+            <FarmAnimal species={pet.species} color={pet.color} mood="content" accessory={it} className={s.wardrobeArt} />
+            {itemLabel(t, it)}
           </button>
         ))}
       </div>
-      {shopItems.length > 0 && <p className={s.hint}>{t('kid.farm.moreInRewards', { count: shopItems.length })}</p>}
+
+      {shopItems.length > 0 && (
+        <>
+          <h4 className={s.subheading}>{t('kid.farm.shop')}</h4>
+          <p className={s.hint}>{t('kid.farm.tryOnHint')}</p>
+          <ul className={s.careList}>
+            {shopItems.map(r => (
+              <li key={r.id}>
+                <div className={clsx(s.shopItem, tryOn === r.pet_item && s.speciesOn)}>
+                  <button type="button" className={s.tryOnBtn} aria-pressed={tryOn === r.pet_item}
+                    onClick={() => setTryOn(tryOn === r.pet_item ? null : r.pet_item ?? null)}>
+                    <FarmAnimal species={pet.species} color={pet.color} mood="happy" accessory={r.pet_item} className={s.careArt} />
+                    <span className={s.careName}>{r.name}</span>
+                  </button>
+                  <button type="button" className={s.buyBtn}
+                    disabled={balance < r.effective_cost || data.redeemingId === r.id} onClick={() => redeem(r)}>
+                    {t('kid.rewards.cost', { count: r.effective_cost })}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {picking && picking.pet_action === 'design' && (
+        <DesignSheet pet={pet} reward={picking} busy={data.redeemingId === picking.id}
+          onConfirm={pick => redeem(picking, pick)} onClose={() => setPicking(null)} />
+      )}
+      {picking && picking.pet_action !== 'design' && (
+        <PetLookSheet pet={pet} reward={picking} busy={data.redeemingId === picking.id}
+          onConfirm={pick => redeem(picking, pick)} onClose={() => setPicking(null)} />
+      )}
     </section>
   );
 }

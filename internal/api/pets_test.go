@@ -1,9 +1,16 @@
 package api_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -177,5 +184,91 @@ func TestPetWaitsWhilePaused(t *testing.T) {
 	webhook.NewPetChecker(env.store).CheckAt(context.Background(), time.Now())
 	if p := env.myPet(t, kid); p["health"].(float64) != 80 || p["fullness"].(float64) != 70 {
 		t.Fatalf("paused pet changed: %v", p)
+	}
+}
+
+func TestPetNewAnimalRestyleAndEmojiAccessory(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kid := env.createChild(t, "Kid")
+	env.enablePets(t)
+	env.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Biscuit", "species": "dog", "color": "purple"}, childHeaders(kid), http.StatusBadRequest)
+	env.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Biscuit", "species": "dog", "color": "chocolate"}, childHeaders(kid), http.StatusCreated)
+	env.db.Exec(`UPDATE pets SET health = 30`)
+	env.expectStatus(t, "POST", "/api/points/adjust", map[string]any{"user_id": kid, "amount": 500, "note": "seed"}, adminHeaders(), http.StatusNoContent)
+
+	// New animal: the pick is required, and stats carry over.
+	swap := env.petRewardID(t, kid, "new_animal")
+	before := env.balance(t, kid)
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", swap), nil, childHeaders(kid), http.StatusUnprocessableEntity)
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", swap), map[string]any{"pet": map[string]any{"species": "dog", "color": "chocolate"}}, childHeaders(kid), http.StatusUnprocessableEntity)
+	if env.balance(t, kid) != before {
+		t.Fatal("refused swap cost points")
+	}
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", swap), map[string]any{"pet": map[string]any{"species": "horse"}}, childHeaders(kid), http.StatusCreated)
+	p := env.myPet(t, kid)
+	if p["species"] != "horse" || p["color"] != "chestnut" || p["health"].(float64) != 30 || p["name"] != "Biscuit" {
+		t.Fatalf("after swap: %v", p)
+	}
+
+	// Restyle: a coat of the current animal.
+	restyle := env.petRewardID(t, kid, "restyle")
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", restyle), map[string]any{"pet": map[string]any{"color": "ginger"}}, childHeaders(kid), http.StatusUnprocessableEntity)
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", restyle), map[string]any{"pet": map[string]any{"color": "palomino"}}, childHeaders(kid), http.StatusCreated)
+	if p := env.myPet(t, kid); p["color"] != "palomino" || p["species"] != "horse" {
+		t.Fatalf("after restyle: %v", p)
+	}
+
+	// Custom emoji accessories.
+	env.expectStatus(t, "POST", "/api/rewards", map[string]any{"name": "Bad", "cost": 5, "pet_action": "accessory", "pet_item": "e:tail:🎓"}, adminHeaders(), http.StatusBadRequest)
+	resp := env.expectStatus(t, "POST", "/api/rewards", map[string]any{"name": "Grad cap", "cost": 5, "pet_action": "accessory", "pet_item": "e:head:🎓"}, adminHeaders(), http.StatusCreated)
+	var rw map[string]any
+	decodeBody(t, resp, &rw)
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", int(rw["id"].(float64))), nil, childHeaders(kid), http.StatusCreated)
+	if p := env.myPet(t, kid); p["accessory"] != "e:head:🎓" {
+		t.Fatalf("emoji accessory: %v", p)
+	}
+}
+
+func TestPetDesignAccessory(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kid := env.createChild(t, "Kid")
+	env.enablePets(t)
+	env.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Biscuit", "species": "dog"}, childHeaders(kid), http.StatusCreated)
+	env.expectStatus(t, "POST", "/api/points/adjust", map[string]any{"user_id": kid, "amount": 100, "note": "seed"}, adminHeaders(), http.StatusNoContent)
+	design := env.petRewardID(t, kid, "design")
+
+	// A 600x300 picture: shrunk to fit 256.
+	img := image.NewNRGBA(image.Rect(0, 0, 600, 300))
+	for x := 100; x < 500; x++ {
+		img.SetNRGBA(x, 150, color.NRGBA{R: 255, A: 255})
+	}
+	var buf bytes.Buffer
+	png.Encode(&buf, img)
+	dataURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes())
+
+	before := env.balance(t, kid)
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", design), map[string]any{"pet": map[string]any{"slot": "tail", "image": dataURL}}, childHeaders(kid), http.StatusUnprocessableEntity)
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", design), map[string]any{"pet": map[string]any{"slot": "head", "image": "data:image/png;base64,bm90IGFuIGltYWdl"}}, childHeaders(kid), http.StatusUnprocessableEntity)
+	if env.balance(t, kid) != before {
+		t.Fatal("refused design cost points")
+	}
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", design), map[string]any{"pet": map[string]any{"slot": "head", "image": dataURL}}, childHeaders(kid), http.StatusCreated)
+	p := env.myPet(t, kid)
+	acc, _ := p["accessory"].(string)
+	if !strings.HasPrefix(acc, "img:head:") {
+		t.Fatalf("design accessory: %v", p)
+	}
+	path := "data/uploads/pets/" + strings.TrimPrefix(acc, "img:head:") + ".png"
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("saved picture: %v", err)
+	}
+	defer os.Remove(path)
+	defer f.Close()
+	cfg, err := png.DecodeConfig(f)
+	if err != nil || cfg.Width != 256 || cfg.Height != 128 {
+		t.Fatalf("picture size %dx%d (%v)", cfg.Width, cfg.Height, err)
 	}
 }

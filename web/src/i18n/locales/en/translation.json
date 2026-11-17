@@ -437,8 +437,20 @@
         "feed": "Feed (lots of food)",
         "treat": "Treat (a little food, lots of joy)",
         "play": "Play (lots of joy)",
-        "accessory": "Accessory"
-      }
+        "accessory": "Accessory",
+        "restyle": "Restyle (new coat colour)",
+        "new_animal": "New animal (stats carry over)",
+        "design": "Design (kid draws their own)"
+      },
+      "customEmoji": "Custom (emoji)…",
+      "fieldEmoji": "Emoji",
+      "fieldSlot": "Where it goes",
+      "slot": {
+        "head": "On the head",
+        "face": "On the face",
+        "neck": "Around the neck"
+      },
+      "preview": "Preview"
     },
     "scheduleManager": {
       "ariaDeleteSchedule": "Delete schedule",
@@ -684,7 +696,10 @@
         "off": "Farm pets are off. Animals and their care rewards are hidden until you turn them back on.",
         "addedRewards_one": "Farm pets are on. Added {{count}} pet-care reward.",
         "addedRewards_other": "Farm pets are on. Added {{count}} pet-care rewards to the store.",
-        "failed": "Couldn't change farm pets."
+        "failed": "Couldn't change farm pets.",
+        "remove": "Remove",
+        "confirmRemove": "Tap again to remove",
+        "removed": "Removed {{name}} ({{owner}}). They can adopt again."
       }
     },
     "skins": {
@@ -1299,7 +1314,80 @@
         "bow": "Bow",
         "bell": "Bell",
         "sunglasses": "Sunglasses",
-        "scarf": "Scarf"
+        "scarf": "Scarf",
+        "crown": "Crown",
+        "party_hat": "Party hat",
+        "top_hat": "Top hat",
+        "beanie": "Beanie",
+        "wizard_hat": "Wizard hat",
+        "pirate_hat": "Pirate hat",
+        "round_glasses": "Round glasses",
+        "heart_glasses": "Heart glasses",
+        "bowtie": "Bow tie",
+        "medal": "Medal",
+        "flower": "Flower"
+      },
+      "coat": "Coat",
+      "shop": "Accessory shop",
+      "tryOnHint": "Tap one to try it on.",
+      "color": {
+        "chestnut": "Chestnut",
+        "black": "Black",
+        "grey": "Grey",
+        "palomino": "Palomino",
+        "golden": "Golden",
+        "chocolate": "Chocolate",
+        "white": "White",
+        "ginger": "Ginger",
+        "brown": "Brown",
+        "holstein": "Black & white",
+        "jersey": "Jersey",
+        "red": "Red",
+        "pink": "Pink",
+        "spotted": "Spotted",
+        "cream": "Cream",
+        "tan": "Tan"
+      },
+      "pick": {
+        "swapTitle": "Choose a new animal",
+        "swapLead": "{{name}} keeps their name, health, food, joy and accessories.",
+        "restyleTitle": "A new coat for {{name}}",
+        "restyleLead": "Pick a coat colour.",
+        "confirm_one": "Get it for {{count}} pt",
+        "confirm_other": "Get it for {{count}} pts"
+      },
+      "close": "Close",
+      "react": {
+        "food": "{{sign}}{{count}} food",
+        "joy": "{{sign}}{{count}} joy",
+        "line": {
+          "feed": "{{name}} gobbled it all up!",
+          "treat": "{{name}} loved the treat!",
+          "play": "{{name}} had so much fun playing!",
+          "accessory": "{{name}} looks amazing!",
+          "design": "{{name}} is wearing your design!",
+          "wear": "{{name}} shows it off!",
+          "restyle": "{{name}} loves the new coat!",
+          "new_animal": "Ta-da! Meet the new {{name}}!"
+        }
+      },
+      "design": {
+        "title": "Design an accessory",
+        "lead": "Draw something for your animal to wear, or start from a picture.",
+        "canvas": "Drawing pad",
+        "where": "Where it goes",
+        "colour": "Colour",
+        "brush": "Brush size {{size}}",
+        "eraser": "Eraser",
+        "undo": "Undo",
+        "clear": "Clear",
+        "upload": "Use a picture",
+        "mine": "My design",
+        "slot": {
+          "head": "Head",
+          "face": "Face",
+          "neck": "Neck"
+        }
       }
     }
   },
@@ -1444,6 +1532,7 @@
     "familyToday": "The family today",
     "chartTitle": "Today so far",
     "chartDesc": "How much of their day each person has done, hour by hour. Now: {{summary}}.",
-    "chartPerson": "{{name}} {{pct}}%"
+    "chartPerson": "{{name}} {{pct}}%",
+    "farm": "The farm"
   }
 }

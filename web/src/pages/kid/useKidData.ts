@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, APIError } from '../../api';
 import type {
-  Farm, PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
+  Farm, PetPick, PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
 } from '../../types';
 import { localDateStr } from '../../utils';
 
@@ -193,7 +193,7 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   });
 
   /** Returns true when the reward was redeemed. */
-  const redeem = useCallback(async (reward: Reward): Promise<boolean> => {
+  const redeem = useCallback(async (reward: Reward, pet?: PetPick): Promise<boolean> => {
     if (!points) return false;
     const commitment = commitmentFor(reward.id);
     const funded = commitment?.pool
@@ -203,7 +203,7 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
     if (commitment && !funded) return false;
     setRedeemingId(reward.id);
     try {
-      await api.rewards.redeem(reward.id);
+      await api.rewards.redeem(reward.id, pet);
       setRedeemedId(reward.id);
       showToast(t('kid.rewards.redeemedToast', { name: reward.name }));
       await Promise.all([loadExtras(), loadRewards()]);
