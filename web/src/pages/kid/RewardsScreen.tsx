@@ -6,12 +6,12 @@ import type { PetPick, Reward, User } from '../../types';
 import { GoalCard } from './GoalCard';
 import { Notice } from './parts';
 import type { KidData } from './useKidData';
-import { FarmAnimal } from './farm/FarmAnimal';
 import { PetLookSheet } from './farm/PetLookSheet';
 import { DesignSheet } from './farm/DesignSheet';
 import { ReactingAnimal, reactionLine, type ReactionEvent } from './farm/PetReaction';
 import { Sheet } from './Sheet';
-import { needsPick, previewLook } from './farm/petLook';
+import { needsPick } from './farm/petLook';
+import { PetRewardThumb } from './farm/PetRewardThumb';
 import fs from './farm/petSheet.module.css';
 import s from './kid.module.css';
 
@@ -88,7 +88,7 @@ export function RewardsScreen({ user, data, topBar, onRedeemed, onFarm }: Reward
     return (
       <li key={reward.id} className={s.reward}>
         {reward.pet_action && pet
-          ? <FarmAnimal species={pet.species} color={pet.color} {...previewLook(pet, reward)} className={fs.rewardPreview} title={reward.name} />
+          ? <PetRewardThumb pet={pet} reward={reward} />
           : <span className={s.well}><Icon name={rewardIcon(reward.icon)} /></span>}
         <div className={s.rewardText}>
           <h3 className={s.rewardName}>

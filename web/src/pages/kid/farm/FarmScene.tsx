@@ -43,11 +43,13 @@ export interface FarmSceneProps {
   /** Highlight this person's animal. */
   meId?: number;
   compact?: boolean;
+  /** Show owners' names under the animals (default: unless compact). */
+  owners?: boolean;
   onSelect?: (pet: Pet) => void;
   className?: string;
 }
 
-export function FarmScene({ pets, meId, compact, onSelect, className }: FarmSceneProps) {
+export function FarmScene({ pets, meId, compact, owners = !compact, onSelect, className }: FarmSceneProps) {
   const { t } = useTranslation();
   const out = pets.filter(p => !p.hiding);
   const hiding = pets.filter(p => p.hiding);
@@ -105,7 +107,7 @@ export function FarmScene({ pets, meId, compact, onSelect, className }: FarmScen
   const tag = (p: Pet) => (
     <span className={s.tag} style={{ ['--tag' as string]: p.owner_color ? `var(--person-${p.owner_color})` : undefined }}>
       <span className={s.tagName}>{p.name}</span>
-      {!compact && p.owner_name && <span className={s.tagOwner}>{p.owner_name}</span>}
+      {owners && p.owner_name && <span className={s.tagOwner}>{p.owner_name}</span>}
     </span>
   );
 

@@ -13,7 +13,8 @@ import { FarmScene } from './FarmScene';
 import { ColorPicker, PetLookSheet } from './PetLookSheet';
 import { DesignSheet } from './DesignSheet';
 import { ReactingAnimal, reactionLine, type ReactionEvent } from './PetReaction';
-import { itemLabel, needsPick, previewLook } from './petLook';
+import { itemLabel, needsPick } from './petLook';
+import { PetRewardThumb } from './PetRewardThumb';
 import k from '../kid.module.css';
 import s from './petSheet.module.css';
 
@@ -235,7 +236,7 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
                 onClick={() => redeem(r)}
                 title={blocked ? (pet.hiding ? t('kid.farm.hint.hiding', { name: pet.name }) : t('kid.farm.tooSick', { name: pet.name })) : undefined}
               >
-                <FarmAnimal species={pet.species} color={pet.color} {...previewLook(pet, r)} className={s.careArt} />
+                <PetRewardThumb pet={pet} reward={r} className={s.careThumb} />
                 <span className={s.careName}>{r.name}</span>
                 <span className={s.careCost}>{t('kid.rewards.cost', { count: r.effective_cost })}</span>
               </button>

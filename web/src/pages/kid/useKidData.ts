@@ -205,7 +205,8 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
     try {
       await api.rewards.redeem(reward.id, pet);
       setRedeemedId(reward.id);
-      showToast(t('kid.rewards.redeemedToast', { name: reward.name }));
+      // Pet care shows the animal's reaction instead.
+      if (!reward.pet_action) showToast(t('kid.rewards.redeemedToast', { name: reward.name }));
       await Promise.all([loadExtras(), loadRewards()]);
       setTimeout(() => setRedeemedId(prev => (prev === reward.id ? null : prev)), 2000);
       return true;

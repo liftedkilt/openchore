@@ -152,6 +152,18 @@
 @keyframes farm-step { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
 @keyframes farm-wag { from { transform: rotate(-8deg); } to { transform: rotate(8deg); } }
 
+/* Reactions: the jaw chews from its hinge (~4 bites a second), cheeks puff
+   with it, a wagging tail speeds up while playing, a heart floats while loved. */
+:global(.farm-chew) { transform-box: fill-box; transform-origin: 50% 0; animation: farm-chew 125ms ease-in-out infinite alternate; }
+:global(.farm-puff) { transform-box: fill-box; transform-origin: 50% 50%; animation: farm-puff 125ms ease-in-out infinite alternate; }
+:global(.farm-tail-fast) { animation-duration: 280ms; }
+:global(.farm-float) { transform-box: fill-box; transform-origin: 50% 50%; animation: farm-float 900ms ease-in-out infinite alternate; }
+
+@keyframes farm-chew { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+@keyframes farm-puff { from { transform: scale(1); } to { transform: scale(1.18); } }
+@keyframes farm-float { from { transform: translateY(1px) scale(0.9); } to { transform: translateY(-2px) scale(1.1); } }
+
 @media (prefers-reduced-motion: reduce) {
-  :global(.farm-leg-a), :global(.farm-leg-b), :global(.farm-tail) { animation: none; }
+  :global(.farm-leg-a), :global(.farm-leg-b), :global(.farm-tail),
+  :global(.farm-chew), :global(.farm-puff), :global(.farm-float) { animation: none; }
 }

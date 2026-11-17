@@ -256,7 +256,7 @@ export const AmbientDashboard: React.FC = () => {
               {showFarm && farm && (
                 <div className={styles.farmPanel}>
                   <div className={styles.label}>{t('wall.farm')}</div>
-                  <FarmScene pets={farm.pets} className={styles.farm} />
+                  <FarmScene pets={farm.pets} compact owners className={styles.farm} />
                 </div>
               )}
             </section>
