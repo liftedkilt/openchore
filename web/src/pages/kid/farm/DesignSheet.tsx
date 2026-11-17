@@ -13,6 +13,36 @@ const SIZE = 256;
 const COLORS = ['#1d1b1a', '#ffffff', '#e2453c', '#f39c32', '#ffd166', '#5fbf5a', '#3c8fe0', '#8a5ae0', '#f59ac0', '#8a5a33'];
 const BRUSHES = [6, 12, 24];
 
+/**
+ * The drawing trimmed to its own edges (plus a little padding), as a PNG
+ * data URL, so it fills the accessory spot instead of sitting small in the
+ * middle of an empty canvas. Returns '' when nothing is drawn.
+ */
+function trimmed(c: HTMLCanvasElement): string {
+  const data = c.getContext('2d')?.getImageData(0, 0, SIZE, SIZE).data;
+  if (!data) return '';
+  let x0 = SIZE, y0 = SIZE, x1 = -1, y1 = -1;
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      if (data[(y * SIZE + x) * 4 + 3] > 8) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  }
+  if (x1 < 0) return '';
+  const pad = 4;
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
+  x1 = Math.min(SIZE - 1, x1 + pad); y1 = Math.min(SIZE - 1, y1 + pad);
+  const out = document.createElement('canvas');
+  out.width = x1 - x0 + 1;
+  out.height = y1 - y0 + 1;
+  out.getContext('2d')?.drawImage(c, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+  return out.toDataURL('image/png');
+}
+
 interface DesignSheetProps {
   pet: Pet;
   reward: Reward;
@@ -37,11 +67,9 @@ export function DesignSheet({ pet, reward, busy, onConfirm, onClose }: DesignShe
   const refresh = useCallback(() => {
     const c = canvas.current;
     if (!c) return;
-    setPreview(c.toDataURL('image/png'));
-    const data = c.getContext('2d')?.getImageData(0, 0, SIZE, SIZE).data;
-    let any = false;
-    if (data) for (let i = 3; i < data.length; i += 4) if (data[i]) { any = true; break; }
-    setEmpty(!any);
+    const url = trimmed(c);
+    setPreview(url);
+    setEmpty(!url);
   }, []);
   useEffect(refresh, [refresh]);
 
@@ -189,7 +217,7 @@ export function DesignSheet({ pet, reward, busy, onConfirm, onClose }: DesignShe
 
       <div className={k.sheetActions}>
         <button type="button" className={k.primaryAction} disabled={empty || busy}
-          onClick={() => onConfirm({ slot, image: canvas.current?.toDataURL('image/png') ?? '' })}>
+          onClick={() => onConfirm({ slot, image: preview })}>
           {t('kid.farm.pick.confirm', { count: reward.effective_cost })}
         </button>
       </div>

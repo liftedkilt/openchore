@@ -680,7 +680,10 @@ function EmojiAccessory({ slot, emoji, r }: { slot: AccessorySlot; emoji: string
 
 function ImageAccessory({ slot, url, r }: { slot: AccessorySlot; url: string; r: Rig }) {
   const { x, y, size } = slotBox(slot, r);
-  return <image href={url} x={x - size / 2} y={y - size / 2} width={size} height={size} preserveAspectRatio="xMidYMid meet" pointerEvents="none" />;
+  // Drawings are trimmed to their own edges, so anchor by slot: a hat sits on
+  // the crown, glasses centre on the eyes, neckwear hangs from the collar.
+  const align = slot === 'head' ? 'xMidYMax' : slot === 'neck' ? 'xMidYMin' : 'xMidYMid';
+  return <image href={url} x={x - size / 2} y={y - size / 2} width={size} height={size} preserveAspectRatio={`${align} meet`} pointerEvents="none" />;
 }
 
 function Builtin({ item, r }: { item: string; r: Rig }) {
