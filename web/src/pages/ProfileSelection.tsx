@@ -301,17 +301,18 @@ export const ProfileSelection: React.FC = () => {
   };
 
   // Open a /u/:slug link once: signed in as that person already, go to their
-  // list; signed out, start their usual sign-in (straight in, PIN or linked
-  // account). Signed in as someone else, or an unknown slug, shows the picker
-  // so nobody is switched by accident.
+  // list; otherwise start their usual sign-in (straight in, PIN or linked
+  // account), switching from whoever is on a shared device. A personal-device
+  // (persistent) session, or an unknown slug, shows the picker instead, so a
+  // parent's own phone isn't signed out by opening a kid's link.
   useEffect(() => {
     if (!slug || slugHandled.current || users.length === 0) return;
     slugHandled.current = true;
     const target = findUserBySlug(users, slug);
     if (!target) return;
     if (me?.id === target.id) navigate('/', { replace: true });
-    else if (!me) handleSelect(target);
-  }, [slug, users, me, navigate]);
+    else if (!me || !persistent) handleSelect(target);
+  }, [slug, users, me, persistent, navigate]);
 
   const { kids, parents } = useMemo(() => orderFamily(users), [users]);
 
