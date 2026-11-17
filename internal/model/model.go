@@ -277,6 +277,8 @@ type Reward struct {
 	Stock         *int               `json:"stock,omitempty"`
 	Active        bool               `json:"active"`
 	Shareable     bool               `json:"shareable"`
+	PetAction     string             `json:"pet_action,omitempty"` // "" or a pet-care action (feed, treat, play, accessory)
+	PetItem       string             `json:"pet_item,omitempty"`   // the accessory an "accessory" reward gives
 	CreatedBy     int64              `json:"created_by"`
 	CreatedAt     time.Time          `json:"created_at"`
 	Assignments   []RewardAssignment `json:"assignments,omitempty"`
@@ -341,6 +343,79 @@ type PoolContributor struct {
 	UserName    string `json:"user_name"`
 	AvatarURL   string `json:"avatar_url,omitempty"`
 	AmountSaved int    `json:"amount_saved"`
+}
+
+// --- Pets ---
+
+// Pet actions a reward can carry.
+const (
+	PetActionFeed      = "feed"
+	PetActionTreat     = "treat"
+	PetActionPlay      = "play"
+	PetActionAccessory = "accessory"
+)
+
+// ValidPetAction reports whether a is a pet action or empty (ordinary reward).
+func ValidPetAction(a string) bool {
+	switch a {
+	case "", PetActionFeed, PetActionTreat, PetActionPlay, PetActionAccessory:
+		return true
+	}
+	return false
+}
+
+// PetItems are the accessories a pet can wear (drawn by the web app).
+var PetItems = []string{"straw_hat", "cowboy_hat", "bandana", "flower_crown", "bow", "bell", "sunglasses", "scarf"}
+
+// ValidPetItem reports whether it is one of PetItems.
+func ValidPetItem(it string) bool {
+	for _, v := range PetItems {
+		if v == it {
+			return true
+		}
+	}
+	return false
+}
+
+// PetSpecies are the farm animals a person can adopt. Every pet lives on
+// one shared family farm, so everyone sees how everyone's animal is doing.
+var PetSpecies = []string{"horse", "dog", "cat", "chicken", "cow", "pig", "sheep", "goat"}
+
+// ValidPetSpecies reports whether sp is one of PetSpecies.
+func ValidPetSpecies(sp string) bool {
+	for _, v := range PetSpecies {
+		if v == sp {
+			return true
+		}
+	}
+	return false
+}
+
+// Pet is a person's optional companion. Chores keep it healthy; points buy
+// food and play (pet-care rewards). Health can't be bought.
+type Pet struct {
+	ID             int64     `json:"id"`
+	UserID         int64     `json:"user_id"`
+	Name           string    `json:"name"`
+	Species        string    `json:"species"`
+	Health         int       `json:"health"`
+	Fullness       int       `json:"fullness"`
+	Joy            int       `json:"joy"`
+	Accessory      string    `json:"accessory,omitempty"` // worn item, from Items
+	Items          []string  `json:"items"`               // owned accessories
+	LastMissedDate *string   `json:"last_missed_date,omitempty"`
+	LastDayChecked string    `json:"last_day_checked"`
+	CreatedAt      time.Time `json:"created_at"`
+
+	// Computed on read.
+	Mood    string `json:"mood"`   // hiding, very_sick, sick, hungry, bored, happy, content
+	Hiding  bool   `json:"hiding"` // missed chores yesterday and today's aren't done yet
+	Sick    bool   `json:"sick"`
+	CanPlay bool   `json:"can_play"`
+
+	// Owner details for the shared farm view.
+	OwnerName  string `json:"owner_name,omitempty"`
+	OwnerColor string `json:"owner_color,omitempty"`
 }
 
 // --- Streaks ---

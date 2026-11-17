@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/liftedkilt/openchore/internal/model"
@@ -11,10 +12,29 @@ import (
 type RewardHandler struct {
 	store      *store.Store
 	dispatcher *webhook.Dispatcher
+	pets       *PetHandler
 }
 
-func NewRewardHandler(s *store.Store, d *webhook.Dispatcher) *RewardHandler {
-	return &RewardHandler{store: s, dispatcher: d}
+func NewRewardHandler(s *store.Store, d *webhook.Dispatcher, pets *PetHandler) *RewardHandler {
+	return &RewardHandler{store: s, dispatcher: d, pets: pets}
+}
+
+// validatePetReward checks a reward's pet-care fields.
+func validatePetReward(rw *model.Reward) string {
+	if !model.ValidPetAction(rw.PetAction) {
+		return "unknown pet_action"
+	}
+	if rw.PetAction == model.PetActionAccessory {
+		if !model.ValidPetItem(rw.PetItem) {
+			return "unknown pet_item"
+		}
+	} else {
+		rw.PetItem = ""
+	}
+	if rw.PetAction != "" && rw.Shareable {
+		return "pet-care rewards can't be shared"
+	}
+	return ""
 }
 
 func (h *RewardHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -23,6 +43,16 @@ func (h *RewardHandler) List(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list rewards")
 		return
+	}
+	// Pet-care rewards only show while farm pets are on.
+	if !petsEnabled(r.Context(), h.store) {
+		kept := rewards[:0]
+		for _, rw := range rewards {
+			if rw.PetAction == "" {
+				kept = append(kept, rw)
+			}
+		}
+		rewards = kept
 	}
 	if rewards == nil {
 		rewards = []model.Reward{}
@@ -50,6 +80,8 @@ func (h *RewardHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Cost        int    `json:"cost"`
 		Stock       *int   `json:"stock"`
 		Shareable   bool   `json:"shareable"`
+		PetAction   string `json:"pet_action"`
+		PetItem     string `json:"pet_item"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -72,7 +104,13 @@ func (h *RewardHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Stock:       req.Stock,
 		Active:      true,
 		Shareable:   req.Shareable,
+		PetAction:   req.PetAction,
+		PetItem:     req.PetItem,
 		CreatedBy:   createdBy,
+	}
+	if msg := validatePetReward(reward); msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
 	}
 	if err := h.store.CreateReward(r.Context(), reward); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create reward")
@@ -100,6 +138,8 @@ func (h *RewardHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Stock       *int    `json:"stock"`
 		Active      *bool   `json:"active"`
 		Shareable   *bool   `json:"shareable"`
+		PetAction   *string `json:"pet_action"`
+		PetItem     *string `json:"pet_item"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -125,6 +165,16 @@ func (h *RewardHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Shareable != nil {
 		existing.Shareable = *req.Shareable
+	}
+	if req.PetAction != nil {
+		existing.PetAction = *req.PetAction
+	}
+	if req.PetItem != nil {
+		existing.PetItem = *req.PetItem
+	}
+	if msg := validatePetReward(existing); msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
 	}
 	if err := h.store.UpdateReward(r.Context(), existing); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update reward")
@@ -186,10 +236,40 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user := UserFromContext(r.Context())
+	if user == nil {
+		writeError(w, http.StatusForbidden, "sign in to a profile first")
+		return
+	}
+	// Pet care: refuse before any points move if it can't take effect
+	// (no pet, hiding, too sick to play, accessory already owned).
+	petReward, err := h.store.GetReward(r.Context(), rewardID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load reward")
+		return
+	}
+	if petReward != nil && petReward.PetAction == "" {
+		petReward = nil
+	}
+	if petReward != nil {
+		msg, err := h.pets.checkPetReward(r.Context(), user, petReward)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to check pet")
+			return
+		}
+		if msg != "" {
+			writeError(w, http.StatusUnprocessableEntity, msg)
+			return
+		}
+	}
 	redemption, err := h.store.RedeemReward(r.Context(), user.ID, rewardID)
 	if err != nil {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
+	}
+	if petReward != nil {
+		if err := h.pets.applyPetReward(r.Context(), user.ID, petReward); err != nil {
+			log.Printf("pets: redemption %d paid but effect failed: %v", redemption.ID, err)
+		}
 	}
 
 	// Fire webhook
@@ -272,6 +352,10 @@ func (h *RewardHandler) Commit(w http.ResponseWriter, r *http.Request) {
 		req.AutoContributePercent = 0
 	}
 	user := UserFromContext(r.Context())
+	if rw, _ := h.store.GetReward(r.Context(), rewardID); rw != nil && rw.PetAction != "" {
+		writeError(w, http.StatusUnprocessableEntity, "pet-care rewards can't be saved for")
+		return
+	}
 	c, err := h.store.CreateCommitment(r.Context(), user.ID, rewardID, req.AutoContributePercent)
 	if err != nil {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())

@@ -30,7 +30,8 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 	chores := NewChoreHandler(s, dispatcher, discordNotifier, aiSvc)
 	admin := NewAdminHandler(s, dispatcher)
 	points := NewPointsHandler(s)
-	rewards := NewRewardHandler(s, dispatcher)
+	pets := NewPetHandler(s)
+	rewards := NewRewardHandler(s, dispatcher, pets)
 	streaks := NewStreakHandler(s)
 	webhooks := NewWebhookHandler(s)
 	triggers := NewTriggerHandler(s)
@@ -110,6 +111,11 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 			r.Delete("/me/chores/{id}", chores.DeleteOwn)
 
 			// Any user can view and redeem rewards
+			r.Get("/pets", pets.Farm)
+			r.Get("/me/pet", pets.Mine)
+			r.Post("/me/pet", pets.Adopt)
+			r.Patch("/me/pet", pets.Update)
+
 			r.Get("/rewards", rewards.List)
 			r.Post("/rewards/{id}/redeem", rewards.Redeem)
 
@@ -174,6 +180,9 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 				r.Delete("/redemptions/{redemptionID}", rewards.UndoRedemption)
 
 				// Streak rewards management
+				r.Put("/admin/pets", pets.SetEnabled)
+				r.Delete("/admin/users/{id}/pet", pets.Remove)
+
 				r.Get("/admin/streak-rewards", streaks.ListRewards)
 				r.Post("/admin/streak-rewards", streaks.CreateReward)
 				r.Delete("/admin/streak-rewards/{id}", streaks.DeleteReward)
