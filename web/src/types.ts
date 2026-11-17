@@ -280,9 +280,47 @@ export interface Reward {
   stock?: number;
   active: boolean;
   shareable: boolean;
+  /** '' for an ordinary reward; otherwise it cares for the person's farm animal. */
+  pet_action?: PetAction | '';
+  /** The accessory an "accessory" reward gives. */
+  pet_item?: PetItem;
   created_by: number;
   created_at: string;
   assignments?: RewardAssignment[];
+}
+
+// --- Farm pets ---
+
+export type PetAction = 'feed' | 'treat' | 'play' | 'accessory';
+export type PetSpecies = 'horse' | 'dog' | 'cat' | 'chicken' | 'cow' | 'pig' | 'sheep' | 'goat';
+export type PetItem = 'straw_hat' | 'cowboy_hat' | 'bandana' | 'flower_crown' | 'bow' | 'bell' | 'sunglasses' | 'scarf';
+export type PetMood = 'hiding' | 'very_sick' | 'sick' | 'hungry' | 'bored' | 'happy' | 'content';
+
+export const PET_SPECIES: PetSpecies[] = ['horse', 'dog', 'cat', 'chicken', 'cow', 'pig', 'sheep', 'goat'];
+export const PET_ITEMS: PetItem[] = ['straw_hat', 'cowboy_hat', 'bandana', 'flower_crown', 'bow', 'bell', 'sunglasses', 'scarf'];
+
+export interface Pet {
+  id: number;
+  user_id: number;
+  name: string;
+  species: PetSpecies;
+  health: number;
+  fullness: number;
+  joy: number;
+  accessory?: PetItem | '';
+  items: PetItem[];
+  last_missed_date?: string;
+  mood: PetMood;
+  hiding: boolean;
+  sick: boolean;
+  can_play: boolean;
+  owner_name?: string;
+  owner_color?: string;
+}
+
+export interface Farm {
+  enabled: boolean;
+  pets: Pet[];
 }
 
 export interface PoolContributor {

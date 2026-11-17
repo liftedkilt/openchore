@@ -1,0 +1,111 @@
+.sheet { max-width: 720px; }
+
+.section { margin-top: var(--space-4); }
+.heading { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: 20px; }
+.subheading { margin: var(--space-4) 0 var(--space-2); font-size: 15px; }
+
+.otherCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--oc-radius-md);
+  background: var(--surface-sunk);
+}
+.otherCard p { display: flex; flex-direction: column; margin: 0; font-size: 14px; }
+.otherArt { width: 72px; height: 58px; flex: none; }
+
+.species { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: var(--space-2); margin: var(--space-3) 0; }
+.speciesBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-2);
+  border: 2px solid transparent;
+  border-radius: var(--oc-radius-md);
+  background: var(--surface-sunk);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.speciesOn { border-color: var(--accent); background: var(--surface); }
+.speciesArt { width: 76px; height: 61px; }
+
+.nameRow { display: flex; flex-direction: column; gap: var(--space-1); font-size: 14px; font-weight: 700; }
+
+.mineHead { display: flex; align-items: center; gap: var(--space-3); }
+.mineArt { width: 120px; height: 96px; flex: none; }
+.mineText { flex: 1; min-width: 0; }
+.moodLine { margin: 2px 0 0; font-weight: 600; }
+.hint { margin: 4px 0 0; color: var(--ink-muted); font-size: 14px; }
+.renameBtn {
+  padding: 2px 8px;
+  border: 0;
+  border-radius: var(--oc-radius-pill);
+  background: var(--surface-sunk);
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.meters { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+.meter { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: var(--space-2); font-size: 13px; font-weight: 700; }
+.meterTrack { height: 12px; border-radius: 999px; background: var(--surface-sunk); overflow: hidden; }
+.meterFill { display: block; height: 100%; border-radius: 999px; transition: width 400ms; }
+.health { background: #e45b6c; }
+.food { background: #f0a04b; }
+.joy { background: #6fb7e8; }
+.low { animation: meter-pulse 1.4s ease-in-out infinite; }
+@keyframes meter-pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .low { animation: none; } }
+
+.careList { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.careBtn {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 0 var(--space-2);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--oc-radius-md);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.careBtn:disabled { opacity: 0.45; cursor: default; }
+.careIcon { grid-row: 1 / 3; font-size: 24px; }
+.careName { font-weight: 700; font-size: 14px; }
+.careCost { font-size: 12px; opacity: 0.85; }
+
+/* Farm card on Today. */
+.farmCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.farmCardHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.farmCardTitle { margin: 0; font-size: 17px; }
+.farmCardLine { margin: 0; color: var(--ink-muted); font-size: 14px; }
+.farmCardOpen {
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--oc-radius-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}

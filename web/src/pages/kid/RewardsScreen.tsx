@@ -18,18 +18,93 @@ interface RewardsProps {
   data: KidData;
   topBar: React.ReactNode;
   onRedeemed: () => void;
+  /** Open the family farm (adopt / care). */
+  onFarm?: () => void;
 }
 
-export function RewardsScreen({ user, data, topBar, onRedeemed }: RewardsProps) {
+export function RewardsScreen({ user, data, topBar, onRedeemed, onFarm }: RewardsProps) {
   const { t, i18n } = useTranslation();
   const balance = data.points?.balance ?? 0;
   const committed = data.points?.committed ?? 0;
   const commitments = data.points?.active_commitments ?? [];
   const hasPersonalGoal = commitments.some(c => !c.shared_pool_id);
-  const rewards = data.rewards;
+  // Pet-care rewards get their own shelf (only while farm pets are on).
+  const allRewards = data.rewards;
+  const rewards = allRewards?.filter(r => !r.pet_action) ?? null;
+  const petRewards = data.farm?.enabled ? (allRewards ?? []).filter(r => r.pet_action) : [];
+  const pet = data.myPet;
 
   const redeem = async (reward: Reward) => {
     if (await data.redeem(reward)) onRedeemed();
+  };
+
+  const renderReward = (reward: Reward, petBlocked = false) => {
+    const commitment = data.commitmentFor(reward.id);
+    const committedTo = !!commitment;
+    const shared = reward.shareable;
+    const target = commitment?.pool ? commitment.pool.target_cost : (commitment?.target_cost ?? reward.effective_cost);
+    const saved = commitment?.pool ? commitment.pool.amount_saved : (commitment?.amount_saved ?? 0);
+    const funded = committedTo && saved >= target;
+    const canAfford = !shared && balance >= reward.effective_cost;
+    const outOfStock = reward.stock != null && reward.stock <= 0;
+    const redeeming = data.redeemingId === reward.id;
+    const redeemed = data.redeemedId === reward.id;
+    const savingToward = data.savingTowardId === reward.id;
+    // Personal: offer "Save toward" when it's out of reach and there's
+    // no personal goal yet. Shared: "Join" until you're in the pot.
+    const showSaveToward = reward.pet_action ? false : shared
+      ? !committedTo && !outOfStock
+      : !committedTo && !hasPersonalGoal && reward.effective_cost > balance && !outOfStock;
+    const redeemEnabled = !petBlocked && (shared ? funded : committedTo ? funded : canAfford);
+    const label = redeemed ? t('kid.rewards.redeemed')
+      : redeeming ? t('kid.rewards.redeeming')
+      : outOfStock ? t('kid.rewards.gone')
+    : petBlocked ? t('kid.farm.notNow')
+      : committedTo ? (funded ? t('kid.rewards.redeem') : t('kid.rewards.progress', { saved, target }))
+      : canAfford ? t('kid.rewards.redeem')
+      : shared ? t('kid.rewards.familyGoal')
+      : t('kid.rewards.more', { count: reward.effective_cost - balance });
+    const ready = redeemEnabled && !outOfStock;
+
+    return (
+      <li key={reward.id} className={s.reward}>
+        <span className={s.well}><Icon name={rewardIcon(reward.icon)} /></span>
+        <div className={s.rewardText}>
+          <h3 className={s.rewardName}>
+            {reward.name}
+            {shared && <span className={s.tag}><Icon name="people" />{t('kid.rewards.familyTag')}</span>}
+            {committedTo && !shared && <span className={s.tag}>{t('kid.rewards.goalTag')}</span>}
+          </h3>
+          {reward.description && <p className={s.rewardDesc}>{reward.description}</p>}
+          <p className={s.rewardMeta}>
+            <span className={s.cost}><Icon name="star" fill />{t('kid.rewards.cost', { count: reward.effective_cost })}</span>
+            {reward.stock != null && <span>{t('kid.rewards.stock', { count: reward.stock })}</span>}
+          </p>
+        </div>
+        <div className={s.rewardActions}>
+          <button
+            type="button"
+            className={clsx(s.redeem, ready && s.redeemReady, redeemed && s.redeemDone)}
+            disabled={!redeemEnabled || outOfStock || redeeming || redeemed}
+            onClick={() => redeem(reward)}
+          >
+            {redeemed && <Icon name="check" />}
+            {!ready && !redeemed && !committedTo && !outOfStock && <Icon name="lock" />}
+            {label}
+          </button>
+          {showSaveToward && (
+            <button
+              type="button"
+              className={s.saveToward}
+              onClick={() => data.saveToward(reward)}
+              disabled={savingToward}
+            >
+              {savingToward ? t('kid.rewards.redeeming') : shared ? t('kid.rewards.join') : t('kid.rewards.saveToward')}
+            </button>
+          )}
+        </div>
+      </li>
+    );
   };
 
   return (
@@ -78,74 +153,28 @@ export function RewardsScreen({ user, data, topBar, onRedeemed }: RewardsProps) 
           <Notice icon="gift" title={t('kid.rewards.emptyTitle')}>{t('kid.rewards.emptyText')}</Notice>
         ) : (
           <ul className={s.rewardList}>
-            {rewards.map(reward => {
-              const commitment = data.commitmentFor(reward.id);
-              const committedTo = !!commitment;
-              const shared = reward.shareable;
-              const target = commitment?.pool ? commitment.pool.target_cost : (commitment?.target_cost ?? reward.effective_cost);
-              const saved = commitment?.pool ? commitment.pool.amount_saved : (commitment?.amount_saved ?? 0);
-              const funded = committedTo && saved >= target;
-              const canAfford = !shared && balance >= reward.effective_cost;
-              const outOfStock = reward.stock != null && reward.stock <= 0;
-              const redeeming = data.redeemingId === reward.id;
-              const redeemed = data.redeemedId === reward.id;
-              const savingToward = data.savingTowardId === reward.id;
-              // Personal: offer "Save toward" when it's out of reach and there's
-              // no personal goal yet. Shared: "Join" until you're in the pot.
-              const showSaveToward = shared
-                ? !committedTo && !outOfStock
-                : !committedTo && !hasPersonalGoal && reward.effective_cost > balance && !outOfStock;
-              const redeemEnabled = shared ? funded : committedTo ? funded : canAfford;
-              const label = redeemed ? t('kid.rewards.redeemed')
-                : redeeming ? t('kid.rewards.redeeming')
-                : outOfStock ? t('kid.rewards.gone')
-                : committedTo ? (funded ? t('kid.rewards.redeem') : t('kid.rewards.progress', { saved, target }))
-                : canAfford ? t('kid.rewards.redeem')
-                : shared ? t('kid.rewards.familyGoal')
-                : t('kid.rewards.more', { count: reward.effective_cost - balance });
-              const ready = redeemEnabled && !outOfStock;
-
-              return (
-                <li key={reward.id} className={s.reward}>
-                  <span className={s.well}><Icon name={rewardIcon(reward.icon)} /></span>
-                  <div className={s.rewardText}>
-                    <h3 className={s.rewardName}>
-                      {reward.name}
-                      {shared && <span className={s.tag}><Icon name="people" />{t('kid.rewards.familyTag')}</span>}
-                      {committedTo && !shared && <span className={s.tag}>{t('kid.rewards.goalTag')}</span>}
-                    </h3>
-                    {reward.description && <p className={s.rewardDesc}>{reward.description}</p>}
-                    <p className={s.rewardMeta}>
-                      <span className={s.cost}><Icon name="star" fill />{t('kid.rewards.cost', { count: reward.effective_cost })}</span>
-                      {reward.stock != null && <span>{t('kid.rewards.stock', { count: reward.stock })}</span>}
-                    </p>
-                  </div>
-                  <div className={s.rewardActions}>
-                    <button
-                      type="button"
-                      className={clsx(s.redeem, ready && s.redeemReady, redeemed && s.redeemDone)}
-                      disabled={!redeemEnabled || outOfStock || redeeming || redeemed}
-                      onClick={() => redeem(reward)}
-                    >
-                      {redeemed && <Icon name="check" />}
-                      {!ready && !redeemed && !committedTo && !outOfStock && <Icon name="lock" />}
-                      {label}
-                    </button>
-                    {showSaveToward && (
-                      <button
-                        type="button"
-                        className={s.saveToward}
-                        onClick={() => data.saveToward(reward)}
-                        disabled={savingToward}
-                      >
-                        {savingToward ? t('kid.rewards.redeeming') : shared ? t('kid.rewards.join') : t('kid.rewards.saveToward')}
-                      </button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
+            {rewards.map(reward => renderReward(reward))}
           </ul>
+        )}
+
+        {petRewards.length > 0 && (
+          <section aria-labelledby="kid-pet-care">
+            <h2 id="kid-pet-care" className={s.sectionTitle}>
+              {pet ? t('kid.farm.shopFor', { name: pet.name }) : t('kid.farm.shopTitle')}
+            </h2>
+            {!pet && (
+              <Notice icon="sprout" title={t('kid.farm.adoptTitle')}>
+                <button type="button" className={s.linkBtn} onClick={onFarm}>{t('kid.farm.adoptCta')}</button>
+              </Notice>
+            )}
+            {pet && (
+              <ul className={s.rewardList}>
+                {petRewards
+                  .filter(r => !(r.pet_action === 'accessory' && r.pet_item && pet.items.includes(r.pet_item)))
+                  .map(reward => renderReward(reward, reward.pet_action === 'play' && !pet.can_play))}
+              </ul>
+            )}
+          </section>
         )}
 
         {data.redemptions.length > 0 && (

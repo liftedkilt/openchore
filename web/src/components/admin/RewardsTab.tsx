@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { Trash2, Pencil, X } from 'lucide-react';
 import { api } from '../../api';
-import type { User, Reward, StreakRewardItem } from '../../types';
+import type { User, Reward, StreakRewardItem, PetAction, PetItem } from '../../types';
+import { PET_ITEMS } from '../../types';
 import { Avatar, Icon } from '../../design';
 import { IconPicker, IconWell, personColor } from './pickers';
 import ui from './ui.module.css';
@@ -108,6 +109,8 @@ const RewardForm: React.FC<{
   const [cost, setCost] = useState(reward?.cost?.toString() || '50');
   const [stock, setStock] = useState(reward?.stock?.toString() || '');
   const [shareable, setShareable] = useState(reward?.shareable ?? false);
+  const [petAction, setPetAction] = useState<PetAction | ''>(reward?.pet_action ?? '');
+  const [petItem, setPetItem] = useState<PetItem>(reward?.pet_item ?? 'straw_hat');
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,7 +124,9 @@ const RewardForm: React.FC<{
         cost: parseInt(cost) || 0,
         stock: stock ? parseInt(stock) : undefined,
         active: true,
-        shareable,
+        shareable: petAction ? false : shareable,
+        pet_action: petAction,
+        pet_item: petAction === 'accessory' ? petItem : undefined,
       };
       if (reward) {
         await api.rewards.update(reward.id, data);
@@ -165,10 +170,32 @@ const RewardForm: React.FC<{
         </label>
       </div>
 
-      <label className={ui.check} title={t('admin.rewardsTab.fieldShareableTitle')}>
-        <input type="checkbox" checked={shareable} onChange={e => setShareable(e.target.checked)} />
-        <span className={ui.checkLabel}>{t('admin.rewardsTab.fieldShareableLabel')}</span>
-      </label>
+      {!petAction && (
+        <label className={ui.check} title={t('admin.rewardsTab.fieldShareableTitle')}>
+          <input type="checkbox" checked={shareable} onChange={e => setShareable(e.target.checked)} />
+          <span className={ui.checkLabel}>{t('admin.rewardsTab.fieldShareableLabel')}</span>
+        </label>
+      )}
+
+      <div className={ui.formRow}>
+        <label className={ui.field}>
+          <span className={ui.label} title={t('admin.rewardsTab.fieldPetActionTitle')}>{t('admin.rewardsTab.fieldPetAction')}</span>
+          <select className={ui.input} value={petAction} onChange={e => setPetAction(e.target.value as PetAction | '')}>
+            <option value="">{t('admin.rewardsTab.petAction.none')}</option>
+            {(['feed', 'treat', 'play', 'accessory'] as const).map(a => (
+              <option key={a} value={a}>{t(`admin.rewardsTab.petAction.${a}`)}</option>
+            ))}
+          </select>
+        </label>
+        {petAction === 'accessory' && (
+          <label className={ui.field}>
+            <span className={ui.label}>{t('admin.rewardsTab.fieldPetItem')}</span>
+            <select className={ui.input} value={petItem} onChange={e => setPetItem(e.target.value as PetItem)}>
+              {PET_ITEMS.map(it => <option key={it} value={it}>{t(`kid.farm.item.${it}`)}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
 
       <div className={ui.actionsEnd}>
         <button type="button" className={ui.btnGhost} onClick={onCancel}>{t('admin.rewardsTab.cancel')}</button>

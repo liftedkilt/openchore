@@ -22,6 +22,7 @@ import { PhotoSheet } from './PhotoSheet';
 import { MeSheet } from './MeSheet';
 import { OwnTasksSheet } from './OwnTasksSheet';
 import { CelebrationLayer } from './CelebrationLayer';
+import { FarmSheet } from './farm/FarmSheet';
 import { choreDomId } from './ChoreItem';
 import { catFromCategory } from '../../design';
 import s from './kid.module.css';
@@ -63,6 +64,7 @@ export const KidApp: React.FC = () => {
   const [celebrating, setCelebrating] = useState<Celebrating | null>(null);
   // "My own tasks": open on the list (date undefined) or a new task for a day.
   const [ownTasks, setOwnTasks] = useState<{ date?: string } | null>(null);
+  const [farmOpen, setFarmOpen] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
 
   // The household's public URL for QR links (a grown-up setting; kids fall
@@ -192,9 +194,9 @@ export const KidApp: React.FC = () => {
     <SkinScope skin={skin} color={color} className={s.root}>
       <main className={s.main}>
         <Routes>
-          <Route index element={<TodayScreen {...shared} now={now} />} />
+          <Route index element={<TodayScreen {...shared} now={now} onFarm={() => setFarmOpen(true)} />} />
           <Route path="week" element={<WeekScreen {...shared} />} />
-          <Route path="rewards" element={<RewardsScreen user={user} data={data} topBar={topBar} onRedeemed={playComplete} />} />
+          <Route path="rewards" element={<RewardsScreen user={user} data={data} topBar={topBar} onRedeemed={playComplete} onFarm={() => setFarmOpen(true)} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
@@ -254,6 +256,8 @@ export const KidApp: React.FC = () => {
           onSignedOutEverywhere={logout}
         />
       )}
+
+      {farmOpen && <FarmSheet user={user} data={data} onClose={() => setFarmOpen(false)} />}
 
       {ownTasks && (
         <OwnTasksSheet

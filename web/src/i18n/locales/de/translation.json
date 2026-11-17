@@ -428,7 +428,17 @@
       "streakSubtitle": "Bonuspunkte für Tage am Stück.",
       "subtitle": "Was man sich mit Punkten holen kann.",
       "unlimited": "Unbegrenzt",
-      "update": "Aktualisieren"
+      "update": "Aktualisieren",
+      "fieldPetAction": "Hoftier-Pflege",
+      "fieldPetActionTitle": "Mach daraus eine Tierpflege-Belohnung: Einlösen füttert das Hoftier, spielt mit ihm oder schmückt es.",
+      "fieldPetItem": "Accessoire",
+      "petAction": {
+        "none": "Keine Tier-Belohnung",
+        "feed": "Füttern (viel Futter)",
+        "treat": "Leckerli (etwas Futter, viel Freude)",
+        "play": "Spielen (viel Freude)",
+        "accessory": "Accessoire"
+      }
     },
     "scheduleManager": {
       "ariaDeleteSchedule": "Zeitplan löschen",
@@ -665,6 +675,16 @@
           "modelPlaceholder": "kokoro",
           "fromEnv": "Über die Umgebungsvariable TTS_BASE_URL auf dem Server festgelegt. Ändere sie dort."
         }
+      },
+      "pets": {
+        "title": "Hoftiere",
+        "description": "Jede Person kann ein Hoftier adoptieren, das auf einem gemeinsamen Familienhof lebt. Erledigte Aufgaben halten es gesund; verpasste Aufgaben machen es krank und lassen es sich verstecken. Mit Punkten gibt es Futter, Spielzeit und Accessoires über Tierpflege-Belohnungen. Gesundheit kann man nicht kaufen.",
+        "toggle": "Hoftiere einschalten",
+        "on": "Hoftiere sind eingeschaltet.",
+        "off": "Hoftiere sind ausgeschaltet. Tiere und ihre Pflege-Belohnungen bleiben verborgen, bis du sie wieder einschaltest.",
+        "addedRewards_one": "Hoftiere sind eingeschaltet. {{count}} Tierpflege-Belohnung hinzugefügt.",
+        "addedRewards_other": "Hoftiere sind eingeschaltet. {{count}} Tierpflege-Belohnungen hinzugefügt.",
+        "failed": "Hoftiere konnten nicht geändert werden."
       }
     },
     "skins": {
@@ -1214,6 +1234,72 @@
         "everyN_other": "Alle {{count}} Tage",
         "from": "ab {{date}}",
         "until": "bis {{date}}"
+      }
+    },
+    "farm": {
+      "title": "Der Bauernhof",
+      "empty": "Noch keine Tiere – adoptiere eins!",
+      "hidingTitle": "Versteckt im Stall",
+      "open": "{{name}} besuchen",
+      "adoptCta": "Tier adoptieren",
+      "adoptTitle": "Ein Hoftier adoptieren",
+      "adoptLead": "Wenn du deine Aufgaben machst, bleibt dein Tier gesund. Mit Punkten kannst du es füttern, mit ihm spielen und es schmücken.",
+      "chooseAnimal": "Wähle ein Tier",
+      "nameLabel": "Name",
+      "namePlaceholder": "z. B. Keks",
+      "adopt": "Adoptieren",
+      "adoptFailed": "Adoptieren hat nicht geklappt. Versuch es noch mal.",
+      "saveFailed": "Speichern hat nicht geklappt. Versuch es noch mal.",
+      "rename": "Umbenennen",
+      "belongsTo": "{{name}} gehört {{owner}}",
+      "health": "Gesundheit",
+      "food": "Futter",
+      "joy": "Freude",
+      "careTitle": "Kümmern",
+      "noCare": "Bitte einen Erwachsenen, Tierpflege zu den Belohnungen hinzuzufügen.",
+      "wardrobe": "Kleiderschrank",
+      "moreInRewards_one": "{{count}} weiteres Accessoire bei den Belohnungen.",
+      "moreInRewards_other": "{{count}} weitere Accessoires bei den Belohnungen.",
+      "tooSick": "{{name}} ist zu krank zum Spielen. Deine Aufgaben helfen.",
+      "notNow": "Jetzt nicht",
+      "shopTitle": "Für dein Hoftier",
+      "shopFor": "Für {{name}}",
+      "mood": {
+        "hiding": "{{name}} versteckt sich im Stall.",
+        "very_sick": "{{name}} ist sehr krank.",
+        "sick": "{{name}} fühlt sich krank.",
+        "hungry": "{{name}} hat Hunger.",
+        "bored": "{{name}} ist langweilig.",
+        "happy": "{{name}} ist glücklich!",
+        "content": "{{name}} geht es gut."
+      },
+      "hint": {
+        "hiding": "Gestern wurden Aufgaben verpasst. Erledige die heutigen, damit {{name}} wieder herauskommt.",
+        "sick": "Wenn du jeden Tag alle Aufgaben machst, wird {{name}} wieder gesund.",
+        "hungry": "Füttere {{name}} über die Belohnungen.",
+        "bored": "Spiel mit {{name}}, um es aufzumuntern.",
+        "ok": "Mach weiter deine Aufgaben, damit {{name}} gesund bleibt."
+      },
+      "species": {
+        "horse": "Pferd",
+        "dog": "Hund",
+        "cat": "Katze",
+        "chicken": "Huhn",
+        "cow": "Kuh",
+        "pig": "Schwein",
+        "sheep": "Schaf",
+        "goat": "Ziege"
+      },
+      "item": {
+        "none": "Nichts",
+        "straw_hat": "Strohhut",
+        "cowboy_hat": "Cowboyhut",
+        "bandana": "Halstuch",
+        "flower_crown": "Blumenkranz",
+        "bow": "Schleife",
+        "bell": "Glocke",
+        "sunglasses": "Sonnenbrille",
+        "scarf": "Schal"
       }
     }
   },
