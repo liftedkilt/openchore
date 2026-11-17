@@ -2,7 +2,7 @@
 // wander about, sick ones shuffle slowly, very sick ones lie down, and an
 // animal whose owner missed chores hides in its shelter by the fence where
 // everyone can see it.
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { Pet } from '../../../types';

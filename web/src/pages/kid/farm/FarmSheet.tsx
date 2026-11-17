@@ -1,7 +1,7 @@
 // The family farm, opened from Today: everyone's animals, plus your own
 // animal's care — adopt one, feed / treat / play (pet-care rewards), and
 // choose which accessory it wears.
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { api, APIError } from '../../../api';

@@ -4,7 +4,6 @@
 // the shared face and accessory components read, so every mood and accessory
 // lands correctly on every animal. Flat, friendly children's-book style with
 // soft outlines in a darker tint of each animal's own colour.
-import React from 'react';
 import type { PetItem, PetMood, PetSpecies } from '../../../types';
 
 const INK = '#2b2522';
