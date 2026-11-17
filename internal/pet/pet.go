@@ -17,8 +17,9 @@ const (
 	DailyHunger   = 20 // fullness lost every day
 	DailyBoredom  = 15 // joy lost every day
 	GoodDayHealth = 15 // all of the day's chores done
-	MissHealth    = 15 // per missed chore...
-	MaxMissHealth = 40 // ...up to this much in one day
+	FreeDayHealth = 5  // a day with no chores
+	MissHealth    = 10 // per missed chore...
+	MaxMissHealth = 30 // ...up to this much in one day
 	StarveHealth  = 10 // fullness ran out
 
 	SickBelow     = 40
@@ -49,6 +50,8 @@ func ApplyDay(p *model.Pet, date string, d DayResult) {
 		p.LastMissedDate = &dd
 	case d.Counted > 0:
 		p.Health += GoodDayHealth
+	default:
+		p.Health += FreeDayHealth
 	}
 	if p.Fullness == 0 {
 		p.Health -= StarveHealth
@@ -70,8 +73,8 @@ func Effect(action string) (fullness, joy int) {
 }
 
 // Describe fills in the computed fields. yesterday is the day before today;
-// todayDone is whether every chore counting toward today is done (true on a
-// day with none).
+// todayDone is whether every chore counting toward today that can be done
+// yet is done (see CaughtUp).
 func Describe(p *model.Pet, yesterday string, todayDone bool) {
 	p.Hiding = p.LastMissedDate != nil && *p.LastMissedDate == yesterday && !todayDone
 	p.Sick = p.Health < SickBelow
@@ -95,9 +98,12 @@ func Describe(p *model.Pet, yesterday string, todayDone bool) {
 }
 
 // IsDone reports whether a scheduled chore counts as done for the pet:
-// completed (approved or waiting for a grown-up) or excused. A rejected
-// try doesn't count.
+// completed (approved or waiting for a grown-up), excused, or a first come,
+// first served chore a sibling got to first. A rejected try doesn't count.
 func IsDone(c model.ScheduledChore) bool {
+	if c.CompletedBySibling {
+		return true
+	}
 	if !c.Completed {
 		return false
 	}
@@ -117,6 +123,18 @@ func Summarize(chores []model.ScheduledChore) DayResult {
 		}
 	}
 	return d
+}
+
+// CaughtUp reports whether every chore counting toward today that is
+// available yet is done: a hiding pet comes out as soon as you've caught up,
+// without waiting for chores that unlock this evening.
+func CaughtUp(today []model.ScheduledChore) bool {
+	for _, c := range today {
+		if model.CountsTowardDay(c.Category) && c.Available && !IsDone(c) {
+			return false
+		}
+	}
+	return true
 }
 
 func clamp(v int) int {

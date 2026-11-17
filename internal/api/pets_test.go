@@ -139,7 +139,7 @@ func TestPetHidesAndGetsSickAfterMissedChores(t *testing.T) {
 	checker.CheckAt(context.Background(), now) // idempotent
 
 	p := env.myPet(t, kid)
-	if p["health"].(float64) != 65 || p["hiding"] != true || p["mood"] != "hiding" {
+	if p["health"].(float64) != 70 || p["hiding"] != true || p["mood"] != "hiding" {
 		t.Fatalf("after a missed day: %v", p)
 	}
 

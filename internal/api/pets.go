@@ -47,7 +47,7 @@ func (h *PetHandler) describe(ctx context.Context, p *model.Pet, owner *model.Us
 	if err != nil {
 		return err
 	}
-	pet.Describe(p, yesterday, pet.Summarize(chores).Missed == 0)
+	pet.Describe(p, yesterday, pet.CaughtUp(chores))
 	if owner != nil {
 		p.OwnerName = owner.Name
 		p.OwnerColor = owner.Color
@@ -164,8 +164,8 @@ func (h *PetHandler) Adopt(w http.ResponseWriter, r *http.Request) {
 		Health:   pet.StartHealth,
 		Fullness: pet.StartFullness,
 		Joy:      pet.StartJoy,
-		// The daily check starts with adoption day itself.
-		LastDayChecked: h.now().AddDate(0, 0, -1).Format(model.DateFormat),
+		// Adoption day isn't judged: the first day checked is tomorrow.
+		LastDayChecked: h.now().Format(model.DateFormat),
 	}
 	if err := h.store.CreatePet(ctx, p); err != nil {
 		if errors.Is(err, store.ErrPetExists) {

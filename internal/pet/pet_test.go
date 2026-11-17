@@ -19,11 +19,11 @@ func TestApplyDay(t *testing.T) {
 		t.Fatalf("good day: %+v", p)
 	}
 	ApplyDay(p, "2026-11-17", DayResult{Counted: 3, Missed: 1})
-	if p.Health != 80 || p.LastMissedDate == nil || *p.LastMissedDate != "2026-11-17" {
+	if p.Health != 85 || p.LastMissedDate == nil || *p.LastMissedDate != "2026-11-17" {
 		t.Fatalf("missed day: %+v", p)
 	}
 	ApplyDay(p, "2026-11-18", DayResult{Counted: 5, Missed: 5})
-	if p.Health != 40 {
+	if p.Health != 55 {
 		t.Fatalf("a bad day is capped at -%d: %+v", MaxMissHealth, p)
 	}
 	// Paused: nothing changes.
@@ -36,7 +36,7 @@ func TestApplyDay(t *testing.T) {
 	p = newPet()
 	p.Fullness = 10
 	ApplyDay(p, "2026-11-20", DayResult{})
-	if p.Fullness != 0 || p.Health != StartHealth-StarveHealth {
+	if p.Fullness != 0 || p.Health != StartHealth+FreeDayHealth-StarveHealth {
 		t.Fatalf("starving: %+v", p)
 	}
 }
@@ -71,11 +71,27 @@ func TestSummarizeCountsPendingAndExcusedAsDone(t *testing.T) {
 		{Category: "core", Completed: true, CompletionStatus: st(model.StatusExcused)},
 		{Category: "core", Completed: true, CompletionStatus: st(model.StatusRejected)},
 		{Category: "core"},
+		{Category: "core", CompletedBySibling: true},
 		{Category: "bonus"},
 		{Category: "optional"},
 	}
 	d := Summarize(chores)
-	if d.Counted != 5 || d.Missed != 2 {
+	if d.Counted != 6 || d.Missed != 2 {
 		t.Fatalf("got %+v", d)
+	}
+}
+
+func TestCaughtUpIgnoresLaterChores(t *testing.T) {
+	chores := []model.ScheduledChore{
+		{Category: "core", Available: true, Completed: true},
+		{Category: "core", Available: false},
+		{Category: "bonus", Available: true},
+	}
+	if !CaughtUp(chores) {
+		t.Fatal("a chore that isn't available yet held the pet in hiding")
+	}
+	chores[1].Available = true
+	if CaughtUp(chores) {
+		t.Fatal("caught up with an available chore undone")
 	}
 }

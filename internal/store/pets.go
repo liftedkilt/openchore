@@ -132,8 +132,8 @@ func (s *Store) ListPets(ctx context.Context) ([]model.Pet, error) {
 	return pets, nil
 }
 
-// CreatePet adopts a pet. lastDayChecked is the day before adoption, so the
-// daily check starts with adoption day itself.
+// CreatePet adopts a pet. Callers set LastDayChecked to adoption day, so the
+// first day judged is the next one.
 func (s *Store) CreatePet(ctx context.Context, p *model.Pet) error {
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO pets (user_id, name, species, health, fullness, joy, last_day_checked)
