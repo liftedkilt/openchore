@@ -8,7 +8,9 @@
 // Colours live in a per-species palette (one per coat colour) that the rig is
 // merged with, so a black horse gets a black mane and a red cow a white face
 // without any species drawing needing to know which coat it is wearing.
+import { useId } from 'react';
 import type { PetMood, PetSpecies } from '../../../types';
+import s from './farm.module.css';
 
 const INK = '#2b2522';
 const LIGHT_INK = '#f6f1e8';
@@ -198,7 +200,25 @@ function tint(r: Rig, t: number): Rig {
   return { ...r, fur: pale(r.fur, t), shade: pale(r.shade, t), line: pale(r.line, t * 0.6), face: pale(r.face, r.face === r.fur ? t : t * 0.4) };
 }
 
-const LINE = { strokeWidth: 1.5, strokeLinejoin: 'round' as const, strokeLinecap: 'round' as const };
+/**
+ * Outline props for a part drawn in `color` at width `w`. The attributes are
+ * the soft tinted line; the inline style lets the skin's farm dials push it
+ * towards the skin's own ink and thicken it (themes.css: --farm-ink,
+ * --farm-ink-mix, --farm-line-k). With the dials at 0% / 1 the line is
+ * exactly the soft one, so the other skins are untouched.
+ */
+function ln(color: string, w = 1.5) {
+  return {
+    stroke: color,
+    strokeWidth: w,
+    strokeLinejoin: 'round' as const,
+    strokeLinecap: 'round' as const,
+    style: {
+      stroke: `color-mix(in srgb, var(--farm-ink, #000) var(--farm-ink-mix, 0%), ${color})`,
+      strokeWidth: `calc(${w}px * var(--farm-line-k, 1))`,
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Face
@@ -368,34 +388,35 @@ function Tail({ species, r, fast }: { species: PetSpecies; r: Rig; fast?: boolea
   const wag = fast ? 'farm-tail farm-tail-fast' : 'farm-tail';
   switch (species) {
     case 'horse':
-      return <path d={`M${bx + 2} ${y - 8} q-12 6 -11 26 q2 -4 5 -6 q1 4 4 6 q3 -14 6 -22z`} fill={r.dark} stroke={r.darkLine} {...LINE} />;
+      return <path d={`M${bx + 2} ${y - 8} q-12 6 -11 26 q2 -4 5 -6 q1 4 4 6 q3 -14 6 -22z`} fill={r.dark} {...ln(r.darkLine)} />;
     case 'dog':
       return <path className={wag} d={`M${bx + 3} ${y - 5} q-9 -4 -12 -16`} stroke={r.shade} strokeWidth={5} fill="none" strokeLinecap="round" />;
     case 'cat':
       return (
         <g className={wag}>
-          <path d={`M${bx + 2} ${y + 2} q-13 -2 -11 -17 q1 -7 7 -5`} stroke={r.line} strokeWidth={7} fill="none" strokeLinecap="round" />
+          {/* Outline stroke: 4.5 of fur plus the outline on each side, so it thickens with --farm-line-k. */}
+          <path d={`M${bx + 2} ${y + 2} q-13 -2 -11 -17 q1 -7 7 -5`} {...ln(r.line, 7)} style={{ ...ln(r.line).style, strokeWidth: 'calc(4.5px + 2.5px * var(--farm-line-k, 1))' }} fill="none" />
           <path d={`M${bx + 2} ${y + 2} q-13 -2 -11 -17 q1 -7 7 -5`} stroke={r.fur} strokeWidth={4.5} fill="none" strokeLinecap="round" />
         </g>
       );
     case 'chicken':
       return (
         <path d={`M${bx + 6} ${y - 4} q-8 -6 -8 -20 q5 5 8 10 q-2 -9 3 -16 q3 8 4 14 q1 -7 6 -11 q0 10 -2 20z`}
-          fill={r.fur} stroke={r.line} {...LINE} />
+          fill={r.fur} {...ln(r.line)} />
       );
     case 'cow':
       return (
         <g>
-          <path d={`M${bx + 2} ${y - 7} q-9 6 -8 24`} stroke={r.line} strokeWidth={2.2} fill="none" strokeLinecap="round" />
+          <path d={`M${bx + 2} ${y - 7} q-9 6 -8 24`} {...ln(r.line, 2.2)} fill="none" />
           <path d={`M${bx - 6} ${y + 15} q-3 3 0 7 q3 -3 3 -7z`} fill={r.dark} />
         </g>
       );
     case 'pig':
-      return <path d={`M${bx + 2} ${y - 4} q-7 -5 -4 -9 q4 -2 3 2 q-1 3 -5 2`} stroke={r.line} strokeWidth={2} fill="none" strokeLinecap="round" />;
+      return <path d={`M${bx + 2} ${y - 4} q-7 -5 -4 -9 q4 -2 3 2 q-1 3 -5 2`} {...ln(r.line, 2)} fill="none" />;
     case 'sheep':
-      return <circle cx={bx - 1} cy={y - 6} r={5} fill={r.fur} stroke={r.line} {...LINE} />;
+      return <circle cx={bx - 1} cy={y - 6} r={5} fill={r.fur} {...ln(r.line)} />;
     case 'goat':
-      return <path d={`M${bx + 3} ${y - 6} l-7 -8 q5 1 9 5z`} fill={r.fur} stroke={r.line} {...LINE} />;
+      return <path d={`M${bx + 3} ${y - 6} l-7 -8 q5 1 9 5z`} fill={r.fur} {...ln(r.line)} />;
   }
 }
 
@@ -407,8 +428,8 @@ function BodyDetail({ species, r }: { species: PetSpecies; r: Rig }) {
       return (
         <g>
           {/* neck with mane */}
-          <path d={`M${x + 12} ${y - 10} Q${x + 20} ${y - 26} ${r.head.x - 2} ${r.head.y - 6} L${r.head.x + 6} ${r.head.y + 8} Q${x + 24} ${y} ${x + 18} ${y + 6}z`} fill={r.fur} stroke={r.line} {...LINE} />
-          <path d={`M${r.head.x - 3} ${r.head.y - r.head.r - 1} q-9 2 -11 9 q-7 2 -8 9 q-6 3 -6 9 q-3 2 -2 6 L${x + 11} ${y - 9} Q${x + 20} ${y - 26} ${r.head.x - 1} ${r.head.y - 5}z`} fill={r.dark} stroke={r.darkLine} {...LINE} />
+          <path d={`M${x + 12} ${y - 10} Q${x + 20} ${y - 26} ${r.head.x - 2} ${r.head.y - 6} L${r.head.x + 6} ${r.head.y + 8} Q${x + 24} ${y} ${x + 18} ${y + 6}z`} fill={r.fur} {...ln(r.line)} />
+          <path d={`M${r.head.x - 3} ${r.head.y - r.head.r - 1} q-9 2 -11 9 q-7 2 -8 9 q-6 3 -6 9 q-3 2 -2 6 L${x + 11} ${y - 9} Q${x + 20} ${y - 26} ${r.head.x - 1} ${r.head.y - 5}z`} fill={r.dark} {...ln(r.darkLine)} />
         </g>
       );
     case 'dog':
@@ -422,7 +443,7 @@ function BodyDetail({ species, r }: { species: PetSpecies; r: Rig }) {
       return (
         <g>
           <path d={`M${x + 10} ${y - 14} L${r.head.x - 6} ${r.head.y - 2} L${r.head.x + 6} ${r.head.y + 6} L${x + 16} ${y - 2}z`} fill={r.fur} />
-          <path d={`M${x - 6} ${y - 3} q10 -8 20 0 q-8 11 -20 0z`} fill={r.shade} stroke={r.line} {...LINE} />
+          <path d={`M${x - 6} ${y - 3} q10 -8 20 0 q-8 11 -20 0z`} fill={r.shade} {...ln(r.line)} />
         </g>
       );
     case 'cow':
@@ -452,7 +473,7 @@ function BodyDetail({ species, r }: { species: PetSpecies; r: Rig }) {
       return (
         <g>
           {[[-18, -6], [-8, -12], [4, -13], [15, -9], [21, 0], [14, 9], [2, 12], [-11, 10], [-20, 5]].map(([dx, dy], i) => (
-            <circle key={i} cx={x + dx} cy={y + dy} r={8.5} fill={r.fur} stroke={r.line} {...LINE} />
+            <circle key={i} cx={x + dx} cy={y + dy} r={8.5} fill={r.fur} {...ln(r.line)} />
           ))}
           <ellipse cx={x} cy={y} rx={rx - 3} ry={ry - 3} fill={r.fur} />
         </g>
@@ -469,35 +490,35 @@ function HeadBack({ species, r }: { species: PetSpecies; r: Rig }) {
     case 'horse':
       return (
         <g>
-          <path d={`M${x - 7} ${y - hr + 3} l-1 -9 l6 6z M${x + 2} ${y - hr + 1} l3 -8 l4 8z`} fill={r.fur} stroke={r.line} {...LINE} />
-          <path d={`M${x - 4} ${y - hr + 1} q-4 4 -6 10 q4 -2 6 -5 q2 3 6 4 q-1 -6 -6 -9z`} fill={r.dark} stroke={r.darkLine} {...LINE} />
+          <path d={`M${x - 7} ${y - hr + 3} l-1 -9 l6 6z M${x + 2} ${y - hr + 1} l3 -8 l4 8z`} fill={r.fur} {...ln(r.line)} />
+          <path d={`M${x - 4} ${y - hr + 1} q-4 4 -6 10 q4 -2 6 -5 q2 3 6 4 q-1 -6 -6 -9z`} fill={r.dark} {...ln(r.darkLine)} />
         </g>
       );
     case 'dog':
-      return <path d={`M${x + 2} ${y - hr + 2} q8 -3 10 4 q-1 4 -4 5 q-2 -6 -6 -9z`} fill={r.dark} stroke={r.line} {...LINE} />;
+      return <path d={`M${x + 2} ${y - hr + 2} q8 -3 10 4 q-1 4 -4 5 q-2 -6 -6 -9z`} fill={r.dark} {...ln(r.line)} />;
     case 'cat':
       return (
         <g>
-          <path d={`M${x - 10} ${y - 6} l-1 -13 l11 7z M${x + 3} ${y - 12} l9 -8 l1 13z`} fill={r.fur} stroke={r.line} {...LINE} />
+          <path d={`M${x - 10} ${y - 6} l-1 -13 l11 7z M${x + 3} ${y - 12} l9 -8 l1 13z`} fill={r.fur} {...ln(r.line)} />
           <path d={`M${x - 8} ${y - 8} l0 -7 l6 4z M${x + 5} ${y - 12} l5 -4 l0 7z`} fill={r.inner ?? r.shade} />
         </g>
       );
     case 'chicken':
       return (
-        <path d={`M${x - 8} ${y - hr + 3} q0 -8 5 -6 q1 -7 6 -3 q3 -6 6 1 q2 -3 4 2 q-6 2 -21 6z`} fill="#e5473f" stroke="#b7342d" {...LINE} />
+        <path d={`M${x - 8} ${y - hr + 3} q0 -8 5 -6 q1 -7 6 -3 q3 -6 6 1 q2 -3 4 2 q-6 2 -21 6z`} fill="#e5473f" {...ln('#b7342d')} />
       );
     case 'cow':
       return (
         <g>
           <path d={`M${x - 7} ${y - hr + 3} q-3 -9 -9 -9`} stroke={r.horn} strokeWidth={4} fill="none" strokeLinecap="round" />
           <path d={`M${x + 7} ${y - hr + 3} q3 -9 9 -9`} stroke={r.horn} strokeWidth={4} fill="none" strokeLinecap="round" />
-          <ellipse cx={x - hr - 2} cy={y - 2} rx={6} ry={3.5} fill={r.fur} stroke={r.line} {...LINE} />
+          <ellipse cx={x - hr - 2} cy={y - 2} rx={6} ry={3.5} fill={r.fur} {...ln(r.line)} />
         </g>
       );
     case 'pig':
       return (
         <g>
-          <path d={`M${x - 10} ${y - 7} l-3 -11 l11 5z M${x + 4} ${y - 12} l8 -8 l2 11z`} fill={r.fur} stroke={r.line} {...LINE} />
+          <path d={`M${x - 10} ${y - 7} l-3 -11 l11 5z M${x + 4} ${y - 12} l8 -8 l2 11z`} fill={r.fur} {...ln(r.line)} />
           <path d={`M${x - 8} ${y - 9} l-1 -5 l5 3z M${x + 6} ${y - 12} l4 -4 l1 6z`} fill={r.inner ?? r.shade} />
         </g>
       );
@@ -505,9 +526,9 @@ function HeadBack({ species, r }: { species: PetSpecies; r: Rig }) {
       return (
         <g>
           {[[-6, -9], [2, -11], [8, -8]].map(([dx, dy], i) => (
-            <circle key={i} cx={x + dx} cy={y + dy} r={5.5} fill={r.fur} stroke={r.line} {...LINE} />
+            <circle key={i} cx={x + dx} cy={y + dy} r={5.5} fill={r.fur} {...ln(r.line)} />
           ))}
-          <ellipse cx={x - hr} cy={y + 1} rx={5} ry={3} fill={r.face} stroke={r.darkLine} {...LINE} />
+          <ellipse cx={x - hr} cy={y + 1} rx={5} ry={3} fill={r.face} {...ln(r.darkLine)} />
         </g>
       );
     case 'goat':
@@ -515,7 +536,7 @@ function HeadBack({ species, r }: { species: PetSpecies; r: Rig }) {
         <g>
           <path d={`M${x - 5} ${y - hr + 2} q-4 -10 -12 -12`} stroke={r.horn} strokeWidth={3.5} fill="none" strokeLinecap="round" />
           <path d={`M${x + 2} ${y - hr + 1} q-1 -11 -8 -14`} stroke={r.horn} strokeWidth={3.5} fill="none" strokeLinecap="round" />
-          <path d={`M${x - hr + 2} ${y - 2} q-9 -1 -9 6 q6 2 10 -2z`} fill={r.fur} stroke={r.line} {...LINE} />
+          <path d={`M${x - hr + 2} ${y - 2} q-9 -1 -9 6 q6 2 10 -2z`} fill={r.fur} {...ln(r.line)} />
         </g>
       );
   }
@@ -528,16 +549,16 @@ function HeadFront({ species, r }: { species: PetSpecies; r: Rig }) {
     case 'horse':
       return (
         <g>
-          <ellipse cx={x + 13} cy={y + 9} rx={10} ry={7.5} fill={r.muzzle} stroke={r.line} {...LINE} />
+          <ellipse cx={x + 13} cy={y + 9} rx={10} ry={7.5} fill={r.muzzle} {...ln(r.line)} />
           <ellipse cx={x + 18} cy={y + 7} rx={1.4} ry={1.1} fill={r.nose ?? r.line} />
         </g>
       );
     case 'dog':
       return (
         <g>
-          <ellipse cx={x + 9} cy={y + 8} rx={8.5} ry={6.5} fill={r.muzzle} stroke={r.line} {...LINE} />
+          <ellipse cx={x + 9} cy={y + 8} rx={8.5} ry={6.5} fill={r.muzzle} {...ln(r.line)} />
           <ellipse cx={x + 14} cy={y + 5} rx={3} ry={2.4} fill={r.nose ?? r.line} />
-          <path d={`M${x - 4} ${y - hr + 2} q-9 1 -12 10 q-2 9 4 13 q5 -3 5 -12 q0 -7 3 -11z`} fill={r.dark} stroke={r.line} {...LINE} />
+          <path d={`M${x - 4} ${y - hr + 2} q-9 1 -12 10 q-2 9 4 13 q5 -3 5 -12 q0 -7 3 -11z`} fill={r.dark} {...ln(r.line)} />
         </g>
       );
     case 'cat':
@@ -553,15 +574,15 @@ function HeadFront({ species, r }: { species: PetSpecies; r: Rig }) {
     case 'chicken':
       return (
         <g>
-          <path d={`M${x + 9} ${y - 1} l9 3 l-9 3z`} fill="#f2a93b" stroke="#c98427" {...LINE} />
-          <path d={`M${x + 9} ${y + 5} q3 6 -1 8 q-3 -4 1 -8z`} fill="#e5473f" stroke="#b7342d" {...LINE} />
+          <path d={`M${x + 9} ${y - 1} l9 3 l-9 3z`} fill="#f2a93b" {...ln('#c98427')} />
+          <path d={`M${x + 9} ${y + 5} q3 6 -1 8 q-3 -4 1 -8z`} fill="#e5473f" {...ln('#b7342d')} />
         </g>
       );
     case 'cow':
       return (
         <g>
           {r.patch && <path d={`M${x - 11} ${y - 9} q8 -4 12 3 q-1 8 -9 7 q-5 -4 -3 -10z`} fill={r.patch} />}
-          <ellipse cx={x + 9} cy={y + 10} rx={10} ry={6.5} fill={r.muzzle} stroke={r.line} {...LINE} />
+          <ellipse cx={x + 9} cy={y + 10} rx={10} ry={6.5} fill={r.muzzle} {...ln(r.line)} />
           <ellipse cx={x + 6} cy={y + 9.5} rx={1.4} ry={1.1} fill={r.nose ?? r.line} />
           <ellipse cx={x + 13} cy={y + 9.5} rx={1.4} ry={1.1} fill={r.nose ?? r.line} />
         </g>
@@ -569,18 +590,18 @@ function HeadFront({ species, r }: { species: PetSpecies; r: Rig }) {
     case 'pig':
       return (
         <g>
-          <ellipse cx={x + 11} cy={y + 6} rx={6.5} ry={5.5} fill={r.muzzle} stroke={r.line} {...LINE} />
+          <ellipse cx={x + 11} cy={y + 6} rx={6.5} ry={5.5} fill={r.muzzle} {...ln(r.line)} />
           <ellipse cx={x + 9} cy={y + 6} rx={1.3} ry={1.7} fill={r.nose ?? r.line} />
           <ellipse cx={x + 13.5} cy={y + 6} rx={1.3} ry={1.7} fill={r.nose ?? r.line} />
         </g>
       );
     case 'sheep':
-      return <ellipse cx={x + hr - 1} cy={y + 1} rx={5} ry={3} fill={r.face} stroke={r.darkLine} {...LINE} />;
+      return <ellipse cx={x + hr - 1} cy={y + 1} rx={5} ry={3} fill={r.face} {...ln(r.darkLine)} />;
     case 'goat':
       return (
         <g>
-          <ellipse cx={x + 11} cy={y + 8} rx={8} ry={6} fill={r.muzzle} stroke={r.line} {...LINE} />
-          <path d={`M${x + 7} ${y + 13} q2 8 4 10 q2 -4 3 -10z`} fill={r.shade} stroke={r.line} {...LINE} />
+          <ellipse cx={x + 11} cy={y + 8} rx={8} ry={6} fill={r.muzzle} {...ln(r.line)} />
+          <path d={`M${x + 7} ${y + 13} q2 8 4 10 q2 -4 3 -10z`} fill={r.shade} {...ln(r.line)} />
           <ellipse cx={x + 16} cy={y + 6} rx={1.3} ry={1} fill={r.nose ?? r.line} />
         </g>
       );
@@ -695,24 +716,24 @@ function Builtin({ item, r }: { item: string; r: Rig }) {
     case 'straw_hat':
       return (
         <g transform={`translate(${hx} ${hy}) scale(${s})`}>
-          <ellipse cx={0} cy={1} rx={17} ry={4.5} fill="#f0cf74" stroke="#b08a3a" {...LINE} />
-          <path d="M-8 1 q-1 -11 8 -11 q9 0 8 11z" fill="#f6dd8c" stroke="#b08a3a" {...LINE} />
+          <ellipse cx={0} cy={1} rx={17} ry={4.5} fill="#f0cf74" {...ln('#b08a3a')} />
+          <path d="M-8 1 q-1 -11 8 -11 q9 0 8 11z" fill="#f6dd8c" {...ln('#b08a3a')} />
           <path d="M-8 -1 q8 2 16 0" stroke="#e2453c" strokeWidth={2.4} fill="none" />
         </g>
       );
     case 'cowboy_hat':
       return (
         <g transform={`translate(${hx} ${hy}) scale(${s})`}>
-          <path d="M-18 -1 q2 7 18 6 q16 1 18 -6 q-6 5 -18 3 q-12 2 -18 -3z" fill="#9a6336" stroke="#5e3a1e" {...LINE} />
-          <path d="M-9 2 q-1 -13 4 -13 q3 3 6 0 q6 -1 6 13z" fill="#b6773f" stroke="#5e3a1e" {...LINE} />
+          <path d="M-18 -1 q2 7 18 6 q16 1 18 -6 q-6 5 -18 3 q-12 2 -18 -3z" fill="#9a6336" {...ln('#5e3a1e')} />
+          <path d="M-9 2 q-1 -13 4 -13 q3 3 6 0 q6 -1 6 13z" fill="#b6773f" {...ln('#5e3a1e')} />
           <path d="M-9 1 h18" stroke="#5e3a1e" strokeWidth={2} />
         </g>
       );
     case 'top_hat':
       return (
         <g transform={`translate(${hx} ${hy}) scale(${s})`}>
-          <ellipse cx={0} cy={2} rx={15} ry={3.6} fill="#2e2c38" stroke="#15141b" {...LINE} />
-          <path d="M-9 2 l-0.5 -14 q9.5 -2.5 19 0 l-0.5 14z" fill="#3b3947" stroke="#15141b" {...LINE} />
+          <ellipse cx={0} cy={2} rx={15} ry={3.6} fill="#2e2c38" {...ln('#15141b')} />
+          <path d="M-9 2 l-0.5 -14 q9.5 -2.5 19 0 l-0.5 14z" fill="#3b3947" {...ln('#15141b')} />
           <path d="M-9.3 -2 q9.3 2.6 18.6 0 v4.2 q-9.3 2.4 -18.6 0z" fill="#c23b4a" stroke="#15141b" strokeWidth={1} />
           <path d="M-6 -10 v8" stroke="#fff" strokeWidth={1.4} strokeLinecap="round" opacity={0.18} />
         </g>
@@ -720,27 +741,27 @@ function Builtin({ item, r }: { item: string; r: Rig }) {
     case 'party_hat':
       return (
         <g transform={`translate(${hx + 2 * s} ${hy + 1}) scale(${s}) rotate(10)`}>
-          <path d="M-8 2 L0 -15 L8 2z" fill="#ff7ab3" stroke="#b03a6e" {...LINE} />
+          <path d="M-8 2 L0 -15 L8 2z" fill="#ff7ab3" {...ln('#b03a6e')} />
           <path d="M-5.6 -3 L5.6 -3 M-3 -8.5 L3 -8.5" stroke="#8fc4f4" strokeWidth={2.2} strokeLinecap="round" />
           <path d="M-8 2 q8 -3 16 0" stroke="#ffe66d" strokeWidth={2.2} fill="none" strokeLinecap="round" />
-          <circle cx={0} cy={-15.5} r={3} fill="#ffe66d" stroke="#b08a3a" {...LINE} />
+          <circle cx={0} cy={-15.5} r={3} fill="#ffe66d" {...ln('#b08a3a')} />
         </g>
       );
     case 'beanie':
       return (
         <g transform={`translate(${hx} ${hy}) scale(${s})`}>
-          <path d="M-13 3 q0 -15 13 -15 q13 0 13 15z" fill="#7a5cc7" stroke="#4b3680" {...LINE} />
+          <path d="M-13 3 q0 -15 13 -15 q13 0 13 15z" fill="#7a5cc7" {...ln('#4b3680')} />
           <path d="M-5 -9 q-1 6 -2 12 M0 -11 v14 M5 -9 q1 6 2 12" stroke="#fff" strokeWidth={1.4} strokeLinecap="round" opacity={0.22} />
-          <path d="M-13 3 q13 -3.5 26 0 v4 q-13 3 -26 0z" fill="#9b7fe0" stroke="#4b3680" {...LINE} />
+          <path d="M-13 3 q13 -3.5 26 0 v4 q-13 3 -26 0z" fill="#9b7fe0" {...ln('#4b3680')} />
           <path d="M-9 1.5 v4 M-4.5 0.8 v4 M0 0.5 v4 M4.5 0.8 v4 M9 1.5 v4" stroke="#4b3680" strokeWidth={1} strokeLinecap="round" opacity={0.5} />
-          <circle cx={0} cy={-13} r={3.6} fill="#f3ecff" stroke="#4b3680" {...LINE} />
+          <circle cx={0} cy={-13} r={3.6} fill="#f3ecff" {...ln('#4b3680')} />
         </g>
       );
     case 'wizard_hat':
       return (
         <g transform={`translate(${hx} ${hy}) scale(${s})`}>
-          <ellipse cx={0} cy={2} rx={16} ry={4} fill="#3b48c2" stroke="#26307f" {...LINE} />
-          <path d="M-9 2 Q-5 -6 -3 -13 Q-1 -17 8 -18 Q2 -15 3 -11 Q6 -4 9 2z" fill="#4a5be0" stroke="#26307f" {...LINE} />
+          <ellipse cx={0} cy={2} rx={16} ry={4} fill="#3b48c2" {...ln('#26307f')} />
+          <path d="M-9 2 Q-5 -6 -3 -13 Q-1 -17 8 -18 Q2 -15 3 -11 Q6 -4 9 2z" fill="#4a5be0" {...ln('#26307f')} />
           <path d="M-9 2 q9 -3 18 0" stroke="#ffd34e" strokeWidth={2} fill="none" strokeLinecap="round" />
           <Star x={-1} y={-6} r={2.4} fill="#ffe66d" />
           <Star x={3.5} y={-1.5} r={1.6} fill="#ffe66d" />
@@ -750,7 +771,7 @@ function Builtin({ item, r }: { item: string; r: Rig }) {
     case 'pirate_hat':
       return (
         <g transform={`translate(${hx} ${hy}) scale(${s})`}>
-          <path d="M-19 3 q-1 -11 10 -13 q9 -3 18 0 q11 2 10 13 q-9 -5 -19 -4 q-10 -1 -19 4z" fill="#2e2c38" stroke="#15141b" {...LINE} />
+          <path d="M-19 3 q-1 -11 10 -13 q9 -3 18 0 q11 2 10 13 q-9 -5 -19 -4 q-10 -1 -19 4z" fill="#2e2c38" {...ln('#15141b')} />
           <path d="M-18 2.5 q9 -4.5 18 -3.5 q9 -1 18 3.5" stroke="#f5c542" strokeWidth={1.4} fill="none" strokeLinecap="round" />
           <circle cx={0} cy={-5.5} r={3} fill="#fff8ea" />
           <path d="M-0.6 -3 h1.2 v1.6 h-1.2z" fill="#fff8ea" />
@@ -762,7 +783,7 @@ function Builtin({ item, r }: { item: string; r: Rig }) {
     case 'crown':
       return (
         <g transform={`translate(${hx} ${hy}) scale(${s})`}>
-          <path d="M-11 4 L-12.5 -8 L-6 -2.5 L0 -11 L6 -2.5 L12.5 -8 L11 4z" fill="#f5c542" stroke="#a9781c" {...LINE} />
+          <path d="M-11 4 L-12.5 -8 L-6 -2.5 L0 -11 L6 -2.5 L12.5 -8 L11 4z" fill="#f5c542" {...ln('#a9781c')} />
           <path d="M-11 0.5 h22 v3.5 h-22z" fill="#ffd966" stroke="#a9781c" strokeWidth={1} />
           <circle cx={-12.5} cy={-8} r={1.7} fill="#ef4d6a" stroke="#a9781c" strokeWidth={0.7} />
           <circle cx={0} cy={-11} r={1.9} fill="#5fa8f5" stroke="#a9781c" strokeWidth={0.7} />
@@ -795,9 +816,9 @@ function Builtin({ item, r }: { item: string; r: Rig }) {
     case 'bow':
       return (
         <g transform={`translate(${hx + 7 * s} ${hy + 1}) scale(${s}) rotate(-15)`}>
-          <path d="M-1 0 q-7 -8 -10 -3 q0 7 10 3z M1 0 q7 -8 10 -3 q0 7 -10 3z" fill="#f05a7a" stroke="#a83350" {...LINE} />
+          <path d="M-1 0 q-7 -8 -10 -3 q0 7 10 3z M1 0 q7 -8 10 -3 q0 7 -10 3z" fill="#f05a7a" {...ln('#a83350')} />
           <path d="M-1 1 q-6 7 -8 4 M1 1 q6 7 8 4" stroke="#a83350" strokeWidth={1.2} fill="none" />
-          <circle cx={0} cy={0} r={2.6} fill="#f05a7a" stroke="#a83350" {...LINE} />
+          <circle cx={0} cy={0} r={2.6} fill="#f05a7a" {...ln('#a83350')} />
         </g>
       );
     case 'sunglasses':
@@ -840,8 +861,8 @@ function Builtin({ item, r }: { item: string; r: Rig }) {
     case 'bandana':
       return (
         <g>
-          <path d={`M${nx - nw} ${ny - 2} q${nw} 6 ${nw * 2} 0 l-2 4 q${-nw + 2} 5 ${-nw * 2 + 4} 0z`} fill="#e2453c" stroke="#a52e28" {...LINE} />
-          <path d={`M${nx - 1} ${ny + 3} l-5 10 l10 -4z`} fill="#e2453c" stroke="#a52e28" {...LINE} />
+          <path d={`M${nx - nw} ${ny - 2} q${nw} 6 ${nw * 2} 0 l-2 4 q${-nw + 2} 5 ${-nw * 2 + 4} 0z`} fill="#e2453c" {...ln('#a52e28')} />
+          <path d={`M${nx - 1} ${ny + 3} l-5 10 l10 -4z`} fill="#e2453c" {...ln('#a52e28')} />
           {[[-6, 1], [0, 3], [6, 1], [-3, 8], [1, 9]].map(([dx, dy], i) => (
             <circle key={i} cx={nx + dx} cy={ny + dy} r={0.9} fill="#fff" opacity={0.9} />
           ))}
@@ -850,8 +871,8 @@ function Builtin({ item, r }: { item: string; r: Rig }) {
     case 'scarf':
       return (
         <g>
-          <path d={`M${nx - nw} ${ny - 2} q${nw} 6 ${nw * 2} 0 l0 5 q${-nw} 6 ${-nw * 2} 0z`} fill="#6fa8dc" stroke="#3f6f9e" {...LINE} />
-          <path d={`M${nx - nw + 1} ${ny + 2} l-9 11 l7 2 l5 -11z`} fill="#4f86bd" stroke="#3f6f9e" {...LINE} />
+          <path d={`M${nx - nw} ${ny - 2} q${nw} 6 ${nw * 2} 0 l0 5 q${-nw} 6 ${-nw * 2} 0z`} fill="#6fa8dc" {...ln('#3f6f9e')} />
+          <path d={`M${nx - nw + 1} ${ny + 2} l-9 11 l7 2 l5 -11z`} fill="#4f86bd" {...ln('#3f6f9e')} />
           <path d={`M${nx - nw - 8} ${ny + 13} l-1 3 M${nx - nw - 5} ${ny + 14} l-1 3 M${nx - nw - 2} ${ny + 15} l-1 3`} stroke="#3f6f9e" strokeWidth={1.2} strokeLinecap="round" />
           <path d={`M${nx - nw + 3} ${ny + 1} q${nw - 3} 3 ${nw * 2 - 6} -1`} stroke="#fff" strokeWidth={1.2} fill="none" opacity={0.6} />
         </g>
@@ -861,7 +882,7 @@ function Builtin({ item, r }: { item: string; r: Rig }) {
         <g>
           <path d={strap} stroke={INK} strokeWidth={1.4} fill="none" strokeLinecap="round" />
           <g transform={`translate(${nx} ${ny + 4})`}>
-            <path d="M-1.5 0 l-8 -5 q-1.5 5 0 10z M1.5 0 l8 -5 q1.5 5 0 10z" fill="#e2453c" stroke="#9a2b24" {...LINE} />
+            <path d="M-1.5 0 l-8 -5 q-1.5 5 0 10z M1.5 0 l8 -5 q1.5 5 0 10z" fill="#e2453c" {...ln('#9a2b24')} />
             <rect x={-2.2} y={-2.8} width={4.4} height={5.6} rx={1.2} fill="#e2453c" stroke="#9a2b24" strokeWidth={1.2} />
           </g>
         </g>
@@ -870,7 +891,7 @@ function Builtin({ item, r }: { item: string; r: Rig }) {
       return (
         <g>
           <path d={strap} stroke="#8a5a33" strokeWidth={3} fill="none" strokeLinecap="round" />
-          <path d={`M${nx - 4} ${ny + 8} q0 -6 4 -6 q4 0 4 6 l1.5 1.5 h-11z`} fill="#ffd166" stroke="#b08a3a" {...LINE} />
+          <path d={`M${nx - 4} ${ny + 8} q0 -6 4 -6 q4 0 4 6 l1.5 1.5 h-11z`} fill="#ffd166" {...ln('#b08a3a')} />
           <circle cx={nx} cy={ny + 10.5} r={1.3} fill="#b08a3a" />
         </g>
       );
@@ -879,7 +900,7 @@ function Builtin({ item, r }: { item: string; r: Rig }) {
         <g>
           <path d={strap} stroke="#2f62b3" strokeWidth={3.4} fill="none" strokeLinecap="round" />
           <path d={`M${nx - 4} ${ny + 2} l4 7 l4 -7z`} fill="#e2453c" stroke="#9a2b24" strokeWidth={1} strokeLinejoin="round" />
-          <circle cx={nx} cy={ny + 10} r={4.6} fill="#ffd166" stroke="#b08a3a" {...LINE} />
+          <circle cx={nx} cy={ny + 10} r={4.6} fill="#ffd166" {...ln('#b08a3a')} />
           <Star x={nx} y={ny + 10} r={2.6} fill="#b08a3a" />
         </g>
       );
@@ -926,7 +947,7 @@ function Leg({ species, r, hip, len, far }: { species: PetSpecies; r: Rig; hip: 
   const hoof = species === 'cow' || species === 'goat' || species === 'horse' || species === 'pig' || species === 'sheep';
   return (
     <g>
-      <rect x={hip.x - 3.5} y={hip.y} width={7} height={len} rx={3} fill={fill} stroke={r.line} strokeWidth={1.2} />
+      <rect x={hip.x - 3.5} y={hip.y} width={7} height={len} rx={3} fill={fill} {...ln(r.line, 1.2)} />
       {hoof && <path d={`M${hip.x - 3.5} ${hip.y + len - 4} h7 v2 a3 3 0 0 1 -3 2 h-1 a3 3 0 0 1 -3 -2z`} fill={species === 'pig' ? r.hoof ?? r.line : '#4a3f38'} />}
     </g>
   );
@@ -954,11 +975,11 @@ export function FarmAnimal({ species, mood, color, accessory, accessoryImageUrl,
         ))}
         {lying && species !== 'chicken' && (
           <g>
-            <ellipse cx={body.x - body.rx + 8} cy={body.y + body.ry - 1} rx={7} ry={3.5} fill={r.shade} stroke={r.line} strokeWidth={1.2} />
-            <ellipse cx={body.x + body.rx - 6} cy={body.y + body.ry - 1} rx={8} ry={3.5} fill={r.fur} stroke={r.line} strokeWidth={1.2} />
+            <ellipse cx={body.x - body.rx + 8} cy={body.y + body.ry - 1} rx={7} ry={3.5} fill={r.shade} {...ln(r.line, 1.2)} />
+            <ellipse cx={body.x + body.rx - 6} cy={body.y + body.ry - 1} rx={8} ry={3.5} fill={r.fur} {...ln(r.line, 1.2)} />
           </g>
         )}
-        <ellipse cx={body.x} cy={body.y} rx={body.rx} ry={body.ry} fill={r.fur} stroke={r.line} {...LINE} />
+        <ellipse cx={body.x} cy={body.y} rx={body.rx} ry={body.ry} fill={r.fur} {...ln(r.line)} />
         <BodyDetail species={species} r={r} />
         {!lying && r.legs.map((l, i) => (i === 1 || i === 3) && (
           <g key={i} className={legClass(i)}><Leg species={species} r={r} hip={l} len={l.len} far={false} /></g>
@@ -967,7 +988,7 @@ export function FarmAnimal({ species, mood, color, accessory, accessoryImageUrl,
           <ellipse cx={body.x + 2} cy={body.y + body.ry - 4} rx={body.rx * 0.55} ry={4} fill="#fff" opacity={species === 'cow' ? 0 : 0.18} />
         )}
         <HeadBack species={species} r={r} />
-        <circle cx={head.x} cy={head.y} r={head.r} fill={r.face} stroke={species === 'sheep' ? r.darkLine : r.line} {...LINE} />
+        <circle cx={head.x} cy={head.y} r={head.r} fill={r.face} {...ln(species === 'sheep' ? r.darkLine : r.line)} />
         <path d={`M${head.x - head.r * 0.55} ${head.y - head.r * 0.6} q${head.r * 0.5} -${head.r * 0.35} ${head.r} 0`} stroke="#fff" strokeWidth={1.6} fill="none" opacity={0.35} strokeLinecap="round" />
         <HeadFront species={species} r={r} />
         <Face r={r} mood={mood} species={species} reaction={react} />
@@ -983,13 +1004,13 @@ export function Shelter({ color, className, peeking }: { color?: string; classNa
   return (
     <svg viewBox="0 0 80 70" className={className} aria-hidden="true">
       <ellipse cx={40} cy={67} rx={36} ry={3} fill="#1d1b1a" opacity={0.14} />
-      <path d="M12 30 h56 v36 h-56z" fill={wall} stroke="#8a6a44" strokeWidth={1.5} strokeLinejoin="round" />
+      <path d="M12 30 h56 v36 h-56z" fill={wall} {...ln('#8a6a44')} />
       <path d="M12 42 h56 M12 54 h56" stroke="#8a6a44" strokeWidth={1} opacity={0.45} />
-      <path d="M26 66 v-20 q14 -13 28 0 v20z" fill="#2a211c" stroke="#5a4634" strokeWidth={1.5} />
-      <path d="M4 31 L40 5 L76 31 Z" fill="#c4553f" stroke="#7d2f27" strokeWidth={1.5} strokeLinejoin="round" />
+      <path d="M26 66 v-20 q14 -13 28 0 v20z" fill="#2a211c" {...ln('#5a4634')} />
+      <path d="M4 31 L40 5 L76 31 Z" fill="#c4553f" {...ln('#7d2f27')} />
       <path d="M22 18 l18 -13 l18 13" stroke="#e07a62" strokeWidth={2} fill="none" strokeLinecap="round" opacity={0.7} />
-      <path d="M2 32 h76" stroke="#7d2f27" strokeWidth={3} strokeLinecap="round" />
-      <circle cx={40} cy={22} r={4} fill="#fff6d6" stroke="#7d2f27" strokeWidth={1.2} />
+      <path d="M2 32 h76" {...ln('#7d2f27', 3)} />
+      <circle cx={40} cy={22} r={4} fill="#fff6d6" {...ln('#7d2f27', 1.2)} />
       <path d="M6 66 q3 -6 5 0 M70 66 q3 -7 5 0" stroke="#6fa84f" strokeWidth={2} fill="none" strokeLinecap="round" />
       {peeking && (
         <g className="farm-peek">
@@ -1000,5 +1021,74 @@ export function Shelter({ color, className, peeking }: { color?: string; classNa
         </g>
       )}
     </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Scenery
+
+/** Stars as [left %, top %, size px]: kept to the sky, never stretched. */
+const STARS: readonly [number, number, number][] = [
+  [6, 7, 2], [14, 18, 3], [21, 5, 2], [27, 26, 2], [33, 11, 3], [44, 4, 2], [49, 21, 2], [55, 9, 3],
+  [61, 27, 2], [66, 4, 2], [72, 16, 3], [78, 7, 2], [86, 22, 2], [91, 6, 3], [96, 15, 2], [39, 30, 2],
+];
+
+/**
+ * The farm's scenery: sky extras (stars, moon or sun), two rolling hills, the
+ * barn and the fence. Every colour and every theme-dependent part comes from
+ * the --farm-* dials in themes.css, so the same markup is a sunny pastel farm,
+ * a dusk farm or a bold flat farm depending on the skin around it.
+ * Render it first inside the scene root (s.farm).
+ */
+export function FarmBackdrop() {
+  const posts = `farm-posts-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  return (
+    <>
+      <div className={s.sky} aria-hidden="true">
+        {STARS.map(([x, y, d], i) => (
+          <span key={i} className={s.star} style={{ left: `${x}%`, top: `${y}%`, width: d, height: d, animationDelay: `${(i * 0.83) % 5}s` }} />
+        ))}
+        <svg className={s.moon} viewBox="0 0 28 28">
+          <path d="M17 3 A11 11 0 1 0 25 20 A9 9 0 0 1 17 3z" />
+          <circle className={s.crater} cx={9} cy={15} r={1.8} />
+          <circle className={s.crater} cx={13} cy={21} r={1.2} />
+        </svg>
+        <svg className={s.sun} viewBox="0 0 40 40">
+          <path className={s.sunRays} d="M20 1 v6 M20 33 v6 M1 20 h6 M33 20 h6 M6.6 6.6 l4.2 4.2 M29.2 29.2 l4.2 4.2 M6.6 33.4 l4.2 -4.2 M29.2 10.8 l4.2 -4.2" />
+          <circle cx={20} cy={20} r={9.5} />
+        </svg>
+      </div>
+      <svg className={s.backdrop} viewBox="0 0 400 200" preserveAspectRatio="none" aria-hidden="true">
+        <path className={s.hillFar} d="M0 92 Q80 70 170 88 T400 80 V200 H0z" />
+        <path className={s.ridge} d="M-2 92 Q80 70 170 88 T402 80" />
+        <path className={s.hillNear} d="M0 104 Q120 88 240 104 T400 100 V200 H0z" />
+        <path className={s.ridge} d="M-2 104 Q120 88 240 104 T402 100" />
+      </svg>
+      <svg className={s.barn} viewBox="0 0 120 100" preserveAspectRatio="xMaxYMax meet" aria-hidden="true">
+        <rect className={s.barnWall} x={18} y={42} width={84} height={56} />
+        <path className={s.barnRoof} d="M10 44 L60 10 L110 44z" />
+        <path className={s.barnDoor} d="M44 98 V62 H76 V98z" />
+        <path className={s.barnTrim} d="M44 98 V62 H76 V98z M44 62 L76 98 M76 62 L44 98" />
+        <rect className={s.barnWindow} x={52} y={24} width={16} height={12} />
+        <g className={s.barnLamps}>
+          <rect className={s.barnWindow} x={25} y={60} width={12} height={12} rx={1.5} />
+          <rect className={s.barnWindow} x={83} y={60} width={12} height={12} rx={1.5} />
+          <path className={s.barnMullion} d="M31 60 v12 M25 66 h12 M89 60 v12 M83 66 h12" />
+        </g>
+      </svg>
+      <svg className={s.fence} aria-hidden="true">
+        <defs>
+          <pattern id={posts} width={34} height={34} patternUnits="userSpaceOnUse">
+            <line className={s.postEdge} x1={6} y1={8} x2={6} y2={30} />
+            <line className={s.post} x1={6} y1={8} x2={6} y2={30} />
+          </pattern>
+        </defs>
+        <rect x={0} y={0} width="100%" height={34} fill={`url(#${posts})`} />
+        <line className={s.railEdge} x1={-10} y1={15.5} x2="110%" y2={15.5} />
+        <line className={s.railEdge} x1={-10} y1={23.5} x2="110%" y2={23.5} />
+        <line className={s.rail} x1={-10} y1={15.5} x2="110%" y2={15.5} />
+        <line className={s.rail} x1={-10} y1={23.5} x2="110%" y2={23.5} />
+      </svg>
+    </>
   );
 }

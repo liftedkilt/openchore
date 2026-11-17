@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { Pet } from '../../../types';
-import { FarmAnimal, Shelter } from './FarmAnimal';
+import { FarmAnimal, FarmBackdrop, Shelter } from './FarmAnimal';
 import s from './farm.module.css';
 
 interface Spot { x: number; y: number; face: 1 | -1; ms: number; walking: boolean }
@@ -113,17 +113,7 @@ export function FarmScene({ pets, meId, compact, owners = !compact, onSelect, cl
 
   return (
     <div className={clsx(s.farm, compact && s.compact, className)} role="group" aria-label={t('kid.farm.title')}>
-      <svg className={s.backdrop} viewBox="0 0 400 200" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M0 92 Q80 70 170 88 T400 80 V200 H0z" fill="#b6dc8e" />
-        <path d="M0 104 Q120 88 240 104 T400 100 V200 H0z" fill="#9fd27a" />
-      </svg>
-      <svg className={s.barn} viewBox="0 0 120 100" aria-hidden="true">
-        <path d="M10 44 L60 10 L110 44z" fill="#9e3b32" />
-        <rect x={18} y={42} width={84} height={56} fill="#c2473c" />
-        <path d="M44 98 V62 H76 V98z M44 62 L76 98 M76 62 L44 98" stroke="#fff4e6" strokeWidth={3} fill="#8e2f27" />
-        <rect x={52} y={24} width={16} height={12} fill="#fff4e6" />
-      </svg>
-      <div className={s.fence} aria-hidden="true" />
+      <FarmBackdrop />
 
       {hiding.length > 0 && (
         <ul className={s.shelters} aria-label={t('kid.farm.hidingTitle')}>

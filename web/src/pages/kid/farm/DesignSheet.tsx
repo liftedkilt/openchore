@@ -179,7 +179,7 @@ export function DesignSheet({ pet, reward, busy, onConfirm, onClose }: DesignShe
           <div className={k.ownChips} role="radiogroup" aria-label={t('kid.farm.design.where')}>
             {PET_ITEM_SLOTS.map(sl => (
               <button key={sl} type="button" role="radio" aria-checked={slot === sl}
-                className={clsx(k.smallBtn, k.ownChip, slot === sl && k.ownChipOn)} onClick={() => setSlot(sl)}>
+                className={clsx(s.chip, slot === sl && s.chipOn)} onClick={() => setSlot(sl)}>
                 {t(`kid.farm.design.slot.${sl}`)}
               </button>
             ))}
@@ -198,17 +198,17 @@ export function DesignSheet({ pet, reward, busy, onConfirm, onClose }: DesignShe
         <div className={k.ownChips}>
           {BRUSHES.map(b => (
             <button key={b} type="button" aria-pressed={brush === b}
-              className={clsx(k.smallBtn, k.ownChip, brush === b && k.ownChipOn)} onClick={() => setBrush(b)}
+              className={clsx(s.chip, brush === b && s.chipOn)} onClick={() => setBrush(b)}
               aria-label={t('kid.farm.design.brush', { size: b })}>
               <span className={s.brushDot} style={{ width: b / 1.5 + 4, height: b / 1.5 + 4 }} />
             </button>
           ))}
-          <button type="button" aria-pressed={erase} className={clsx(k.smallBtn, k.ownChip, erase && k.ownChipOn)} onClick={() => setErase(!erase)}>
+          <button type="button" aria-pressed={erase} className={clsx(s.chip, erase && s.chipOn)} onClick={() => setErase(!erase)}>
             {t('kid.farm.design.eraser')}
           </button>
-          <button type="button" className={clsx(k.smallBtn, k.ownChip)} onClick={undo}>{t('kid.farm.design.undo')}</button>
-          <button type="button" className={clsx(k.smallBtn, k.ownChip)} onClick={clear}>{t('kid.farm.design.clear')}</button>
-          <label className={clsx(k.smallBtn, k.ownChip, s.uploadBtn)}>
+          <button type="button" className={clsx(s.chip)} onClick={undo}>{t('kid.farm.design.undo')}</button>
+          <button type="button" className={clsx(s.chip)} onClick={clear}>{t('kid.farm.design.clear')}</button>
+          <label className={clsx(s.chip, s.uploadBtn)}>
             {t('kid.farm.design.upload')}
             <input type="file" accept="image/png,image/jpeg,image/gif" hidden onChange={e => upload(e.target.files?.[0])} />
           </label>

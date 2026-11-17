@@ -14,7 +14,7 @@ import {
 } from './ownTasks';
 import s from './kid.module.css';
 
-const TASK_ICONS: IconName[] = ICON_NAMES.filter(n => !['back', 'chev', 'plus', 'people', 'lock'].includes(n));
+const TASK_ICONS: IconName[] = ICON_NAMES.filter(n => !['back', 'chev', 'plus', 'people', 'lock', 'swap'].includes(n));
 const REPEATS: RepeatKind[] = ['once', 'weekly', 'interval'];
 
 export interface OwnTasksSheetProps {

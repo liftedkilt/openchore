@@ -247,11 +247,11 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
 
       <h4 className={s.subheading}>{t('kid.farm.wardrobe')}</h4>
       <div className={k.ownChips} role="group" aria-label={t('kid.farm.wardrobe')}>
-        <button type="button" className={clsx(k.smallBtn, k.ownChip, !pet.accessory && k.ownChipOn)} aria-pressed={!pet.accessory} disabled={busy} onClick={() => wear('')}>
+        <button type="button" className={clsx(s.chip, !pet.accessory && s.chipOn)} aria-pressed={!pet.accessory} disabled={busy} onClick={() => wear('')}>
           {t('kid.farm.item.none')}
         </button>
         {pet.items.map(it => (
-          <button key={it} type="button" className={clsx(k.smallBtn, k.ownChip, s.wardrobeChip, pet.accessory === it && k.ownChipOn)} aria-pressed={pet.accessory === it} disabled={busy} onClick={() => wear(it)}>
+          <button key={it} type="button" className={clsx(s.chip, s.wardrobeChip, pet.accessory === it && s.chipOn)} aria-pressed={pet.accessory === it} disabled={busy} onClick={() => wear(it)}>
             <FarmAnimal species={pet.species} color={pet.color} mood="content" accessory={it} className={s.wardrobeArt} />
             {itemLabel(t, it)}
           </button>
@@ -262,7 +262,7 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
         <>
           <h4 className={s.subheading}>{t('kid.farm.shop')}</h4>
           <p className={s.hint}>{t('kid.farm.tryOnHint')}</p>
-          <ul className={s.careList}>
+          <ul className={clsx(s.careList, s.shopList)}>
             {shopItems.map(r => (
               <li key={r.id}>
                 <div className={clsx(s.shopItem, tryOn === r.pet_item && s.speciesOn)}>
