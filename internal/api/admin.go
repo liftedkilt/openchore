@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/liftedkilt/openchore/internal/config"
+	"github.com/liftedkilt/openchore/internal/friends"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/webhook"
 )
@@ -36,6 +37,7 @@ var secretSettings = map[string]bool{
 	sessionSecretSetting:  true,
 	settingAIAPIKey:       true,
 	settingTTSAPIKey:      true,
+	friends.SettingHubKey: true,
 }
 
 func (h *AdminHandler) GetSetting(w http.ResponseWriter, r *http.Request) {

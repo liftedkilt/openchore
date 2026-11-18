@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/liftedkilt/openchore/internal/discord"
+	"github.com/liftedkilt/openchore/internal/friends"
 	"github.com/liftedkilt/openchore/internal/mcp"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/webhook"
@@ -16,6 +17,9 @@ import (
 type Auth struct {
 	Sessions *SessionManager
 	OIDC     *OIDCService
+	// Friends is the friend-families service; nil makes one (the caller
+	// that wants its background sync passes its own and starts it).
+	Friends *friends.Service
 }
 
 func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.Mux, *ChoreHandler, *ReportsHandler) {
@@ -33,6 +37,10 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 	pets := NewPetHandler(s)
 	rewards := NewRewardHandler(s, dispatcher, pets)
 	streaks := NewStreakHandler(s)
+	if auth.Friends == nil {
+		auth.Friends = friends.New(s)
+	}
+	friendsH := NewFriendsHandler(s, auth.Friends)
 	webhooks := NewWebhookHandler(s)
 	triggers := NewTriggerHandler(s)
 	tokens := NewTokenHandler(s)
@@ -117,6 +125,11 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 			r.Post("/me/pet", pets.Adopt)
 			r.Patch("/me/pet", pets.Update)
 
+			// The weekly leaderboard and friend families' farms. Signed-in
+			// only: they show other families' kids.
+			r.Get("/leaderboard", friendsH.Leaderboard)
+			r.Get("/friends/farms", friendsH.Farms)
+
 			r.Get("/rewards", rewards.List)
 			r.Post("/rewards/{id}/redeem", rewards.Redeem)
 
@@ -183,6 +196,15 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 				// Streak rewards management
 				r.Put("/admin/pets", pets.SetEnabled)
 				r.Delete("/admin/users/{id}/pet", pets.Remove)
+
+				// Leaderboard and friend families
+				r.Get("/admin/friends", friendsH.AdminGet)
+				r.Put("/admin/friends", friendsH.AdminUpdate)
+				r.Post("/admin/friends/invites", friendsH.CreateInvite)
+				r.Post("/admin/friends/join", friendsH.Join)
+				r.Post("/admin/friends/{id}/sync", friendsH.SyncNow)
+				r.Delete("/admin/friends/{id}", friendsH.Unlink)
+				r.Put("/admin/users/{id}/share", friendsH.SetShared)
 
 				r.Get("/admin/streak-rewards", streaks.ListRewards)
 				r.Post("/admin/streak-rewards", streaks.CreateReward)

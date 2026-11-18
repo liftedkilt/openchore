@@ -233,6 +233,49 @@ func allTools() []*Tool {
 		method: http.MethodDelete, path: "/admin/users/{id}/pet",
 		props: map[string]any{"id": integer("Person id.")}})
 
+	// ---- Leaderboard and friend families ----
+	add(endpoint{name: "get_leaderboard", title: "The weekly leaderboard", readOnly: true,
+		desc: "This week's standings (Monday to Sunday), or last week's: each person's chores done out of chores assigned " +
+			"(Must-do and Every-day chores; excused chores and paused days are left out), bonus chores as a tie-breaker, and rank. " +
+			"People need 5 assigned chores in the week to be ranked (rank 0 = not yet). Includes people shared by linked friend families.",
+		method: http.MethodGet, path: "/leaderboard", query: []string{"week"},
+		props: map[string]any{"week": enum("Which week (default this).", "this", "last")}})
+	add(endpoint{name: "list_friend_farms", title: "Friend families' farms", readOnly: true,
+		desc:   "The farm animals each linked friend family shares, as of their last sync.",
+		method: http.MethodGet, path: "/friends/farms"})
+	add(endpoint{name: "get_friend_families", title: "Friend families settings", readOnly: true,
+		desc: "Leaderboard on/off, this family's name, the coordination server (hub), who is shared with friend families, " +
+			"and each link with its status, the names the other family shares and the last sync. A waiting link carries the invite to send.",
+		method: http.MethodGet, path: "/admin/friends"})
+	add(endpoint{name: "update_friend_families", title: "Change leaderboard and friend families settings",
+		desc: "Turn the leaderboard on or off, set the family name other families see, or set the coordination server " +
+			"(hub) used to create invites. Only the fields given change.",
+		method: http.MethodPut, path: "/admin/friends",
+		props: map[string]any{
+			"leaderboard_enabled": boolean("Show the weekly leaderboard."),
+			"family_name":         str("Name other families see, e.g. \"The Forsyths\"."),
+			"hub_url":             str("Coordination server address, https://…"),
+			"hub_key":             str("Key that lets this family create invites on that server."),
+		}})
+	add(endpoint{name: "share_person_with_friends", title: "Share a person with friend families",
+		desc: "Turn sharing on or off for one person. A shared person's first name, colour, daily chore counts, streak and " +
+			"farm animal go to every linked friend family; chore names, photos, points and rewards never do. Confirm with the parent first.",
+		method: http.MethodPut, path: "/admin/users/{id}/share", required: []string{"shared"},
+		props: map[string]any{"id": integer("Person id."), "shared": boolean("Share or stop sharing.")}})
+	add(endpoint{name: "create_friend_invite", title: "Invite a friend family",
+		desc:   "Make a one-time invite (valid 7 days) for another family's OpenChore to link with this one. Give the invite text to the other parent.",
+		method: http.MethodPost, path: "/admin/friends/invites"})
+	add(endpoint{name: "join_friend_family", title: "Join a friend family",
+		desc:   "Link to another family using the invite their parent sent.",
+		method: http.MethodPost, path: "/admin/friends/join", required: []string{"invite"},
+		props: map[string]any{"invite": str("The invite text, starting ocf1.")}})
+	add(endpoint{name: "sync_friend_family", title: "Sync with a friend family now",
+		desc:   "Exchange the latest data with one linked family now, without waiting for the 15-minute sync.",
+		method: http.MethodPost, path: "/admin/friends/{id}/sync", props: map[string]any{"id": integer("Link id from get_friend_families.")}})
+	add(endpoint{name: "unlink_friend_family", title: "Unlink a friend family",
+		desc:   "End a link with another family and delete their data here. They are told at their next sync. Confirm first.",
+		method: http.MethodDelete, path: "/admin/friends/{id}", props: map[string]any{"id": integer("Link id from get_friend_families.")}})
+
 	// ---- Rewards ----
 	add(endpoint{name: "list_rewards", title: "List rewards", readOnly: true,
 		desc:   "Every reward, including hidden ones, with per-kid visibility and prices.",

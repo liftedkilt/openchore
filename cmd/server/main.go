@@ -14,6 +14,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/liftedkilt/openchore/internal/api"
 	"github.com/liftedkilt/openchore/internal/config"
+	"github.com/liftedkilt/openchore/internal/friends"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/tts"
 	"github.com/liftedkilt/openchore/internal/webhook"
@@ -110,7 +111,11 @@ func main() {
 		log.Fatalf("failed to load sign-in settings: %v", err)
 	}
 
-	router, choreHandler, reportsHandler := api.NewRouter(s, dispatcher, api.Auth{Sessions: sessions, OIDC: oidcSvc})
+	// Leaderboard scoring and friend-family sync (docs/friends.md).
+	friendsSvc := friends.New(s)
+	go friendsSvc.Start(context.Background())
+
+	router, choreHandler, reportsHandler := api.NewRouter(s, dispatcher, api.Auth{Sessions: sessions, OIDC: oidcSvc, Friends: friendsSvc})
 
 	// Optional AI and read-aloud audio: off unless a base URL is set, either
 	// in the environment or under Manage → Settings → AI.

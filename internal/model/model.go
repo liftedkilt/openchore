@@ -621,3 +621,76 @@ type AIReviewResult struct {
 	Confidence float64 `json:"confidence"`
 	Feedback   string  `json:"feedback"`
 }
+
+// --- Leaderboard & friend families (docs/friends.md) ---
+
+// ScoreDay is one person's chores on one day, counted for the leaderboard:
+// Done out of Assigned, with Bonus counted on the side. A Paused day is
+// left out of the score.
+type ScoreDay struct {
+	Date     string `json:"date"`
+	Assigned int    `json:"assigned"`
+	Done     int    `json:"done"`
+	Bonus    int    `json:"bonus"`
+	Paused   bool   `json:"paused,omitempty"`
+}
+
+// Friend link statuses.
+const (
+	FriendStatusWaiting = "waiting" // invite made, the other family hasn't joined yet
+	FriendStatusActive  = "active"
+	FriendStatusEnded   = "ended" // the other family unlinked
+)
+
+// FriendLink is a link to another family's OpenChore, kept through a hub.
+type FriendLink struct {
+	ID            int64      `json:"id"`
+	Status        string     `json:"status"`
+	HubURL        string     `json:"hub_url"`
+	HubLink       string     `json:"-"`
+	Token         string     `json:"-"`
+	Secret        string     `json:"-"`
+	Invite        string     `json:"invite,omitempty"`
+	InviteExpires *time.Time `json:"invite_expires,omitempty"`
+	PeerName      string     `json:"peer_name"`
+	Snapshot      string     `json:"-"`
+	SnapshotAt    *time.Time `json:"snapshot_at,omitempty"`
+	LastSyncAt    *time.Time `json:"last_sync_at,omitempty"`
+	LastError     string     `json:"last_error,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+}
+
+// FriendSnapshot is what one family sends another: the people a parent chose
+// to share, with their daily chore counts, streak and farm animal. It never
+// carries chore names, photos, points or rewards.
+type FriendSnapshot struct {
+	Version     int            `json:"version"`
+	Family      string         `json:"family"`
+	GeneratedAt time.Time      `json:"generated_at"`
+	Today       string         `json:"today"` // the sender's date, in its own time zone
+	Members     []FriendMember `json:"members"`
+}
+
+type FriendMember struct {
+	ID     string     `json:"id"` // stable within the sending family
+	Name   string     `json:"name"`
+	Color  string     `json:"color,omitempty"`
+	Streak int        `json:"streak"`
+	Paused bool       `json:"paused,omitempty"`
+	Days   []ScoreDay `json:"days"`
+	Pet    *FriendPet `json:"pet,omitempty"`
+}
+
+// FriendPet is a farm animal as shown to a friend family, in its real state.
+type FriendPet struct {
+	Name      string `json:"name"`
+	Species   string `json:"species"`
+	Color     string `json:"color,omitempty"`
+	Accessory string `json:"accessory,omitempty"`
+	Health    int    `json:"health"`
+	Fullness  int    `json:"fullness"`
+	Joy       int    `json:"joy"`
+	Mood      string `json:"mood"`
+	Hiding    bool   `json:"hiding"`
+	Sick      bool   `json:"sick"`
+}
