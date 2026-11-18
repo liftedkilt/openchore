@@ -665,7 +665,7 @@ type FriendLink struct {
 }
 
 // FriendSnapshot is what one family sends another: the people a parent chose
-// to share, with their daily chore counts (and what those chores were worth
+// to share with that family, with their daily chore counts (and what those chores were worth
 // in points), streak and farm animal. It never carries chore names, photos,
 // point balances or rewards.
 type FriendSnapshot struct {
@@ -674,6 +674,10 @@ type FriendSnapshot struct {
 	GeneratedAt time.Time      `json:"generated_at"`
 	Today       string         `json:"today"` // the sender's date, in its own time zone
 	Members     []FriendMember `json:"members"`
+	// Accepted lists the receiver's people (by their FriendMember.ID) that
+	// the sender has chosen to show, so each parent can see whether the
+	// other side has picked a kid up yet.
+	Accepted []string `json:"accepted"`
 }
 
 type FriendMember struct {

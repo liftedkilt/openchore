@@ -709,8 +709,7 @@
         "familiesDesc": "Link with another family that runs OpenChore so the kids can share a leaderboard and visit each other's farms. The two homes never connect to each other: each one sends encrypted updates to a coordination server every 15 minutes, and the server can't read them.",
         "familyName": "Your family's name",
         "familyNamePlaceholder": "e.g. The Forsyths",
-        "shareTitle": "Who to share",
-        "shareDesc": "For each person you tick, friend families see their first name, colour, how many chores they did each day and what those chores were worth, their streak and their farm animal. Chore names, photos, point balances and rewards are never sent.",
+        "shareDesc": "For each person you share, that family gets their first name, colour, how many chores they did each day and what those chores were worth, their streak and their farm animal. Chore names, photos, point balances and rewards are never sent. Until you tick someone they offer, only that person's name is kept here.",
         "status": {
           "waiting": "Waiting for them",
           "active": "Linked",
@@ -723,9 +722,8 @@
         "copy": "Copy",
         "copied": "Copied",
         "copyFailed": "Couldn't copy. Select the invite and copy it by hand.",
-        "theyShare": "They share: {{names}}",
-        "theyShareNobody": "They aren't sharing anyone yet",
-        "lastSync": "last update {{when}}",
+        "theyShareNobody": "They aren't sharing anyone yet.",
+        "lastSync": "Last update {{when}}",
         "endedHelp": "The other family ended this link, or the invite ran out. Their data has been removed.",
         "syncError": "Last update failed: {{error}}",
         "syncNow": "Update now",
@@ -734,7 +732,6 @@
         "remove": "Remove",
         "confirmUnlink": "Really unlink?",
         "unlinked": "Unlinked. Their data has been removed.",
-        "nobodyShared": "You're linked, but you aren't sharing anyone, so the other family sees nobody from your home.",
         "joinTitle": "Join with an invite",
         "joinDesc": "Paste the invite the other parent sent you.",
         "joinLabel": "Invite from the other family",
@@ -750,7 +747,13 @@
         "inviteMade": "Invite made. Send it to the other parent.",
         "needName": "Give your family a name before linking.",
         "saved": "Saved.",
-        "failed": "That didn't work. Try again."
+        "failed": "That didn't work. Try again.",
+        "bothPick": "A person shows up for the other family only when both parents have ticked them: you choose who to send, and they choose who to show. The same goes the other way.",
+        "outboundTitle": "Sent to {{family}}",
+        "inboundTitle": "Offered by {{family}}",
+        "theyShow": "shown there",
+        "theyHavent": "not ticked there yet",
+        "notShown": "not shown here yet"
       }
     },
     "skins": {

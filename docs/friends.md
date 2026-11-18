@@ -55,6 +55,8 @@ other family's.
 2. They send the invite to the other parent (text, email, anything).
 3. The other parent gives their family a name and pastes the invite under
    **Join with an invite**. They don't need a hub key.
+4. Each parent then ticks who to send and who to show (below). Nothing is
+   shared just by linking.
 
 The invite works once and runs out after 7 days. It carries the hub address,
 the link, a one-time join code, and the key the two families use to encrypt
@@ -65,8 +67,17 @@ out at its next sync, and both sides delete the other family's data.
 
 ### What is shared
 
-Nothing, until a parent ticks a person under **Who to share**. Sharing is per
-person and applies to every linked family.
+Sharing is chosen **per linked family and in both directions**, under that
+family in Settings, and both lists start empty:
+
+- **Sent to them:** which of your people you send to that family.
+- **Offered by them:** which of the people they send you are shown here.
+
+A person appears on the other family's leaderboard and farm only when both
+parents have ticked them. Each side can see whether the other has ticked the
+people it sends. Until you tick someone you're offered, only their name and
+colour are kept on your server; their chore counts and animal are dropped as
+they arrive.
 
 | Shared | Never shared |
 | --- | --- |
@@ -108,9 +119,11 @@ An instance takes its hub from Settings, or from `OPENCHORE_HUB_URL` /
 
 - `GET /api/leaderboard?week=this|last` – the standings, friends included.
 - `GET /api/friends/farms` – each friend family's farm, shaped like `GET /api/pets`.
-- `GET` / `PUT /api/admin/friends` – leaderboard switch, family name, hub, who
-  is shared, and the links.
-- `PUT /api/admin/users/{id}/share` (`shared`).
+- `GET` / `PUT /api/admin/friends` – leaderboard switch, family name, hub, and
+  each linked family with its `outbound` (your people: `shared`, and `accepted`
+  once they show them) and `inbound` (their people: `accepted` = shown here).
+- `PUT /api/admin/friends/{id}` (`share_user_ids`, `accept_member_ids`; each
+  replaces its list) – who to send to and show from one family.
 - `POST /api/admin/friends/invites`, `POST /api/admin/friends/join` (`invite`),
   `POST /api/admin/friends/{id}/sync`, `DELETE /api/admin/friends/{id}`.
 

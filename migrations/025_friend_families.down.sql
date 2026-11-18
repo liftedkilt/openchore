@@ -1,3 +1,4 @@
-ALTER TABLE users DROP COLUMN share_with_friends;
+DROP TABLE friend_link_accepts;
+DROP TABLE friend_link_shares;
 DROP TABLE friend_links;
 DROP TABLE score_days;

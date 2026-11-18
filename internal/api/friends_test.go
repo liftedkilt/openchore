@@ -165,10 +165,6 @@ func TestFriendFamiliesLinkThroughHub(t *testing.T) {
 		t.Fatalf("invite: %v", link)
 	}
 
-	// Share Ava (not Secret) and Bo.
-	a.expectStatus(t, "PUT", fmt.Sprintf("/api/admin/users/%d/share", ava), map[string]any{"shared": true}, adminHeaders(), http.StatusOK)
-	b.expectStatus(t, "PUT", fmt.Sprintf("/api/admin/users/%d/share", bo), map[string]any{"shared": true}, adminHeaders(), http.StatusOK)
-
 	// B joins: no hub settings needed, only a name and the invite.
 	b.expectStatus(t, "POST", "/api/admin/friends/join", map[string]any{"invite": invite}, adminHeaders(), http.StatusBadRequest)
 	b.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"family_name": "The Bos"}, adminHeaders(), http.StatusOK)
@@ -182,16 +178,74 @@ func TestFriendFamiliesLinkThroughHub(t *testing.T) {
 	c.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"family_name": "Strangers"}, adminHeaders(), http.StatusOK)
 	c.expectStatus(t, "POST", "/api/admin/friends/join", map[string]any{"invite": invite}, adminHeaders(), http.StatusBadRequest)
 
-	// A syncs: picks up B's people and leaves its own; B syncs and gets A's.
-	resp = a.expectStatus(t, "POST", fmt.Sprintf("/api/admin/friends/%d/sync", aLink), nil, adminHeaders(), http.StatusOK)
-	decodeBody(t, resp, &link)
-	if link["status"] != "active" || link["peer_name"] != "The Bos" || fmt.Sprint(link["members"]) != "[Bo]" || link["invite"] != "" {
-		t.Fatalf("A's link after sync: %v", link)
+	aPath, bPath := fmt.Sprintf("/api/admin/friends/%d", aLink), fmt.Sprintf("/api/admin/friends/%d", bLink)
+	put := func(e *testEnv, path string, body map[string]any) map[string]any {
+		t.Helper()
+		var out map[string]any
+		decodeBody(t, e.expectStatus(t, "PUT", path, body, adminHeaders(), http.StatusOK), &out)
+		return out
 	}
-	resp = b.expectStatus(t, "POST", fmt.Sprintf("/api/admin/friends/%d/sync", bLink), nil, adminHeaders(), http.StatusOK)
-	decodeBody(t, resp, &link)
-	if link["peer_name"] != "The Avas" || fmt.Sprint(link["members"]) != "[Ava]" {
-		t.Fatalf("B's link after sync: %v", link)
+	// names lists a direction of a link as "Name:flag" pairs.
+	names := func(l map[string]any, dir, flag string) string {
+		var out []string
+		for _, v := range l[dir].([]any) {
+			m := v.(map[string]any)
+			out = append(out, fmt.Sprintf("%v:%v", m["name"], m[flag]))
+		}
+		return strings.Join(out, " ")
+	}
+	sync := func(e *testEnv, path string) map[string]any {
+		t.Helper()
+		var out map[string]any
+		decodeBody(t, e.expectStatus(t, "POST", path+"/sync", nil, adminHeaders(), http.StatusOK), &out)
+		return out
+	}
+
+	// Linked, but nothing is shared in either direction until parents choose.
+	link = sync(a, aPath)
+	if link["status"] != "active" || link["peer_name"] != "The Bos" || len(link["inbound"].([]any)) != 0 || link["invite"] != "" {
+		t.Fatalf("A's link after the first sync: %v", link)
+	}
+	if lb := b.leaderboard(t); len(lb) != 1 || lb[0]["name"] != "Bo" {
+		t.Fatalf("B's leaderboard before anything is shared: %v", lb)
+	}
+
+	// A's parent shares Ava (not Secret) with the Bos. B is offered Ava, but
+	// she isn't shown, and none of her data is kept, until B's parent picks her.
+	a.expectStatus(t, "PUT", aPath, map[string]any{"share_user_ids": []int{999}}, adminHeaders(), http.StatusBadRequest)
+	link = put(a, aPath, map[string]any{"share_user_ids": []int{ava}})
+	if got := names(link, "outbound", "shared"); got != "Admin:false Ava:true Secret:false" {
+		t.Fatalf("A's outbound: %s", got)
+	}
+	link = sync(b, bPath)
+	if got := names(link, "inbound", "accepted"); got != "Ava:false" {
+		t.Fatalf("B's inbound: %s", got)
+	}
+	if lb := b.leaderboard(t); len(lb) != 1 {
+		t.Fatalf("Ava shown at B before B's parent accepted her: %v", lb)
+	}
+	if farms := b.getJSON(t, "/api/friends/farms", childHeaders(bo))["farms"].([]any); len(farms) != 0 {
+		t.Fatalf("A's farm shown at B before anyone was accepted: %v", farms)
+	}
+	var stored string
+	if err := b.db.QueryRow(`SELECT snapshot FROM friend_links`).Scan(&stored); err != nil || strings.Contains(stored, "Biscuit") {
+		t.Fatalf("B kept data for a person its parent hasn't accepted: %v %s", err, stored)
+	}
+
+	// B's parent accepts Ava (and can't accept someone who wasn't offered).
+	b.expectStatus(t, "PUT", bPath, map[string]any{"accept_member_ids": []string{"12345"}}, adminHeaders(), http.StatusBadRequest)
+	avaID := fmt.Sprint(ava)
+	link = put(b, bPath, map[string]any{"accept_member_ids": []string{avaID}, "share_user_ids": []int{bo}})
+	if got := names(link, "inbound", "accepted"); got != "Ava:true" {
+		t.Fatalf("B's inbound after accepting: %s", got)
+	}
+	// A can see that the Bos picked Ava up, and is now offered Bo.
+	link = sync(a, aPath)
+	if got := names(link, "outbound", "accepted"); got != "Admin:false Ava:true Secret:false" {
+		t.Fatalf("A doesn't see that B accepted Ava: %s", got)
+	}
+	if got := names(link, "inbound", "accepted"); got != "Bo:false" {
+		t.Fatalf("A's inbound: %s", got)
 	}
 
 	// B's leaderboard has Ava with her real count; Secret never left A.
@@ -235,13 +289,15 @@ func TestFriendFamiliesLinkThroughHub(t *testing.T) {
 		}
 	}
 
-	// Switching sharing off empties what the other family holds at the next sync.
-	a.expectStatus(t, "PUT", fmt.Sprintf("/api/admin/users/%d/share", ava), map[string]any{"shared": false}, adminHeaders(), http.StatusOK)
-	a.expectStatus(t, "POST", fmt.Sprintf("/api/admin/friends/%d/sync", aLink), nil, adminHeaders(), http.StatusOK)
-	resp = b.expectStatus(t, "POST", fmt.Sprintf("/api/admin/friends/%d/sync", bLink), nil, adminHeaders(), http.StatusOK)
-	decodeBody(t, resp, &link)
-	if fmt.Sprint(link["members"]) != "[]" {
-		t.Fatalf("Ava still held by B after sharing was switched off: %v", link)
+	// When A's parent stops sharing Ava, B loses her at its next sync.
+	put(a, aPath, map[string]any{"share_user_ids": []int{}})
+	if link = sync(b, bPath); len(link["inbound"].([]any)) != 0 {
+		t.Fatalf("Ava still held by B after A stopped sharing her: %v", link)
+	}
+	for _, e := range b.leaderboard(t) {
+		if e["name"] == "Ava" {
+			t.Fatal("Ava still on B's leaderboard after A stopped sharing her")
+		}
 	}
 
 	// A unlinks: gone at A at once, and B finds out at its next sync and
@@ -250,9 +306,7 @@ func TestFriendFamiliesLinkThroughHub(t *testing.T) {
 	if links := a.getJSON(t, "/api/admin/friends", adminHeaders())["links"].([]any); len(links) != 0 {
 		t.Fatalf("A still has links: %v", links)
 	}
-	resp = b.expectStatus(t, "POST", fmt.Sprintf("/api/admin/friends/%d/sync", bLink), nil, adminHeaders(), http.StatusOK)
-	decodeBody(t, resp, &link)
-	if link["status"] != "ended" {
+	if link = sync(b, bPath); link["status"] != "ended" {
 		t.Fatalf("B's link after A unlinked: %v", link)
 	}
 	if farms := b.getJSON(t, "/api/friends/farms", childHeaders(bo))["farms"].([]any); len(farms) != 0 {

@@ -39,5 +39,16 @@ CREATE TABLE friend_links (
     created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Nothing about a person leaves the instance until a parent turns this on.
-ALTER TABLE users ADD COLUMN share_with_friends INTEGER NOT NULL DEFAULT 0;
+-- Sharing is chosen per family, in both directions, and a person only shows
+-- up when both parents picked them: the sender shares them (friend_link_shares)
+-- and the receiver accepts them (friend_link_accepts). Both start empty.
+CREATE TABLE friend_link_shares (
+    link_id INTEGER NOT NULL REFERENCES friend_links(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    PRIMARY KEY (link_id, user_id)
+);
+CREATE TABLE friend_link_accepts (
+    link_id   INTEGER NOT NULL REFERENCES friend_links(id) ON DELETE CASCADE,
+    member_id TEXT    NOT NULL, -- the person's id in the other family's snapshot
+    PRIMARY KEY (link_id, member_id)
+);

@@ -99,9 +99,18 @@ func (h *FriendsHandler) Leaderboard(w http.ResponseWriter, r *http.Request) {
 		if l.Status != model.FriendStatusActive || snap == nil {
 			continue
 		}
+		accepts, err := h.store.FriendLinkAccepts(ctx, l.ID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to list friend families")
+			return
+		}
+		shown := friends.Shown(snap, accepts)
+		if len(shown) == 0 {
+			continue
+		}
 		name := familyLabel(l.PeerName)
 		pets := 0
-		for _, m := range snap.Members {
+		for _, m := range shown {
 			if m.Pet != nil {
 				pets++
 			}
@@ -143,8 +152,17 @@ func (h *FriendsHandler) Farms(w http.ResponseWriter, r *http.Request) {
 		if l.Status != model.FriendStatusActive || snap == nil {
 			continue
 		}
+		accepts, err := h.store.FriendLinkAccepts(r.Context(), l.ID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to list friend families")
+			return
+		}
+		shown := friends.Shown(snap, accepts)
+		if len(shown) == 0 {
+			continue
+		}
 		pets := []model.Pet{}
-		for j, m := range snap.Members {
+		for j, m := range shown {
 			p := m.Pet
 			if p == nil {
 				continue
@@ -170,15 +188,6 @@ func (h *FriendsHandler) AdminGet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to list people")
 		return
 	}
-	shared, err := h.store.SharedUserIDs(ctx)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list people")
-		return
-	}
-	people := []map[string]any{}
-	for _, u := range users {
-		people = append(people, map[string]any{"id": u.ID, "name": u.Name, "color": u.Color, "role": u.Role, "shared": shared[u.ID]})
-	}
 	links, err := h.store.ListFriendLinks(ctx)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list friend families")
@@ -186,7 +195,12 @@ func (h *FriendsHandler) AdminGet(w http.ResponseWriter, r *http.Request) {
 	}
 	outLinks := []map[string]any{}
 	for i := range links {
-		outLinks = append(outLinks, linkView(&links[i]))
+		v, err := h.linkView(ctx, &links[i], users)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to list friend families")
+			return
+		}
+		outLinks = append(outLinks, v)
 	}
 	hubURL, hubKey, fromEnv := h.svc.Hub(ctx)
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -195,25 +209,70 @@ func (h *FriendsHandler) AdminGet(w http.ResponseWriter, r *http.Request) {
 		"hub_url":             hubURL,
 		"hub_key_set":         hubKey != "",
 		"hub_from_env":        fromEnv,
-		"people":              people,
 		"links":               outLinks,
 	})
 }
 
-// linkView is a link as a parent sees it, with the names the other family
-// is sharing.
-func linkView(l *model.FriendLink) map[string]any {
-	members := []string{}
-	if snap := friends.PeerSnapshot(l); snap != nil {
-		for _, m := range snap.Members {
-			members = append(members, m.Name)
+// linkView is a linked family as a parent sees it, with both directions of
+// sharing. A person is only visible to the other side when both parents
+// picked them:
+//
+//	outbound: this household's people; shared = we send them to this
+//	  family, accepted = that family has chosen to show them.
+//	inbound: the people that family offers us; accepted = we show them.
+func (h *FriendsHandler) linkView(ctx context.Context, l *model.FriendLink, users []model.User) (map[string]any, error) {
+	if users == nil {
+		var err error
+		if users, err = h.store.ListUsers(ctx); err != nil {
+			return nil, err
 		}
+	}
+	shares, err := h.store.FriendLinkShares(ctx, l.ID)
+	if err != nil {
+		return nil, err
+	}
+	accepts, err := h.store.FriendLinkAccepts(ctx, l.ID)
+	if err != nil {
+		return nil, err
+	}
+	snap := friends.PeerSnapshot(l)
+	theirs := map[string]bool{}
+	inbound := []map[string]any{}
+	if snap != nil {
+		for _, id := range snap.Accepted {
+			theirs[id] = true
+		}
+		for _, m := range snap.Members {
+			inbound = append(inbound, map[string]any{"id": m.ID, "name": m.Name, "color": m.Color, "accepted": accepts[m.ID]})
+		}
+	}
+	outbound := []map[string]any{}
+	for _, u := range users {
+		outbound = append(outbound, map[string]any{
+			"id": u.ID, "name": u.Name, "color": u.Color, "role": u.Role,
+			"shared": shares[u.ID], "accepted": shares[u.ID] && theirs[fmt.Sprint(u.ID)],
+		})
 	}
 	return map[string]any{
 		"id": l.ID, "status": l.Status, "peer_name": l.PeerName, "hub_url": l.HubURL,
-		"invite": l.Invite, "invite_expires": l.InviteExpires, "members": members,
+		"invite": l.Invite, "invite_expires": l.InviteExpires, "outbound": outbound, "inbound": inbound,
 		"snapshot_at": l.SnapshotAt, "last_sync_at": l.LastSyncAt, "last_error": l.LastError, "created_at": l.CreatedAt,
+	}, nil
+}
+
+// writeLink answers with one link's view.
+func (h *FriendsHandler) writeLink(w http.ResponseWriter, r *http.Request, status int, id int64) {
+	l, err := h.store.GetFriendLink(r.Context(), id)
+	if err != nil || l == nil {
+		writeError(w, http.StatusInternalServerError, "failed to load friend family")
+		return
 	}
+	v, err := h.linkView(r.Context(), l, nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load friend family")
+		return
+	}
+	writeJSON(w, status, v)
 }
 
 // AdminUpdate changes the leaderboard switch, the family name and the hub.
@@ -270,33 +329,75 @@ func (h *FriendsHandler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 	h.AdminGet(w, r)
 }
 
-// SetShared turns sharing with friend families on or off for one person.
-func (h *FriendsHandler) SetShared(w http.ResponseWriter, r *http.Request) {
+// UpdateLink sets, for one linked family, who this household shares with
+// them (share_user_ids) and which of the people they offer are shown here
+// (accept_member_ids). Each list replaces the previous one; a list left out
+// isn't changed. It then syncs, so the other family isn't left with a stale
+// copy for 15 minutes.
+func (h *FriendsHandler) UpdateLink(w http.ResponseWriter, r *http.Request) {
 	id, err := urlParamInt64(r, "id")
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid user id")
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	ctx := r.Context()
+	l, _ := h.store.GetFriendLink(ctx, id)
+	if l == nil {
+		writeError(w, http.StatusNotFound, "friend family not found")
 		return
 	}
 	var req struct {
-		Shared *bool `json:"shared"`
+		Share  *[]int64  `json:"share_user_ids"`
+		Accept *[]string `json:"accept_member_ids"`
 	}
-	if err := decodeJSON(r, &req); err != nil || req.Shared == nil {
-		writeError(w, http.StatusBadRequest, "shared (true or false) is required")
+	if err := decodeJSON(r, &req); err != nil || (req.Share == nil && req.Accept == nil) {
+		writeError(w, http.StatusBadRequest, "share_user_ids or accept_member_ids is required")
 		return
 	}
-	found, err := h.store.SetUserShared(r.Context(), id, *req.Shared)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to save")
-		return
+	if req.Share != nil {
+		users, err := h.store.ListUsers(ctx)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to list people")
+			return
+		}
+		known := map[int64]bool{}
+		for _, u := range users {
+			known[u.ID] = true
+		}
+		for _, uid := range *req.Share {
+			if !known[uid] {
+				writeError(w, http.StatusBadRequest, fmt.Sprintf("person %d not found", uid))
+				return
+			}
+		}
+		if err := h.store.SetFriendLinkShares(ctx, id, *req.Share); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to save")
+			return
+		}
 	}
-	if !found {
-		writeError(w, http.StatusNotFound, "person not found")
-		return
+	if req.Accept != nil {
+		// Only people the other family actually offers can be accepted.
+		offered := map[string]bool{}
+		if snap := friends.PeerSnapshot(l); snap != nil {
+			for _, m := range snap.Members {
+				offered[m.ID] = true
+			}
+		}
+		for _, mid := range *req.Accept {
+			if !offered[mid] {
+				writeError(w, http.StatusBadRequest, "that person isn't being shared by the other family")
+				return
+			}
+		}
+		if err := h.store.SetFriendLinkAccepts(ctx, id, *req.Accept); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to save")
+			return
+		}
 	}
-	// Don't leave a stale copy with friends for 15 minutes after a parent
-	// switches someone off.
-	go h.svc.SyncAll(context.WithoutCancel(r.Context()))
-	writeJSON(w, http.StatusOK, map[string]any{"id": id, "shared": *req.Shared})
+	if l.Status != model.FriendStatusEnded {
+		_ = h.svc.Sync(ctx, id) // a failure is recorded on the link
+	}
+	h.writeLink(w, r, http.StatusOK, id)
 }
 
 func (h *FriendsHandler) needName(w http.ResponseWriter, r *http.Request) bool {
@@ -330,7 +431,7 @@ func (h *FriendsHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = h.store.SetSetting(r.Context(), friends.SettingLeaderboard, "true")
-	writeJSON(w, http.StatusCreated, linkView(l))
+	h.writeLink(w, r, http.StatusCreated, l.ID)
 }
 
 // Join links to another family with the invite they sent.
@@ -351,7 +452,7 @@ func (h *FriendsHandler) Join(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = h.store.SetSetting(r.Context(), friends.SettingLeaderboard, "true")
-	writeJSON(w, http.StatusCreated, linkView(l))
+	h.writeLink(w, r, http.StatusCreated, l.ID)
 }
 
 // SyncNow syncs one link straight away.
@@ -369,8 +470,7 @@ func (h *FriendsHandler) SyncNow(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	l, _ := h.store.GetFriendLink(r.Context(), id)
-	writeJSON(w, http.StatusOK, linkView(l))
+	h.writeLink(w, r, http.StatusOK, id)
 }
 
 // Unlink ends a link and removes the other family's data.

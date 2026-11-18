@@ -73,7 +73,14 @@ export const FriendFamiliesSection: React.FC = () => {
   );
   const nameDirty = name.trim() !== cfg.family_name;
   const canLink = cfg.family_name !== '';
-  const sharedCount = cfg.people.filter(p => p.shared).length;
+  // Tick or untick one of our people for one family.
+  const share = (l: FriendLink, userId: number, on: boolean) => run(() => api.friends.updateLink(l.id, {
+    share_user_ids: l.outbound.filter(p => (p.id === userId ? on : p.shared)).map(p => p.id),
+  }));
+  // Tick or untick one of their people.
+  const accept = (l: FriendLink, memberId: string, on: boolean) => run(() => api.friends.updateLink(l.id, {
+    accept_member_ids: l.inbound.filter(m => (m.id === memberId ? on : m.accepted)).map(m => m.id),
+  }));
 
   return (
     <section className={clsx(ui.card, ui.section)}>
@@ -102,17 +109,6 @@ export const FriendFamiliesSection: React.FC = () => {
         </button>
       </div>
 
-      <fieldset className={ff.people}>
-        <legend className={ui.label}>{tt('shareTitle')}</legend>
-        <p className={ff.note}>{tt('shareDesc')}</p>
-        {cfg.people.map(p => (
-          <label key={p.id} className={ui.check}>
-            <input type="checkbox" checked={p.shared} disabled={busy} onChange={e => run(() => api.friends.share(p.id, e.target.checked))} />
-            <span className={ui.checkLabel}>{p.name}</span>
-          </label>
-        ))}
-      </fieldset>
-
       {cfg.links.length > 0 && (
         <ul className={ui.list}>
           {cfg.links.map(l => (
@@ -131,10 +127,38 @@ export const FriendFamiliesSection: React.FC = () => {
                 </>
               )}
               {l.status === 'active' && (
-                <p className={ff.note}>
-                  {l.members.length > 0 ? tt('theyShare', { names: l.members.join(', ') }) : tt('theyShareNobody')}
-                  {l.last_sync_at && <> · {tt('lastSync', { when: when(l.last_sync_at) })}</>}
-                </p>
+                <>
+                  {l.last_sync_at && <p className={ff.note}>{tt('lastSync', { when: when(l.last_sync_at) })}</p>}
+                  <p className={ff.note}>{tt('bothPick')}</p>
+                  <div className={ff.sides}>
+                    <fieldset className={ff.people}>
+                      <legend className={ui.label}>{tt('outboundTitle', { family: l.peer_name || tt('unnamed') })}</legend>
+                      {l.outbound.map(p => (
+                        <label key={p.id} className={ui.check}>
+                          <input type="checkbox" checked={p.shared} disabled={busy} onChange={e => share(l, p.id, e.target.checked)} />
+                          <span className={ui.checkLabel}>
+                            {p.name}
+                            {p.shared && <span className={clsx(ff.hint, p.accepted && ff.ok)}>{tt(p.accepted ? 'theyShow' : 'theyHavent')}</span>}
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+                    <fieldset className={ff.people}>
+                      <legend className={ui.label}>{tt('inboundTitle', { family: l.peer_name || tt('unnamed') })}</legend>
+                      {l.inbound.length === 0 && <p className={ff.note}>{tt('theyShareNobody')}</p>}
+                      {l.inbound.map(m => (
+                        <label key={m.id} className={ui.check}>
+                          <input type="checkbox" checked={m.accepted} disabled={busy} onChange={e => accept(l, m.id, e.target.checked)} />
+                          <span className={ui.checkLabel}>
+                            {m.name}
+                            {!m.accepted && <span className={ff.hint}>{tt('notShown')}</span>}
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+                  </div>
+                  <p className={ff.note}>{tt('shareDesc')}</p>
+                </>
               )}
               {l.status === 'ended' && <p className={ff.note}>{tt('endedHelp')}</p>}
               {l.last_error && <p className={clsx(ff.note, ff.error)}>{tt('syncError', { error: l.last_error })}</p>}
@@ -152,7 +176,6 @@ export const FriendFamiliesSection: React.FC = () => {
           ))}
         </ul>
       )}
-      {cfg.links.some(l => l.status === 'active') && sharedCount === 0 && <p className={clsx(ff.note, ff.error)}>{tt('nobodyShared')}</p>}
 
       <h4 className={ff.sub}>{tt('joinTitle')}</h4>
       <p className={ff.note}>{tt('joinDesc')}</p>

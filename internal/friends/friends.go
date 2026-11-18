@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -183,10 +184,11 @@ func (f *Service) FamilyName(ctx context.Context) string {
 	return v
 }
 
-// Snapshot builds what this family shares: only people a parent switched
-// sharing on for, and nothing but names, colours, daily chore counts (with
-// what those chores were worth), streaks and farm animals.
-func (f *Service) Snapshot(ctx context.Context) (*model.FriendSnapshot, error) {
+// Snapshot builds what this family shares with one linked family: only the
+// people a parent picked for that family, and nothing but names, colours,
+// daily chore counts (with what those chores were worth), streaks and farm
+// animals.
+func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnapshot, error) {
 	now := f.now()
 	snap := &model.FriendSnapshot{
 		Version:     snapshotVersion,
@@ -194,8 +196,17 @@ func (f *Service) Snapshot(ctx context.Context) (*model.FriendSnapshot, error) {
 		GeneratedAt: now.UTC(),
 		Today:       now.Format(model.DateFormat),
 		Members:     []model.FriendMember{},
+		Accepted:    []string{},
 	}
-	shared, err := f.store.SharedUserIDs(ctx)
+	accepts, err := f.store.FriendLinkAccepts(ctx, linkID)
+	if err != nil {
+		return nil, err
+	}
+	for id := range accepts {
+		snap.Accepted = append(snap.Accepted, id)
+	}
+	sort.Strings(snap.Accepted)
+	shared, err := f.store.FriendLinkShares(ctx, linkID)
 	if err != nil || len(shared) == 0 {
 		return snap, err
 	}
@@ -242,6 +253,18 @@ func (f *Service) Snapshot(ctx context.Context) (*model.FriendSnapshot, error) {
 		snap.Members = append(snap.Members, m)
 	}
 	return snap, nil
+}
+
+// Shown returns the members of a peer snapshot that a parent here chose to
+// show. Only these appear on the leaderboard and in farm visits.
+func Shown(snap *model.FriendSnapshot, accepts map[string]bool) []model.FriendMember {
+	var out []model.FriendMember
+	for _, m := range snap.Members {
+		if accepts[m.ID] {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // PeerSnapshot decodes a link's stored snapshot of the other family (nil if
@@ -487,7 +510,7 @@ func (f *Service) Sync(ctx context.Context, id int64) error {
 		_ = f.store.SaveFriendSync(ctx, id, l.Status, "", "", nil, err.Error(), now)
 		return err
 	}
-	snap, err := f.Snapshot(ctx)
+	snap, err := f.Snapshot(ctx, id)
 	if err != nil {
 		return fail(err)
 	}
@@ -530,6 +553,17 @@ func (f *Service) Sync(ctx context.Context, id int64) error {
 		// Never go back to an older snapshot than the one already held.
 		if old := PeerSnapshot(l); old == nil || !ps.GeneratedAt.Before(old.GeneratedAt) {
 			sanitize(&ps)
+			// Keep nothing but the name of anyone a parent here hasn't
+			// picked: enough to offer them, no more.
+			accepts, err := f.store.FriendLinkAccepts(ctx, id)
+			if err != nil {
+				return fail(err)
+			}
+			for i, m := range ps.Members {
+				if !accepts[m.ID] {
+					ps.Members[i] = model.FriendMember{ID: m.ID, Name: m.Name, Color: m.Color, Days: []model.ScoreDay{}}
+				}
+			}
 			clean, _ := json.Marshal(ps)
 			peerName, peerJSON = ps.Family, string(clean)
 			at := ps.GeneratedAt
@@ -544,6 +578,12 @@ func sanitize(s *model.FriendSnapshot) {
 	s.Family = clip(s.Family, maxNameLen)
 	if len(s.Members) > 30 {
 		s.Members = s.Members[:30]
+	}
+	if len(s.Accepted) > 100 {
+		s.Accepted = s.Accepted[:100]
+	}
+	for i := range s.Accepted {
+		s.Accepted[i] = clip(s.Accepted[i], 20)
 	}
 	for i := range s.Members {
 		m := &s.Members[i]

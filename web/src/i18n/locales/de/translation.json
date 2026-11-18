@@ -709,8 +709,7 @@
         "familiesDesc": "Verbinde dich mit einer anderen Familie, die OpenChore nutzt, damit die Kinder eine Rangliste teilen und sich gegenseitig auf dem Bauernhof besuchen können. Die beiden Haushalte verbinden sich nie direkt: Jeder schickt alle 15 Minuten verschlüsselte Daten an einen Koordinationsserver, der sie nicht lesen kann.",
         "familyName": "Name eurer Familie",
         "familyNamePlaceholder": "z. B. Familie Müller",
-        "shareTitle": "Wen teilen",
-        "shareDesc": "Von jeder angekreuzten Person sehen befreundete Familien Vorname, Farbe, die Zahl der erledigten Aufgaben pro Tag und deren Punktwert, die Serie und das Hoftier. Namen von Aufgaben, Fotos, Punktestände und Belohnungen werden nie gesendet.",
+        "shareDesc": "Von jeder Person, die ihr teilt, erhält diese Familie Vorname, Farbe, die Zahl der erledigten Aufgaben pro Tag und deren Punktwert, die Serie und das Hoftier. Namen von Aufgaben, Fotos, Punktestände und Belohnungen werden nie gesendet. Solange ihr eine angebotene Person nicht ankreuzt, wird hier nur ihr Name gespeichert.",
         "status": {
           "waiting": "Warten auf die anderen",
           "active": "Verbunden",
@@ -723,9 +722,8 @@
         "copy": "Kopieren",
         "copied": "Kopiert",
         "copyFailed": "Kopieren fehlgeschlagen. Markiere die Einladung und kopiere sie von Hand.",
-        "theyShare": "Sie teilen: {{names}}",
-        "theyShareNobody": "Sie teilen noch niemanden",
-        "lastSync": "zuletzt aktualisiert {{when}}",
+        "theyShareNobody": "Sie teilen noch niemanden.",
+        "lastSync": "Zuletzt aktualisiert {{when}}",
         "endedHelp": "Die andere Familie hat die Verbindung beendet oder die Einladung ist abgelaufen. Ihre Daten wurden entfernt.",
         "syncError": "Letzte Aktualisierung fehlgeschlagen: {{error}}",
         "syncNow": "Jetzt aktualisieren",
@@ -734,7 +732,6 @@
         "remove": "Entfernen",
         "confirmUnlink": "Wirklich trennen?",
         "unlinked": "Getrennt. Ihre Daten wurden entfernt.",
-        "nobodyShared": "Ihr seid verbunden, teilt aber niemanden. Die andere Familie sieht also niemanden von euch.",
         "joinTitle": "Mit einer Einladung beitreten",
         "joinDesc": "Füge die Einladung ein, die dir der andere Elternteil geschickt hat.",
         "joinLabel": "Einladung der anderen Familie",
@@ -750,7 +747,13 @@
         "inviteMade": "Einladung erstellt. Schicke sie an den anderen Elternteil.",
         "needName": "Gib eurer Familie einen Namen, bevor ihr euch verbindet.",
         "saved": "Gespeichert.",
-        "failed": "Das hat nicht geklappt. Versuche es noch einmal."
+        "failed": "Das hat nicht geklappt. Versuche es noch einmal.",
+        "bothPick": "Eine Person erscheint bei der anderen Familie erst, wenn beide Eltern sie angekreuzt haben: Ihr wählt, wen ihr sendet, und sie wählen, wen sie anzeigen. Umgekehrt gilt dasselbe.",
+        "outboundTitle": "An {{family}} gesendet",
+        "inboundTitle": "Von {{family}} angeboten",
+        "theyShow": "wird dort angezeigt",
+        "theyHavent": "dort noch nicht angekreuzt",
+        "notShown": "hier noch nicht angezeigt"
       }
     },
     "skins": {

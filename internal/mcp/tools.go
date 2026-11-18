@@ -245,8 +245,9 @@ func allTools() []*Tool {
 		desc:   "The farm animals each linked friend family shares, as of their last sync.",
 		method: http.MethodGet, path: "/friends/farms"})
 	add(endpoint{name: "get_friend_families", title: "Friend families settings", readOnly: true,
-		desc: "Leaderboard on/off, this family's name, the coordination server (hub), who is shared with friend families, " +
-			"and each link with its status, the names the other family shares and the last sync. A waiting link carries the invite to send.",
+		desc: "Leaderboard on/off, this family's name, the coordination server (hub), and each linked family with its status and last sync, " +
+			"who this household shares with them (outbound: shared, and accepted once they chose to show that person) and who they offer " +
+			"(inbound: accepted when shown here). A waiting link carries the invite to send.",
 		method: http.MethodGet, path: "/admin/friends"})
 	add(endpoint{name: "update_friend_families", title: "Change leaderboard and friend families settings",
 		desc: "Turn the leaderboard on or off, set the family name other families see, or set the coordination server " +
@@ -258,11 +259,18 @@ func allTools() []*Tool {
 			"hub_url":             str("Coordination server address, https://…"),
 			"hub_key":             str("Key that lets this family create invites on that server."),
 		}})
-	add(endpoint{name: "share_person_with_friends", title: "Share a person with friend families",
-		desc: "Turn sharing on or off for one person. A shared person's first name, colour, daily chore counts (and what those chores were worth in points), streak and " +
-			"farm animal go to every linked friend family; chore names, photos, point balances and rewards never do. Confirm with the parent first.",
-		method: http.MethodPut, path: "/admin/users/{id}/share", required: []string{"shared"},
-		props: map[string]any{"id": integer("Person id."), "shared": boolean("Share or stop sharing.")}})
+	add(endpoint{name: "set_friend_family_sharing", title: "Choose who is shared with a friend family",
+		desc: "For one linked family, set who this household shares with them (share_user_ids) and which of the people they offer " +
+			"are shown here (accept_member_ids, from that link's inbound list). Each list replaces the previous one; leave one out to keep it. " +
+			"A person only appears on the other family's leaderboard and farm when both parents picked them. A shared person's first name, " +
+			"colour, daily chore counts (and what those chores were worth in points), streak and farm animal are sent; chore names, photos, " +
+			"point balances and rewards never are. Confirm with the parent first.",
+		method: http.MethodPut, path: "/admin/friends/{id}",
+		props: map[string]any{
+			"id":                integer("Link id from get_friend_families."),
+			"share_user_ids":    ids("Ids of the people in this household to share with that family."),
+			"accept_member_ids": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Ids (from that link's inbound list) of the people from that family to show here."},
+		}})
 	add(endpoint{name: "create_friend_invite", title: "Invite a friend family",
 		desc:   "Make a one-time invite (valid 7 days) for another family's OpenChore to link with this one. Give the invite text to the other parent.",
 		method: http.MethodPost, path: "/admin/friends/invites"})

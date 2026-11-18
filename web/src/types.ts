@@ -638,7 +638,10 @@ export interface FriendLink {
   hub_url: string;
   invite?: string;
   invite_expires?: string;
-  members: string[];
+  /** This household's people: shared = sent to this family; accepted = they chose to show them. */
+  outbound: { id: number; name: string; color?: string; role: string; shared: boolean; accepted: boolean }[];
+  /** The people this family offers: accepted = shown here. */
+  inbound: { id: string; name: string; color?: string; accepted: boolean }[];
   snapshot_at?: string;
   last_sync_at?: string;
   last_error?: string;
@@ -651,6 +654,5 @@ export interface FriendsSettings {
   hub_url: string;
   hub_key_set: boolean;
   hub_from_env: boolean;
-  people: { id: number; name: string; color?: string; role: string; shared: boolean }[];
   links: FriendLink[];
 }

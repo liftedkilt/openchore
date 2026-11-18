@@ -291,10 +291,8 @@ export const api = {
     settings: () => fetchWithAuth<FriendsSettings>('/admin/friends'),
     update: (data: { leaderboard_enabled?: boolean; family_name?: string; hub_url?: string; hub_key?: string }) =>
       fetchWithAuth<FriendsSettings>('/admin/friends', { method: 'PUT', body: JSON.stringify(data) }),
-    share: (userId: number, shared: boolean) => fetchWithAuth<{ id: number; shared: boolean }>(`/admin/users/${userId}/share`, {
-      method: 'PUT',
-      body: JSON.stringify({ shared }),
-    }),
+    updateLink: (id: number, data: { share_user_ids?: number[]; accept_member_ids?: string[] }) =>
+      fetchWithAuth<FriendLink>(`/admin/friends/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     invite: () => fetchWithAuth<FriendLink>('/admin/friends/invites', { method: 'POST' }),
     join: (invite: string) => fetchWithAuth<FriendLink>('/admin/friends/join', { method: 'POST', body: JSON.stringify({ invite }) }),
     sync: (id: number) => fetchWithAuth<FriendLink>(`/admin/friends/${id}/sync`, { method: 'POST' }),

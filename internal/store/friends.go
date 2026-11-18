@@ -43,12 +43,12 @@ func (s *Store) SaveScoreDay(ctx context.Context, userID int64, d model.ScoreDay
 	return err
 }
 
-// --- Sharing ---
+// --- Sharing, per linked family ---
 
-// SharedUserIDs returns the people a parent has chosen to share with friend
-// families.
-func (s *Store) SharedUserIDs(ctx context.Context) (map[int64]bool, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id FROM users WHERE share_with_friends = 1`)
+// FriendLinkShares returns the people a parent chose to share with one
+// linked family.
+func (s *Store) FriendLinkShares(ctx context.Context, linkID int64) (map[int64]bool, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT user_id FROM friend_link_shares WHERE link_id = ?`, linkID)
 	if err != nil {
 		return nil, err
 	}
@@ -64,15 +64,59 @@ func (s *Store) SharedUserIDs(ctx context.Context) (map[int64]bool, error) {
 	return out, rows.Err()
 }
 
-// SetUserShared turns sharing with friend families on or off for a person.
-// It reports whether the person exists.
-func (s *Store) SetUserShared(ctx context.Context, userID int64, shared bool) (bool, error) {
-	res, err := s.db.ExecContext(ctx, `UPDATE users SET share_with_friends = ? WHERE id = ?`, shared, userID)
+// FriendLinkAccepts returns the other family's people (by snapshot member
+// id) a parent chose to show from one linked family.
+func (s *Store) FriendLinkAccepts(ctx context.Context, linkID int64) (map[string]bool, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT member_id FROM friend_link_accepts WHERE link_id = ?`, linkID)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	n, _ := res.RowsAffected()
-	return n > 0, nil
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
+// SetFriendLinkShares replaces who is shared with one linked family.
+func (s *Store) SetFriendLinkShares(ctx context.Context, linkID int64, userIDs []int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM friend_link_shares WHERE link_id = ?`, linkID); err != nil {
+		return err
+	}
+	for _, id := range userIDs {
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO friend_link_shares (link_id, user_id) VALUES (?, ?)`, linkID, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// SetFriendLinkAccepts replaces which of the other family's people are shown.
+func (s *Store) SetFriendLinkAccepts(ctx context.Context, linkID int64, memberIDs []string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM friend_link_accepts WHERE link_id = ?`, linkID); err != nil {
+		return err
+	}
+	for _, id := range memberIDs {
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO friend_link_accepts (link_id, member_id) VALUES (?, ?)`, linkID, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // --- Friend links ---
