@@ -9,38 +9,103 @@ Leaderboard & friend families**:
 
 ## The score
 
-One number per person per week (Monday to Sunday, in the server's time zone):
+Everyone gets one number per week (Monday to Sunday, in the server's time
+zone): a score from 0 to 100, shown as "Score 88 (12 of 13 chores)".
 
-**points earned ÷ points assigned × 100**, a score out of 100 shown as
-"Score 88 (12 of 13 chores)". No percentages are shown.
+### The formula
 
-Each assigned chore is worth its own point value, so a big chore counts for
-more than a small one. It is a share, never a points total: every family sets
-its own point values, so totals can't be compared between families, but the
-share of your own chores' points can.
+```
+score = 100 × (points of the assigned chores you did)
+              ÷ (points of all the chores you were assigned)
+```
+
+rounded to the nearest whole number.
+
+- **"Points" here is each chore's own point value**, the number a parent set
+  on the chore. It is not the points balance, and nothing is added to or
+  taken from anyone's balance by the leaderboard.
+- **"Assigned" means Must-do and Every-day chores** (`required`, `core`)
+  scheduled for that person that week.
+- The whole week is added up first and divided once. It is not an average of
+  daily scores, so a day with many chores counts for more than a day with one.
+
+### A worked example
+
+Emma's week has 13 assigned chores:
+
+| Chores | Each worth | Assigned | Done | Points assigned | Points earned |
+| --- | --- | --- | --- | --- | --- |
+| Make bed | 2 | 7 | 7 | 14 | 14 |
+| Feed the cats | 5 | 5 | 5 | 25 | 25 |
+| Mow the lawn | 20 | 1 | 0 | 20 | 0 |
+| **Total** | | **13** | **12** | **59** | **39** |
+
+Score = 100 × 39 ÷ 59 = 66.1, shown as **Score 66 (12 of 13 chores)**.
+
+She did 12 of 13 chores, but the one she skipped was the biggest, so her score
+is 66 and not 92. If she had skipped a "Make bed" instead, it would be
+100 × 57 ÷ 59 = **97**.
+
+### Why it works this way
+
+- **A share, not a total, so families can be compared.** Every family sets
+  its own point values. One family's chores are worth 2 to 20 points, another's
+  20 to 200, and there is no fair exchange rate between them. Dividing by what
+  *you* were assigned cancels the scale out: 39 of 59 and 390 of 590 are the
+  same score.
+- **It also evens out workload.** A kid with 6 chores and a kid with 30 are
+  both measured against what their own parents asked of them.
+- **Weighted by points, so effort counts.** A plain count would treat making
+  the bed and mowing the lawn as equal, and skipping the hard chore would cost
+  no more than skipping the easy one. Point values are the parents' own
+  statement of how much each chore matters, so they are the weights.
+- **Out of 100, with no percent sign.** It reads as a score, and the chore
+  count sits next to it so kids can see what it's made from. It's labelled
+  "Score" because "points" already means the balance kids spend on rewards.
+- **Bonus chores don't raise it.** They're optional, so counting them would
+  favour kids whose parents offer more of them. They only break ties.
+
+### The rules in full
 
 | Rule | Detail |
 | --- | --- |
-| Assigned | Must-do and Every-day chores (`required`, `core`) scheduled for that person |
+| Assigned | Must-do and Every-day chores (`required`, `core`) scheduled for that person individually |
 | Worth | The chore's point value. A schedule's points multiplier isn't applied |
-| No points | If none of a person's chores carry points that week, the score is chores done ÷ chores assigned |
-| Excused | Left out of both sides of the fraction |
-| Paused days | Left out entirely |
 | Done | Completed and approved, or waiting for a grown-up. A rejected try isn't done |
-| Today | A chore due today joins the fraction when it's done, when it expires, or when the day ends. Nobody is marked down in the morning for chores that aren't due yet |
-| Bonus | Bonus chores, and family / first-come chores the person did, are counted on the side ("+3 bonus"). They break ties and never change the score |
+| Excused | Left out of both sides of the division: neither assigned nor done |
+| Paused days | Left out entirely |
+| Today | A chore due today joins both sides when it's done, or joins the assigned side when it expires or the day ends. Nobody is marked down in the morning for chores that aren't due yet |
+| No points | If none of a person's assigned chores carry points that week, the score is 100 × chores done ÷ chores assigned |
+| Zero-point chores | In a week that does have points, a chore worth 0 points doesn't move the score (it still shows in the chore count) |
+| Bonus | Bonus chores, and family / first-come chores the person did, are counted on the side ("+3 bonus") |
 | Optional | Optional chores and kids' own tasks count for nothing |
 | Penalties and decay | Not part of the score: it looks only at which chores were done |
-| Ranking | Share earned, then bonus count; ties share a place. A person needs 5 assigned chores in the week to be ranked |
+| Nothing assigned | No score yet; shown as "–" |
 
-A kid with one chore a day reaches 100% more easily than a kid with eight.
-The chore count is always shown next to the score so that stays visible.
-Because chores are weighted, the two can differ: 9 of 10 chores is well under
-a score of 90 if the one missed was the big one.
+### Ranking
 
-Finished days are stored in `score_days` (so a paused day stays out of the
-score after the person is unpaused) and recounted for a week, which picks up
-late approvals and rejections. Rules live in `internal/score`.
+1. People with at least **5 assigned chores** that week are ranked; the rest
+   are listed under "Getting started". With fewer chores, a single one swings
+   the score too far.
+2. Higher share first. The exact fraction is compared, not the rounded score,
+   so 39 ÷ 59 ranks below 2 ÷ 3 even though both show 66 or 67.
+3. Then more bonus chores.
+4. Anyone still level shares a place.
+
+### What it doesn't fix
+
+- A kid with one chore a day reaches 100 more easily than a kid with eight.
+  The chore count next to the score keeps that visible.
+- Changing a chore's point value mid-week changes the score for the days
+  recounted after the change (the last 7 finished days).
+- Each server reports its own numbers. There is no cheat detection; the
+  parents are the referees.
+
+### Where it lives
+
+Rules: `internal/score`. Finished days are stored in `score_days` (so a paused
+day stays out of the score after the person is unpaused) and recounted for a
+week, which picks up late approvals and rejections.
 
 ## Friend families
 
