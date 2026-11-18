@@ -628,6 +628,16 @@ export type ParsedAccessory =
 const EMOJI_RE = /^e:(head|face|neck):(.+)$/su;
 const IMAGE_RE = /^img:(head|face|neck):([a-f0-9]{16,64}|preview)$/;
 
+/**
+ * A picture address is only ever one of ours: an upload under /uploads/pets,
+ * or a PNG data URL made in this page (a drawing or a chosen file being
+ * previewed). Anything else is dropped rather than put in the page.
+ */
+const SAFE_IMAGE_RE = /^(?:\/uploads\/pets\/[a-f0-9]{16,64}\.png|data:image\/png;base64,[A-Za-z0-9+/=]+)$/;
+export function safeImageHref(url: string | undefined): string | undefined {
+  return url && SAFE_IMAGE_RE.test(url) ? url : undefined;
+}
+
 /** Where an uploaded accessory image is served from. */
 export function accessoryImageUrl(id: string): string {
   return `/uploads/pets/${id}.png`;
@@ -704,7 +714,9 @@ function ImageAccessory({ slot, url, r }: { slot: AccessorySlot; url: string; r:
   // Drawings are trimmed to their own edges, so anchor by slot: a hat sits on
   // the crown, glasses centre on the eyes, neckwear hangs from the collar.
   const align = slot === 'head' ? 'xMidYMax' : slot === 'neck' ? 'xMidYMin' : 'xMidYMid';
-  return <image href={url} x={x - size / 2} y={y - size / 2} width={size} height={size} preserveAspectRatio={`${align} meet`} pointerEvents="none" />;
+  const href = safeImageHref(url);
+  if (!href) return null;
+  return <image href={href} x={x - size / 2} y={y - size / 2} width={size} height={size} preserveAspectRatio={`${align} meet`} pointerEvents="none" />;
 }
 
 function Builtin({ item, r }: { item: string; r: Rig }) {
