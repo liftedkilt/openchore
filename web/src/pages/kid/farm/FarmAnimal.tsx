@@ -1015,7 +1015,8 @@ export function FarmAnimal({ species, mood, color, accessory, accessoryImageUrl,
     const lying = mood === 'very_sick';
     const sick = lying || mood === 'sick';
     const { x, y, size } = SPRITE_BOX;
-    const href = spritePreview ? sprite : spriteUrl(sprite);
+    const href = safeImageHref(spritePreview ? sprite : spriteUrl(sprite));
+    if (!href) return null;
     // The frame shown while standing still. A strip with a frame for the
     // mood uses it; otherwise the standing frame is tinted green when sick
     // and squashed flat when too sick to stand.
