@@ -202,6 +202,10 @@ type Chore struct {
 	PhotoSource        string    `json:"photo_source"`
 	Source             string    `json:"source"`
 	ExternalID         string    `json:"external_id,omitempty"`
+	// AutoComplete marks a chore another app finishes through the API when
+	// the work is really done. Only a parent (or an API token) may complete
+	// or uncomplete it; the assignee cannot tick it themselves.
+	AutoComplete       bool      `json:"auto_complete"`
 	TTSAudioURL        string    `json:"tts_audio_url,omitempty"`
 	CreatedBy          int64     `json:"created_by"`
 	CreatedAt          time.Time `json:"created_at"`
@@ -596,6 +600,7 @@ type ScheduledChore struct {
 	RequiresApproval bool    `json:"requires_approval"`
 	RequiresPhoto    bool    `json:"requires_photo"`
 	PhotoSource      string  `json:"photo_source"`
+	AutoComplete     bool    `json:"auto_complete"`
 	AssignmentType   string  `json:"assignment_type"`
 	AvailableAt      *string `json:"available_at,omitempty"`
 	DueBy              *string `json:"due_by,omitempty"`

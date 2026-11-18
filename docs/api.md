@@ -186,6 +186,13 @@ Requires an authenticated caller with the `admin` role.
 | `GET` `POST` | `/api/admin/tokens` | List / create API tokens |
 | `DELETE` | `/api/admin/tokens/{id}` | Revoke a token |
 
+#### Chores another app finishes
+
+Set `auto_complete: true` on a chore (Manage → Chores → "Ticked off by another app") when something else knows the work is done, such as a learning app reporting that today's practice is complete. The person it is assigned to can then neither tick nor untick it; a parent or an API token still can. The other app completes it with an API token:
+
+1. `GET /api/users/{id}/chores?date=YYYY-MM-DD` and pick the entry with the chore's `chore_id` to get its `schedule_id`.
+2. `POST /api/schedules/{schedule_id}/complete` with `{"completed_by": <person id>, "completion_date": "YYYY-MM-DD"}`. It is approved on the spot; `409` means it was already done.
+
 ### Reports, settings, AI
 
 | Method | Path | Description |

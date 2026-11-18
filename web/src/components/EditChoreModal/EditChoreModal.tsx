@@ -32,6 +32,7 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
   const [icon, setIcon] = useState(chore.icon || '');
   const [requiresApproval, setRequiresApproval] = useState(chore.requires_approval);
   const [requiresPhoto, setRequiresPhoto] = useState(chore.requires_photo);
+  const [autoComplete, setAutoComplete] = useState(!!chore.auto_complete);
   const [photoSource, setPhotoSource] = useState<'child' | 'external' | 'both'>(chore.photo_source || 'child');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -109,6 +110,7 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
         requires_approval: requiresApproval,
         requires_photo: requiresPhoto,
         photo_source: requiresPhoto ? photoSource : 'child',
+        auto_complete: autoComplete,
       });
       setSaved(true);
       onSaved();
@@ -162,6 +164,10 @@ const EditChoreModal: React.FC<Props> = ({ chore, isOpen, onClose, onSaved, user
             <label className={styles.checkRow}>
               <input type="checkbox" checked={requiresPhoto} onChange={e => setRequiresPhoto(e.target.checked)} />
               <span className={styles.checkLabel}>{t('admin.editChore.requiresPhoto')}</span>
+            </label>
+            <label className={styles.checkRow}>
+              <input type="checkbox" checked={autoComplete} onChange={e => setAutoComplete(e.target.checked)} />
+              <span className={styles.checkLabel}>{t('admin.editChore.autoComplete')}</span>
             </label>
           </div>
           {requiresPhoto && (
