@@ -599,13 +599,31 @@ func sanitize(s *model.FriendSnapshot) {
 			d.DonePoints = max(0, min(d.DonePoints, d.AssignedPoints))
 		}
 		if p := m.Pet; p != nil {
+			// Only animals, coats and moods this version can draw.
+			if !model.ValidPetSpecies(p.Species) {
+				m.Pet = nil
+				continue
+			}
 			p.Name = clip(p.Name, maxNameLen)
+			if !model.ValidPetColor(p.Species, p.Color) {
+				p.Color = ""
+			}
 			if !model.ValidPetItem(p.Accessory) || strings.HasPrefix(p.Accessory, "img:") {
 				p.Accessory = ""
 			}
+			if !knownMoods[p.Mood] {
+				p.Mood = "content"
+			}
+			p.Health, p.Fullness, p.Joy = pct(p.Health), pct(p.Fullness), pct(p.Joy)
 		}
 	}
 }
+
+var knownMoods = map[string]bool{
+	"hiding": true, "very_sick": true, "sick": true, "hungry": true, "bored": true, "happy": true, "content": true,
+}
+
+func pct(v int) int { return max(0, min(100, v)) }
 
 func clip(s string, n int) string {
 	s = strings.TrimSpace(s)
