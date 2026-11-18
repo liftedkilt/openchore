@@ -64,6 +64,15 @@ date, with times and late rules), `unassign_chore`, `update_schedule`,
 manual adjustments, decay, rewards with per-kid visibility and prices,
 redemptions, savings goals, streak milestones.
 
+**Farm pets**: turn them on or off, see every animal and its mood, remove an
+animal or a custom picture, and make pet-care rewards (`pet_action`).
+
+**Leaderboard and friend families**: `get_leaderboard`, `get_friend_families`,
+`update_friend_families` (leaderboard switch, family name, coordination
+server), `create_friend_invite`, `join_friend_family`,
+`set_friend_family_sharing` (who is sent to and shown from one family),
+`sync_friend_family`, `unlink_friend_family`, `list_friend_farms`.
+
 **Reports and setup**: reports and AI summaries, settings, config export,
 webhooks and their delivery logs, API tokens, sign-in providers and options,
 AI and read-aloud configuration.
