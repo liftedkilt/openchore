@@ -378,6 +378,34 @@ func (h *PetHandler) RemovePicture(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ApprovePicture records whether a grown-up has looked at a person's own
+// animal picture and said it may be sent to friend families. It never
+// affects the family's own farm, where the picture shows either way.
+func (h *PetHandler) ApprovePicture(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+	var req struct {
+		Approved *bool `json:"approved"`
+	}
+	if err := decodeJSON(r, &req); err != nil || req.Approved == nil {
+		writeError(w, http.StatusBadRequest, "approved (true or false) is required")
+		return
+	}
+	found, err := h.store.SetPetSpriteApproved(r.Context(), id, *req.Approved)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save")
+		return
+	}
+	if !found {
+		writeError(w, http.StatusNotFound, "that person's animal has no picture of its own")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": id, "approved": *req.Approved})
+}
+
 // PetChoice is what a person picks when redeeming a "new_animal" or
 // "restyle" reward.
 type PetChoice struct {

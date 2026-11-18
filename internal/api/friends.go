@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -27,6 +28,7 @@ type FriendsHandler struct {
 }
 
 func NewFriendsHandler(s *store.Store, svc *friends.Service) *FriendsHandler {
+	svc.ReadPicture = readPetImage // approved custom animal pictures can go to friend families
 	return &FriendsHandler{store: s, svc: svc}
 }
 
@@ -195,12 +197,22 @@ func (h *FriendsHandler) Farms(w http.ResponseWriter, r *http.Request) {
 			pets = append(pets, model.Pet{
 				ID: int64(j + 1), Name: p.Name, Species: p.Species, Color: p.Color, Accessory: p.Accessory,
 				Mood: p.Mood, Hiding: p.Hiding, Sick: p.Sick,
+				SpriteData: pictureDataURL(p.Picture), SpriteFrames: p.Frames,
 				Items: []string{}, OwnerName: m.Name, OwnerColor: m.Color,
 			})
 		}
 		farms = append(farms, map[string]any{"link_id": l.ID, "family": familyLabel(l.PeerName), "snapshot_at": l.SnapshotAt, "pets": pets})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"farms": farms})
+}
+
+// pictureDataURL turns a friend's animal picture (already checked and
+// re-encoded when it arrived) into something the page can show.
+func pictureDataURL(png []byte) string {
+	if len(png) == 0 {
+		return ""
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
 }
 
 // --- Parents ---
@@ -279,7 +291,7 @@ func (h *FriendsHandler) linkView(ctx context.Context, l *model.FriendLink, user
 		})
 	}
 	return map[string]any{
-		"id": l.ID, "status": l.Status, "peer_name": l.PeerName, "hub_url": l.HubURL,
+		"id": l.ID, "status": l.Status, "peer_name": l.PeerName, "hub_url": l.HubURL, "show_pictures": l.ShowPictures,
 		"invite": l.Invite, "invite_expires": l.InviteExpires, "outbound": outbound, "inbound": inbound,
 		"snapshot_at": l.SnapshotAt, "last_sync_at": l.LastSyncAt, "last_error": l.LastError, "created_at": l.CreatedAt,
 	}, nil
@@ -360,8 +372,9 @@ func (h *FriendsHandler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateLink sets, for one linked family, who this household shares with
-// them (share_user_ids) and which of the people they offer are shown here
-// (accept_member_ids). Each list replaces the previous one; a list left out
+// them (share_user_ids), which of the people they offer are shown here
+// (accept_member_ids), and whether their custom animal pictures are shown
+// (show_pictures). Each list replaces the previous one; a list left out
 // isn't changed. It then syncs, so the other family isn't left with a stale
 // copy for 15 minutes.
 func (h *FriendsHandler) UpdateLink(w http.ResponseWriter, r *http.Request) {
@@ -377,12 +390,19 @@ func (h *FriendsHandler) UpdateLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Share  *[]int64  `json:"share_user_ids"`
-		Accept *[]string `json:"accept_member_ids"`
+		Share        *[]int64  `json:"share_user_ids"`
+		Accept       *[]string `json:"accept_member_ids"`
+		ShowPictures *bool     `json:"show_pictures"`
 	}
-	if err := decodeJSON(r, &req); err != nil || (req.Share == nil && req.Accept == nil) {
-		writeError(w, http.StatusBadRequest, "share_user_ids or accept_member_ids is required")
+	if err := decodeJSON(r, &req); err != nil || (req.Share == nil && req.Accept == nil && req.ShowPictures == nil) {
+		writeError(w, http.StatusBadRequest, "share_user_ids, accept_member_ids or show_pictures is required")
 		return
+	}
+	if req.ShowPictures != nil {
+		if err := h.svc.SetShowPictures(ctx, id, *req.ShowPictures); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to save")
+			return
+		}
 	}
 	if req.Share != nil {
 		users, err := h.store.ListUsers(ctx)

@@ -6,7 +6,7 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { Pet, PetAction } from '../../../types';
-import { FarmAnimal, type PetReaction as FaceReaction } from './FarmAnimal';
+import { FarmAnimal, petPicture, type PetReaction as FaceReaction } from './FarmAnimal';
 import s from './reaction.module.css';
 
 export interface ReactionEvent {
@@ -84,7 +84,7 @@ export function ReactingAnimal({ pet, reaction, accessory, className, artClassNa
           color={pet.color}
           mood={pet.hiding ? 'bored' : pet.mood}
           accessory={accessory ?? pet.accessory}
-          sprite={pet.sprite} spriteFrames={pet.sprite_frames}
+          {...petPicture(pet)}
           reaction={active && !lying ? FACE[active.kind] : undefined}
           className={artClassName}
         />

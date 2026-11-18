@@ -702,7 +702,11 @@
         "confirmRemove": "Tap again to remove",
         "removed": "Removed {{name}} ({{owner}}). They can adopt again.",
         "removePicture": "Remove picture",
-        "pictureRemoved": "{{name}}'s picture was removed."
+        "pictureRemoved": "{{name}}'s picture was removed.",
+        "approve": "OK to send to friend families",
+        "approveTitle": "Tick this once you've looked at the picture. It always shows on your own farm; this only decides whether linked families can be sent it.",
+        "approved": "{{name}}'s picture can now be sent to friend families.",
+        "unapproved": "{{name}}'s picture will no longer be sent to friend families."
       },
       "friends": {
         "title": "Leaderboard & friend families",
@@ -712,7 +716,7 @@
         "familiesDesc": "Link with another family that runs OpenChore so the kids can share a leaderboard and visit each other's farms. The two homes never connect to each other: each one sends encrypted updates to a coordination server every 15 minutes, and the server can't read them.",
         "familyName": "Your family's name",
         "familyNamePlaceholder": "e.g. The Smiths",
-        "shareDesc": "For each person you share, that family gets their first name, colour, their score and chore counts for this week and last, their streak, and their farm animal with how it's doing. Chore names, photos, point values, point balances and rewards are never sent. Until you tick someone they offer, only that person's name is kept here.",
+        "shareDesc": "For each person you share, that family gets their first name, colour, their score and chore counts for this week and last, their streak, and their farm animal with how it's doing. Chore names, photos, point values, point balances and rewards are never sent. A custom animal picture is sent only after you approve it. Until you tick someone they offer, only that person's name is kept here.",
         "status": {
           "waiting": "Waiting for them",
           "active": "Linked",
@@ -756,7 +760,9 @@
         "inboundTitle": "Offered by {{family}}",
         "theyShow": "shown there",
         "theyHavent": "not ticked there yet",
-        "notShown": "not shown here yet"
+        "notShown": "not shown here yet",
+        "showPictures": "Show custom animal pictures from {{family}}",
+        "showPicturesDesc": "Kids can use their own pictures as farm animals. With this off, a friend's animal shows as the built-in kind and their pictures aren't kept here. Your own kids' pictures are only sent once you tick \"OK to send to friend families\" under Farm pets."
       }
     },
     "skins": {

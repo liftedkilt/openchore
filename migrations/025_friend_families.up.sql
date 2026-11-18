@@ -32,6 +32,7 @@ CREATE TABLE friend_links (
     secret         TEXT    NOT NULL,
     invite         TEXT    NOT NULL DEFAULT '', -- kept until the other family joins
     invite_expires DATETIME,
+    show_pictures  INTEGER NOT NULL DEFAULT 0,  -- show this family's custom animal pictures (off until a parent says so)
     peer_name      TEXT    NOT NULL DEFAULT '',
     snapshot       TEXT    NOT NULL DEFAULT '', -- the other family's last snapshot (JSON)
     snapshot_at    DATETIME,

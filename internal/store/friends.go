@@ -121,13 +121,13 @@ func (s *Store) SetFriendLinkAccepts(ctx context.Context, linkID int64, memberID
 
 // --- Friend links ---
 
-const friendLinkColumns = `id, status, side, hub_url, hub_link, token, secret, invite, invite_expires,
+const friendLinkColumns = `id, status, side, show_pictures, hub_url, hub_link, token, secret, invite, invite_expires,
 	peer_name, snapshot, snapshot_at, last_sync_at, last_error, created_at`
 
 func scanFriendLink(row interface{ Scan(...any) error }) (*model.FriendLink, error) {
 	l := &model.FriendLink{}
 	var expires, snapAt, syncAt sql.NullTime
-	if err := row.Scan(&l.ID, &l.Status, &l.Side, &l.HubURL, &l.HubLink, &l.Token, &l.Secret, &l.Invite, &expires,
+	if err := row.Scan(&l.ID, &l.Status, &l.Side, &l.ShowPictures, &l.HubURL, &l.HubLink, &l.Token, &l.Secret, &l.Invite, &expires,
 		&l.PeerName, &l.Snapshot, &snapAt, &syncAt, &l.LastError, &l.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -207,6 +207,13 @@ func (s *Store) SaveFriendSync(ctx context.Context, id int64, status, peerName, 
 		}
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE friend_links SET last_sync_at = ?, last_error = '' WHERE id = ?`, now, id)
+	return err
+}
+
+// SetFriendShowPictures records whether this family's custom animal
+// pictures are shown here.
+func (s *Store) SetFriendShowPictures(ctx context.Context, id int64, show bool) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE friend_links SET show_pictures = ? WHERE id = ?`, show, id)
 	return err
 }
 

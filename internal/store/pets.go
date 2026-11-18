@@ -11,17 +11,17 @@ import (
 // ErrPetExists is returned when a person who already has a pet adopts another.
 var ErrPetExists = fmt.Errorf("you already have a pet")
 
-const petColumns = `id, user_id, name, species, color, health, fullness, joy, accessory, sprite, sprite_frames, last_missed_date, last_day_checked, created_at`
+const petColumns = `id, user_id, name, species, color, health, fullness, joy, accessory, sprite, sprite_frames, sprite_approved, last_missed_date, last_day_checked, created_at`
 
 func scanPet(row interface{ Scan(...any) error }) (*model.Pet, error) {
 	p := &model.Pet{}
 	var missed sql.NullString
-	if err := row.Scan(&p.ID, &p.UserID, &p.Name, &p.Species, &p.Color, &p.Health, &p.Fullness, &p.Joy, &p.Accessory, &p.Sprite, &p.SpriteFrames,
+	if err := row.Scan(&p.ID, &p.UserID, &p.Name, &p.Species, &p.Color, &p.Health, &p.Fullness, &p.Joy, &p.Accessory, &p.Sprite, &p.SpriteFrames, &p.SpriteApproved,
 		&missed, &p.LastDayChecked, &p.CreatedAt); err != nil {
 		return nil, err
 	}
 	if p.Sprite == "" {
-		p.SpriteFrames = 0
+		p.SpriteFrames, p.SpriteApproved = 0, false
 	}
 	if missed.Valid {
 		m := missed.String
@@ -176,10 +176,22 @@ func (s *Store) SetPetSprite(ctx context.Context, userID int64, id string, frame
 	if err := tx.QueryRowContext(ctx, `SELECT sprite FROM pets WHERE user_id = ?`, userID).Scan(&old); err != nil {
 		return "", err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE pets SET sprite = ?, sprite_frames = ? WHERE user_id = ?`, id, max(frames, 1), userID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE pets SET sprite = ?, sprite_frames = ?, sprite_approved = 0 WHERE user_id = ?`, id, max(frames, 1), userID); err != nil {
 		return "", err
 	}
 	return old, tx.Commit()
+}
+
+// SetPetSpriteApproved records whether a parent has said the person's
+// picture may be sent to friend families. It reports whether there is a
+// picture to approve.
+func (s *Store) SetPetSpriteApproved(ctx context.Context, userID int64, approved bool) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE pets SET sprite_approved = ? WHERE user_id = ? AND sprite != ''`, approved, userID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
 }
 
 // SavePetDay stores the outcome of one or more daily checks. The

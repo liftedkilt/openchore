@@ -9,7 +9,7 @@ import { api } from '../../../api';
 import { Icon } from '../../../design';
 import type { FriendFarm, Leaderboard, LeaderboardEntry, Pet, User } from '../../../types';
 import { Sheet } from '../Sheet';
-import { FarmAnimal } from '../farm/FarmAnimal';
+import { FarmAnimal, petPicture } from '../farm/FarmAnimal';
 import { FarmScene } from '../farm/FarmScene';
 import fs from '../farm/petSheet.module.css';
 import s from './board.module.css';
@@ -94,7 +94,7 @@ function FriendFarmView({ farm }: { farm: FriendFarm }) {
       <FarmScene pets={farm.pets} onSelect={setSelected} />
       {selected && (
         <div className={fs.otherCard} role="status">
-          <FarmAnimal species={selected.species} color={selected.color} mood={selected.mood} accessory={selected.accessory} className={fs.otherArt} />
+          <FarmAnimal species={selected.species} color={selected.color} mood={selected.mood} accessory={selected.accessory} {...petPicture(selected)} className={fs.otherArt} />
           <p>
             <strong>{t('kid.farm.belongsTo', { name: selected.name, owner: selected.owner_name ?? '' })}</strong>
             <span>{t(`kid.farm.mood.${selected.mood}`, { name: selected.name })}</span>
@@ -175,7 +175,7 @@ export function LeaderboardSheet({ user, initial, onClose }: { user: User; initi
               <button key={f.link_id} type="button" className={s.farmBtn} onClick={() => setVisiting(f.link_id)}>
                 <span className={s.farmArt} aria-hidden="true">
                   {f.pets.slice(0, 3).map(p => (
-                    <FarmAnimal key={p.id} species={p.species} color={p.color} mood={p.mood} accessory={p.accessory} />
+                    <FarmAnimal key={p.id} species={p.species} color={p.color} mood={p.mood} accessory={p.accessory} {...petPicture(p)} />
                   ))}
                 </span>
                 <span className={s.farmName}>{f.family}</span>

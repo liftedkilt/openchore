@@ -702,7 +702,11 @@
         "confirmRemove": "Zum Entfernen nochmal tippen",
         "removed": "{{name}} ({{owner}}) entfernt. Es kann neu adoptiert werden.",
         "removePicture": "Bild entfernen",
-        "pictureRemoved": "Das Bild von {{name}} wurde entfernt."
+        "pictureRemoved": "Das Bild von {{name}} wurde entfernt.",
+        "approve": "Darf an befreundete Familien gesendet werden",
+        "approveTitle": "Kreuze das an, wenn du dir das Bild angesehen hast. Auf eurem eigenen Hof wird es immer gezeigt; hier entscheidest du nur, ob es an verbundene Familien gesendet werden darf.",
+        "approved": "Das Bild von {{name}} darf jetzt an befreundete Familien gesendet werden.",
+        "unapproved": "Das Bild von {{name}} wird nicht mehr an befreundete Familien gesendet."
       },
       "friends": {
         "title": "Rangliste & befreundete Familien",
@@ -712,7 +716,7 @@
         "familiesDesc": "Verbinde dich mit einer anderen Familie, die OpenChore nutzt, damit die Kinder eine Rangliste teilen und sich gegenseitig auf dem Bauernhof besuchen können. Die beiden Haushalte verbinden sich nie direkt: Jeder schickt alle 15 Minuten verschlüsselte Daten an einen Koordinationsserver, der sie nicht lesen kann.",
         "familyName": "Name eurer Familie",
         "familyNamePlaceholder": "z. B. Familie Müller",
-        "shareDesc": "Von jeder Person, die ihr teilt, erhält diese Familie Vorname, Farbe, Wertung und Aufgabenzahl dieser und der letzten Woche, die Serie und das Hoftier mit seinem Zustand. Namen von Aufgaben, Fotos, Punktwerte, Punktestände und Belohnungen werden nie gesendet. Solange ihr eine angebotene Person nicht ankreuzt, wird hier nur ihr Name gespeichert.",
+        "shareDesc": "Von jeder Person, die ihr teilt, erhält diese Familie Vorname, Farbe, Wertung und Aufgabenzahl dieser und der letzten Woche, die Serie und das Hoftier mit seinem Zustand. Namen von Aufgaben, Fotos, Punktwerte, Punktestände und Belohnungen werden nie gesendet. Ein eigenes Tierbild wird erst gesendet, wenn ihr es freigebt. Solange ihr eine angebotene Person nicht ankreuzt, wird hier nur ihr Name gespeichert.",
         "status": {
           "waiting": "Warten auf die anderen",
           "active": "Verbunden",
@@ -756,7 +760,9 @@
         "inboundTitle": "Von {{family}} angeboten",
         "theyShow": "wird dort angezeigt",
         "theyHavent": "dort noch nicht angekreuzt",
-        "notShown": "hier noch nicht angezeigt"
+        "notShown": "hier noch nicht angezeigt",
+        "showPictures": "Eigene Tierbilder von {{family}} anzeigen",
+        "showPicturesDesc": "Kinder können eigene Bilder als Hoftiere verwenden. Ist das aus, erscheint das Tier eines Freundes in der eingebauten Form und seine Bilder werden hier nicht gespeichert. Die Bilder eurer eigenen Kinder werden erst gesendet, wenn ihr unter Hoftiere „Darf an befreundete Familien gesendet werden“ ankreuzt."
       }
     },
     "skins": {

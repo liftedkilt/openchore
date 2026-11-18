@@ -291,7 +291,7 @@ export const api = {
     settings: () => fetchWithAuth<FriendsSettings>('/admin/friends'),
     update: (data: { leaderboard_enabled?: boolean; family_name?: string; hub_url?: string; hub_key?: string }) =>
       fetchWithAuth<FriendsSettings>('/admin/friends', { method: 'PUT', body: JSON.stringify(data) }),
-    updateLink: (id: number, data: { share_user_ids?: number[]; accept_member_ids?: string[] }) =>
+    updateLink: (id: number, data: { share_user_ids?: number[]; accept_member_ids?: string[]; show_pictures?: boolean }) =>
       fetchWithAuth<FriendLink>(`/admin/friends/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     invite: () => fetchWithAuth<FriendLink>('/admin/friends/invites', { method: 'POST' }),
     join: (invite: string) => fetchWithAuth<FriendLink>('/admin/friends/join', { method: 'POST', body: JSON.stringify({ invite }) }),
@@ -315,6 +315,10 @@ export const api = {
     }),
     remove: (userId: number) => fetchWithAuth(`/admin/users/${userId}/pet`, { method: 'DELETE' }),
     removePicture: (userId: number) => fetchWithAuth(`/admin/users/${userId}/pet/picture`, { method: 'DELETE' }),
+    approvePicture: (userId: number, approved: boolean) => fetchWithAuth(`/admin/users/${userId}/pet/picture`, {
+      method: 'PUT',
+      body: JSON.stringify({ approved }),
+    }),
   },
   commitments: {
     listForUser: (userId: number) => fetchWithAuth<RewardCommitment[]>(`/users/${userId}/commitments`),

@@ -270,6 +270,7 @@ func allTools() []*Tool {
 			"id":                integer("Link id from get_friend_families."),
 			"share_user_ids":    ids("Ids of the people in this household to share with that family."),
 			"accept_member_ids": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Ids (from that link's inbound list) of the people from that family to show here."},
+			"show_pictures":     boolean("Show that family's custom animal pictures here (off by default; while off they aren't kept)."),
 		}})
 	add(endpoint{name: "create_friend_invite", title: "Invite a friend family",
 		desc:   "Make a one-time invite (valid 7 days) for another family's OpenChore to link with this one. Give the invite text to the other parent.",
@@ -285,6 +286,11 @@ func allTools() []*Tool {
 		desc:   "End a link with another family and delete their data here. They are told at their next sync. Confirm first.",
 		method: http.MethodDelete, path: "/admin/friends/{id}", props: map[string]any{"id": integer("Link id from get_friend_families.")}})
 
+	add(endpoint{name: "approve_farm_pet_picture", title: "Allow a custom animal picture to be shared",
+		desc: "Say whether a person's own animal picture may be sent to linked friend families. A parent should have looked at the picture first; " +
+			"ask them before approving. It always shows on the family's own farm either way, and a new picture needs approving again.",
+		method: http.MethodPut, path: "/admin/users/{id}/pet/picture", required: []string{"approved"},
+		props: map[string]any{"id": integer("Person id."), "approved": boolean("May be sent to friend families.")}})
 	add(endpoint{name: "remove_farm_pet_picture", title: "Remove a person's own animal picture",
 		desc:   "Take away the picture a person uploaded for their farm animal (a \"picture\" reward), e.g. if it isn't suitable. The animal goes back to its drawn look and keeps everything else. Confirm first.",
 		method: http.MethodDelete, path: "/admin/users/{id}/pet/picture",

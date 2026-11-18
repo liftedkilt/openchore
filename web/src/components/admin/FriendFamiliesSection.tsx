@@ -157,6 +157,12 @@ export const FriendFamiliesSection: React.FC = () => {
                       ))}
                     </fieldset>
                   </div>
+                  <label className={ui.check}>
+                    <input type="checkbox" checked={l.show_pictures} disabled={busy}
+                      onChange={e => run(() => api.friends.updateLink(l.id, { show_pictures: e.target.checked }))} />
+                    <span className={ui.checkLabel}>{tt('showPictures', { family: l.peer_name || tt('unnamed') })}</span>
+                  </label>
+                  <p className={ff.note}>{tt('showPicturesDesc')}</p>
                   <p className={ff.note}>{tt('shareDesc')}</p>
                 </>
               )}

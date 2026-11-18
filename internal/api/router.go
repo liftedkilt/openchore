@@ -200,6 +200,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 				r.Put("/admin/pets", pets.SetEnabled)
 				r.Delete("/admin/users/{id}/pet", pets.Remove)
 				r.Delete("/admin/users/{id}/pet/picture", pets.RemovePicture)
+				r.Put("/admin/users/{id}/pet/picture", pets.ApprovePicture)
 
 				// Leaderboard and friend families
 				r.Get("/admin/friends", friendsH.AdminGet)

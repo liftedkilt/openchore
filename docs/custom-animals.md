@@ -116,21 +116,39 @@ export an animation's frames as one row, which is the same thing.
   deletes the picture.
 - **Grown-ups** can remove a person's picture in Settings → Farm pets
   (`DELETE /api/admin/users/{id}/pet/picture`, MCP `remove_farm_pet_picture`).
-  There is no approval step before a picture appears on the family farm.
+  There is no approval step before a picture appears on the family's own
+  farm; approval is for sending it to other families (below).
 - The animal keeps its kind, coat, name, health, food, joy and accessories
   underneath. Changing coat colour has no visible effect while a picture is on.
 - The night and bold-outline farm skins don't restyle a picture.
 
 ## Friend families
 
-A picture is **not** sent to linked families ([friends.md](friends.md)). They
-see the built-in animal of the same kind. Sending pictures is planned, with
-the sending parent's approval and a per-family switch on the receiving side.
+A picture goes to a linked family ([friends.md](friends.md)) only when **both
+parents** have said so:
+
+1. **The sending parent approves it.** In Settings → Farm pets, tick "OK to
+   send to friend families" next to the animal, after looking at the picture.
+   A new picture needs approving again. This never affects your own farm,
+   where the picture shows either way.
+2. **The receiving parent opts in.** Under the linked family in Settings,
+   "Show custom animal pictures from …" is off until they tick it. While it
+   is off, pictures from that family aren't kept at all, and their animals
+   show as the built-in kind.
+
+A picture that arrives is treated like an upload from a stranger: it is
+checked and re-encoded by the same rules before it is kept or shown, and one
+that fails is dropped. Only pictures up to 48 KB are sent (pixel art is a
+few kilobytes), with at most 150 KB of them per family.
 
 ## API
 
 - `POST /api/rewards/{id}/redeem` with `{"pet": {"image": "data:image/png;base64,…"}}`
   for a `picture` reward.
 - `PATCH /api/me/pet` with `{"sprite": ""}` to go back to the drawn animal.
+- `PUT /api/admin/users/{id}/pet/picture` with `{"approved": true}` to allow
+  (or stop) sending it to friend families; `DELETE` removes the picture.
+- `PUT /api/admin/friends/{id}` with `{"show_pictures": true}` to show a
+  linked family's pictures.
 - `GET /api/pets` returns `sprite` (an id) and `sprite_frames` (1 to 6) on an
   animal that has a picture; the file is at `/uploads/pets/<id>.png`.

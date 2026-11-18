@@ -474,6 +474,12 @@ type Pet struct {
 	// SpriteFrames is how many frames the picture holds side by side
 	// (PetSpriteFrames order); 1 for a single picture.
 	SpriteFrames int `json:"sprite_frames,omitempty"`
+	// SpriteApproved: a parent has said the picture may be sent to friend
+	// families. Cleared whenever the picture changes.
+	SpriteApproved bool `json:"sprite_approved,omitempty"`
+	// SpriteData is set instead of Sprite for a friend family's animal:
+	// its picture as a data: URL (it isn't a file on this server).
+	SpriteData string `json:"sprite_data,omitempty"`
 	Items          []string  `json:"items"`               // owned accessories
 	LastMissedDate *string   `json:"last_missed_date,omitempty"`
 	LastDayChecked string    `json:"last_day_checked"`
@@ -666,6 +672,9 @@ type FriendLink struct {
 	ID            int64      `json:"id"`
 	Status        string     `json:"status"`
 	Side          string     `json:"-"` // "a" made the invite, "b" joined with it
+	// ShowPictures: a parent here has chosen to show this family's custom
+	// animal pictures. Off by default; without it they are not even kept.
+	ShowPictures bool `json:"show_pictures"`
 	HubURL        string     `json:"hub_url"`
 	HubLink       string     `json:"-"`
 	Token         string     `json:"-"`
@@ -729,4 +738,10 @@ type FriendPet struct {
 	Mood      string `json:"mood"`
 	Hiding    bool   `json:"hiding"`
 	Sick      bool   `json:"sick"`
+	// Picture is the animal's custom picture, sent only when a parent in
+	// the sending family approved it for sharing. PNG data (a strip of
+	// Frames square frames); the receiving server re-checks and re-encodes
+	// it, and only keeps it if a parent there chose to show pictures.
+	Picture []byte `json:"picture,omitempty"`
+	Frames  int    `json:"frames,omitempty"`
 }

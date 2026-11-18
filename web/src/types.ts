@@ -334,6 +334,10 @@ export interface Pet {
   sprite?: string;
   /** Frames in that picture, side by side: stand, walk, walk, sick, lying down, happy (1 = a single picture). */
   sprite_frames?: number;
+  /** A parent has said the picture may be sent to friend families. */
+  sprite_approved?: boolean;
+  /** A friend family's animal: its picture as a data: URL (set instead of sprite). */
+  sprite_data?: string;
   items: PetItem[];
   last_missed_date?: string;
   mood: PetMood;
@@ -642,6 +646,8 @@ export interface FriendLink {
   status: 'waiting' | 'active' | 'ended';
   peer_name: string;
   hub_url: string;
+  /** Show this family's custom animal pictures here. */
+  show_pictures: boolean;
   invite?: string;
   invite_expires?: string;
   /** This household's people: shared = sent to this family; accepted = they chose to show them. */

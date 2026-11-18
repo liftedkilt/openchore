@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -547,4 +548,70 @@ func TestFriendLinkKeepsItsOwnHub(t *testing.T) {
 	if msg := fmt.Sprint(out["error"]); len(msg) > 250 || strings.Contains(msg, "\n") {
 		t.Fatalf("hub error not kept short: %d characters", len(msg))
 	}
+}
+
+// A custom animal picture reaches a friend family only when a parent on the
+// sending side approved it and a parent on the receiving side chose to show
+// that family's pictures. Otherwise it isn't sent, or isn't kept.
+func TestFriendPicturesNeedBothParents(t *testing.T) {
+	hubSrv := startHub(t)
+	a, b, aPath, bPath, ava := linkedPair(t, hubSrv)
+	bo := b.createChild(t, "Bo")
+	a.expectStatus(t, "POST", "/api/points/adjust", map[string]any{"user_id": ava, "amount": 500, "note": "seed"}, adminHeaders(), http.StatusNoContent)
+	reward := a.petRewardID(t, ava, "picture")
+	upload := func() string {
+		a.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", reward),
+			map[string]any{"pet": map[string]any{"image": spritePNG(t, 3*32, 32, false, 3)}}, childHeaders(ava), http.StatusCreated).Body.Close()
+		id := a.myPet(t, ava)["sprite"].(string)
+		t.Cleanup(func() { os.Remove("data/uploads/pets/" + id + ".png") })
+		return id
+	}
+	upload()
+	approve := fmt.Sprintf("/api/admin/users/%d/pet/picture", ava)
+	bothSync := func() {
+		t.Helper()
+		a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
+		b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	}
+	theirPet := func() map[string]any {
+		t.Helper()
+		farms := b.getJSON(t, "/api/friends/farms", childHeaders(bo))["farms"].([]any)
+		return farms[0].(map[string]any)["pets"].([]any)[0].(map[string]any)
+	}
+
+	// Not approved: not sent at all, even though B would show pictures.
+	b.expectStatus(t, "PUT", bPath, map[string]any{"show_pictures": true}, adminHeaders(), http.StatusOK)
+	bothSync()
+	if p := theirPet(); p["sprite_data"] != nil || strings.Contains(b.storedSnapshot(t), `"picture"`) {
+		t.Fatalf("an unapproved picture was sent: %v", p)
+	}
+	// A kid can't approve their own; a parent can.
+	a.expectStatus(t, "PUT", approve, map[string]any{"approved": true}, childHeaders(ava), http.StatusForbidden)
+	a.expectStatus(t, "PUT", approve, map[string]any{"approved": true}, adminHeaders(), http.StatusOK)
+	bothSync()
+	p := theirPet()
+	if data, _ := p["sprite_data"].(string); !strings.HasPrefix(data, "data:image/png;base64,") || p["sprite_frames"] != 3.0 || p["species"] != "dog" {
+		t.Fatalf("approved picture not shown at B: %v", p)
+	}
+	// B's parent turns pictures off: gone from B at once, hub or no hub.
+	b.expectStatus(t, "PUT", bPath, map[string]any{"show_pictures": false}, adminHeaders(), http.StatusOK)
+	if p := theirPet(); p["sprite_data"] != nil || strings.Contains(b.storedSnapshot(t), `"picture"`) {
+		t.Fatalf("picture kept after B turned pictures off: %v", p)
+	}
+	b.expectStatus(t, "PUT", bPath, map[string]any{"show_pictures": true}, adminHeaders(), http.StatusOK)
+	if p := theirPet(); p["sprite_data"] == nil {
+		t.Fatalf("picture didn't come back when B turned pictures on again: %v", p)
+	}
+	// A new picture needs approving again.
+	upload()
+	if a.myPet(t, ava)["sprite_approved"] != nil {
+		t.Fatal("a new picture kept the old one's approval")
+	}
+	bothSync()
+	if p := theirPet(); p["sprite_data"] != nil {
+		t.Fatalf("a new, unapproved picture was sent: %v", p)
+	}
+	// Approving when there's no picture makes no sense.
+	a.expectStatus(t, "PATCH", "/api/me/pet", map[string]any{"sprite": ""}, childHeaders(ava), http.StatusOK)
+	a.expectStatus(t, "PUT", approve, map[string]any{"approved": true}, adminHeaders(), http.StatusNotFound)
 }

@@ -966,6 +966,16 @@ export function spriteFrameCount(w: number, h: number): number {
 /** The URL of a person's own animal picture. */
 export const spriteUrl = (id: string) => accessoryImageUrl(id);
 
+/**
+ * The picture props for a pet: its own upload, or (a friend family's animal)
+ * the picture that came with their data.
+ */
+export function petPicture(p: { sprite?: string; sprite_data?: string; sprite_frames?: number }) {
+  return p.sprite_data
+    ? { sprite: p.sprite_data, spritePreview: true, spriteFrames: p.sprite_frames }
+    : { sprite: p.sprite, spriteFrames: p.sprite_frames };
+}
+
 export interface FarmAnimalProps {
   species: PetSpecies;
   mood: PetMood;

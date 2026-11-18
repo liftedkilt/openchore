@@ -106,6 +106,7 @@ Optional features, off until a parent turns them on. Details in
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/pets` | The family farm: every animal with its mood (public, like chores and points) |
+| `GET` | `/api/leaderboard/household` | This household's own weekly standings (public, for the wall display) |
 | `GET` `POST` `PATCH` | `/api/me/pet` | This person's animal: view, adopt, rename / change accessory / drop a custom picture |
 | `GET` | `/api/leaderboard?week=this\|last` | The weekly standings, with people shared by linked families |
 | `GET` | `/api/friends/farms` | Linked families' farms, as of their last sync |
@@ -191,7 +192,7 @@ Requires an authenticated caller with the `admin` role.
 |--------|------|-------------|
 | `PUT` | `/api/admin/pets` | Turn farm pets on or off |
 | `DELETE` | `/api/admin/users/{id}/pet` | Remove a person's animal |
-| `DELETE` | `/api/admin/users/{id}/pet/picture` | Remove a person's custom animal picture |
+| `PUT` `DELETE` | `/api/admin/users/{id}/pet/picture` | Allow a custom animal picture to be sent to friend families / remove it |
 | `GET` `PUT` | `/api/admin/friends` | Leaderboard switch, family name, coordination server, and each linked family |
 | `POST` | `/api/admin/friends/invites` | Make an invite for another family |
 | `POST` | `/api/admin/friends/join` | Join with another family's invite |

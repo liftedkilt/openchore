@@ -5,3 +5,6 @@
 -- lying down, happy). See docs/custom-animals.md.
 ALTER TABLE pets ADD COLUMN sprite TEXT NOT NULL DEFAULT '';
 ALTER TABLE pets ADD COLUMN sprite_frames INTEGER NOT NULL DEFAULT 1;
+-- A parent has looked at the picture and said it may be sent to friend
+-- families. Cleared whenever the picture changes.
+ALTER TABLE pets ADD COLUMN sprite_approved INTEGER NOT NULL DEFAULT 0;

@@ -35,6 +35,7 @@ import (
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/pet"
 	"github.com/liftedkilt/openchore/internal/score"
+	"github.com/liftedkilt/openchore/internal/sprite"
 	"github.com/liftedkilt/openchore/internal/store"
 )
 
@@ -52,6 +53,12 @@ const (
 	// approval or rejection still lands in the score.
 	recomputeDays = 7
 
+	// A custom animal picture is sent only if it's this small, and a
+	// snapshot carries at most this much of them (the hub caps the whole
+	// snapshot at 256 KB).
+	maxPictureBytes  = 48 << 10
+	maxPicturesTotal = 150 << 10
+
 	snapshotVersion = 1
 	invitePrefix    = "ocf1."
 	syncInterval    = 15 * time.Minute
@@ -67,7 +74,10 @@ type Service struct {
 	client  *http.Client // for this household's own hub
 	guarded *http.Client // for a hub named by someone else's invite
 	now     func() time.Time
-	mu      sync.Mutex // one sync at a time
+	// ReadPicture loads a custom animal picture by its upload id (set by
+	// the API layer, which owns the uploads folder). Nil = never send one.
+	ReadPicture func(id string) ([]byte, error)
+	mu          sync.Mutex // one sync at a time
 }
 
 func New(s *store.Store) *Service {
@@ -358,6 +368,7 @@ func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnap
 		}
 	}
 	yesterday := now.AddDate(0, 0, -1).Format(model.DateFormat)
+	pictureBytes := 0
 	for _, u := range users {
 		if !shared[u.ID] {
 			continue
@@ -385,6 +396,14 @@ func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnap
 			}
 			m.Pet = &model.FriendPet{Name: p.Name, Species: p.Species, Color: p.Color, Accessory: acc,
 				Mood: p.Mood, Hiding: p.Hiding, Sick: p.Sick}
+			// The animal's own picture goes along only once a parent here
+			// has approved it for sharing, and only while there's room.
+			if p.Sprite != "" && p.SpriteApproved && f.ReadPicture != nil {
+				if raw, err := f.ReadPicture(p.Sprite); err == nil && len(raw) <= maxPictureBytes && pictureBytes+len(raw) <= maxPicturesTotal {
+					m.Pet.Picture, m.Pet.Frames = raw, max(p.SpriteFrames, 1)
+					pictureBytes += len(raw)
+				}
+			}
 		}
 		snap.Members = append(snap.Members, m)
 	}
@@ -748,6 +767,7 @@ func (f *Service) Sync(ctx context.Context, id int64) error {
 				return fail(err)
 			}
 			strip(&ps, accepts)
+			keepPictures(&ps, l.ShowPictures)
 			clean, _ := json.Marshal(ps)
 			peerName, peerJSON = ps.Family, string(clean)
 			at := ps.GeneratedAt
@@ -765,6 +785,56 @@ func strip(s *model.FriendSnapshot, accepts map[string]bool) {
 			s.Members[i] = model.FriendMember{ID: m.ID, Name: m.Name, Color: m.Color, Weeks: []model.FriendWeek{}}
 		}
 	}
+}
+
+// keepPictures deals with the custom animal pictures in a peer's snapshot.
+// Unless a parent here chose to show that family's pictures they are
+// dropped. Otherwise each one is checked and re-encoded like an upload
+// (it's a file from someone else's server); one that fails is dropped and
+// the animal shows as its built-in kind.
+func keepPictures(s *model.FriendSnapshot, show bool) {
+	for i := range s.Members {
+		p := s.Members[i].Pet
+		if p == nil || len(p.Picture) == 0 {
+			if p != nil {
+				p.Picture, p.Frames = nil, 0
+			}
+			continue
+		}
+		p.Frames = 0
+		if !show || len(p.Picture) > maxPictureBytes {
+			p.Picture = nil
+			continue
+		}
+		clean, frames, err := sprite.Decode(p.Picture)
+		if err != nil {
+			p.Picture = nil
+			continue
+		}
+		p.Picture, p.Frames = clean, frames
+	}
+}
+
+// SetShowPictures records whether a linked family's custom animal pictures
+// are shown here. Turning it off deletes the stored ones at once; turning
+// it on brings them in at the next sync.
+func (f *Service) SetShowPictures(ctx context.Context, id int64, show bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.store.SetFriendShowPictures(ctx, id, show); err != nil || show {
+		return err
+	}
+	l, err := f.store.GetFriendLink(ctx, id)
+	if err != nil || l == nil {
+		return err
+	}
+	snap := PeerSnapshot(l)
+	if snap == nil {
+		return nil
+	}
+	keepPictures(snap, false)
+	clean, _ := json.Marshal(snap)
+	return f.store.SetFriendSnapshot(ctx, id, string(clean))
 }
 
 // SetAccepts replaces which of a linked family's people are shown here, and

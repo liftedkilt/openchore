@@ -166,7 +166,8 @@ A linked family is sent only what its screens show:
 | First name and colour | Chore names and descriptions |
 | For this week and last: chores done, chores assigned, bonus count, and the score | A day-by-day breakdown, and the point values the score was worked out from |
 | Streak length | Photos |
-| Farm animal: name, kind, coat, accessory, and how it's doing (mood, sick, hiding) | The animal's health, food and joy numbers, and a custom picture |
+| Farm animal: name, kind, coat, accessory, and how it's doing (mood, sick, hiding) | The animal's health, food and joy numbers |
+| A custom animal picture, only if you approved it and they chose to show pictures ([custom-animals.md](custom-animals.md)) | A custom picture you haven't approved |
 | | Point balances, rewards, redemptions, ages, PINs, sign-in details |
 
 The score travels as a share out of 10,000 (the score to two more decimal
@@ -182,7 +183,9 @@ anything.
 
 The leaderboard and friends' farms need a signed-in person; unlike the
 household's own chores and farm they aren't shown to a device nobody has
-signed in on.
+signed in on. The wall display shows a one-line leaderboard of **this
+household only** (`GET /api/leaderboard/household`, which is public like
+chores and points).
 
 ### The hub
 
@@ -295,4 +298,4 @@ Hub: `POST /v1/links`, `POST /v1/links/{id}/join`, `POST /v1/links/{id}/exchange
 ## Not built yet
 
 Playdates (sending an animal to a friend's farm), gifts, trophies,
-family-vs-family and co-op goals, and the leaderboard on the wall display.
+family-vs-family and co-op goals.
