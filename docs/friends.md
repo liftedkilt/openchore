@@ -162,24 +162,76 @@ signed in on.
 
 ### The hub
 
-`cmd/hub` (in the same container image as `openchore-hub`) is a small
-separate server with its own SQLite file. It is the only part that has to be
-reachable from both homes.
-
-```
-PORT       listen port (default 8090)
-HUB_DB     SQLite file (default hub.db)
-HUB_KEYS   comma-separated keys allowed to create links
-HUB_OPEN   "true" to let anyone create links
-```
+`cmd/hub` (in the API container image as `openchore-hub`) is a small separate
+server with its own SQLite file. It is the only part that has to be reachable
+from both homes, so it is the only part you put on the internet.
 
 What it knows: that a link exists, two token hashes, and two encrypted blobs
-with their sizes and times. It can't read names, scores or animals. Creating
-a link needs one of `HUB_KEYS`; joining needs only the invite. Invites nobody
-joins are deleted after 7 days, and links nobody syncs after 90.
+with their sizes and times. It can't read names, scores or animals, and it has
+no web interface or sign-in.
 
-An instance takes its hub from Settings, or from `OPENCHORE_HUB_URL` /
+One hub can serve any number of families. Only the family that *makes* an
+invite needs the hub's address and key; the family that joins needs nothing
+but the invite.
+
+#### Running one
+
+```yaml
+services:
+  hub:
+    image: ghcr.io/liftedkilt/openchore/api:latest
+    entrypoint: ["openchore-hub"]
+    restart: unless-stopped
+    environment:
+      HUB_DB: /data/hub.db
+      HUB_TRUST_PROXY: "true"   # only behind exactly one reverse proxy
+    volumes:
+      - hub-data:/data
+    ports:
+      - "8090:8090"
+volumes:
+  hub-data:
+```
+
+Put it behind HTTPS (any reverse proxy) with **no** sign-in wall in front:
+OpenChore servers call it, not people, and they can't log in. Then:
+
+1. On first start the hub makes a key and writes it to `hub.key` next to the
+   database. Read it from there (`docker compose exec hub cat /data/hub.key`);
+   it is never printed in the log.
+2. In OpenChore, under **Settings → Leaderboard & friend families → Invite a
+   family**, enter the hub's address and that key.
+
+| Setting | Meaning |
+| --- | --- |
+| `PORT` | Listen port (default 8090) |
+| `HUB_DB` | SQLite file (default `hub.db`) |
+| `HUB_KEYS` | Comma-separated keys allowed to create links. If set, no key file is made |
+| `HUB_KEY_FILE` | Where the made-on-first-start key lives (default `hub.key` next to `HUB_DB`) |
+| `HUB_OPEN` | `true` lets anyone create links without a key |
+| `HUB_TRUST_PROXY` | `true` behind one reverse proxy, so rate limits use the caller's real address |
+
+An OpenChore server takes its hub from Settings, or from `OPENCHORE_HUB_URL` /
 `OPENCHORE_HUB_KEY` (which win).
+
+#### How it protects itself
+
+- **Keys and tokens.** Creating a link needs a hub key. Joining needs the
+  one-time code in the invite. Everything after that needs the token that
+  member was given; a wrong token gets the same answer as a link that doesn't
+  exist.
+- **Rate limits** per address: 120 requests a minute, and 10 a minute for
+  creating or joining links. An honest server makes one request per link every
+  15 minutes.
+- **Size limits.** A snapshot can be at most 256 KB, and the hub holds at most
+  10,000 links.
+- **Clean-up.** Invites nobody joins are deleted after 7 days, and links
+  nobody syncs after 90.
+- **Logging.** One line per request: address, method, path and status. Never
+  bodies, keys or tokens.
+
+Back up the SQLite file and `hub.key` together. If the hub's data is lost,
+linked families see the link as ended and need a new invite.
 
 ## API
 

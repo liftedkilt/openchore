@@ -19,8 +19,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -33,6 +36,12 @@ const (
 	IdleTTL = 90 * 24 * time.Hour
 	// MaxLinks caps how many links the hub holds, as a backstop.
 	MaxLinks = 10000
+
+	// Per-address request budgets, refilled every minute. An instance
+	// syncs each link every 15 minutes, so these are far above honest use
+	// and only slow down someone hammering the hub.
+	RatePerMinute       = 120
+	RateSignupPerMinute = 10 // creating and joining links
 )
 
 const schema = `
@@ -56,6 +65,18 @@ type Hub struct {
 	keys []string // sha256 of each key allowed to create links; empty = anyone
 	now  func() time.Time
 	mux  *http.ServeMux
+
+	// TrustProxy makes the hub take the caller's address from the last
+	// X-Forwarded-For entry (set it when exactly one reverse proxy sits in
+	// front). Otherwise the connection's own address is used.
+	TrustProxy bool
+	// Log, when set, gets one line per request (never bodies or tokens).
+	Log *log.Logger
+
+	mu      sync.Mutex
+	window  time.Time
+	hits    map[string]int
+	signups map[string]int
 }
 
 // New prepares the database and returns the hub. keys are the secrets that
@@ -71,6 +92,12 @@ func New(db *sql.DB, keys []string) (*Hub, error) {
 		}
 	}
 	h.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok\n")) })
+	h.mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write([]byte("OpenChore coordination server.\n\n" +
+			"This passes encrypted updates between families who have linked their OpenChore apps.\n" +
+			"It can't read them, and there is nothing to see or sign in to here.\n"))
+	})
 	h.mux.HandleFunc("POST /v1/links", h.create)
 	h.mux.HandleFunc("POST /v1/links/{id}/join", h.join)
 	h.mux.HandleFunc("POST /v1/links/{id}/exchange", h.exchange)
@@ -79,8 +106,63 @@ func New(db *sql.DB, keys []string) (*Hub, error) {
 }
 
 func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, MaxBlob*2)
-	h.mux.ServeHTTP(w, r)
+	addr := h.caller(r)
+	rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+	signup := r.Method == http.MethodPost && (r.URL.Path == "/v1/links" || strings.HasSuffix(r.URL.Path, "/join"))
+	switch {
+	case r.URL.Path == "/healthz":
+		h.mux.ServeHTTP(rec, r) // probes aren't counted or logged
+		return
+	case !h.allow(addr, signup):
+		rec.Header().Set("Retry-After", "60")
+		fail(rec, http.StatusTooManyRequests, "too many requests; try again in a minute")
+	default:
+		r.Body = http.MaxBytesReader(rec, r.Body, MaxBlob*2)
+		h.mux.ServeHTTP(rec, r)
+	}
+	if h.Log != nil {
+		// Link ids aren't secret (tokens are, and they're in headers).
+		h.Log.Printf("%s %s %s %d", addr, r.Method, r.URL.Path, rec.status)
+	}
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
+// caller is the address requests are counted against.
+func (h *Hub) caller(r *http.Request) string {
+	if h.TrustProxy {
+		if parts := strings.Split(r.Header.Get("X-Forwarded-For"), ","); len(parts) > 0 {
+			if ip := strings.TrimSpace(parts[len(parts)-1]); ip != "" {
+				return ip
+			}
+		}
+	}
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
+}
+
+// allow counts a request against the caller's budget for this minute.
+func (h *Hub) allow(addr string, signup bool) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if now := h.now(); h.hits == nil || now.Sub(h.window) >= time.Minute {
+		h.window, h.hits, h.signups = now, map[string]int{}, map[string]int{}
+	}
+	h.hits[addr]++
+	if signup {
+		h.signups[addr]++
+	}
+	return h.hits[addr] <= RatePerMinute && h.signups[addr] <= RateSignupPerMinute
 }
 
 // Sweep deletes invites nobody joined in time and links nobody has synced
@@ -268,6 +350,9 @@ func (h *Hub) remove(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// SetClock overrides the clock (tests).
+func (h *Hub) SetClock(now func() time.Time) { h.now = now }
 
 // DB exposes the database (tests).
 func (h *Hub) DB() *sql.DB { return h.db }
