@@ -87,6 +87,9 @@ type createChoreRequest struct {
 	RequiresApproval   bool   `json:"requires_approval"`
 	RequiresPhoto      bool   `json:"requires_photo"`
 	PhotoSource        string `json:"photo_source"`
+	// AutoComplete is a pointer so clients that don't know the field (older
+	// integrations) leave it alone on update.
+	AutoComplete *bool `json:"auto_complete"`
 }
 
 func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -132,6 +135,7 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		RequiresApproval:   req.RequiresApproval,
 		RequiresPhoto:      req.RequiresPhoto,
 		PhotoSource:        photoSource,
+		AutoComplete:       req.AutoComplete != nil && *req.AutoComplete,
 		Source:             "manual",
 		CreatedBy:          createdBy,
 	}
@@ -200,6 +204,9 @@ func (h *ChoreHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Always update booleans as they might be toggled off (or we could rely on a PATCH approach, but here we just assign)
 	existing.RequiresApproval = req.RequiresApproval
 	existing.RequiresPhoto = req.RequiresPhoto
+	if req.AutoComplete != nil {
+		existing.AutoComplete = *req.AutoComplete
+	}
 	if req.PhotoSource != "" {
 		if req.PhotoSource != model.PhotoSourceChild && req.PhotoSource != model.PhotoSourceExternal && req.PhotoSource != model.PhotoSourceBoth {
 			writeError(w, http.StatusBadRequest, "photo_source must be child, external, or both")
@@ -407,6 +414,15 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	}
 	actingForOther := caller.Role == model.RoleAdmin && completedBy != caller.ID
 
+	// Fetch chore details to check category and requirements
+	chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
+
+	// A chore another app finishes can't be ticked by the person doing it.
+	if chore != nil && chore.AutoComplete && caller.Role != model.RoleAdmin {
+		writeError(w, http.StatusForbidden, autoCompleteMessage)
+		return
+	}
+
 	// Enforce time lock
 	now := time.Now()
 	nowTime := now.Format("15:04")
@@ -450,9 +466,6 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	// Fetch chore details to check category and requirements
-	chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
 
 	// For "child" photo source the kid takes the photo at completion time.
 	// For "external" or "both", a photo can be attached later.
@@ -777,6 +790,12 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 	if schedule != nil && !canActOnSchedule(UserFromContext(r.Context()), schedule) {
 		writeError(w, http.StatusForbidden, "this chore is assigned to someone else")
 		return
+	}
+	if schedule != nil && UserFromContext(r.Context()).Role != model.RoleAdmin {
+		if chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID); chore != nil && chore.AutoComplete {
+			writeError(w, http.StatusForbidden, autoCompleteMessage)
+			return
+		}
 	}
 
 	// Get completion before deleting so we can reverse points
@@ -1225,3 +1244,7 @@ func completerFor(caller *model.User, schedule *model.ChoreSchedule, requested i
 	}
 	return requested, nil
 }
+
+// autoCompleteMessage is what the assignee is told when they try to tick (or
+// untick) a chore that another app finishes for them.
+const autoCompleteMessage = "this chore is ticked off for you when the work is done"

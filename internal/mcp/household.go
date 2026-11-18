@@ -36,6 +36,7 @@ type apiChore struct {
 	RequiresApproval   bool   `json:"requires_approval"`
 	RequiresPhoto      bool   `json:"requires_photo"`
 	PhotoSource        string `json:"photo_source"`
+	AutoComplete       bool   `json:"auto_complete"`
 	Source             string `json:"source"`
 }
 
@@ -236,6 +237,7 @@ func householdTools() []*Tool {
 		"requires_approval":    boolean("A parent must approve before points are paid."),
 		"requires_photo":       boolean("Needs a photo as proof (then waits for approval)."),
 		"photo_source":         enum("Who provides the photo: child (default), external (a camera/automation), or both.", "child", "external", "both"),
+		"auto_complete":        boolean("Another app finishes this chore through the API when the work is really done; the person doing it can't tick it themselves (a parent or an API token still can)."),
 	}
 
 	return []*Tool{
@@ -265,7 +267,7 @@ func householdTools() []*Tool {
 			}, patternProps), "title"),
 			Run: func(ctx context.Context, c *caller, a Args) (any, error) {
 				body := a.pick("title", "description", "category", "icon", "points_value", "missed_penalty_value",
-					"estimated_minutes", "requires_approval", "requires_photo", "photo_source")
+					"estimated_minutes", "requires_approval", "requires_photo", "photo_source", "auto_complete")
 				out, err := c.do(ctx, http.MethodPost, "/chores", nil, body)
 				if err != nil {
 					return nil, err
@@ -307,7 +309,7 @@ func householdTools() []*Tool {
 				}
 				body := map[string]any{}
 				for _, k := range []string{"title", "description", "category", "icon", "points_value", "missed_penalty_value",
-					"estimated_minutes", "requires_approval", "requires_photo", "photo_source"} {
+					"estimated_minutes", "requires_approval", "requires_photo", "photo_source", "auto_complete"} {
 					if v, ok := cur[k]; ok {
 						body[k] = v
 					}
@@ -592,6 +594,9 @@ func overview(ctx context.Context, c *caller, a Args) (any, error) {
 		}
 		if ch.RequiresPhoto {
 			entry["needs_photo"] = ch.PhotoSource
+		}
+		if ch.AutoComplete {
+			entry["auto_complete"] = true
 		}
 		if ch.EstimatedMinutes != nil {
 			entry["minutes"] = *ch.EstimatedMinutes

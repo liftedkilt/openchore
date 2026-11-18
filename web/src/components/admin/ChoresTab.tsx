@@ -105,6 +105,9 @@ export const ChoresTab: React.FC = () => {
                         {chore.requires_photo && (
                           <span title={t('admin.choresTab.requiresPhotoTitle')}><Icon name="camera" /> {t('admin.choresTab.requiresPhotoLabel')}</span>
                         )}
+                        {chore.auto_complete && (
+                          <span title={t('admin.choresTab.autoCompleteTitle')}><Icon name="lock" /> {t('admin.choresTab.autoCompleteLabel')}</span>
+                        )}
                         {chore.source === 'self' && (
                           <span title={t('admin.choresTab.addedByTitle')}>
                             <Icon name="people" /> {t('admin.choresTab.addedBy', { name: users.find(u => u.id === chore.created_by)?.name ?? '?' })}

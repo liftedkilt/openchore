@@ -96,6 +96,13 @@ describe('choreView', () => {
     expect(proof.needsPhotoProof).toBe(true);
   });
 
+  it('cannot be ticked or unticked when another app finishes it', () => {
+    expect(choreView(chore({ auto_complete: true }), ctx))
+      .toMatchObject({ state: 'todo', canToggle: false, meta: 'Ticks itself when you finish' });
+    expect(choreView(chore({ auto_complete: true, completed: true, completion_status: 'approved' }), ctx))
+      .toMatchObject({ state: 'done', canToggle: false });
+  });
+
   it('is read-only on other days', () => {
     expect(choreView(chore({ date: '2026-09-23' }), ctx)).toMatchObject({ canToggle: false, meta: 'Not done' });
     expect(choreView(chore({ date: '2026-09-25', completed: false }), ctx).canToggle).toBe(false);
