@@ -281,9 +281,13 @@ func householdTools() []*Tool {
 				}
 				res, err := assign(ctx, c, id, uids, a)
 				if err != nil {
-					return map[string]any{"chore": out, "assignment_error": err.Error()}, nil
+					return partialFailure{map[string]any{"chore": out, "assignment_error": err.Error()}}, nil
 				}
-				return map[string]any{"chore": out, "assignment": res}, nil
+				full := map[string]any{"chore": out, "assignment": res}
+				if _, failed := res["errors"]; failed {
+					return partialFailure{full}, nil
+				}
+				return full, nil
 			},
 		},
 		{
@@ -336,7 +340,14 @@ func householdTools() []*Tool {
 				if err != nil {
 					return nil, err
 				}
-				return assign(ctx, c, id, uids, a)
+				res, err := assign(ctx, c, id, uids, a)
+				if err != nil {
+					return nil, err
+				}
+				if _, failed := res["errors"]; failed {
+					return partialFailure{res}, nil
+				}
+				return res, nil
 			},
 		},
 		{
