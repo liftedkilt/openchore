@@ -255,7 +255,7 @@ func allTools() []*Tool {
 		method: http.MethodPut, path: "/admin/friends",
 		props: map[string]any{
 			"leaderboard_enabled": boolean("Show the weekly leaderboard."),
-			"family_name":         str("Name other families see, e.g. \"The Forsyths\"."),
+			"family_name":         str("Name other families see, e.g. \"The Smiths\"."),
 			"hub_url":             str("Coordination server address, https://…"),
 			"hub_key":             str("Key that lets this family create invites on that server."),
 		}})

@@ -28,7 +28,7 @@ test.describe('Leaderboard', () => {
 
     // Linking needs a family name first.
     await expect(section.getByText('Give your family a name before linking.')).toBeVisible();
-    await section.getByPlaceholder('e.g. The Forsyths').fill('The Testers');
+    await section.getByPlaceholder('e.g. The Smiths').fill('The Testers');
     await section.getByRole('button', { name: 'Save' }).first().click();
     await expect(section.getByText('Give your family a name before linking.')).toHaveCount(0);
 
