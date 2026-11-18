@@ -440,7 +440,8 @@
         "accessory": "Accessory",
         "restyle": "Restyle (new coat colour)",
         "new_animal": "New animal (stats carry over)",
-        "design": "Design (kid draws their own)"
+        "design": "Design (kid draws their own)",
+        "picture": "Own picture (kid uploads their animal)"
       },
       "customEmoji": "Custom (emoji)…",
       "fieldEmoji": "Emoji",
@@ -699,7 +700,9 @@
         "failed": "Couldn't change farm pets.",
         "remove": "Remove",
         "confirmRemove": "Tap again to remove",
-        "removed": "Removed {{name}} ({{owner}}). They can adopt again."
+        "removed": "Removed {{name}} ({{owner}}). They can adopt again.",
+        "removePicture": "Remove picture",
+        "pictureRemoved": "{{name}}'s picture was removed."
       },
       "friends": {
         "title": "Leaderboard & friend families",
@@ -1422,7 +1425,8 @@
           "design": "{{name}} is wearing your design!",
           "wear": "{{name}} shows it off!",
           "restyle": "{{name}} loves the new coat!",
-          "new_animal": "Ta-da! Meet the new {{name}}!"
+          "new_animal": "Ta-da! Meet the new {{name}}!",
+          "picture": "{{name}} has a whole new look!"
         }
       },
       "design": {
@@ -1442,6 +1446,23 @@
           "face": "Face",
           "neck": "Neck"
         }
+      },
+      "picture": {
+        "title": "Use my own picture",
+        "lead": "Pick a picture you drew or made. Your animal will look like it everywhere on the farm.",
+        "choose": "Choose a picture",
+        "change": "Choose a different picture",
+        "rules": "It needs to be a PNG with a see-through background, about 64 by 64 pixels, with the animal facing right and its feet at the bottom.",
+        "kit": "Want to make one? Start from these:",
+        "kitBlank": "Blank canvas",
+        "kitGuide": "Where things go",
+        "kitLayer": "Guide layer",
+        "kitSample": "Example duck",
+        "notPng": "That isn't a PNG picture. Save it as a PNG and try again.",
+        "preview": "How it will look",
+        "drop": "Go back to the drawn animal",
+        "dropConfirm": "Really? Your picture will be deleted",
+        "dropped": "Back to the drawn animal."
       }
     },
     "board": {

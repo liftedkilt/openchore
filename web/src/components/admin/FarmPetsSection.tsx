@@ -38,6 +38,16 @@ export const FarmPetsSection: React.FC = () => {
     }
   };
 
+  const removePicture = async (p: Pet) => {
+    try {
+      await api.pets.removePicture(p.user_id);
+      setMessage({ type: 'success', text: t('admin.settingsTab.pets.pictureRemoved', { name: p.name }) });
+      load();
+    } catch {
+      setMessage({ type: 'error', text: t('admin.settingsTab.pets.failed') });
+    }
+  };
+
   const toggle = async (on: boolean) => {
     setSaving(true);
     setMessage(null);
@@ -74,10 +84,15 @@ export const FarmPetsSection: React.FC = () => {
         <ul className={ui.list}>
           {pets.map(p => (
             <li key={p.id} className={fp.row}>
-              <FarmAnimal species={p.species} color={p.color} mood={p.mood} accessory={p.accessory} className={fp.thumb} />
+              <FarmAnimal species={p.species} color={p.color} mood={p.mood} accessory={p.accessory} sprite={p.sprite} className={fp.thumb} />
               <span className={fp.text}>
                 <strong>{p.name}</strong> · {p.owner_name} · {t(`kid.farm.mood.${p.mood}`, { name: p.name })}
               </span>
+              {p.sprite && (
+                <button type="button" className={ui.btnGhost} onClick={() => removePicture(p)}>
+                  {t('admin.settingsTab.pets.removePicture')}
+                </button>
+              )}
               <button type="button" className={confirming === p.id ? ui.btnDanger : ui.btnGhost} onClick={() => remove(p)}>
                 {confirming === p.id ? t('admin.settingsTab.pets.confirmRemove') : t('admin.settingsTab.pets.remove')}
               </button>

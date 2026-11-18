@@ -291,7 +291,7 @@ export interface Reward {
 
 // --- Farm pets ---
 
-export type PetAction = 'feed' | 'treat' | 'play' | 'accessory' | 'new_animal' | 'restyle' | 'design';
+export type PetAction = 'feed' | 'treat' | 'play' | 'accessory' | 'new_animal' | 'restyle' | 'design' | 'picture';
 /** What a person picks when redeeming new_animal / restyle / design rewards. */
 export interface PetPick { species?: PetSpecies; color?: string; slot?: PetItemSlot; image?: string }
 export type PetSpecies = 'horse' | 'dog' | 'cat' | 'chicken' | 'cow' | 'pig' | 'sheep' | 'goat';
@@ -330,6 +330,8 @@ export interface Pet {
   fullness: number;
   joy: number;
   accessory?: PetItem | '';
+  /** The person's own picture, shown in place of the drawn animal (docs/custom-animals.md). */
+  sprite?: string;
   items: PetItem[];
   last_missed_date?: string;
   mood: PetMood;

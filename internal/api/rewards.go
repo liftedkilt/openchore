@@ -252,7 +252,7 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 	}
 	// New animal / restyle carry the person's pick in the body.
 	var choice *PetChoice
-	if petReward != nil && (petReward.PetAction == model.PetActionNewAnimal || petReward.PetAction == model.PetActionRestyle || petReward.PetAction == model.PetActionDesign) {
+	if petReward != nil && (petReward.PetAction == model.PetActionNewAnimal || petReward.PetAction == model.PetActionRestyle || petReward.PetAction == model.PetActionDesign || petReward.PetAction == model.PetActionPicture) {
 		r.Body = http.MaxBytesReader(w, r.Body, 5<<20) // room for a drawn picture
 		var body struct {
 			Pet *PetChoice `json:"pet"`
@@ -272,7 +272,7 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// A drawn accessory is saved first and removed again if paying fails.
+	// A drawn accessory or animal picture is saved first and removed again if paying fails.
 	if choice != nil && choice.png != nil {
 		id, err := savePetImage(choice.png)
 		if err != nil {
@@ -280,6 +280,9 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		choice.item = "img:" + choice.Slot + ":" + id
+		if petReward.PetAction == model.PetActionPicture {
+			choice.item = id
+		}
 		defer func() {
 			if choice.item == "" {
 				removePetImage(id)

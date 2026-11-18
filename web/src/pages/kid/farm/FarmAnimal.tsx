@@ -919,9 +919,39 @@ function Accessory({ accessory, imageUrl, r }: { accessory?: string; imageUrl?: 
 
 // ---------------------------------------------------------------------------
 
+/**
+ * A person's own animal picture (docs/custom-animals.md). It is drawn in a
+ * square with its bottom edge on the ground line, and accessories go at
+ * fixed spots given for a 64 x 64 picture: the top of the head, the eyes and
+ * the neck. Keep in step with web/scripts/gen-sprite-kit.py.
+ */
+const SPRITE_BOX = { x: 14, y: 4, size: 72 };
+const SPRITE_ANCHORS = { hat: { x: 46, y: 8 }, eyes: { x: 46, y: 19 }, neck: { x: 39, y: 32 } };
+const spritePt = (p: Pt): Pt => ({ x: SPRITE_BOX.x + (p.x * SPRITE_BOX.size) / 64, y: SPRITE_BOX.y + (p.y * SPRITE_BOX.size) / 64 });
+/** Where accessories sit on a picture, as a rig the accessory code understands. */
+function spriteRig(): Rig {
+  const hat = spritePt(SPRITE_ANCHORS.hat);
+  const eyes = spritePt(SPRITE_ANCHORS.eyes);
+  const neck = spritePt(SPRITE_ANCHORS.neck);
+  return {
+    ...RIGS.dog, ...resolveCoat('dog'),
+    head: { x: eyes.x, y: eyes.y + 1, r: 12 },
+    eyes: [{ x: eyes.x - 5, y: eyes.y }, { x: eyes.x + 5, y: eyes.y }],
+    hat: { x: hat.x, y: hat.y, s: 1 },
+    neck: { x: neck.x, y: neck.y - 6, w: 13 },
+  };
+}
+
+/** The URL of a person's own animal picture. */
+export const spriteUrl = (id: string) => accessoryImageUrl(id);
+
 export interface FarmAnimalProps {
   species: PetSpecies;
   mood: PetMood;
+  /** The person's own picture (an upload id, or a preview URL with spritePreview) shown in place of the drawn animal. */
+  sprite?: string;
+  /** Treat `sprite` as a ready URL (a live preview before upload). */
+  spritePreview?: boolean;
   /** Coat colour key from COAT_COLORS[species]; unknown or empty → the default coat. */
   color?: string;
   /** A built-in item key, `e:<head|face|neck>:<emoji>` or `img:<head|face|neck>:<id>`. */
@@ -954,7 +984,22 @@ function Leg({ species, r, hip, len, far }: { species: PetSpecies; r: Rig; hip: 
 }
 
 /** One farm animal, 100 x 80, facing right, feet on the ground at y = 76. */
-export function FarmAnimal({ species, mood, color, accessory, accessoryImageUrl, reaction, className, title }: FarmAnimalProps) {
+export function FarmAnimal({ species, mood, color, accessory, accessoryImageUrl, reaction, sprite, spritePreview, className, title }: FarmAnimalProps) {
+  if (sprite) {
+    const lying = mood === 'very_sick';
+    const { x, y, size } = SPRITE_BOX;
+    return (
+      <svg viewBox="0 0 100 80" overflow="visible" className={className} role={title ? 'img' : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
+        <ellipse cx={50} cy={76} rx={26} ry={3.5} fill="#1d1b1a" opacity={0.14} />
+        {/* Too sick to stand: squashed flat onto the ground line. */}
+        <g transform={lying ? 'translate(0 76) scale(1 0.6) translate(0 -76)' : undefined}>
+          <image href={spritePreview ? sprite : spriteUrl(sprite)} x={x} y={y} width={size} height={size}
+            preserveAspectRatio="xMidYMax meet" pointerEvents="none" style={{ imageRendering: 'pixelated' }} />
+          <Accessory accessory={accessory} imageUrl={accessoryImageUrl} r={spriteRig()} />
+        </g>
+      </svg>
+    );
+  }
   const base: Rig = { ...(RIGS[species] ?? RIGS.dog), ...resolveCoat(species, color) };
   const lying = mood === 'very_sick';
   const react = lying ? undefined : reaction;

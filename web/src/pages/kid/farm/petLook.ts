@@ -24,7 +24,7 @@ export function petColor(species: PetSpecies, color?: string): string {
 export const colorLabel = (t: TFunction, color: string) => t(`kid.farm.color.${color}`);
 
 /** Rewards that need a pick (animal and/or coat) before redeeming. */
-export const needsPick = (r: Reward) => r.pet_action === 'new_animal' || r.pet_action === 'restyle' || r.pet_action === 'design';
+export const needsPick = (r: Reward) => r.pet_action === 'new_animal' || r.pet_action === 'restyle' || r.pet_action === 'design' || r.pet_action === 'picture';
 
 /** How a pet-care reward would make the person's animal look. */
 export function previewLook(pet: Pet, r: Reward): { accessory?: string; mood: Pet['mood'] } {

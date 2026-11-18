@@ -12,6 +12,7 @@ import { FarmAnimal } from './FarmAnimal';
 import { FarmScene } from './FarmScene';
 import { ColorPicker, PetLookSheet } from './PetLookSheet';
 import { DesignSheet } from './DesignSheet';
+import { PictureSheet } from './PictureSheet';
 import { ReactingAnimal, reactionLine, type ReactionEvent } from './PetReaction';
 import { itemLabel, needsPick } from './petLook';
 import { PetRewardThumb } from './PetRewardThumb';
@@ -36,7 +37,7 @@ export function FarmSheet({ user, data, onClose }: FarmSheetProps) {
       <FarmScene pets={pets} meId={user.id} onSelect={setSelected} />
       {other && (
         <div className={s.otherCard} role="status">
-          <FarmAnimal species={other.species} color={other.color} mood={other.mood} accessory={other.accessory} className={s.otherArt} />
+          <FarmAnimal species={other.species} color={other.color} mood={other.mood} accessory={other.accessory} sprite={other.sprite} className={s.otherArt} />
           <p>
             <strong>{t('kid.farm.belongsTo', { name: other.name, owner: other.owner_name ?? '' })}</strong>
             <span>{t(`kid.farm.mood.${other.mood}`, { name: other.name })}</span>
@@ -186,6 +187,26 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
     }
   };
 
+  // Going back to the drawn animal deletes the picture, so ask twice.
+  const [confirmDrop, setConfirmDrop] = useState(false);
+  const dropPicture = async () => {
+    if (!confirmDrop) {
+      setConfirmDrop(true);
+      return;
+    }
+    setConfirmDrop(false);
+    setBusy(true);
+    try {
+      await api.pets.update({ sprite: '' });
+      await data.loadExtras();
+      data.showToast(t('kid.farm.picture.dropped'));
+    } catch (e) {
+      data.showToast(e instanceof APIError ? e.message : t('kid.farm.saveFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const hint = pet.hiding ? t('kid.farm.hint.hiding', { name: pet.name })
     : pet.sick ? t('kid.farm.hint.sick', { name: pet.name })
     : pet.mood === 'hungry' ? t('kid.farm.hint.hungry', { name: pet.name })
@@ -212,6 +233,11 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
             {reaction ? reactionLine(t, pet, reaction.kind) : t(`kid.farm.mood.${pet.mood}`, { name: pet.name })}
           </p>
           <p className={s.hint}>{hint}</p>
+          {pet.sprite && (
+            <button type="button" className={k.linkBtn} disabled={busy} onClick={dropPicture}>
+              {confirmDrop ? t('kid.farm.picture.dropConfirm') : t('kid.farm.picture.drop')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -252,7 +278,7 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
         </button>
         {pet.items.map(it => (
           <button key={it} type="button" className={clsx(s.chip, s.wardrobeChip, pet.accessory === it && s.chipOn)} aria-pressed={pet.accessory === it} disabled={busy} onClick={() => wear(it)}>
-            <FarmAnimal species={pet.species} color={pet.color} mood="content" accessory={it} className={s.wardrobeArt} />
+            <FarmAnimal species={pet.species} color={pet.color} mood="content" accessory={it} sprite={pet.sprite} className={s.wardrobeArt} />
             {itemLabel(t, it)}
           </button>
         ))}
@@ -268,7 +294,7 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
                 <div className={clsx(s.shopItem, tryOn === r.pet_item && s.speciesOn)}>
                   <button type="button" className={s.tryOnBtn} aria-pressed={tryOn === r.pet_item}
                     onClick={() => setTryOn(tryOn === r.pet_item ? null : r.pet_item ?? null)}>
-                    <FarmAnimal species={pet.species} color={pet.color} mood="happy" accessory={r.pet_item} className={s.careArt} />
+                    <FarmAnimal species={pet.species} color={pet.color} mood="happy" accessory={r.pet_item} sprite={pet.sprite} className={s.careArt} />
                     <span className={s.careName}>{r.name}</span>
                   </button>
                   <button type="button" className={s.buyBtn}
@@ -286,7 +312,11 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
         <DesignSheet pet={pet} reward={picking} busy={data.redeemingId === picking.id}
           onConfirm={pick => redeem(picking, pick)} onClose={() => setPicking(null)} />
       )}
-      {picking && picking.pet_action !== 'design' && (
+      {picking && picking.pet_action === 'picture' && (
+        <PictureSheet pet={pet} reward={picking} busy={data.redeemingId === picking.id}
+          onConfirm={pick => redeem(picking, pick)} onClose={() => setPicking(null)} />
+      )}
+      {picking && picking.pet_action !== 'design' && picking.pet_action !== 'picture' && (
         <PetLookSheet pet={pet} reward={picking} busy={data.redeemingId === picking.id}
           onConfirm={pick => redeem(picking, pick)} onClose={() => setPicking(null)} />
       )}

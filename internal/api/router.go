@@ -196,6 +196,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 				// Streak rewards management
 				r.Put("/admin/pets", pets.SetEnabled)
 				r.Delete("/admin/users/{id}/pet", pets.Remove)
+				r.Delete("/admin/users/{id}/pet/picture", pets.RemovePicture)
 
 				// Leaderboard and friend families
 				r.Get("/admin/friends", friendsH.AdminGet)

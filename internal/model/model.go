@@ -361,12 +361,13 @@ const (
 	PetActionNewAnimal = "new_animal" // swap species (and coat); health, food and joy carry over
 	PetActionRestyle   = "restyle"    // change coat colour
 	PetActionDesign    = "design"     // draw or upload your own accessory
+	PetActionPicture   = "picture"    // use your own picture as the animal (docs/custom-animals.md)
 )
 
 // ValidPetAction reports whether a is a pet action or empty (ordinary reward).
 func ValidPetAction(a string) bool {
 	switch a {
-	case "", PetActionFeed, PetActionTreat, PetActionPlay, PetActionAccessory, PetActionNewAnimal, PetActionRestyle, PetActionDesign:
+	case "", PetActionFeed, PetActionTreat, PetActionPlay, PetActionAccessory, PetActionNewAnimal, PetActionRestyle, PetActionDesign, PetActionPicture:
 		return true
 	}
 	return false
@@ -462,6 +463,10 @@ type Pet struct {
 	Joy            int       `json:"joy"`
 	Color          string    `json:"color,omitempty"`     // coat colour (PetColors); "" = default
 	Accessory      string    `json:"accessory,omitempty"` // worn item, from Items
+	// Sprite, when set, is the id of the person's own picture, shown in
+	// place of the drawn animal (uploads/pets/<id>.png). Species and Color
+	// are kept underneath: they are what friend families see.
+	Sprite string `json:"sprite,omitempty"`
 	Items          []string  `json:"items"`               // owned accessories
 	LastMissedDate *string   `json:"last_missed_date,omitempty"`
 	LastDayChecked string    `json:"last_day_checked"`

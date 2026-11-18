@@ -211,6 +211,9 @@ func (h *PetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name      *string `json:"name"`
 		Accessory *string `json:"accessory"`
+		// Sprite can only be cleared here (""): going back to the drawn
+		// animal is free; a new picture comes from a "picture" reward.
+		Sprite *string `json:"sprite"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -224,6 +227,16 @@ func (h *PetHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := h.store.RenamePet(ctx, u.ID, name); err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to rename pet")
+			return
+		}
+	}
+	if req.Sprite != nil {
+		if *req.Sprite != "" {
+			writeError(w, http.StatusUnprocessableEntity, "get a picture reward to use your own picture")
+			return
+		}
+		if err := h.clearSprite(ctx, u.ID); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to change picture")
 			return
 		}
 	}
@@ -265,6 +278,7 @@ var defaultPetRewards = []model.Reward{
 	{Name: "Round glasses", Description: "Smart round glasses for your farm animal.", Icon: "👓", Cost: 20, PetAction: model.PetActionAccessory, PetItem: "round_glasses"},
 	{Name: "Restyle coat", Description: "Give your farm animal a new coat colour.", Icon: "🎨", Cost: 30, PetAction: model.PetActionRestyle},
 	{Name: "Design an accessory", Description: "Draw your own accessory, or use a picture, and your animal will wear it.", Icon: "🖍️", Cost: 40, PetAction: model.PetActionDesign},
+	{Name: "Use my own picture", Description: "Make your farm animal look like a picture you drew or made.", Icon: "🖼️", Cost: 60, PetAction: model.PetActionPicture},
 	{Name: "New animal", Description: "Trade for a different farm animal. Health, food and joy come along.", Icon: "🔁", Cost: 150, PetAction: model.PetActionNewAnimal},
 }
 
@@ -327,6 +341,39 @@ func (h *PetHandler) Remove(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// clearSprite goes back to the drawn animal and deletes the picture.
+func (h *PetHandler) clearSprite(ctx context.Context, userID int64) error {
+	old, err := h.store.SetPetSprite(ctx, userID, "")
+	if err == nil && old != "" {
+		removePetImage(old)
+	}
+	return err
+}
+
+// RemovePicture takes a person's own animal picture away (grown-ups), e.g.
+// when it isn't suitable. The animal goes back to its drawn look.
+func (h *PetHandler) RemovePicture(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+	p, err := h.store.GetPetForUser(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load pet")
+		return
+	}
+	if p == nil {
+		writeError(w, http.StatusNotFound, "that person has no farm animal")
+		return
+	}
+	if err := h.clearSprite(r.Context(), id); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to remove picture")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // PetChoice is what a person picks when redeeming a "new_animal" or
 // "restyle" reward.
 type PetChoice struct {
@@ -337,7 +384,7 @@ type PetChoice struct {
 	Image string `json:"image"`
 
 	png  []byte // the checked, shrunk picture
-	item string // "img:<slot>:<id>" once saved
+	item string // once saved: "img:<slot>:<id>" for an accessory, the bare id for an animal picture
 }
 
 // checkPetReward refuses a pet-care redemption that can't take effect,
@@ -396,6 +443,15 @@ func (h *PetHandler) checkPetReward(ctx context.Context, u *model.User, rw *mode
 			return err.Error(), nil
 		}
 		choice.png = png
+	case model.PetActionPicture:
+		if choice == nil || choice.Image == "" {
+			return "choose a picture", nil
+		}
+		png, err := decodeSprite(choice.Image)
+		if err != nil {
+			return err.Error(), nil
+		}
+		choice.png = png
 	case model.PetActionRestyle:
 		if choice == nil || !model.ValidPetColor(p.Species, choice.Color) {
 			return "choose a coat colour", nil
@@ -425,6 +481,12 @@ func (h *PetHandler) applyPetReward(ctx context.Context, userID int64, rw *model
 		return h.store.SetPetLook(ctx, userID, choice.Species, choice.Color)
 	case model.PetActionDesign:
 		return h.store.AddPetItem(ctx, userID, choice.item)
+	case model.PetActionPicture:
+		old, err := h.store.SetPetSprite(ctx, userID, choice.item)
+		if err == nil && old != "" {
+			removePetImage(old)
+		}
+		return err
 	}
 	f, j := pet.Effect(rw.PetAction)
 	return h.store.AdjustPetNeeds(ctx, userID, f, j)

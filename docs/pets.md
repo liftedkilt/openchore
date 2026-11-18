@@ -57,6 +57,7 @@ store (ledger row, stock, per-person visibility and pricing all apply):
 | `play` | Joy +35, Food −10 (refused while hiding or very sick) |
 | `accessory` | Gives `pet_item` and puts it on (refused if already owned) |
 | `restyle` | New coat colour, picked at redemption (`{"pet": {"color": …}}`) |
+| `picture` | The person's own picture is shown in place of the drawn animal, sent at redemption (`{"pet": {"image": …}}`); see [custom-animals.md](custom-animals.md) |
 | `new_animal` | A different animal (and coat), picked at redemption (`{"pet": {"species": …, "color": …}}`). Name, health, food, joy and accessories carry over, so it's never a way out of a sick pet |
 
 Accessories (`pet_item`) are one of 19 built-ins (hats, glasses, neckwear) or a

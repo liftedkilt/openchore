@@ -174,6 +174,7 @@ export function DesignSheet({ pet, reward, busy, onConfirm, onClose }: DesignShe
             mood="happy"
             accessory={empty ? pet.accessory : `img:${slot}:preview`}
             accessoryImageUrl={empty ? undefined : preview}
+            sprite={pet.sprite}
             className={s.pickArt}
           />
           <div className={k.ownChips} role="radiogroup" aria-label={t('kid.farm.design.where')}>

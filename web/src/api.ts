@@ -305,7 +305,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ name, species, color }),
     }),
-    update: (data: { name?: string; accessory?: PetItem | '' }) => fetchWithAuth<Pet>('/me/pet', {
+    update: (data: { name?: string; accessory?: PetItem | ''; sprite?: '' }) => fetchWithAuth<Pet>('/me/pet', {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
@@ -314,6 +314,7 @@ export const api = {
       body: JSON.stringify({ enabled }),
     }),
     remove: (userId: number) => fetchWithAuth(`/admin/users/${userId}/pet`, { method: 'DELETE' }),
+    removePicture: (userId: number) => fetchWithAuth(`/admin/users/${userId}/pet/picture`, { method: 'DELETE' }),
   },
   commitments: {
     listForUser: (userId: number) => fetchWithAuth<RewardCommitment[]>(`/users/${userId}/commitments`),

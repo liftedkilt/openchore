@@ -95,6 +95,74 @@ func shrink(src image.Image, max int) image.Image {
 	return dst
 }
 
+// Custom animal pictures (docs/custom-animals.md): a small PNG with a
+// transparent background, stored as it was drawn so pixel art stays crisp.
+const (
+	spriteMaxSide  = 128
+	spriteMinSide  = 8
+	spriteMaxBytes = 1 << 20
+	spriteMaxPix   = 2048 * 2048
+)
+
+// decodeSprite checks a data: URL holding a PNG and returns it re-encoded.
+// A picture bigger than spriteMaxSide is scaled down by picking pixels (no
+// smoothing), which keeps enlarged pixel art sharp.
+func decodeSprite(dataURL string) ([]byte, error) {
+	meta, payload, ok := strings.Cut(dataURL, ",")
+	if !ok || meta != "data:image/png;base64" {
+		return nil, errors.New("the picture must be a PNG file")
+	}
+	raw, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil || len(raw) == 0 {
+		return nil, errors.New("couldn't read that picture")
+	}
+	if len(raw) > spriteMaxBytes {
+		return nil, errors.New("that picture is too big; make it 128 by 128 pixels or smaller")
+	}
+	cfg, err := png.DecodeConfig(bytes.NewReader(raw))
+	if err != nil || cfg.Width*cfg.Height > spriteMaxPix {
+		return nil, errors.New("couldn't read that picture; save it as a PNG")
+	}
+	if cfg.Width < spriteMinSide || cfg.Height < spriteMinSide {
+		return nil, errors.New("that picture is too small; 64 by 64 pixels works best")
+	}
+	src, err := png.Decode(bytes.NewReader(raw))
+	if err != nil {
+		return nil, errors.New("couldn't read that picture; save it as a PNG")
+	}
+	b := src.Bounds()
+	w, h := b.Dx(), b.Dy()
+	dw, dh := w, h
+	if longest := max(w, h); longest > spriteMaxSide {
+		dw, dh = max(1, w*spriteMaxSide/longest), max(1, h*spriteMaxSide/longest)
+	}
+	dst := image.NewNRGBA(image.Rect(0, 0, dw, dh))
+	var clear, solid int
+	for y := 0; y < dh; y++ {
+		for x := 0; x < dw; x++ {
+			// The middle of each target pixel's patch in the source.
+			c := color.NRGBAModel.Convert(src.At(b.Min.X+(2*x+1)*w/(2*dw), b.Min.Y+(2*y+1)*h/(2*dh))).(color.NRGBA)
+			dst.SetNRGBA(x, y, c)
+			if c.A < 16 {
+				clear++
+			} else {
+				solid++
+			}
+		}
+	}
+	switch {
+	case solid == 0:
+		return nil, errors.New("that picture is empty")
+	case clear == 0:
+		return nil, errors.New("the picture needs a see-through background, or the animal will be a square")
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, dst); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 func maxInt(a, b int) int {
 	if a > b {
 		return a

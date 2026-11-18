@@ -285,6 +285,11 @@ func allTools() []*Tool {
 		desc:   "End a link with another family and delete their data here. They are told at their next sync. Confirm first.",
 		method: http.MethodDelete, path: "/admin/friends/{id}", props: map[string]any{"id": integer("Link id from get_friend_families.")}})
 
+	add(endpoint{name: "remove_farm_pet_picture", title: "Remove a person's own animal picture",
+		desc:   "Take away the picture a person uploaded for their farm animal (a \"picture\" reward), e.g. if it isn't suitable. The animal goes back to its drawn look and keeps everything else. Confirm first.",
+		method: http.MethodDelete, path: "/admin/users/{id}/pet/picture",
+		props: map[string]any{"id": integer("Person id.")}})
+
 	// ---- Rewards ----
 	add(endpoint{name: "list_rewards", title: "List rewards", readOnly: true,
 		desc:   "Every reward, including hidden ones, with per-kid visibility and prices.",
@@ -299,7 +304,7 @@ func allTools() []*Tool {
 			"cost":        integer("Price in points (positive)."),
 			"stock":       integer("How many are available (omit for unlimited)."),
 			"shareable":   boolean("Kids can pool points toward it together."),
-			"pet_action":  enum("Make it a farm-pet care reward (omit for an ordinary reward): feed, treat, play, accessory, new_animal (trade for another animal; stats carry over), restyle (new coat colour) or design (the kid draws or uploads their own accessory).", "feed", "treat", "play", "accessory", "new_animal", "restyle", "design"),
+			"pet_action":  enum("Make it a farm-pet care reward (omit for an ordinary reward): feed, treat, play, accessory, new_animal (trade for another animal; stats carry over), restyle (new coat colour), design (the kid draws or uploads their own accessory) or picture (the kid uploads their own picture to use as the animal).", "feed", "treat", "play", "accessory", "new_animal", "restyle", "design", "picture"),
 			"pet_item":    str(petItemDesc),
 		}})
 	add(endpoint{name: "update_reward", title: "Edit a reward",

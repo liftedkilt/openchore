@@ -440,7 +440,8 @@
         "accessory": "Accessoire",
         "restyle": "Neues Fell (Fellfarbe)",
         "new_animal": "Neues Tier (Werte bleiben)",
-        "design": "Selbst gestalten (Kind malt)"
+        "design": "Selbst gestalten (Kind malt)",
+        "picture": "Eigenes Bild (Kind lädt sein Tier hoch)"
       },
       "customEmoji": "Eigenes (Emoji)…",
       "fieldEmoji": "Emoji",
@@ -699,7 +700,9 @@
         "failed": "Hoftiere konnten nicht geändert werden.",
         "remove": "Entfernen",
         "confirmRemove": "Zum Entfernen nochmal tippen",
-        "removed": "{{name}} ({{owner}}) entfernt. Es kann neu adoptiert werden."
+        "removed": "{{name}} ({{owner}}) entfernt. Es kann neu adoptiert werden.",
+        "removePicture": "Bild entfernen",
+        "pictureRemoved": "Das Bild von {{name}} wurde entfernt."
       },
       "friends": {
         "title": "Rangliste & befreundete Familien",
@@ -1422,7 +1425,8 @@
           "design": "{{name}} trägt dein Design!",
           "wear": "{{name}} führt es stolz vor!",
           "restyle": "{{name}} liebt das neue Fell!",
-          "new_animal": "Tadaa! Das ist {{name}} in neu!"
+          "new_animal": "Tadaa! Das ist {{name}} in neu!",
+          "picture": "{{name}} sieht ganz neu aus!"
         }
       },
       "design": {
@@ -1442,6 +1446,23 @@
           "face": "Gesicht",
           "neck": "Hals"
         }
+      },
+      "picture": {
+        "title": "Mein eigenes Bild verwenden",
+        "lead": "Wähle ein Bild, das du gemalt oder gemacht hast. Dein Tier sieht dann überall auf dem Hof so aus.",
+        "choose": "Bild auswählen",
+        "change": "Anderes Bild auswählen",
+        "rules": "Es muss ein PNG mit durchsichtigem Hintergrund sein, etwa 64 mal 64 Pixel groß. Das Tier schaut nach rechts und steht mit den Füßen am unteren Rand.",
+        "kit": "Du möchtest eins machen? Fang hiermit an:",
+        "kitBlank": "Leere Fläche",
+        "kitGuide": "Was wohin gehört",
+        "kitLayer": "Hilfsebene",
+        "kitSample": "Beispiel-Ente",
+        "notPng": "Das ist kein PNG-Bild. Speichere es als PNG und versuche es noch einmal.",
+        "preview": "So wird es aussehen",
+        "drop": "Zurück zum gezeichneten Tier",
+        "dropConfirm": "Wirklich? Dein Bild wird gelöscht",
+        "dropped": "Zurück beim gezeichneten Tier."
       }
     },
     "board": {
