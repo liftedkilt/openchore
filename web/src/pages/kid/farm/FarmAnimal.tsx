@@ -985,16 +985,35 @@ function Leg({ species, r, hip, len, far }: { species: PetSpecies; r: Rig; hip: 
 
 /** One farm animal, 100 x 80, facing right, feet on the ground at y = 76. */
 export function FarmAnimal({ species, mood, color, accessory, accessoryImageUrl, reaction, sprite, spritePreview, className, title }: FarmAnimalProps) {
+  const tintId = `farm-sick-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   if (sprite) {
     const lying = mood === 'very_sick';
+    const sick = lying || mood === 'sick';
     const { x, y, size } = SPRITE_BOX;
+    // A sick animal turns green (queasy); more so when it's too sick to stand.
+    // The drawn animals change their faces instead; a picture has only its colour.
+    const g = lying ? 0.55 : 0.35;
     return (
       <svg viewBox="0 0 100 80" overflow="visible" className={className} role={title ? 'img' : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
         <ellipse cx={50} cy={76} rx={26} ry={3.5} fill="#1d1b1a" opacity={0.14} />
+        {sick && (
+          <defs>
+            {/* Pull every colour part-way toward a sickly green; see-through pixels stay see-through. */}
+            <filter id={tintId} colorInterpolationFilters="sRGB" x="0" y="0" width="1" height="1">
+              <feColorMatrix type="matrix" values={[
+                1 - g, 0, 0, 0, 0.42 * g,
+                0, 1 - g, 0, 0, 0.72 * g,
+                0, 0, 1 - g, 0, 0.30 * g,
+                0, 0, 0, 1, 0,
+              ].join(' ')} />
+            </filter>
+          </defs>
+        )}
         {/* Too sick to stand: squashed flat onto the ground line. */}
         <g transform={lying ? 'translate(0 76) scale(1 0.6) translate(0 -76)' : undefined}>
           <image href={spritePreview ? sprite : spriteUrl(sprite)} x={x} y={y} width={size} height={size}
-            preserveAspectRatio="xMidYMax meet" pointerEvents="none" style={{ imageRendering: 'pixelated' }} />
+            preserveAspectRatio="xMidYMax meet" pointerEvents="none" style={{ imageRendering: 'pixelated' }}
+            filter={sick ? `url(#${tintId})` : undefined} />
           <Accessory accessory={accessory} imageUrl={accessoryImageUrl} r={spriteRig()} />
         </g>
       </svg>

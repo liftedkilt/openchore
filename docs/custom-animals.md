@@ -19,8 +19,9 @@ The picture is shown with hard pixel edges, never smoothed, so pixel art stays
 crisp. Scaling a big picture down picks pixels without blending for the same
 reason: a 640 × 640 export of 64 × 64 pixel art comes back exactly as drawn.
 
-One picture is all there is. The app makes it bob as it walks, fades it when
-the animal is sick, and squashes it flat when it's too sick to stand. A hiding
+One picture is all there is. The app makes it bob as it walks, tints it green
+when the animal is sick (more strongly when it's very sick), and squashes it
+flat when it's too sick to stand. A hiding
 animal is in its shelter, so it needs no picture.
 
 ### Where accessories go
