@@ -68,6 +68,21 @@ func TestPetsOffByDefault(t *testing.T) {
 	}
 }
 
+// A farm that's on but has no animals yet lists [] rather than null; the web
+// app reads the list without a nil check.
+func TestEmptyFarmListsNoPets(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kid := env.createChild(t, "Kid")
+	env.enablePets(t)
+	resp := env.expectStatus(t, "GET", "/api/pets", nil, childHeaders(kid), http.StatusOK)
+	var farm map[string]any
+	decodeBody(t, resp, &farm)
+	if pets, ok := farm["pets"].([]any); !ok || len(pets) != 0 {
+		t.Fatalf("empty farm pets = %#v, want []", farm["pets"])
+	}
+}
+
 func TestPetAdoptFarmAndCare(t *testing.T) {
 	env := setupTest(t)
 	env.createAdmin(t)
