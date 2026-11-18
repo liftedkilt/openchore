@@ -88,7 +88,7 @@ is 66 and not 92. If she had skipped a "Make bed" instead, it would be
    are listed under "Getting started". With fewer chores, a single one swings
    the score too far.
 2. Higher share first. The exact fraction is compared, not the rounded score,
-   so 39 ÷ 59 ranks below 2 ÷ 3 even though both show 66 or 67.
+   so 2 ÷ 3 ranks just below 67 ÷ 100 even though both show 67.
 3. Then more bonus chores.
 4. Anyone still level shares a place.
 
@@ -96,8 +96,8 @@ is 66 and not 92. If she had skipped a "Make bed" instead, it would be
 
 - A kid with one chore a day reaches 100 more easily than a kid with eight.
   The chore count next to the score keeps that visible.
-- Changing a chore's point value mid-week changes the score for the days
-  recounted after the change (the last 7 finished days).
+- Changing a chore's point value mid-week changes that week's score, because
+  the last 7 finished days are recounted at the new value.
 - Each server reports its own numbers. There is no cheat detection; the
   parents are the referees.
 
