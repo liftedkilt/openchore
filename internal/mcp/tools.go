@@ -296,7 +296,8 @@ func allTools() []*Tool {
 		desc: "Say whether a person's own animal picture may be sent to linked friend families. A parent should have looked at the picture first; " +
 			"ask them before approving. It always shows on the family's own farm either way, and a new picture needs approving again.",
 		method: http.MethodPut, path: "/admin/users/{id}/pet/picture", required: []string{"approved"},
-		props: map[string]any{"id": integer("Person id."), "approved": boolean("May be sent to friend families.")}})
+		props: map[string]any{"id": integer("Person id."), "approved": boolean("May be sent to friend families."),
+			"sprite": str("The id of the picture the parent looked at (the pet's sprite from list_farm_pets); needed to approve, so a picture swapped since isn't approved unseen.")}})
 	add(endpoint{name: "remove_farm_pet_picture", title: "Remove a person's own animal picture",
 		desc:   "Take away the picture a person uploaded for their farm animal (a \"picture\" reward), e.g. if it isn't suitable. The animal goes back to its drawn look and keeps everything else. Confirm first.",
 		method: http.MethodDelete, path: "/admin/users/{id}/pet/picture",

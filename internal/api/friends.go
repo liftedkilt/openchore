@@ -139,10 +139,14 @@ func side(people, shareSum int) teamSide {
 
 // goalView is a team goal as one household sees it. State is "active" (both
 // families have the same goal for this week), "ours" (we put one forward and
-// they haven't agreed yet) or "theirs" (they did, and we haven't).
+// they haven't agreed yet), "theirs" (they did, and we haven't) or "differs"
+// (each put forward a different number).
 type goalView struct {
 	Target int    `json:"target"`
 	State  string `json:"state"`
+	// TheirTarget is set with state "differs": both families have put a
+	// number forward and they aren't the same. Target is ours.
+	TheirTarget int `json:"their_target,omitempty"`
 	// Met: the two families together are at or above the target. For a
 	// finished week that is the result; for this week, the score so far.
 	Met bool `json:"met"`
@@ -162,6 +166,8 @@ func goalFor(l *model.FriendLink, snap *model.FriendSnapshot, week string, toget
 	switch {
 	case ours > 0 && ours == theirs:
 		g.Target, g.State = ours, "active"
+	case ours > 0 && theirs > 0:
+		g.Target, g.State, g.TheirTarget = ours, "differs", theirs
 	case ours > 0:
 		g.Target, g.State = ours, "ours"
 	case theirs > 0:
@@ -187,7 +193,7 @@ func winners(entries []leaderboardEntry) map[string]bool {
 		return out
 	}
 	for _, e := range entries {
-		if e.Rank == 1 {
+		if e.Rank == 1 && e.Share > 0 { // a week where nobody did anything has no winner
 			out[e.Key] = true
 		}
 	}
@@ -232,7 +238,7 @@ func (h *FriendsHandler) standings(ctx context.Context, from string, withFriends
 		name := familyLabel(l.PeerName)
 		// The two families as teams: each side's numbers cover the people it
 		// shares with the other, so both households work out the same thing.
-		ours, err := h.svc.TeamWeek(ctx, l.ID, users, days, from)
+		ours, err := h.svc.TeamWeek(ctx, l, users, days, from)
 		if err != nil {
 			return nil, err
 		}
@@ -274,15 +280,17 @@ func (h *FriendsHandler) standings(ctx context.Context, from string, withFriends
 	return st, nil
 }
 
-// Ribbons returns who in this household is wearing the winner's ribbon this
-// week: whoever came first on last week's leaderboard (friends included in
-// the contest). Empty when the leaderboard is off.
+// Ribbons returns who in this household wears the winner's ribbon on the
+// public farm (and the wall display) this week: whoever came first among the
+// household last week. It deliberately leaves friend families out, so the
+// public farm says nothing about them; signed-in screens take the ribbon
+// from the full leaderboard instead. Empty when the leaderboard is off.
 func (h *FriendsHandler) Ribbons(ctx context.Context) map[int64]bool {
 	out := map[int64]bool{}
 	if v, _ := h.store.GetSetting(ctx, friends.SettingLeaderboard); v != "true" {
 		return out
 	}
-	prev, err := h.standings(ctx, score.WeekStart(h.svc.Now().AddDate(0, 0, -7)), true)
+	prev, err := h.standings(ctx, score.WeekStart(h.svc.Now().AddDate(0, 0, -7)), false)
 	if err != nil {
 		return out
 	}
@@ -356,7 +364,7 @@ func (h *FriendsHandler) Farms(w http.ResponseWriter, r *http.Request) {
 				Mood: p.Mood, Hiding: p.Hiding, Sick: p.Sick,
 				SpriteData: friends.PictureURL(p.Picture), SpriteFrames: p.Frames,
 				Ribbon: won[fmt.Sprintf("f%d:%s", l.ID, m.ID)], FriendKey: fmt.Sprintf("f%d:%s", l.ID, m.ID),
-				Items:  []string{}, OwnerName: m.Name, OwnerColor: m.Color,
+				Items: []string{}, OwnerName: m.Name, OwnerColor: m.Color,
 			})
 		}
 		farms = append(farms, map[string]any{"link_id": l.ID, "family": familyLabel(l.PeerName), "snapshot_at": l.SnapshotAt, "pets": pets})

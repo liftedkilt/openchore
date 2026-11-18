@@ -2,7 +2,7 @@
 // The business rules live on the server; this keeps the old dashboard's
 // client behaviour: double-tap guards, photo flow fallbacks,
 // optimistic auto-save and the same error toasts.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, APIError } from '../../api';
 import type {
@@ -307,10 +307,20 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
     }
   }, [showToast, loadExtras, t]);
 
+  // The farm as a signed-in person sees it: the family's animals, with the
+  // winner's ribbon taken from the full leaderboard (friends included; the
+  // public farm only knows the household's own), plus friends' animals here
+  // on a playdate.
+  const farmPets = useMemo(() => {
+    const winners = new Set((leaderboard?.entries ?? []).filter(e => e.winner && e.user_id).map(e => e.user_id));
+    const own = (farm?.pets ?? []).map(p => (leaderboard?.enabled ? { ...p, ribbon: winners.has(p.user_id) } : p));
+    return [...own, ...visitors];
+  }, [farm, leaderboard, visitors]);
+
   return {
     today, chores, weekChores, streak, points, rewards, redemptions, people,
     farm, myPet: farm?.pets.find(p => p.user_id === userId) ?? null,
-    leaderboard, visitors, gifts,
+    leaderboard, visitors, gifts, farmPets,
     togglingIds, toast, showToast,
     reloadChores, refreshAll, loadRewards, loadExtras, toggle,
     commitmentFor, redeem, redeemingId, redeemedId, saveToward, savingTowardId,

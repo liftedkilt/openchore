@@ -300,13 +300,30 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 			}
 		}()
 	}
+	// A gift or playdate is recorded first, where today's limit is enforced,
+	// and taken back if paying fails: never charged for and not sent.
+	if choice != nil && choice.send != nil {
+		msg, err := h.pets.Friends.ReserveSend(r.Context(), user.ID, choice.send)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to send")
+			return
+		}
+		if msg != "" {
+			writeError(w, http.StatusUnprocessableEntity, msg)
+			return
+		}
+	}
 	redemption, err := h.store.RedeemReward(r.Context(), user.ID, rewardID)
 	if err != nil {
 		if choice != nil {
 			choice.item = ""
+			h.pets.Friends.CancelSend(r.Context(), choice.send)
 		}
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
+	}
+	if choice != nil && choice.send != nil {
+		h.pets.Friends.ConfirmSend(r.Context(), choice.send, redemption.ID)
 	}
 	if petReward != nil {
 		if err := h.pets.applyPetReward(r.Context(), user.ID, petReward, choice); err != nil {
@@ -340,6 +357,13 @@ func (h *RewardHandler) UndoRedemption(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.UndoRedemption(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to undo redemption")
 		return
+	}
+	// A gift or playdate it paid for is taken back too (one that has
+	// already arrived at the other family stays arrived).
+	if h.pets != nil && h.pets.Friends != nil {
+		if err := h.pets.Friends.UndoSend(r.Context(), id); err != nil {
+			log.Printf("rewards: redemption %d undone but its gift or playdate wasn't taken back: %v", id, err)
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -28,8 +28,8 @@ interface FarmSheetProps {
 
 export function FarmSheet({ user, data, onClose }: FarmSheetProps) {
   const { t } = useTranslation();
-  // Friends' animals here on a playdate join the family's own on the farm.
-  const pets = [...(data.farm?.pets ?? []), ...data.visitors];
+  // The family's animals, plus friends' animals here on a playdate.
+  const pets = data.farmPets;
   const mine = data.myPet;
   const [selected, setSelected] = useState<Pet | null>(null);
   const other = selected && selected.user_id !== user.id ? pets.find(p => p.id === selected.id) ?? null : null;

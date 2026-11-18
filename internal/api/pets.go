@@ -405,18 +405,37 @@ func (h *PetHandler) ApprovePicture(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		Approved *bool `json:"approved"`
+		// Sprite is the id of the picture the parent was looking at. If
+		// the kid has changed it since, nothing is approved.
+		Sprite string `json:"sprite"`
 	}
 	if err := decodeJSON(r, &req); err != nil || req.Approved == nil {
 		writeError(w, http.StatusBadRequest, "approved (true or false) is required")
 		return
 	}
-	found, err := h.store.SetPetSpriteApproved(r.Context(), id, *req.Approved)
+	p, err := h.store.GetPetForUser(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load pet")
+		return
+	}
+	if p == nil || p.Sprite == "" {
+		writeError(w, http.StatusNotFound, "that person's animal has no picture of its own")
+		return
+	}
+	if req.Sprite == "" {
+		req.Sprite = p.Sprite
+		if *req.Approved {
+			writeError(w, http.StatusBadRequest, "sprite (the id of the picture you looked at) is required to approve it")
+			return
+		}
+	}
+	found, err := h.store.SetPetSpriteApproved(r.Context(), id, req.Sprite, *req.Approved)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save")
 		return
 	}
 	if !found {
-		writeError(w, http.StatusNotFound, "that person's animal has no picture of its own")
+		writeError(w, http.StatusConflict, "the picture has changed since you looked at it; have another look first")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"id": id, "approved": *req.Approved})
@@ -557,13 +576,11 @@ func (h *PetHandler) applyPetReward(ctx context.Context, userID int64, rw *model
 	case model.PetActionDesign:
 		return h.store.AddPetItem(ctx, userID, choice.item)
 	case model.PetActionGift:
-		// The treat goes to the friend's animal, not this one.
-		return h.Friends.RecordSend(ctx, userID, choice.send)
+		// The treat goes to the friend's animal, not this one. It was
+		// recorded before the points moved (see Redeem).
+		return nil
 	case model.PetActionPlaydate:
 		// A day out: the animal comes home happier.
-		if err := h.Friends.RecordSend(ctx, userID, choice.send); err != nil {
-			return err
-		}
 		return h.store.AdjustPetNeeds(ctx, userID, 0, playdateJoy)
 	case model.PetActionPicture:
 		old, err := h.store.SetPetSprite(ctx, userID, choice.item, choice.frames)

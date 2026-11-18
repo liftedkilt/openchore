@@ -129,7 +129,8 @@ parents** have said so:
 
 1. **The sending parent approves it.** In Settings → Farm pets, tick "OK to
    send to friend families" next to the animal, after looking at the picture.
-   A new picture needs approving again. This never affects your own farm,
+   A new picture needs approving again, and a tick only counts for the
+   picture that was on screen when you ticked it. This never affects your own farm,
    where the picture shows either way.
 2. **The receiving parent opts in.** Under the linked family in Settings,
    "Show custom animal pictures from …" is off until they tick it. While it

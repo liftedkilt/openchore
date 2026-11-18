@@ -62,8 +62,13 @@ CREATE TABLE friend_sends (
     from_user  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     to_member  TEXT    NOT NULL DEFAULT '', -- gift: whose animal, by their snapshot id
     day        TEXT    NOT NULL,
+    redemption_id INTEGER NOT NULL DEFAULT 0, -- the reward redemption that paid for it (undo takes it back)
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- The daily limits, enforced by the table so two taps at once can't both get
+-- through: one treat per friend's animal per day, one playdate per day.
+CREATE UNIQUE INDEX idx_friend_sends_gift ON friend_sends(from_user, link_id, to_member, day) WHERE kind = 'gift';
+CREATE UNIQUE INDEX idx_friend_sends_playdate ON friend_sends(from_user, day) WHERE kind = 'playdate';
 CREATE TABLE friend_received (
     link_id     INTEGER NOT NULL REFERENCES friend_links(id) ON DELETE CASCADE,
     send_id     TEXT    NOT NULL,

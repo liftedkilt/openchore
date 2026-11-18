@@ -708,7 +708,8 @@
         "approve": "Darf an befreundete Familien gesendet werden",
         "approveTitle": "Kreuze das an, wenn du dir das Bild angesehen hast. Auf eurem eigenen Hof wird es immer gezeigt; hier entscheidest du nur, ob es an verbundene Familien gesendet werden darf.",
         "approved": "Das Bild von {{name}} darf jetzt an befreundete Familien gesendet werden.",
-        "unapproved": "Das Bild von {{name}} wird nicht mehr an befreundete Familien gesendet."
+        "unapproved": "Das Bild von {{name}} wird nicht mehr an befreundete Familien gesendet.",
+        "pictureChanged": "Das Bild wurde inzwischen geändert. Sieh es dir noch einmal an und kreuze es dann an."
       },
       "friends": {
         "title": "Rangliste & befreundete Familien",
@@ -778,7 +779,8 @@
         "goalDrop": "Ziel verwerfen",
         "goalInput": "Zielwertung, 1 bis 100",
         "goalSaved": "Ziel gespeichert.",
-        "goalDropped": "Ziel verworfen."
+        "goalDropped": "Ziel verworfen.",
+        "goalDiffers": "Ihr habt {{target}} vorgeschlagen, {{family}} hat {{theirs}} vorgeschlagen. Stimmt ihrem Vorschlag zu oder ändert euren."
       }
     },
     "skins": {

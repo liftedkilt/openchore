@@ -6,5 +6,6 @@
 ALTER TABLE pets ADD COLUMN sprite TEXT NOT NULL DEFAULT '';
 ALTER TABLE pets ADD COLUMN sprite_frames INTEGER NOT NULL DEFAULT 1;
 -- A parent has looked at the picture and said it may be sent to friend
--- families. Cleared whenever the picture changes.
+-- families. Cleared whenever the picture changes, and given for one
+-- particular picture (the id the parent was looking at).
 ALTER TABLE pets ADD COLUMN sprite_approved INTEGER NOT NULL DEFAULT 0;

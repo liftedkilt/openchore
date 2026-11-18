@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
-import { api } from '../../api';
+import { api, APIError } from '../../api';
 import type { Pet } from '../../types';
 import { FarmAnimal, petPicture } from '../../pages/kid/farm/FarmAnimal';
 import { FormMessage } from './FormMessage';
@@ -40,11 +40,13 @@ export const FarmPetsSection: React.FC = () => {
 
   const approvePicture = async (p: Pet, approved: boolean) => {
     try {
-      await api.pets.approvePicture(p.user_id, approved);
+      await api.pets.approvePicture(p.user_id, approved, p.sprite);
       setMessage({ type: 'success', text: t(approved ? 'admin.settingsTab.pets.approved' : 'admin.settingsTab.pets.unapproved', { name: p.name }) });
       load();
-    } catch {
-      setMessage({ type: 'error', text: t('admin.settingsTab.pets.failed') });
+    } catch (e) {
+      // 409: the kid changed the picture while this page was open.
+      setMessage({ type: 'error', text: e instanceof APIError && e.status === 409 ? t('admin.settingsTab.pets.pictureChanged') : t('admin.settingsTab.pets.failed') });
+      load();
     }
   };
 

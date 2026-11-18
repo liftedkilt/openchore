@@ -183,10 +183,12 @@ func (s *Store) SetPetSprite(ctx context.Context, userID int64, id string, frame
 }
 
 // SetPetSpriteApproved records whether a parent has said the person's
-// picture may be sent to friend families. It reports whether there is a
-// picture to approve.
-func (s *Store) SetPetSpriteApproved(ctx context.Context, userID int64, approved bool) (bool, error) {
-	res, err := s.db.ExecContext(ctx, `UPDATE pets SET sprite_approved = ? WHERE user_id = ? AND sprite != ''`, approved, userID)
+// picture (the one with this id) may be sent to friend families. It reports
+// whether that picture is still the person's.
+func (s *Store) SetPetSpriteApproved(ctx context.Context, userID int64, sprite string, approved bool) (bool, error) {
+	// For the picture the parent was looking at: if the kid has swapped it
+	// since, this matches nothing rather than approving one nobody has seen.
+	res, err := s.db.ExecContext(ctx, `UPDATE pets SET sprite_approved = ? WHERE user_id = ? AND sprite != '' AND sprite = ?`, approved, userID, sprite)
 	if err != nil {
 		return false, err
 	}

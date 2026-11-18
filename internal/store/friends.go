@@ -227,11 +227,35 @@ func (s *Store) SetFriendAllowVisits(ctx context.Context, id int64, allow bool) 
 
 // --- Gifts and playdates ---
 
-// AddFriendSend records a gift or playdate a person here sent.
-func (s *Store) AddFriendSend(ctx context.Context, linkID int64, send model.FriendSend, fromUser int64) error {
-	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO friend_sends (id, link_id, kind, from_user, to_member, day) VALUES (?, ?, ?, ?, ?, ?)`,
+// AddFriendSend records a gift or playdate a person here is sending. It
+// reports false, without recording, when today's limit for it is already
+// used (the table's unique indexes decide, so two requests at once can't
+// both get through).
+func (s *Store) AddFriendSend(ctx context.Context, linkID int64, send model.FriendSend, fromUser int64) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`INSERT OR IGNORE INTO friend_sends (id, link_id, kind, from_user, to_member, day) VALUES (?, ?, ?, ?, ?, ?)`,
 		send.ID, linkID, send.Kind, fromUser, send.To, send.Day)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// SetFriendSendRedemption notes which redemption paid for a send.
+func (s *Store) SetFriendSendRedemption(ctx context.Context, sendID string, redemptionID int64) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE friend_sends SET redemption_id = ? WHERE id = ?`, redemptionID, sendID)
+	return err
+}
+
+// DeleteFriendSend takes back a send by its id, or (id "") the one a
+// redemption paid for.
+func (s *Store) DeleteFriendSend(ctx context.Context, sendID string, redemptionID int64) error {
+	if sendID != "" {
+		_, err := s.db.ExecContext(ctx, `DELETE FROM friend_sends WHERE id = ?`, sendID)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM friend_sends WHERE redemption_id = ? AND redemption_id != 0`, redemptionID)
 	return err
 }
 

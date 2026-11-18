@@ -566,7 +566,7 @@ func TestFriendPicturesNeedBothParents(t *testing.T) {
 		t.Cleanup(func() { os.Remove("data/uploads/pets/" + id + ".png") })
 		return id
 	}
-	upload()
+	first := upload()
 	approve := fmt.Sprintf("/api/admin/users/%d/pet/picture", ava)
 	bothSync := func() {
 		t.Helper()
@@ -586,8 +586,9 @@ func TestFriendPicturesNeedBothParents(t *testing.T) {
 		t.Fatalf("an unapproved picture was sent: %v", p)
 	}
 	// A kid can't approve their own; a parent can.
-	a.expectStatus(t, "PUT", approve, map[string]any{"approved": true}, childHeaders(ava), http.StatusForbidden)
-	a.expectStatus(t, "PUT", approve, map[string]any{"approved": true}, adminHeaders(), http.StatusOK)
+	a.expectStatus(t, "PUT", approve, map[string]any{"approved": true, "sprite": first}, childHeaders(ava), http.StatusForbidden)
+	a.expectStatus(t, "PUT", approve, map[string]any{"approved": true}, adminHeaders(), http.StatusBadRequest) // which picture?
+	a.expectStatus(t, "PUT", approve, map[string]any{"approved": true, "sprite": first}, adminHeaders(), http.StatusOK)
 	bothSync()
 	p := theirPet()
 	if data, _ := p["sprite_data"].(string); !strings.HasPrefix(data, "data:image/png;base64,") || p["sprite_frames"] != 3.0 || p["species"] != "dog" {
@@ -602,10 +603,15 @@ func TestFriendPicturesNeedBothParents(t *testing.T) {
 	if p := theirPet(); p["sprite_data"] == nil {
 		t.Fatalf("picture didn't come back when B turned pictures on again: %v", p)
 	}
-	// A new picture needs approving again.
+	// A new picture needs approving again, and a tick meant for the old
+	// one (a settings page left open) doesn't approve it unseen.
 	upload()
 	if a.myPet(t, ava)["sprite_approved"] != nil {
 		t.Fatal("a new picture kept the old one's approval")
+	}
+	a.expectStatus(t, "PUT", approve, map[string]any{"approved": true, "sprite": first}, adminHeaders(), http.StatusConflict)
+	if a.myPet(t, ava)["sprite_approved"] != nil {
+		t.Fatal("a tick for the old picture approved the new one")
 	}
 	bothSync()
 	if p := theirPet(); p["sprite_data"] != nil {
@@ -613,7 +619,7 @@ func TestFriendPicturesNeedBothParents(t *testing.T) {
 	}
 	// Approving when there's no picture makes no sense.
 	a.expectStatus(t, "PATCH", "/api/me/pet", map[string]any{"sprite": ""}, childHeaders(ava), http.StatusOK)
-	a.expectStatus(t, "PUT", approve, map[string]any{"approved": true}, adminHeaders(), http.StatusNotFound)
+	a.expectStatus(t, "PUT", approve, map[string]any{"approved": true, "sprite": first}, adminHeaders(), http.StatusNotFound)
 }
 
 // lastWeekDay stores one finished day in last week for a person.
@@ -681,6 +687,7 @@ func TestFriendTeamsAndGoal(t *testing.T) {
 	}
 	a.lastWeekDay(t, ava, 5, 4) // 80
 	b.lastWeekDay(t, bo, 5, 5)  // 100
+	b.createChild(t, "Unshared")
 	bothSync := func() {
 		t.Helper()
 		for i := 0; i < 2; i++ {
@@ -701,6 +708,17 @@ func TestFriendTeamsAndGoal(t *testing.T) {
 		s := m[k].(map[string]any)
 		return fmt.Sprintf("%v/%v", s["people"], s["score"])
 	}
+	// A hasn't ticked Bo yet: B's team total would be exactly Bo's score, so
+	// it isn't sent, and A's own team only counts people B shows (Ava).
+	if at := team(a, "last"); score(at, "theirs") != "0/0" || score(at, "ours") != "1/80" {
+		t.Fatalf("before A accepted Bo: %v", at)
+	}
+	if stored := a.storedSnapshot(t); strings.Contains(stored, `"share_sum":10000`) {
+		t.Fatalf("A holds a team total that gives away an unaccepted person's score: %s", stored)
+	}
+	a.expectStatus(t, "PUT", aPath, map[string]any{"accept_member_ids": []string{fmt.Sprint(bo)}}, adminHeaders(), http.StatusOK)
+	bothSync() // B learns that A shows Bo...
+	bothSync() // ...and its next snapshot counts him in its team
 	at, bt := team(a, "last"), team(b, "last")
 	if score(at, "ours") != "1/80" || score(at, "theirs") != "1/100" || score(at, "together") != "2/90" {
 		t.Fatalf("A's view of last week's teams: %v", at)
@@ -734,6 +752,15 @@ func TestFriendTeamsAndGoal(t *testing.T) {
 	}
 	if g := team(a, "this")["goal"].(map[string]any); g["state"] != "active" || g["met"] != false {
 		t.Fatalf("this week's goal on the leaderboard: %v", g)
+	}
+	// A different number from each side: each sees the other's, so one can agree.
+	b.expectStatus(t, "PUT", bPath, map[string]any{"goal_target": 70}, adminHeaders(), http.StatusOK)
+	bothSync()
+	their := func(e *testEnv) any {
+		return e.getJSON(t, "/api/admin/friends", adminHeaders())["links"].([]any)[0].(map[string]any)["goal"].(map[string]any)["their_target"]
+	}
+	if goal(a) != "differs 85" || their(a) != 70.0 || goal(b) != "differs 70" || their(b) != 85.0 {
+		t.Fatalf("differing goals: A=%q (%v) B=%q (%v)", goal(a), their(a), goal(b), their(b))
 	}
 	// Either side can drop it.
 	b.expectStatus(t, "PUT", bPath, map[string]any{"goal_target": 0}, adminHeaders(), http.StatusOK)
@@ -828,13 +855,75 @@ func TestFriendGiftsAndPlaydates(t *testing.T) {
 		t.Fatalf("the public farm shows visitors: %v", pets)
 	}
 
-	// A's parent turns visits off: no visitors, and later gifts don't land.
+	// Undoing the redemption takes an unsent gift back with the points.
+	theo := b.createChild(t, "Theo")
+	b.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Socks", "species": "cat"}, childHeaders(theo), http.StatusCreated)
+	b.expectStatus(t, "POST", "/api/points/adjust", map[string]any{"user_id": theo, "amount": 100, "note": "seed"}, adminHeaders(), http.StatusNoContent)
+	b.expectStatus(t, "PUT", bPath, map[string]any{"share_user_ids": []int{bo, theo}}, adminHeaders(), http.StatusOK)
+	bothSync()
+	a.expectStatus(t, "PUT", aPath, map[string]any{"accept_member_ids": []string{fmt.Sprint(bo), fmt.Sprint(theo)}}, adminHeaders(), http.StatusOK)
+	bothSync()
+	resp := b.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", gift), map[string]any{"pet": map[string]any{"friend": avaKey}}, childHeaders(theo), http.StatusCreated)
+	var redemption map[string]any
+	decodeBody(t, resp, &redemption)
+	b.expectStatus(t, "DELETE", fmt.Sprintf("/api/redemptions/%d", int(redemption["id"].(float64))), nil, adminHeaders(), http.StatusNoContent)
+	var left int
+	if err := b.db.QueryRow(`SELECT COUNT(*) FROM friend_sends WHERE from_user = ?`, theo).Scan(&left); err != nil || left != 0 {
+		t.Fatalf("an undone gift is still queued to send: %d %v", left, err)
+	}
+
+	// Two taps at once: the limit holds and only one is paid for.
+	b.db.Exec(`DELETE FROM friend_sends WHERE kind = 'playdate'`)
+	before = b.balance(t, theo)
+	codes := make(chan int, 6)
+	for i := 0; i < 6; i++ {
+		go func() {
+			r := b.request(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", playdate), map[string]any{"pet": link}, childHeaders(theo))
+			r.Body.Close()
+			codes <- r.StatusCode
+		}()
+	}
+	created := 0
+	for i := 0; i < 6; i++ {
+		if <-codes == http.StatusCreated {
+			created++
+		}
+	}
+	if created != 1 || b.balance(t, theo) != before-15 {
+		t.Fatalf("six playdates at once: %d went through, balance %d -> %d", created, before, b.balance(t, theo))
+	}
+
+	// Something that arrived isn't applied again later: not after it has
+	// been forgotten here, and not from a snapshot that has gone stale.
+	bothSync()
+	a.db.Exec(`UPDATE pets SET joy = 10`)
+	a.db.Exec(`UPDATE friend_received SET received_on = date('now', '-8 days')`)
+	b.db.Exec(`UPDATE friend_sends SET day = date('now', '-8 days')`)
+	bothSync()
+	if joy() != 10 {
+		t.Fatalf("an old gift was applied again: joy %v", joy())
+	}
+	if v := a.getJSON(t, "/api/friends/visitors", childHeaders(ava))["visitors"].([]any); len(v) != 0 {
+		t.Fatalf("an old playdate still has a visitor here: %v", v)
+	}
+	b.db.Exec(`DELETE FROM friend_sends`)
+
+	// A's parent turns visits off: B's kids are told, and aren't charged.
 	a.expectStatus(t, "PUT", aPath, map[string]any{"allow_visits": false}, adminHeaders(), http.StatusOK)
+	bothSync()
+	before = b.balance(t, bo)
+	if msg := redeem(gift, map[string]any{"friend": avaKey}, http.StatusUnprocessableEntity); !strings.Contains(msg, "aren't taking treats") || b.balance(t, bo) != before {
+		t.Fatalf("gift while A isn't taking them: %q, balance %d -> %d", msg, before, b.balance(t, bo))
+	}
 	if v := a.getJSON(t, "/api/friends/visitors", childHeaders(ava))["visitors"].([]any); len(v) != 0 {
 		t.Fatalf("visitors after A turned visits off: %v", v)
 	}
 	// However many gifts the other server claims, an animal takes three a day from one family.
 	a.expectStatus(t, "PUT", aPath, map[string]any{"allow_visits": true}, adminHeaders(), http.StatusOK)
+	bothSync()
+	if _, err := b.db.Exec(`DROP INDEX idx_friend_sends_gift`); err != nil { // B's server stops playing by the rules
+		t.Fatal(err)
+	}
 	for i := 0; i < 6; i++ {
 		if _, err := b.db.Exec(`INSERT INTO friend_sends (id, link_id, kind, from_user, to_member, day) VALUES (?, 1, 'gift', ?, ?, ?)`,
 			fmt.Sprintf("flood%d", i), bo, fmt.Sprint(ava), time.Now().Format("2006-01-02")); err != nil {
@@ -842,8 +931,9 @@ func TestFriendGiftsAndPlaydates(t *testing.T) {
 		}
 	}
 	a.db.Exec(`UPDATE pets SET joy = 0`)
+	a.db.Exec(`DELETE FROM friend_received`)
 	bothSync()
-	if joy() != 40 { // two more on top of the first
-		t.Fatalf("joy after a flood of gifts = %v, want 40 (three gifts a day at most)", joy())
+	if joy() != 60 { // three, however many were claimed
+		t.Fatalf("joy after a flood of gifts = %v, want 60 (three gifts a day at most)", joy())
 	}
 }

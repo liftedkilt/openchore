@@ -657,7 +657,7 @@ export interface Leaderboard {
 }
 
 export interface TeamSide { people: number; score: number }
-export interface TeamGoal { target: number; state: 'active' | 'ours' | 'theirs'; met: boolean }
+export interface TeamGoal { target: number; state: 'active' | 'ours' | 'theirs' | 'differs'; their_target?: number; met: boolean }
 export interface LeaderboardTeam { link_id: number; family: string; ours: TeamSide; theirs: TeamSide; together: TeamSide; goal?: TeamGoal }
 
 /** A treat a friend sent one of this household's animals today. */

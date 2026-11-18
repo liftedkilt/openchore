@@ -26,18 +26,22 @@ function GoalRow({ link, busy, tt, onSet }: {
         {!g ? tt('goalNone')
           : g.state === 'active' ? tt('goalActive', { target: g.target, family })
           : g.state === 'ours' ? tt('goalOurs', { target: g.target, family })
+          : g.state === 'differs' ? tt('goalDiffers', { target: g.target, theirs: g.their_target, family })
           : tt('goalTheirs', { target: g.target, family })}
       </p>
       <div className={ff.inline}>
         {g?.state === 'theirs' && (
           <button type="button" className={ui.btnPrimary} disabled={busy} onClick={() => onSet(g.target)}>{tt('goalAgree', { target: g.target })}</button>
         )}
+        {g?.state === 'differs' && g.their_target && (
+          <button type="button" className={ui.btnPrimary} disabled={busy} onClick={() => onSet(g.their_target ?? 0)}>{tt('goalAgree', { target: g.their_target })}</button>
+        )}
         {g?.state !== 'active' && (
           <>
             <input className={clsx(ui.input, ff.goalInput)} type="number" min={1} max={100} value={target}
               aria-label={tt('goalInput')} onChange={e => setTarget(Number(e.target.value))} />
             <button type="button" className={ui.btn} disabled={busy || !(target >= 1 && target <= 100)} onClick={() => onSet(target)}>
-              {tt(g?.state === 'ours' ? 'goalChange' : 'goalPropose')}
+              {tt(g?.state === 'ours' || g?.state === 'differs' ? 'goalChange' : 'goalPropose')}
             </button>
           </>
         )}

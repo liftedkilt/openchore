@@ -102,7 +102,9 @@ next week: a rosette by their name on the leaderboard and on their animal's
 name tag on the farm. Ties share it. There has to be someone to beat: with
 only one ranked person there is no ribbon. "First" means first on your own
 leaderboard, friends included; a friend who wins wears the ribbon when you
-visit their farm.
+visit their farm. A week in which nobody scored has no winner. The wall
+display and the public farm aren't signed in, so there the ribbon goes to the
+best of this household alone.
 
 ### What it doesn't fix
 
@@ -201,8 +203,11 @@ chores and points).
 ### Families as teams, and a goal together
 
 Two linked families are also two teams. The leaderboard shows each family's
-score for the week (the average of the people it shares with the other, among
-those who had chores) and the two together.
+score for the week and the two together. A family's team is the people it
+shares with the other family *that the other family has chosen to show*, among
+those who had chores: a team total never covers someone the other parent
+hasn't ticked, since it would give that person's score away. After a tick it
+takes a couple of syncs for both sides to count the same people.
 
 Either parent can put forward a **team goal** for the week: the score both
 families aim to average *together*, from 1 to 100. It is set under the linked
@@ -211,6 +216,9 @@ until then each side sees "waiting for them" or "they put forward 85". The
 leaderboard then shows progress ("Both families together: 78 of 85") and, when
 the week is over, whether it was reached. A goal is for one week; either side
 can drop it.
+
+If each parent puts forward a different number, both see the other's and
+either can agree to it.
 
 It is a combined score, not a count of chores, so a family with more chores
 doesn't carry more of it. Each family works its side out from the people it
@@ -230,10 +238,17 @@ there is a friend's animal to send them to.
 - **Both parents' ticks apply here too.** A gift or a visit only goes between
   people each family has picked: the sender must be shared with that family
   and shown by them.
-- **Each arrives once**, however often the families sync, and an animal takes
-  at most three treats a day from one family, whatever the other server says.
+- **Each arrives once**, however often the families sync. Only something sent
+  in the last couple of days is taken, so a family whose server has gone quiet
+  can't have an old treat applied again or leave an animal visiting for good.
+- **Limits hold on both sides.** One treat per friend's animal per day and one
+  playdate per day for the sender (two taps at once can't both get through),
+  and an animal takes at most three treats a day from one family, whatever
+  the other server says.
 - **A parent can turn them off** per family ("Take gifts and playdates from
-  …", on by default).
+  …", on by default). The other family's kids are told and aren't charged.
+- **Undoing the redemption** takes back a treat or visit that hasn't been
+  picked up yet, along with the points. One that has already arrived stays.
 - **Visiting animals are for signed-in family members.** They aren't on the
   wall display or the public farm.
 

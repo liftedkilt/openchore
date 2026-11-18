@@ -316,9 +316,10 @@ export const api = {
     }),
     remove: (userId: number) => fetchWithAuth(`/admin/users/${userId}/pet`, { method: 'DELETE' }),
     removePicture: (userId: number) => fetchWithAuth(`/admin/users/${userId}/pet/picture`, { method: 'DELETE' }),
-    approvePicture: (userId: number, approved: boolean) => fetchWithAuth(`/admin/users/${userId}/pet/picture`, {
+    // sprite: the id of the picture the parent is looking at, so one swapped since isn't approved unseen.
+    approvePicture: (userId: number, approved: boolean, sprite?: string) => fetchWithAuth(`/admin/users/${userId}/pet/picture`, {
       method: 'PUT',
-      body: JSON.stringify({ approved }),
+      body: JSON.stringify({ approved, sprite }),
     }),
   },
   commitments: {

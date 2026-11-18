@@ -726,6 +726,9 @@ type FriendSnapshot struct {
 	Team []FriendTeamWeek `json:"team,omitempty"`
 	// Goal is the team goal this family has put forward or agreed to.
 	Goal *FriendGoal `json:"goal,omitempty"`
+	// NoVisits: this family isn't taking gifts or playdates from the
+	// receiver, so there is no point sending (or charging for) one.
+	NoVisits bool `json:"no_visits,omitempty"`
 	// Sends are the gifts and playdates people here sent this family in the
 	// last two days. The receiver applies each once, by ID.
 	Sends []FriendSend `json:"sends,omitempty"`

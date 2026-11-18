@@ -345,13 +345,18 @@ func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnap
 		snap.Accepted = append(snap.Accepted, id)
 	}
 	sort.Strings(snap.Accepted)
-	if l, err := f.store.GetFriendLink(ctx, linkID); err != nil {
+	link, err := f.store.GetFriendLink(ctx, linkID)
+	if err != nil {
 		return nil, err
-	} else if l != nil && l.GoalTarget > 0 && l.GoalWeek != "" {
-		snap.Goal = &model.FriendGoal{Start: l.GoalWeek, Target: l.GoalTarget}
+	}
+	if link != nil && link.GoalTarget > 0 && link.GoalWeek != "" {
+		snap.Goal = &model.FriendGoal{Start: link.GoalWeek, Target: link.GoalTarget}
 	}
 	if snap.Sends, err = f.store.FriendSendsSince(ctx, linkID, now.AddDate(0, 0, -1).Format(model.DateFormat)); err != nil {
 		return nil, err
+	}
+	if link != nil {
+		snap.NoVisits = !link.AllowVisits
 	}
 	shared, err := f.store.FriendLinkShares(ctx, linkID)
 	if err != nil || len(shared) == 0 {
@@ -375,20 +380,11 @@ func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnap
 			pets[all[i].UserID] = &all[i]
 		}
 	}
-	// The team: everyone shared with this family who had chores that week.
-	weekStarts := []string{score.WeekStart(now.AddDate(0, 0, -7)), score.WeekStart(now)}
-	for _, start := range weekStarts {
-		tw := model.FriendTeamWeek{Start: start}
-		for _, u := range users {
-			if !shared[u.ID] {
-				continue
-			}
-			if t := score.Sum(days[u.ID], start, score.WeekEnd(start)); t.Assigned > 0 {
-				tw.People++
-				tw.ShareSum += t.Share
-			}
-		}
-		snap.Team = append(snap.Team, tw)
+	// The team: the people shared with this family that it has chosen to
+	// show, who had chores that week. A total never covers someone the
+	// other parent hasn't accepted (it would give their score away).
+	for _, start := range []string{score.WeekStart(now.AddDate(0, 0, -7)), score.WeekStart(now)} {
+		snap.Team = append(snap.Team, teamWeek(users, days, teamOf(shared, link), start))
 	}
 	yesterday := now.AddDate(0, 0, -1).Format(model.DateFormat)
 	pictureBytes := 0
@@ -445,17 +441,27 @@ func Shown(snap *model.FriendSnapshot, accepts map[string]bool) []model.FriendMe
 	return out
 }
 
-// TeamWeek is how the people this household shares with a link did together
-// in the week starting start: the same numbers its snapshot sends, so both
-// families work out the same team scores.
-func (f *Service) TeamWeek(ctx context.Context, linkID int64, users []model.User, days map[int64][]model.ScoreDay, start string) (model.FriendTeamWeek, error) {
-	tw := model.FriendTeamWeek{Start: start}
-	shared, err := f.store.FriendLinkShares(ctx, linkID)
-	if err != nil {
-		return tw, err
+// teamOf is who plays for this household against a linked family: the people
+// shared with that family whom the family has chosen to show.
+func teamOf(shared map[int64]bool, l *model.FriendLink) map[int64]bool {
+	team := map[int64]bool{}
+	if l == nil {
+		return team
 	}
+	if snap := PeerSnapshot(l); snap != nil {
+		for _, id := range snap.Accepted {
+			if uid, err := strconv.ParseInt(id, 10, 64); err == nil && shared[uid] {
+				team[uid] = true
+			}
+		}
+	}
+	return team
+}
+
+func teamWeek(users []model.User, days map[int64][]model.ScoreDay, team map[int64]bool, start string) model.FriendTeamWeek {
+	tw := model.FriendTeamWeek{Start: start}
 	for _, u := range users {
-		if !shared[u.ID] {
+		if !team[u.ID] {
 			continue
 		}
 		if t := score.Sum(days[u.ID], start, score.WeekEnd(start)); t.Assigned > 0 {
@@ -463,7 +469,18 @@ func (f *Service) TeamWeek(ctx context.Context, linkID int64, users []model.User
 			tw.ShareSum += t.Share
 		}
 	}
-	return tw, nil
+	return tw
+}
+
+// TeamWeek is how this household's team against a linked family did in the
+// week starting start: the same numbers its snapshot sends, so both families
+// work out the same team scores.
+func (f *Service) TeamWeek(ctx context.Context, l *model.FriendLink, users []model.User, days map[int64][]model.ScoreDay, start string) (model.FriendTeamWeek, error) {
+	shared, err := f.store.FriendLinkShares(ctx, l.ID)
+	if err != nil {
+		return model.FriendTeamWeek{Start: start}, err
+	}
+	return teamWeek(users, days, teamOf(shared, l), start), nil
 }
 
 // PeerSnapshot decodes a link's stored snapshot of the other family (nil if
@@ -866,9 +883,32 @@ func (f *Service) receive(ctx context.Context, l *model.FriendLink, s *model.Fri
 			got[g.ToUser]++
 		}
 	}
+	dates, err := f.store.ListFriendReceived(ctx, model.PetActionPlaydate, "", "")
+	if err != nil {
+		return err
+	}
+	visited := map[string]bool{} // from member + day
+	for _, d := range dates {
+		if d.LinkID == l.ID {
+			visited[d.FromMember+"|"+d.Day] = true
+		}
+	}
 	for _, sd := range s.Sends {
 		if !accepts[sd.From] {
 			continue
+		}
+		// Only something sent in the last couple of days counts. What has
+		// arrived is remembered for a week, so a stale snapshot (the other
+		// family's server has gone quiet) or a replayed id can never be
+		// applied a second time.
+		if !recent(sd.Day, now) {
+			continue
+		}
+		if sd.Kind == model.PetActionPlaydate {
+			if visited[sd.From+"|"+sd.Day] {
+				continue // one visit per animal per day
+			}
+			visited[sd.From+"|"+sd.Day] = true
 		}
 		var to int64
 		if sd.Kind == model.PetActionGift {
@@ -892,6 +932,18 @@ func (f *Service) receive(ctx context.Context, l *model.FriendLink, s *model.Fri
 		}
 	}
 	return f.store.PruneFriendSends(ctx, now.AddDate(0, 0, -7).Format(model.DateFormat))
+}
+
+// recent reports whether day (YYYY-MM-DD, someone else's calendar) is within
+// two days either side of now: time zones can put a friend a day ahead or
+// behind, and a send travels for up to two days.
+func recent(day string, now time.Time) bool {
+	d, err := time.ParseInLocation(model.DateFormat, day, now.Location())
+	if err != nil {
+		return false
+	}
+	gap := now.Sub(d)
+	return gap > -48*time.Hour && gap < 72*time.Hour
 }
 
 // SendTarget is a checked gift or playdate, ready to record.
@@ -949,6 +1001,9 @@ func (f *Service) CheckSend(ctx context.Context, userID int64, kind, friendKey s
 	if !shares[userID] || !theyShow {
 		return nil, name + " can't see you yet. A grown-up in each family has to tick you first.", nil
 	}
+	if snap.NoVisits {
+		return nil, name + " aren't taking treats or playdates right now.", nil
+	}
 	switch kind {
 	case model.PetActionGift:
 		accepts, err := f.store.FriendLinkAccepts(ctx, l.ID)
@@ -986,19 +1041,49 @@ func (f *Service) CheckSend(ctx context.Context, userID int64, kind, friendKey s
 	return &SendTarget{LinkID: l.ID, Send: send, Name: name}, "", nil
 }
 
-// RecordSend stores a checked gift or playdate, to go out with the next
-// snapshot, and starts a sync so it arrives soon.
-func (f *Service) RecordSend(ctx context.Context, userID int64, t *SendTarget) error {
+// ReserveSend records a checked gift or playdate before any points move. It
+// returns a refusal to show ("" = recorded) when today's limit for it has
+// been used in the meantime: the table decides, so two taps at once can't
+// both get through. If paying then fails, call CancelSend.
+func (f *Service) ReserveSend(ctx context.Context, userID int64, t *SendTarget) (msg string, err error) {
 	id := make([]byte, 12)
 	if _, err := rand.Read(id); err != nil {
-		return err
+		return "", err
 	}
 	t.Send.ID = base64.RawURLEncoding.EncodeToString(id)
-	if err := f.store.AddFriendSend(ctx, t.LinkID, t.Send, userID); err != nil {
-		return err
+	ok, err := f.store.AddFriendSend(ctx, t.LinkID, t.Send, userID)
+	if err != nil {
+		return "", err
 	}
+	if !ok {
+		t.Send.ID = ""
+		if t.Send.Kind == model.PetActionGift {
+			return "you've already sent " + t.Name + " a treat today", nil
+		}
+		return "your animal has already gone on a playdate today", nil
+	}
+	return "", nil
+}
+
+// CancelSend takes back a reserved send (paying for it failed).
+func (f *Service) CancelSend(ctx context.Context, t *SendTarget) {
+	if t != nil && t.Send.ID != "" {
+		_ = f.store.DeleteFriendSend(ctx, t.Send.ID, 0)
+	}
+}
+
+// ConfirmSend notes which redemption paid for a reserved send (so undoing
+// the redemption can take it back) and starts a sync so it arrives soon.
+func (f *Service) ConfirmSend(ctx context.Context, t *SendTarget, redemptionID int64) {
+	_ = f.store.SetFriendSendRedemption(ctx, t.Send.ID, redemptionID)
 	go func(linkID int64) { _ = f.Sync(context.WithoutCancel(ctx), linkID) }(t.LinkID)
-	return nil
+}
+
+// UndoSend takes back the gift or playdate a redemption paid for, if it
+// hasn't gone out for good: within two days it is simply no longer sent.
+// One the other family has already received stays received.
+func (f *Service) UndoSend(ctx context.Context, redemptionID int64) error {
+	return f.store.DeleteFriendSend(ctx, "", redemptionID)
 }
 
 // Visitors returns the friend families' animals that are here on a playdate
@@ -1029,8 +1114,10 @@ func (f *Service) Visitors(ctx context.Context) ([]model.Pet, []model.FriendGift
 		if family == "" {
 			family = "Friend family"
 		}
-		// A playdate lasts for the sender's day.
-		if snap.Today != "" {
+		// A playdate lasts for the sender's day. Their "today" comes from
+		// their server, so it also has to be about now by our own clock: a
+		// family whose server has gone quiet doesn't leave an animal here.
+		if snap.Today != "" && recent(snap.Today, f.now()) && snap.GeneratedAt.After(f.now().Add(-36*time.Hour)) {
 			dates, err := f.store.ListFriendReceived(ctx, model.PetActionPlaydate, snap.Today, "")
 			if err != nil {
 				return nil, nil, err

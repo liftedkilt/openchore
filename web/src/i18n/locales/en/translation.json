@@ -708,7 +708,8 @@
         "approve": "OK to send to friend families",
         "approveTitle": "Tick this once you've looked at the picture. It always shows on your own farm; this only decides whether linked families can be sent it.",
         "approved": "{{name}}'s picture can now be sent to friend families.",
-        "unapproved": "{{name}}'s picture will no longer be sent to friend families."
+        "unapproved": "{{name}}'s picture will no longer be sent to friend families.",
+        "pictureChanged": "The picture changed while you were looking. Have another look, then tick it."
       },
       "friends": {
         "title": "Leaderboard & friend families",
@@ -778,7 +779,8 @@
         "goalDrop": "Drop the goal",
         "goalInput": "Goal score, 1 to 100",
         "goalSaved": "Goal saved.",
-        "goalDropped": "Goal dropped."
+        "goalDropped": "Goal dropped.",
+        "goalDiffers": "You put forward {{target}} and {{family}} put forward {{theirs}}. Agree to theirs, or change yours."
       }
     },
     "skins": {
