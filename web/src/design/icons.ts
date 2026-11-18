@@ -2,8 +2,9 @@
 // shape data. Every icon sits on a 24px grid with round caps and joins; the
 // stroke weight comes from the --icon-stroke dial.
 //
-// `bin` and `broom` were added for common chore emoji (🗑️, 🧹) in the same
-// style as the rest of the set.
+// `bin` and `broom` were added for common chore emoji (🗑️, 🧹), and the farm
+// set (carrot, apple, ball, brush, pencil, hat, swap) for pet-care rewards, in
+// the same style as the rest of the set.
 
 export type IconShape =
   | { tag: 'path'; d: string; fill?: string }
@@ -48,6 +49,14 @@ export const ICONS = {
   moon: [p('M19.5 14.5A8 8 0 1 1 9.5 4.5a6.5 6.5 0 0 0 10 10z')],
   cone: [p('M7 10.5h10L12 21.5z'), p('M7 10.5a5 5 0 0 1 10 0')],
   screen: [r(3, 5, 18, 12, 2), p('M9 20.5h6M12 17v3.5')],
+  // Farm pets: food, treats, play, restyle, design, accessories, new animal
+  carrot: [p('M9.6 9.3c1.6-1.5 4-1.4 5.4.1 1.3 1.5 1.2 3.7-.4 5.1L4 20z'), p('M15 9.4 18.5 6M16.2 5.5V3M19 8.2h2.5'), p('M9.5 13l1.7 1.7M7.5 16.2l1.2 1.2')],
+  apple: [p('M12 7.8c-1.2-1-2.6-1.5-4-1.2C5.6 7.1 4 9.3 4 12.2c0 4 2.5 8.3 5.5 8.3 1 0 1.6-.5 2.5-.5s1.5.5 2.5.5c3 0 5.5-4.3 5.5-8.3 0-2.9-1.6-5.1-4-5.6-1.4-.3-2.8.2-4 1.2z'), p('M12 7.8c0-1.9.9-3.4 2.6-4.3')],
+  ball: [c(12, 12, 8.5), p('M6 6c2.7 3.3 2.7 8.7 0 12M18 6c-2.7 3.3-2.7 8.7 0 12')],
+  brush: [p('M20.5 3.5 12 12'), p('M10.2 11.2l2.6 2.6c1.3 1.3 1 3.3-.4 4.5-2.3 2-5.9 2.3-8.9 1.2 1.7-.6 2.6-1.8 3-3.6.3-1.5.6-2.9 1.6-3.8.6-.6 1.5-1 2.1-.9z')],
+  pencil: [p('M4 20l1.1-4.6L16.4 4.1a2.1 2.1 0 0 1 3 0l.5.5a2.1 2.1 0 0 1 0 3L8.6 18.9z'), p('M14.3 6.2l3.5 3.5M5.1 15.4l3.5 3.5')],
+  hat: [p('M7 16.5v-4.3a5 5 0 0 1 10 0v4.3'), p('M2.5 16c2 2.3 17 2.3 19 0'), p('M7 13.5c3 1 7 1 10 0')],
+  swap: [p('M4 8.5h15M15.5 5 19 8.5 15.5 12M20 15.5H5M8.5 12 5 15.5 8.5 19')],
   // UI
   back: [p('M14.5 6l-6 6 6 6')],
   chev: [p('M9.5 6l6 6-6 6')],

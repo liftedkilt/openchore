@@ -153,3 +153,84 @@
 [data-person="lilac"]  { --you: var(--person-lilac); }
 [data-person="sand"]   { --you: var(--person-sand); }
 [data-theme="tint"][data-person] { --accent: var(--you); --highlight: var(--you); --done: var(--you); }
+
+/* ============================================================
+   Farm dials: the family farm scene (pages/kid/farm). Every theme sets
+   every one of these, so a nested skin never shows its frame's farm.
+   Light skins keep the sunny pastel farm; the dark skins get a dusk farm;
+   Blocks gets a flat, saturated farm with its thick ink outlines.
+
+   Scenery
+     --farm-sky-top / --farm-sky-low   sky gradient, top to horizon
+     --farm-field                      ground behind the hills
+     --farm-hill-far / --farm-hill-near  the two rolling hills
+     --farm-line / --farm-line-w       scenery outline (hills, barn, fence,
+                                       sun); transparent / 0px = no outline
+     --farm-stars                      none | block: stars in the sky
+     --farm-star                       star colour
+     --farm-moon / --farm-moon-fill    none | block, crescent colour
+     --farm-sun / --farm-sun-fill      none | block, sun colour
+     --farm-barn-wall / -roof / -door / -trim   barn paint
+     --farm-window                     barn windows (lit at night)
+     --farm-barn-lamps                 none | inline: two lit ground windows
+     --farm-fence-rail / --farm-fence-post / --farm-fence-opacity
+     --farm-rail-w / --farm-post-w     fence plank thickness
+     --farm-post-cap                   butt | round: square-cut or rounded post tops
+     --farm-field-ink                  text drawn straight on the field
+   Animals and shelters
+     --farm-art-filter   filter on animals + shelters in the scene only
+     --farm-ink          the bold outline colour
+     --farm-ink-mix      0% = the art's own soft tinted outlines, up to 100%
+                         = fully --farm-ink (applies everywhere, also cards)
+     --farm-line-k       outline width multiplier (1 = as drawn)
+   ============================================================ */
+:root, [data-theme="house"], [data-theme="sunroom"] {
+  --farm-sky-top: #bfe3f7; --farm-sky-low: #e8f5fb; --farm-field: #b6dc8e;
+  --farm-hill-far: #b6dc8e; --farm-hill-near: #9fd27a;
+  --farm-line: transparent; --farm-line-w: 0px;
+  --farm-stars: none; --farm-star: #ffffff;
+  --farm-moon: none; --farm-moon-fill: #f6ecc8;
+  --farm-sun: none; --farm-sun-fill: #ffd34e;
+  --farm-barn-wall: #c2473c; --farm-barn-roof: #9e3b32; --farm-barn-door: #8e2f27; --farm-barn-trim: #fff4e6;
+  --farm-window: #fff4e6; --farm-barn-lamps: none;
+  --farm-fence-rail: #e9d7b4; --farm-fence-post: #d8c39b; --farm-fence-opacity: 0.9;
+  --farm-rail-w: 3px; --farm-post-w: 5px; --farm-post-cap: butt;
+  --farm-field-ink: #2f4a22;
+  --farm-art-filter: none; --farm-ink: #2b2522; --farm-ink-mix: 0%; --farm-line-k: 1;
+}
+/* Dusk: a deep blue evening, calm dark greens, the barn in shadow with warm
+   windows. No large bright areas; the animals are dimmed a little so they sit
+   in the night instead of glaring like stickers. */
+[data-theme="tint"], [data-theme="house-dark"] {
+  --farm-sky-top: #0c1122; --farm-sky-low: #283157; --farm-field: #1d3125;
+  --farm-hill-far: #1d3125; --farm-hill-near: #2b4633;
+  --farm-line: transparent; --farm-line-w: 0px;
+  --farm-stars: block; --farm-star: #dfe4f5;
+  --farm-moon: block; --farm-moon-fill: #e9dfb8;
+  --farm-sun: none; --farm-sun-fill: #ffd34e;
+  --farm-barn-wall: #5a2a2a; --farm-barn-roof: #3f1f22; --farm-barn-door: #321718; --farm-barn-trim: #8a7a6c;
+  --farm-window: #f2c46d; --farm-barn-lamps: inline;
+  --farm-fence-rail: #6e6252; --farm-fence-post: #5b5144; --farm-fence-opacity: 1;
+  --farm-rail-w: 3px; --farm-post-w: 5px; --farm-post-cap: butt;
+  --farm-field-ink: #d9e4d2;
+  --farm-art-filter: brightness(0.86) saturate(0.88) drop-shadow(0 0 1.2px rgb(214 224 255 / 0.4)); --farm-ink: #2b2522; --farm-ink-mix: 0%; --farm-line-k: 1;
+}
+/* House Dark's evening is a touch warmer, to sit on its warm brown ground. */
+[data-theme="house-dark"] {
+  --farm-sky-top: #15141d; --farm-sky-low: #332e44;
+}
+/* Blocks: flat saturated paint, thick ink outlines on everything. */
+[data-theme="blocks"] {
+  --farm-sky-top: #8fd0ff; --farm-sky-low: #8fd0ff; --farm-field: #5ee0a6;
+  --farm-hill-far: #5ee0a6; --farm-hill-near: #2ad193;
+  --farm-line: #121212; --farm-line-w: 2.5px;
+  --farm-stars: none; --farm-star: #ffffff;
+  --farm-moon: none; --farm-moon-fill: #f6ecc8;
+  --farm-sun: block; --farm-sun-fill: #ffc62b;
+  --farm-barn-wall: #ff5a2e; --farm-barn-roof: #2346ff; --farm-barn-door: #121212; --farm-barn-trim: #ffffff;
+  --farm-window: #ffc62b; --farm-barn-lamps: none;
+  --farm-fence-rail: #ffffff; --farm-fence-post: #ffffff; --farm-fence-opacity: 1;
+  --farm-rail-w: 4px; --farm-post-w: 7px; --farm-post-cap: round;
+  --farm-field-ink: #121212;
+  --farm-art-filter: none; --farm-ink: #121212; --farm-ink-mix: 90%; --farm-line-k: 2;
+}

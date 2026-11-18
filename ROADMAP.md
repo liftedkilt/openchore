@@ -49,6 +49,7 @@
 - [ ] Chore swaps/trading between siblings (parent-approved)
 - [ ] Helper mode — partial credit for helping on someone else's chore
 - [x] Family chores (assignment_type: family — anyone can complete, points only if their own chores are done)
+- [x] Farm pets — optional shared family farm; chores keep your animal healthy, points buy food, play and accessories
 
 ## Phase 6: Integrations & Plugins (Partially Complete)
 - [x] Webhook system with HMAC signing and delivery logging

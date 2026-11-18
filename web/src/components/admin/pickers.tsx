@@ -9,7 +9,7 @@ import type { User } from '../../types';
 import styles from './pickers.module.css';
 
 /** UI glyphs that make no sense as a chore or reward icon. */
-const NOT_FOR_CHORES = new Set<IconName>(['back', 'chev', 'plus']);
+const NOT_FOR_CHORES = new Set<IconName>(['back', 'chev', 'plus', 'swap']);
 export const CHORE_ICON_NAMES: IconName[] = ICON_NAMES.filter((n) => !NOT_FOR_CHORES.has(n));
 
 export type { ChoreCategory } from '../../types';

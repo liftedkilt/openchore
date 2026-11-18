@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, APIError } from '../../api';
 import type {
-  PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
+  Farm, PetPick, PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
 } from '../../types';
 import { localDateStr } from '../../utils';
 
@@ -28,6 +28,7 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   const [rewards, setRewards] = useState<Reward[] | null>(null);
   const [redemptions, setRedemptions] = useState<RedemptionHistory[]>([]);
   const [people, setPeople] = useState<User[]>([]);
+  const [farm, setFarm] = useState<Farm | null>(null);
   const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -71,9 +72,14 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   const loadExtras = useCallback(async () => {
     if (!userId) return;
     try {
-      const [s, p] = await Promise.all([api.streaks.getForUser(userId), api.points.getForUser(userId)]);
+      const [s, p, f] = await Promise.all([
+        api.streaks.getForUser(userId),
+        api.points.getForUser(userId),
+        api.pets.farm().catch(() => null),
+      ]);
       setStreak(s);
       setPoints(p);
+      setFarm(f);
     } catch (e) {
       console.error(e);
     }
@@ -187,7 +193,7 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   });
 
   /** Returns true when the reward was redeemed. */
-  const redeem = useCallback(async (reward: Reward): Promise<boolean> => {
+  const redeem = useCallback(async (reward: Reward, pet?: PetPick): Promise<boolean> => {
     if (!points) return false;
     const commitment = commitmentFor(reward.id);
     const funded = commitment?.pool
@@ -197,9 +203,10 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
     if (commitment && !funded) return false;
     setRedeemingId(reward.id);
     try {
-      await api.rewards.redeem(reward.id);
+      await api.rewards.redeem(reward.id, pet);
       setRedeemedId(reward.id);
-      showToast(t('kid.rewards.redeemedToast', { name: reward.name }));
+      // Pet care shows the animal's reaction instead.
+      if (!reward.pet_action) showToast(t('kid.rewards.redeemedToast', { name: reward.name }));
       await Promise.all([loadExtras(), loadRewards()]);
       setTimeout(() => setRedeemedId(prev => (prev === reward.id ? null : prev)), 2000);
       return true;
@@ -293,8 +300,9 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
 
   return {
     today, chores, weekChores, streak, points, rewards, redemptions, people,
+    farm, myPet: farm?.pets.find(p => p.user_id === userId) ?? null,
     togglingIds, toast, showToast,
-    reloadChores, refreshAll, loadRewards, toggle,
+    reloadChores, refreshAll, loadRewards, loadExtras, toggle,
     commitmentFor, redeem, redeemingId, redeemedId, saveToward, savingTowardId,
     contribute, setAutoContribute, breakCommitment, busyGoals,
   };

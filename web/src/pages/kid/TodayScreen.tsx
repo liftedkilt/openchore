@@ -6,7 +6,9 @@ import { gates, isDone, type ChoreView } from './choreView';
 import { GoalNudge } from './GoalCard';
 import { CAT_ORDER, ChoreGroups, Notice, OwnTaskEntry, PausedNotice } from './parts';
 import type { KidData } from './useKidData';
+import { FarmScene } from './farm/FarmScene';
 import s from './kid.module.css';
+import fs from './farm/petSheet.module.css';
 
 /** The day runs 7 am – 9 pm on the sun arc. */
 const DAY_FROM = 7;
@@ -26,9 +28,11 @@ interface TodayProps {
   onSpeak: (text: string, audioUrl?: string) => void;
   /** Open "my own tasks": a new one for `date`, or the list. */
   onOwnTasks?: (date?: string) => void;
+  /** Open the family farm. */
+  onFarm?: () => void;
 }
 
-export function TodayScreen({ user, data, now, topBar, viewOf, tts, onToggle, onPhoto, onSpeak, onOwnTasks }: TodayProps) {
+export function TodayScreen({ user, data, now, topBar, viewOf, tts, onToggle, onPhoto, onSpeak, onOwnTasks, onFarm }: TodayProps) {
   const { t } = useTranslation();
   const chores = (data.chores ?? []).filter(c => c.date === data.today);
   const firstName = user.name.split(' ')[0];
@@ -98,6 +102,21 @@ export function TodayScreen({ user, data, now, topBar, viewOf, tts, onToggle, on
           <OwnTaskEntry onAdd={() => onOwnTasks(data.today)} onList={() => onOwnTasks()} />
         )}
       </section>
+
+      {data.farm?.enabled && onFarm && (
+        <section className={fs.farmCard} aria-labelledby="today-farm">
+          <div className={fs.farmCardHead}>
+            <h2 id="today-farm" className={fs.farmCardTitle}>{t('kid.farm.title')}</h2>
+            <button type="button" className={fs.farmCardOpen} onClick={onFarm}>
+              {data.myPet ? t('kid.farm.open', { name: data.myPet.name }) : t('kid.farm.adoptCta')}
+            </button>
+          </div>
+          {data.myPet && (
+            <p className={fs.farmCardLine}>{t(`kid.farm.mood.${data.myPet.mood}`, { name: data.myPet.name })}</p>
+          )}
+          <FarmScene pets={data.farm.pets} meId={user.id} compact onSelect={onFarm} />
+        </section>
+      )}
 
       {/* Goals: under the list on a phone, under the hero on a tablet. */}
       {commitments.length > 0 && (

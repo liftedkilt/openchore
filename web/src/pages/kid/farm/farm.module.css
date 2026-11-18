@@ -1,0 +1,261 @@
+/* The family farm scene. Its scenery reads the --farm-* dials (themes.css),
+   so the same farm becomes a dusk farm in the dark skins and a bold flat
+   farm in Blocks; see the animal art section at the bottom. */
+.farm {
+  position: relative;
+  height: 300px;
+  overflow: hidden;
+  box-sizing: border-box;
+  /* The frame follows the skin like a card does: its outline, offset shadow
+     and corner come from the dials. */
+  border: var(--outline-w) solid var(--line);
+  border-radius: max(var(--r-row), var(--r-well));
+  box-shadow: var(--lift);
+  isolation: isolate;
+}
+.compact { height: 180px; }
+
+/* Hiding animals: shelters along the fence, front and centre. */
+.shelters {
+  position: absolute;
+  left: 3%;
+  top: 22%;
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  z-index: 3;
+}
+.shelterItem { display: block; }
+.shelterBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.shelterBtn:disabled { cursor: default; }
+.shelter { width: 64px; height: 56px; }
+.compact .shelter { width: 50px; height: 44px; }
+
+.animal {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transform: translate(-50%, -100%) scale(var(--depth, 1));
+  transform-origin: 50% 100%;
+  transition-property: left, top;
+  transition-timing-function: linear;
+}
+.animal:disabled { cursor: default; }
+.animal:focus-visible, .shelterBtn:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; border-radius: var(--r-well); }
+
+.body { display: block; transition: transform 200ms; }
+.svg { display: block; width: 96px; height: 77px; }
+.compact .svg { width: 64px; height: 51px; }
+
+.walking .svg { animation: farm-bob 360ms ease-in-out infinite alternate; }
+.sick .svg { filter: saturate(0.55) brightness(0.96); }
+.lying .svg { filter: saturate(0.4) brightness(0.92); }
+
+.badge {
+  position: absolute;
+  top: -6px;
+  right: 4px;
+  font-size: 18px;
+  line-height: 1;
+  animation: farm-float 2.4s ease-in-out infinite;
+}
+.compact .badge { font-size: 14px; }
+
+.tag {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: -4px;
+  padding: 1px 8px;
+  border: var(--outline-w) solid var(--line);
+  border-radius: var(--r-chip);
+  background: var(--tag, var(--person-sand));
+  color: var(--on-person);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
+}
+.tagOwner { font-size: 10px; font-weight: 500; opacity: 0.8; }
+.compact .tag { font-size: 10px; padding: 0 6px; }
+
+/* Your own animal: a ring in the skin's ink (light on the dusk farm). */
+.mine .tag { outline: 2px solid var(--ink); outline-offset: max(1px, var(--outline-w)); }
+
+.empty {
+  position: absolute;
+  inset: auto 0 12% 0;
+  margin: 0;
+  text-align: center;
+  font-weight: 600;
+  color: #2f4a22;
+}
+
+:global(.farm-peek) { animation: farm-blink 4s infinite; transform-origin: 40px 56px; }
+
+@keyframes farm-bob { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+@keyframes farm-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes farm-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .animal, .walking .svg, .badge, :global(.farm-peek) { animation: none; transition: none; }
+}
+
+/* --- animal art (illustrator) --- */
+/* Legs swing from the hip in diagonal pairs while the animal walks; the dog
+   and cat tails wag gently all the time. */
+:global(.farm-leg-a), :global(.farm-leg-b) { transform-box: fill-box; transform-origin: 50% 0; }
+.walking :global(.farm-leg-a) { animation: farm-step 380ms ease-in-out infinite alternate; }
+.walking :global(.farm-leg-b) { animation: farm-step 380ms ease-in-out infinite alternate-reverse; }
+:global(.farm-tail) { transform-box: fill-box; transform-origin: 100% 100%; animation: farm-wag 900ms ease-in-out infinite alternate; }
+.lying :global(.farm-tail) { animation: none; }
+
+@keyframes farm-step { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
+@keyframes farm-wag { from { transform: rotate(-8deg); } to { transform: rotate(8deg); } }
+
+/* Reactions: the jaw chews from its hinge (~4 bites a second), cheeks puff
+   with it, a wagging tail speeds up while playing, a heart floats while loved. */
+:global(.farm-chew) { transform-box: fill-box; transform-origin: 50% 0; animation: farm-chew 125ms ease-in-out infinite alternate; }
+:global(.farm-puff) { transform-box: fill-box; transform-origin: 50% 50%; animation: farm-puff 125ms ease-in-out infinite alternate; }
+:global(.farm-tail-fast) { animation-duration: 280ms; }
+:global(.farm-float) { transform-box: fill-box; transform-origin: 50% 50%; animation: farm-float 900ms ease-in-out infinite alternate; }
+
+@keyframes farm-chew { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+@keyframes farm-puff { from { transform: scale(1); } to { transform: scale(1.18); } }
+@keyframes farm-float { from { transform: translateY(1px) scale(0.9); } to { transform: translateY(-2px) scale(1.1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  :global(.farm-leg-a), :global(.farm-leg-b), :global(.farm-tail),
+  :global(.farm-chew), :global(.farm-puff), :global(.farm-float) { animation: none; }
+}
+
+/* --- scenery (illustrator) ---
+   Everything here reads the --farm-* dials in themes.css; nothing tests the
+   theme. The backdrop SVG stretches (preserveAspectRatio none), so anything
+   that must keep its shape (stars, moon, sun, barn, fence) is its own
+   element sized in px. */
+.farm {
+  background: linear-gradient(var(--farm-sky-top) 0%, var(--farm-sky-low) 42%, var(--farm-field) 42%);
+}
+
+.sky { position: absolute; inset: 0; pointer-events: none; }
+.star {
+  display: var(--farm-stars);
+  position: absolute;
+  border-radius: 50%;
+  background: var(--farm-star);
+  animation: farm-twinkle 5s ease-in-out infinite;
+}
+.moon, .sun { position: absolute; left: 36%; overflow: visible; }
+.moon { top: 7%; width: 26px; height: 26px; }
+.compact .moon { top: 6%; width: 20px; height: 20px; }
+.moon { display: var(--farm-moon); fill: var(--farm-moon-fill); }
+.crater { fill: var(--farm-sky-top); opacity: 0.18; }
+.sun {
+  display: var(--farm-sun);
+  fill: var(--farm-sun-fill);
+  stroke: var(--farm-line);
+  stroke-width: var(--farm-line-w);
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.sun { width: 34px; height: 34px; top: 5%; }
+.compact .sun { width: 26px; height: 26px; top: 4%; }
+.sun * { vector-effect: non-scaling-stroke; }
+
+.backdrop { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hillFar { fill: var(--farm-hill-far); }
+.hillNear { fill: var(--farm-hill-near); }
+.ridge {
+  fill: none;
+  stroke: var(--farm-line);
+  stroke-width: var(--farm-line-w);
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The barn stands on the far hill: its base is pinned to 48% of the scene
+   (the hills' ground line on the right is 42-46%, the near hill 50-52%), and
+   it is sized by height so it never pokes out of the top of a short, wide
+   strip. The SVG keeps its shape and sits bottom-right in its box. */
+.barn {
+  position: absolute;
+  right: 3%;
+  bottom: 52%;
+  height: 40%;
+  aspect-ratio: 6 / 5;
+  max-width: min(22%, 140px);
+  z-index: 1;
+  overflow: visible;
+}
+.barnWall, .barnRoof, .barnDoor, .barnWindow {
+  stroke: var(--farm-line);
+  stroke-width: var(--farm-line-w);
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.barnWall { fill: var(--farm-barn-wall); }
+.barnRoof { fill: var(--farm-barn-roof); }
+.barnDoor { fill: var(--farm-barn-door); }
+.barnTrim { fill: none; stroke: var(--farm-barn-trim); stroke-width: 3; }
+.barnWindow { fill: var(--farm-window); }
+.barnLamps { display: var(--farm-barn-lamps); }
+.barnMullion { fill: none; stroke: var(--farm-barn-trim); stroke-width: 1.5; }
+
+.fence {
+  position: absolute;
+  left: 0;
+  top: calc(47% - 8px);
+  width: 100%;
+  height: 34px;
+  z-index: 2;
+  opacity: var(--farm-fence-opacity);
+}
+.rail, .railEdge { stroke-linecap: butt; }
+.post, .postEdge { stroke-linecap: var(--farm-post-cap); }
+.rail { stroke: var(--farm-fence-rail); stroke-width: var(--farm-rail-w); }
+/* Rails are thin, so their outline is a little lighter than the scenery's. */
+.railEdge { stroke: var(--farm-line); stroke-width: calc(var(--farm-rail-w) + 1.6 * var(--farm-line-w)); }
+.post { stroke: var(--farm-fence-post); stroke-width: var(--farm-post-w); }
+.postEdge { stroke: var(--farm-line); stroke-width: calc(var(--farm-post-w) + 2 * var(--farm-line-w)); }
+/* Soft skins set --farm-line to transparent, so the edges draw nothing. */
+
+/* Shelters stand on the same ground line as the barn: the hutch's base (its
+   bottom 4px are shadow and grass) lands at about 48% at every scene size,
+   instead of a fixed 22% top that floats in the full-size scene. */
+.farm .shelters { top: calc(48% - 54px); }
+.farm.compact .shelters { top: calc(48% - 42px); }
+
+/* "No animals yet" text sits straight on the field. */
+.farm .empty { color: var(--farm-field-ink); }
+
+/* A gentle night treatment for the animals and shelters on the field only
+   (not on cards elsewhere). It sits on the wrapper, so the sick/lying
+   filters on the SVG itself still stack on top of it. */
+.farm .body, .farm .shelter { filter: var(--farm-art-filter); }
+
+@keyframes farm-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) {
+  .star { animation: none; }
+}

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { api, fetchPublicUserData } from '../api';
-import type { User, ScheduledChore, UserStreakData, PointsData } from '../types';
+import type { Farm, User, ScheduledChore, UserStreakData, PointsData } from '../types';
+import { FarmScene } from './kid/farm/FarmScene';
 import { localDateStr } from '../utils';
 import {
   Avatar, ChoreRow, DayProgress, FamilyMember, HouseScope, Icon, SkinScope,
@@ -151,11 +152,14 @@ export const AmbientDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const [people, setPeople] = useState<PersonDay[]>([]);
+  // Farm pets (optional): everyone's animals, on the shared farm.
+  const [farm, setFarm] = useState<Farm | null>(null);
   const [loading, setLoading] = useState(true);
   const now = useMinuteClock();
 
   const fetchData = useCallback(async () => {
     try {
+      fetchPublicUserData<Farm>('/pets').then(setFarm).catch(() => setFarm(null));
       const users: User[] = await api.users.list();
       const today = localDateStr(new Date());
       const results = await Promise.allSettled(users.filter((u) => !u.paused).map((u) => loadPerson(u, today)));
@@ -202,7 +206,8 @@ export const AmbientDashboard: React.FC = () => {
   );
   const start = () => navigate('/login');
   // Past a handful of lines the chart stops being readable; the strip stays.
-  const showChart = people.filter((p) => p.total > 0).length <= MAX_CHART_LINES;
+  const showFarm = !!farm?.enabled && farm.pets.length > 0;
+  const showChart = !showFarm && people.filter((p) => p.total > 0).length <= MAX_CHART_LINES;
 
   return (
     <HouseScope mode="auto" persistent={false} className={styles.wall} onClick={start}>
@@ -238,7 +243,7 @@ export const AmbientDashboard: React.FC = () => {
           </div>
 
           {people.length > 0 && (
-            <section className={clsx(styles.family, !showChart && styles.familyWide)} aria-labelledby="wall-family">
+            <section className={clsx(styles.family, !showChart && !showFarm && styles.familyWide)} aria-labelledby="wall-family">
               <div className={styles.members}>
                 <h2 id="wall-family" className={styles.label}>{t('wall.familyToday')}</h2>
                 <div className={styles.memberGrid}>
@@ -248,6 +253,12 @@ export const AmbientDashboard: React.FC = () => {
                 </div>
               </div>
               {showChart && <DayChart people={people} now={now} />}
+              {showFarm && farm && (
+                <div className={styles.farmPanel}>
+                  <div className={styles.label}>{t('wall.farm')}</div>
+                  <FarmScene pets={farm.pets} compact owners className={styles.farm} />
+                </div>
+              )}
             </section>
           )}
         </>

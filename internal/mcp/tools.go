@@ -19,6 +19,7 @@ How it fits together:
 - Categories (labels the family sees in the app): "required" = Must do; "core" = Every day; "bonus" = Bonus; "optional" = Optional. Core points are held until that day's Must-do chores are done. Bonus points are only paid once all Must-do and Every-day chores for the day are done. Optional chores never count toward the day (no streak, penalty or gate) and pay any points straight away; kids can add their own optional chores (always 0 points). missed_penalty_value is deducted when a chore ends the day undone.
 - Triggers assign a chore on demand, e.g. Home Assistant calling the trigger URL when the dryer finishes. assignment_type "individual" goes to the trigger's default person; "fcfs" (first come, first served) offers it to every kid and the first to finish earns the points. Triggered chores are for today only.
 - Chores needing approval or a photo wait in list_pending_approvals until a parent approves or rejects them.
+- Farm pets (optional, off unless turned on): each person can adopt one farm animal; all live on one shared farm everyone can see. Finished chore days heal it; missed Must-do/Every-day chores make it sick and send it into hiding until that day's chores are done. Points buy food, treats, play and accessories through rewards with a pet_action; health can't be bought.
 - Points live in a ledger (adjust_points for manual changes). Rewards cost points and can be limited or priced per kid. Streak milestones pay bonus points for consecutive complete days. Decay can slowly reduce idle balances.
 
 Working well:
@@ -216,6 +217,22 @@ func allTools() []*Tool {
 		desc:   "Delete a streak milestone.",
 		method: http.MethodDelete, path: "/admin/streak-rewards/{id}", props: map[string]any{"id": integer("Milestone id.")}})
 
+	// ---- Farm pets ----
+	const petItemDesc = "For pet_action accessory: a built-in accessory (straw_hat, cowboy_hat, flower_crown, crown, party_hat, top_hat, beanie, wizard_hat, pirate_hat, flower, bow, sunglasses, round_glasses, heart_glasses, bandana, scarf, bell, bowtie, medal) or a custom emoji accessory written e:<slot>:<emoji> with slot head, face or neck, e.g. e:head:🎓."
+	add(endpoint{name: "list_farm_pets", title: "The family farm", readOnly: true,
+		desc: "Whether farm pets are on, and every person's animal with its health, fullness, joy and mood " +
+			"(hiding = missed chores yesterday and today's aren't done; sick/very_sick = health low from missed chores).",
+		method: http.MethodGet, path: "/pets"})
+	add(endpoint{name: "set_farm_pets", title: "Turn farm pets on or off",
+		desc: "Turn the optional farm pets on or off for the household. The first time they're turned on, " +
+			"a starter set of pet-care rewards (feed, treat, play, accessories) is added to the store.",
+		method: http.MethodPut, path: "/admin/pets", required: []string{"enabled"},
+		props: map[string]any{"enabled": boolean("On or off.")}})
+	add(endpoint{name: "remove_farm_pet", title: "Remove a person's farm animal",
+		desc:   "Delete a person's farm animal and its accessories so they can adopt again. Confirm first.",
+		method: http.MethodDelete, path: "/admin/users/{id}/pet",
+		props: map[string]any{"id": integer("Person id.")}})
+
 	// ---- Rewards ----
 	add(endpoint{name: "list_rewards", title: "List rewards", readOnly: true,
 		desc:   "Every reward, including hidden ones, with per-kid visibility and prices.",
@@ -230,6 +247,8 @@ func allTools() []*Tool {
 			"cost":        integer("Price in points (positive)."),
 			"stock":       integer("How many are available (omit for unlimited)."),
 			"shareable":   boolean("Kids can pool points toward it together."),
+			"pet_action":  enum("Make it a farm-pet care reward (omit for an ordinary reward): feed, treat, play, accessory, new_animal (trade for another animal; stats carry over), restyle (new coat colour) or design (the kid draws or uploads their own accessory).", "feed", "treat", "play", "accessory", "new_animal", "restyle", "design"),
+			"pet_item":    str(petItemDesc),
 		}})
 	add(endpoint{name: "update_reward", title: "Edit a reward",
 		desc:   "Change a reward; omitted fields are kept. active=false hides it.",
@@ -243,6 +262,8 @@ func allTools() []*Tool {
 			"stock":       integer("How many are available."),
 			"active":      boolean("Shown to kids."),
 			"shareable":   boolean("Kids can pool points toward it."),
+			"pet_action":  enum("Farm-pet care action, or \"\" for an ordinary reward.", "", "feed", "treat", "play", "accessory", "new_animal", "restyle", "design"),
+			"pet_item":    str(petItemDesc),
 		}})
 	add(endpoint{name: "delete_reward", title: "Delete a reward",
 		desc:   "Delete a reward. Setting active=false with update_reward hides it instead.",

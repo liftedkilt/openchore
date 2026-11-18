@@ -1,0 +1,95 @@
+/* Pet reactions: motion on the animal, a prop flying in, particles, deltas. */
+.stage { position: relative; display: inline-flex; justify-content: center; }
+.body { transform-origin: 50% 95%; }
+
+.munch { animation: react-munch 2.4s ease-in-out; }
+.hop { animation: react-hop 2.4s cubic-bezier(.3, .7, .4, 1); }
+.pose { animation: react-pose 1.6s ease-in-out; }
+.poof { animation: react-poof 1.2s ease-out; }
+
+.prop { position: absolute; top: 40%; font-size: 28px; pointer-events: none; }
+.food { right: -10%; animation: react-food 900ms ease-in forwards; }
+.ball { left: -10%; animation: react-ball 1.6s ease-in-out forwards; }
+
+.particle {
+  position: absolute;
+  bottom: 30%;
+  font-size: 20px;
+  opacity: 0;
+  pointer-events: none;
+  animation: react-float 1.6s ease-out forwards;
+}
+
+.deltas {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  display: flex;
+  gap: 8px;
+  transform: translateX(-50%);
+  font-size: 14px;
+  font-weight: 800;
+  color: #2f7a2a;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: react-delta 2.4s ease-out forwards;
+}
+.deltas span { padding: 1px 8px; border-radius: 999px; background: rgb(255 255 255 / 0.9); box-shadow: 0 1px 3px rgb(0 0 0 / 0.15); }
+
+@keyframes react-munch {
+  0%, 30% { transform: none; }
+  40%, 60%, 80% { transform: scale(1.04, 0.96); }
+  50%, 70%, 90% { transform: scale(0.98, 1.03); }
+  100% { transform: none; }
+}
+@keyframes react-hop {
+  0%, 15% { transform: none; }
+  25% { transform: translateY(-22%) rotate(-4deg); }
+  35% { transform: none; }
+  45% { transform: translateY(-28%) rotate(4deg); }
+  55% { transform: scale(1.05, 0.95); }
+  70% { transform: translateY(-18%) scaleX(-1); }
+  85% { transform: scaleX(1); }
+  100% { transform: none; }
+}
+@keyframes react-pose {
+  0% { transform: none; }
+  30% { transform: scale(1.08) rotate(-3deg); }
+  60% { transform: scale(1.08) rotate(3deg); }
+  100% { transform: none; }
+}
+@keyframes react-poof {
+  0% { transform: scale(0.3); opacity: 0; }
+  60% { transform: scale(1.1); opacity: 1; }
+  100% { transform: none; }
+}
+@keyframes react-food {
+  0% { transform: translate(0, -40px) rotate(0); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translate(-90px, 10px) rotate(-200deg) scale(0.4); opacity: 0; }
+}
+@keyframes react-ball {
+  0% { transform: translate(0, 0); opacity: 0; }
+  10% { opacity: 1; }
+  30% { transform: translate(60px, -60px); }
+  50% { transform: translate(120px, 10px); }
+  70% { transform: translate(170px, -30px); }
+  100% { transform: translate(220px, 10px); opacity: 0; }
+}
+@keyframes react-float {
+  0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translate(var(--drift, 0), -90px) scale(1.1); opacity: 0; }
+}
+@keyframes react-delta {
+  0% { transform: translate(-50%, 10px); opacity: 0; }
+  15% { transform: translate(-50%, 0); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translate(-50%, -24px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .munch, .hop, .pose, .poof, .food, .ball { animation: none; }
+  .food, .ball { display: none; }
+  .particle { animation-duration: 1ms; }
+}

@@ -428,7 +428,29 @@
       "streakSubtitle": "Bonus points for days in a row.",
       "subtitle": "What points can buy.",
       "unlimited": "Unlimited",
-      "update": "Update"
+      "update": "Update",
+      "fieldPetAction": "Farm pet care",
+      "fieldPetActionTitle": "Make this a pet-care reward: redeeming it feeds, plays with or dresses up the person's farm animal.",
+      "fieldPetItem": "Accessory",
+      "petAction": {
+        "none": "Not a pet reward",
+        "feed": "Feed (lots of food)",
+        "treat": "Treat (a little food, lots of joy)",
+        "play": "Play (lots of joy)",
+        "accessory": "Accessory",
+        "restyle": "Restyle (new coat colour)",
+        "new_animal": "New animal (stats carry over)",
+        "design": "Design (kid draws their own)"
+      },
+      "customEmoji": "Custom (emoji)…",
+      "fieldEmoji": "Emoji",
+      "fieldSlot": "Where it goes",
+      "slot": {
+        "head": "On the head",
+        "face": "On the face",
+        "neck": "Around the neck"
+      },
+      "preview": "Preview"
     },
     "scheduleManager": {
       "ariaDeleteSchedule": "Delete schedule",
@@ -665,6 +687,19 @@
           "modelPlaceholder": "kokoro",
           "fromEnv": "Set by the TTS_BASE_URL environment variable on the server. Change it there."
         }
+      },
+      "pets": {
+        "title": "Farm pets",
+        "description": "Each person can adopt a farm animal that lives on a shared family farm. Finishing chores keeps it healthy; missed chores make it sick and send it into hiding. Points buy food, play and accessories through pet-care rewards. Health can't be bought.",
+        "toggle": "Turn on farm pets",
+        "on": "Farm pets are on.",
+        "off": "Farm pets are off. Animals and their care rewards are hidden until you turn them back on.",
+        "addedRewards_one": "Farm pets are on. Added {{count}} pet-care reward.",
+        "addedRewards_other": "Farm pets are on. Added {{count}} pet-care rewards to the store.",
+        "failed": "Couldn't change farm pets.",
+        "remove": "Remove",
+        "confirmRemove": "Tap again to remove",
+        "removed": "Removed {{name}} ({{owner}}). They can adopt again."
       }
     },
     "skins": {
@@ -1215,6 +1250,145 @@
         "from": "from {{date}}",
         "until": "until {{date}}"
       }
+    },
+    "farm": {
+      "title": "The farm",
+      "empty": "No animals yet: adopt one!",
+      "hidingTitle": "Hiding in their shelters",
+      "open": "Visit {{name}}",
+      "adoptCta": "Adopt an animal",
+      "adoptTitle": "Adopt a farm animal",
+      "adoptLead": "Doing your chores keeps your animal healthy. Spend points to feed it, play with it and dress it up.",
+      "chooseAnimal": "Choose an animal",
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g. Biscuit",
+      "adopt": "Adopt",
+      "adoptFailed": "Couldn't adopt. Try again.",
+      "saveFailed": "Couldn't save. Try again.",
+      "rename": "Rename",
+      "belongsTo": "{{name}} belongs to {{owner}}",
+      "health": "Health",
+      "food": "Food",
+      "joy": "Joy",
+      "careTitle": "Take care",
+      "noCare": "Ask a grown-up to add pet care to the rewards.",
+      "wardrobe": "Wardrobe",
+      "moreInRewards_one": "{{count}} more accessory in Rewards.",
+      "moreInRewards_other": "{{count}} more accessories in Rewards.",
+      "tooSick": "{{name}} is too sick to play. Doing your chores helps.",
+      "notNow": "Not now",
+      "shopTitle": "For your farm animal",
+      "shopFor": "For {{name}}",
+      "mood": {
+        "hiding": "{{name}} is hiding in its shelter.",
+        "very_sick": "{{name}} is very sick.",
+        "sick": "{{name}} is feeling sick.",
+        "hungry": "{{name}} is hungry.",
+        "bored": "{{name}} is bored.",
+        "happy": "{{name}} is happy!",
+        "content": "{{name}} is doing fine."
+      },
+      "hint": {
+        "hiding": "Chores were missed yesterday. Finish today's chores to coax {{name}} out.",
+        "sick": "Doing all your chores each day helps {{name}} get better.",
+        "hungry": "Feed {{name}} from the rewards.",
+        "bored": "Play with {{name}} to cheer them up.",
+        "ok": "Keep doing your chores to keep {{name}} healthy."
+      },
+      "species": {
+        "horse": "Horse",
+        "dog": "Dog",
+        "cat": "Cat",
+        "chicken": "Chicken",
+        "cow": "Cow",
+        "pig": "Pig",
+        "sheep": "Sheep",
+        "goat": "Goat"
+      },
+      "item": {
+        "none": "Nothing",
+        "straw_hat": "Straw hat",
+        "cowboy_hat": "Cowboy hat",
+        "bandana": "Bandana",
+        "flower_crown": "Flower crown",
+        "bow": "Bow",
+        "bell": "Bell",
+        "sunglasses": "Sunglasses",
+        "scarf": "Scarf",
+        "crown": "Crown",
+        "party_hat": "Party hat",
+        "top_hat": "Top hat",
+        "beanie": "Beanie",
+        "wizard_hat": "Wizard hat",
+        "pirate_hat": "Pirate hat",
+        "round_glasses": "Round glasses",
+        "heart_glasses": "Heart glasses",
+        "bowtie": "Bow tie",
+        "medal": "Medal",
+        "flower": "Flower"
+      },
+      "coat": "Coat",
+      "shop": "Accessory shop",
+      "tryOnHint": "Tap one to try it on.",
+      "color": {
+        "chestnut": "Chestnut",
+        "black": "Black",
+        "grey": "Grey",
+        "palomino": "Palomino",
+        "golden": "Golden",
+        "chocolate": "Chocolate",
+        "white": "White",
+        "ginger": "Ginger",
+        "brown": "Brown",
+        "holstein": "Black & white",
+        "jersey": "Jersey",
+        "red": "Red",
+        "pink": "Pink",
+        "spotted": "Spotted",
+        "cream": "Cream",
+        "tan": "Tan"
+      },
+      "pick": {
+        "swapTitle": "Choose a new animal",
+        "swapLead": "{{name}} keeps their name, health, food, joy and accessories.",
+        "restyleTitle": "A new coat for {{name}}",
+        "restyleLead": "Pick a coat colour.",
+        "confirm_one": "Get it for {{count}} pt",
+        "confirm_other": "Get it for {{count}} pts"
+      },
+      "close": "Close",
+      "react": {
+        "food": "{{sign}}{{count}} food",
+        "joy": "{{sign}}{{count}} joy",
+        "line": {
+          "feed": "{{name}} gobbled it all up!",
+          "treat": "{{name}} loved the treat!",
+          "play": "{{name}} had so much fun playing!",
+          "accessory": "{{name}} looks amazing!",
+          "design": "{{name}} is wearing your design!",
+          "wear": "{{name}} shows it off!",
+          "restyle": "{{name}} loves the new coat!",
+          "new_animal": "Ta-da! Meet the new {{name}}!"
+        }
+      },
+      "design": {
+        "title": "Design an accessory",
+        "lead": "Draw something for your animal to wear, or start from a picture.",
+        "canvas": "Drawing pad",
+        "where": "Where it goes",
+        "colour": "Colour",
+        "brush": "Brush size {{size}}",
+        "eraser": "Eraser",
+        "undo": "Undo",
+        "clear": "Clear",
+        "upload": "Use a picture",
+        "mine": "My design",
+        "slot": {
+          "head": "Head",
+          "face": "Face",
+          "neck": "Neck"
+        }
+      }
     }
   },
   "linkedAccounts": {
@@ -1358,6 +1532,7 @@
     "familyToday": "The family today",
     "chartTitle": "Today so far",
     "chartDesc": "How much of their day each person has done, hour by hour. Now: {{summary}}.",
-    "chartPerson": "{{name}} {{pct}}%"
+    "chartPerson": "{{name}} {{pct}}%",
+    "farm": "The farm"
   }
 }

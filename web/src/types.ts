@@ -280,9 +280,69 @@ export interface Reward {
   stock?: number;
   active: boolean;
   shareable: boolean;
+  /** '' for an ordinary reward; otherwise it cares for the person's farm animal. */
+  pet_action?: PetAction | '';
+  /** The accessory an "accessory" reward gives. */
+  pet_item?: PetItem;
   created_by: number;
   created_at: string;
   assignments?: RewardAssignment[];
+}
+
+// --- Farm pets ---
+
+export type PetAction = 'feed' | 'treat' | 'play' | 'accessory' | 'new_animal' | 'restyle' | 'design';
+/** What a person picks when redeeming new_animal / restyle / design rewards. */
+export interface PetPick { species?: PetSpecies; color?: string; slot?: PetItemSlot; image?: string }
+export type PetSpecies = 'horse' | 'dog' | 'cat' | 'chicken' | 'cow' | 'pig' | 'sheep' | 'goat';
+/** A built-in accessory key, or a custom emoji accessory `e:<head|face|neck>:<emoji>`. */
+export type PetItem = string;
+export type PetItemSlot = 'head' | 'face' | 'neck';
+export type PetMood = 'hiding' | 'very_sick' | 'sick' | 'hungry' | 'bored' | 'happy' | 'content';
+
+export const PET_SPECIES: PetSpecies[] = ['horse', 'dog', 'cat', 'chicken', 'cow', 'pig', 'sheep', 'goat'];
+export const PET_ITEMS: PetItem[] = [
+  'straw_hat', 'cowboy_hat', 'flower_crown', 'crown', 'party_hat', 'top_hat', 'beanie', 'wizard_hat', 'pirate_hat', 'flower', 'bow',
+  'sunglasses', 'round_glasses', 'heart_glasses',
+  'bandana', 'scarf', 'bell', 'bowtie', 'medal',
+];
+export const PET_ITEM_SLOTS: PetItemSlot[] = ['head', 'face', 'neck'];
+/** Each species' coat colours; the first is the default. */
+export const PET_COLORS: Record<PetSpecies, string[]> = {
+  horse: ['chestnut', 'black', 'grey', 'palomino'],
+  dog: ['golden', 'chocolate', 'black', 'white'],
+  cat: ['ginger', 'grey', 'black', 'white'],
+  chicken: ['white', 'brown', 'black', 'golden'],
+  cow: ['holstein', 'jersey', 'black', 'red'],
+  pig: ['pink', 'black', 'ginger', 'spotted'],
+  sheep: ['white', 'cream', 'brown', 'black'],
+  goat: ['white', 'tan', 'brown', 'black'],
+};
+
+export interface Pet {
+  id: number;
+  user_id: number;
+  name: string;
+  species: PetSpecies;
+  /** Coat colour from PET_COLORS; empty = the species' default. */
+  color?: string;
+  health: number;
+  fullness: number;
+  joy: number;
+  accessory?: PetItem | '';
+  items: PetItem[];
+  last_missed_date?: string;
+  mood: PetMood;
+  hiding: boolean;
+  sick: boolean;
+  can_play: boolean;
+  owner_name?: string;
+  owner_color?: string;
+}
+
+export interface Farm {
+  enabled: boolean;
+  pets: Pet[];
 }
 
 export interface PoolContributor {

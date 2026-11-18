@@ -69,6 +69,7 @@ func main() {
 	go expiryChecker.Start(context.Background())
 	decayChecker := webhook.NewDecayChecker(s, dispatcher)
 	go decayChecker.Start(context.Background())
+	go webhook.NewPetChecker(s).Start(context.Background())
 	pointsDecayChecker := webhook.NewPointsDecayChecker(s, dispatcher)
 	// POINTS_DECAY_INTERVAL shortens the decay cadence. The e2e suite sets it
 	// so a decay is observable within a test run instead of 15 minutes later.

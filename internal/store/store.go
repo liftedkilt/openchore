@@ -1348,9 +1348,9 @@ func (s *Store) AdminAdjustPoints(ctx context.Context, userID int64, amount int,
 
 func (s *Store) CreateReward(ctx context.Context, r *model.Reward) error {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO rewards (name, description, icon, cost, stock, active, shareable, created_by)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.Name, r.Description, r.Icon, r.Cost, r.Stock, r.Active, boolToInt(r.Shareable), r.CreatedBy)
+		`INSERT INTO rewards (name, description, icon, cost, stock, active, shareable, pet_action, pet_item, created_by)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.Name, r.Description, r.Icon, r.Cost, r.Stock, r.Active, boolToInt(r.Shareable), r.PetAction, r.PetItem, r.CreatedBy)
 	if err != nil {
 		return err
 	}
@@ -1362,9 +1362,9 @@ func (s *Store) GetReward(ctx context.Context, id int64) (*model.Reward, error) 
 	r := &model.Reward{}
 	var active, shareable int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, name, description, icon, cost, stock, active, shareable, created_by, created_at
+		`SELECT id, name, description, icon, cost, stock, active, shareable, pet_action, pet_item, created_by, created_at
 		 FROM rewards WHERE id = ?`, id).
-		Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &active, &shareable, &r.CreatedBy, &r.CreatedAt)
+		Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &active, &shareable, &r.PetAction, &r.PetItem, &r.CreatedBy, &r.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -1374,7 +1374,7 @@ func (s *Store) GetReward(ctx context.Context, id int64) (*model.Reward, error) 
 }
 
 func (s *Store) ListRewards(ctx context.Context, activeOnly bool) ([]model.Reward, error) {
-	q := `SELECT id, name, description, icon, cost, stock, active, shareable, created_by, created_at FROM rewards`
+	q := `SELECT id, name, description, icon, cost, stock, active, shareable, pet_action, pet_item, created_by, created_at FROM rewards`
 	if activeOnly {
 		q += ` WHERE active = 1`
 	}
@@ -1388,7 +1388,7 @@ func (s *Store) ListRewards(ctx context.Context, activeOnly bool) ([]model.Rewar
 	for rows.Next() {
 		var r model.Reward
 		var active, shareable int
-		if err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &active, &shareable, &r.CreatedBy, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &active, &shareable, &r.PetAction, &r.PetItem, &r.CreatedBy, &r.CreatedAt); err != nil {
 			return nil, err
 		}
 		r.Active = active == 1
@@ -1404,7 +1404,7 @@ func (s *Store) ListRewards(ctx context.Context, activeOnly bool) ([]model.Rewar
 // If it has assignments, only assigned users see it, with per-user cost.
 func (s *Store) ListRewardsForUser(ctx context.Context, userID int64) ([]model.Reward, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT r.id, r.name, r.description, r.icon, r.cost, r.stock, r.shareable, r.created_by, r.created_at,
+		SELECT r.id, r.name, r.description, r.icon, r.cost, r.stock, r.shareable, r.pet_action, r.pet_item, r.created_by, r.created_at,
 			ra.custom_cost
 		FROM rewards r
 		LEFT JOIN reward_assignments ra ON ra.reward_id = r.id AND ra.user_id = ?
@@ -1425,7 +1425,7 @@ func (s *Store) ListRewardsForUser(ctx context.Context, userID int64) ([]model.R
 		var r model.Reward
 		var shareable int
 		var customCost sql.NullInt64
-		if err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &shareable, &r.CreatedBy, &r.CreatedAt, &customCost); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.Icon, &r.Cost, &r.Stock, &shareable, &r.PetAction, &r.PetItem, &r.CreatedBy, &r.CreatedAt, &customCost); err != nil {
 			return nil, err
 		}
 		r.Active = true
@@ -1526,8 +1526,8 @@ func (s *Store) UpdateReward(ctx context.Context, r *model.Reward) error {
 	priorlyShareable := priorShareable == 1
 
 	if _, err := tx.ExecContext(ctx,
-		`UPDATE rewards SET name=?, description=?, icon=?, cost=?, stock=?, active=?, shareable=? WHERE id=?`,
-		r.Name, r.Description, r.Icon, r.Cost, r.Stock, boolToInt(r.Active), boolToInt(r.Shareable), r.ID); err != nil {
+		`UPDATE rewards SET name=?, description=?, icon=?, cost=?, stock=?, active=?, shareable=?, pet_action=?, pet_item=? WHERE id=?`,
+		r.Name, r.Description, r.Icon, r.Cost, r.Stock, boolToInt(r.Active), boolToInt(r.Shareable), r.PetAction, r.PetItem, r.ID); err != nil {
 		return err
 	}
 
