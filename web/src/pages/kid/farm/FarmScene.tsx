@@ -6,7 +6,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { Pet } from '../../../types';
-import { FarmAnimal, FarmBackdrop, Shelter } from './FarmAnimal';
+import { FarmAnimal, petPicture, FarmBackdrop, Shelter } from './FarmAnimal';
+import { Rosette } from './Rosette';
 import s from './farm.module.css';
 
 interface Spot { x: number; y: number; face: 1 | -1; ms: number; walking: boolean }
@@ -106,8 +107,12 @@ export function FarmScene({ pets, meId, compact, owners = !compact, onSelect, cl
 
   const tag = (p: Pet) => (
     <span className={s.tag} style={{ ['--tag' as string]: p.owner_color ? `var(--person-${p.owner_color})` : undefined }}>
-      <span className={s.tagName}>{p.name}</span>
+      <span className={s.tagName}>
+        {p.ribbon && <Rosette className={s.rosette} title={t('kid.board.ribbon')} />}
+        {p.name}
+      </span>
       {owners && p.owner_name && <span className={s.tagOwner}>{p.owner_name}</span>}
+      {p.visiting && <span className={s.tagOwner}>{t('kid.farm.visiting', { family: p.family ?? '' })}</span>}
     </span>
   );
 
@@ -159,7 +164,7 @@ export function FarmScene({ pets, meId, compact, owners = !compact, onSelect, cl
           >
             {badge && <span className={s.badge} aria-hidden="true">{badge}</span>}
             <span className={s.body} style={{ transform: `scaleX(${sp.face})` }}>
-              <FarmAnimal species={p.species} color={p.color} mood={p.mood} accessory={p.accessory} className={s.svg} />
+              <FarmAnimal species={p.species} color={p.color} mood={p.mood} accessory={p.accessory} {...petPicture(p)} className={s.svg} />
             </span>
             {tag(p)}
           </button>

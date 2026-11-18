@@ -3,9 +3,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
-import { api } from '../../api';
+import { api, APIError } from '../../api';
 import type { Pet } from '../../types';
-import { FarmAnimal } from '../../pages/kid/farm/FarmAnimal';
+import { FarmAnimal, petPicture } from '../../pages/kid/farm/FarmAnimal';
 import { FormMessage } from './FormMessage';
 import ui from './ui.module.css';
 import fp from './FarmPetsSection.module.css';
@@ -32,6 +32,28 @@ export const FarmPetsSection: React.FC = () => {
     try {
       await api.pets.remove(p.user_id);
       setMessage({ type: 'success', text: t('admin.settingsTab.pets.removed', { name: p.name, owner: p.owner_name ?? '' }) });
+      load();
+    } catch {
+      setMessage({ type: 'error', text: t('admin.settingsTab.pets.failed') });
+    }
+  };
+
+  const approvePicture = async (p: Pet, approved: boolean) => {
+    try {
+      await api.pets.approvePicture(p.user_id, approved, p.sprite);
+      setMessage({ type: 'success', text: t(approved ? 'admin.settingsTab.pets.approved' : 'admin.settingsTab.pets.unapproved', { name: p.name }) });
+      load();
+    } catch (e) {
+      // 409: the kid changed the picture while this page was open.
+      setMessage({ type: 'error', text: e instanceof APIError && e.status === 409 ? t('admin.settingsTab.pets.pictureChanged') : t('admin.settingsTab.pets.failed') });
+      load();
+    }
+  };
+
+  const removePicture = async (p: Pet) => {
+    try {
+      await api.pets.removePicture(p.user_id);
+      setMessage({ type: 'success', text: t('admin.settingsTab.pets.pictureRemoved', { name: p.name }) });
       load();
     } catch {
       setMessage({ type: 'error', text: t('admin.settingsTab.pets.failed') });
@@ -74,13 +96,24 @@ export const FarmPetsSection: React.FC = () => {
         <ul className={ui.list}>
           {pets.map(p => (
             <li key={p.id} className={fp.row}>
-              <FarmAnimal species={p.species} color={p.color} mood={p.mood} accessory={p.accessory} className={fp.thumb} />
+              <FarmAnimal species={p.species} color={p.color} mood={p.mood} accessory={p.accessory} {...petPicture(p)} className={fp.thumb} />
               <span className={fp.text}>
                 <strong>{p.name}</strong> · {p.owner_name} · {t(`kid.farm.mood.${p.mood}`, { name: p.name })}
               </span>
               <button type="button" className={confirming === p.id ? ui.btnDanger : ui.btnGhost} onClick={() => remove(p)}>
                 {confirming === p.id ? t('admin.settingsTab.pets.confirmRemove') : t('admin.settingsTab.pets.remove')}
               </button>
+              {p.sprite && (
+                <div className={fp.picture}>
+                  <label className={ui.check} title={t('admin.settingsTab.pets.approveTitle')}>
+                    <input type="checkbox" checked={!!p.sprite_approved} onChange={e => approvePicture(p, e.target.checked)} />
+                    <span className={ui.checkLabel}>{t('admin.settingsTab.pets.approve')}</span>
+                  </label>
+                  <button type="button" className={ui.btnGhost} onClick={() => removePicture(p)}>
+                    {t('admin.settingsTab.pets.removePicture')}
+                  </button>
+                </div>
+              )}
             </li>
           ))}
         </ul>

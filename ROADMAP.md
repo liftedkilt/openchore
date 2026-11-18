@@ -45,7 +45,13 @@
 - [x] Streaks tracking and display
 - [x] Streak rewards — admin-configurable rewards for hitting streak milestones
 - [ ] Achievements/badges (milestone-driven, computed server-side)
-- [ ] Leaderboard (optional per-family setting)
+- [x] Leaderboard (optional per-family setting) — weekly, scored by the share of assigned chore points earned, not points totals
+- [x] Friend families — link two households through a coordination server for a shared leaderboard and farm visits
+- [x] Custom animals — use your own picture as your farm animal: one PNG, or a strip of up to six (stand, two walk steps, sick, lying down, happy), with a starter kit (blank canvases, guides, example duck)
+- [x] Custom animals: pictures go to friend families when the sending parent approves and the receiving parent opts in
+- [x] Leaderboard on the wall display (this household only)
+- [x] Friend families: families as teams with a goal to reach together, the weekly winner's ribbon, gifts and playdates between linked families
+- [ ] Friend families: a farm decoration for a reached goal, winner history, repeating goals
 - [ ] Chore swaps/trading between siblings (parent-approved)
 - [ ] Helper mode — partial credit for helping on someone else's chore
 - [x] Family chores (assignment_type: family — anyone can complete, points only if their own chores are done)

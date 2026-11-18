@@ -5,7 +5,7 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { PET_ITEM_SLOTS, type Pet, type PetItemSlot, type Reward } from '../../../types';
 import { Sheet } from '../Sheet';
-import { FarmAnimal } from './FarmAnimal';
+import { FarmAnimal, petPicture } from './FarmAnimal';
 import k from '../kid.module.css';
 import s from './petSheet.module.css';
 
@@ -174,6 +174,7 @@ export function DesignSheet({ pet, reward, busy, onConfirm, onClose }: DesignShe
             mood="happy"
             accessory={empty ? pet.accessory : `img:${slot}:preview`}
             accessoryImageUrl={empty ? undefined : preview}
+            {...petPicture(pet)}
             className={s.pickArt}
           />
           <div className={k.ownChips} role="radiogroup" aria-label={t('kid.farm.design.where')}>

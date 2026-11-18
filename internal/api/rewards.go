@@ -54,6 +54,16 @@ func (h *RewardHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 		rewards = kept
 	}
+	// Gifts and playdates only show when there's a friend family's animal to send them to.
+	if h.pets == nil || h.pets.Friends == nil || !h.pets.Friends.HasFriendAnimals(r.Context()) {
+		kept := rewards[:0]
+		for _, rw := range rewards {
+			if rw.PetAction != model.PetActionGift && rw.PetAction != model.PetActionPlaydate {
+				kept = append(kept, rw)
+			}
+		}
+		rewards = kept
+	}
 	if rewards == nil {
 		rewards = []model.Reward{}
 	}
@@ -252,7 +262,8 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 	}
 	// New animal / restyle carry the person's pick in the body.
 	var choice *PetChoice
-	if petReward != nil && (petReward.PetAction == model.PetActionNewAnimal || petReward.PetAction == model.PetActionRestyle || petReward.PetAction == model.PetActionDesign) {
+	if petReward != nil && (petReward.PetAction == model.PetActionNewAnimal || petReward.PetAction == model.PetActionRestyle || petReward.PetAction == model.PetActionDesign || petReward.PetAction == model.PetActionPicture ||
+		petReward.PetAction == model.PetActionGift || petReward.PetAction == model.PetActionPlaydate) {
 		r.Body = http.MaxBytesReader(w, r.Body, 5<<20) // room for a drawn picture
 		var body struct {
 			Pet *PetChoice `json:"pet"`
@@ -272,7 +283,7 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// A drawn accessory is saved first and removed again if paying fails.
+	// A drawn accessory or animal picture is saved first and removed again if paying fails.
 	if choice != nil && choice.png != nil {
 		id, err := savePetImage(choice.png)
 		if err != nil {
@@ -280,19 +291,39 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		choice.item = "img:" + choice.Slot + ":" + id
+		if petReward.PetAction == model.PetActionPicture {
+			choice.item = id
+		}
 		defer func() {
 			if choice.item == "" {
 				removePetImage(id)
 			}
 		}()
 	}
+	// A gift or playdate is recorded first, where today's limit is enforced,
+	// and taken back if paying fails: never charged for and not sent.
+	if choice != nil && choice.send != nil {
+		msg, err := h.pets.Friends.ReserveSend(r.Context(), user.ID, choice.send)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to send")
+			return
+		}
+		if msg != "" {
+			writeError(w, http.StatusUnprocessableEntity, msg)
+			return
+		}
+	}
 	redemption, err := h.store.RedeemReward(r.Context(), user.ID, rewardID)
 	if err != nil {
 		if choice != nil {
 			choice.item = ""
+			h.pets.Friends.CancelSend(r.Context(), choice.send)
 		}
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
+	}
+	if choice != nil && choice.send != nil {
+		h.pets.Friends.ConfirmSend(r.Context(), choice.send, redemption.ID)
 	}
 	if petReward != nil {
 		if err := h.pets.applyPetReward(r.Context(), user.ID, petReward, choice); err != nil {
@@ -326,6 +357,13 @@ func (h *RewardHandler) UndoRedemption(w http.ResponseWriter, r *http.Request) {
 	if err := h.store.UndoRedemption(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to undo redemption")
 		return
+	}
+	// A gift or playdate it paid for is taken back too (one that has
+	// already arrived at the other family stays arrived).
+	if h.pets != nil && h.pets.Friends != nil {
+		if err := h.pets.Friends.UndoSend(r.Context(), id); err != nil {
+			log.Printf("rewards: redemption %d undone but its gift or playdate wasn't taken back: %v", id, err)
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

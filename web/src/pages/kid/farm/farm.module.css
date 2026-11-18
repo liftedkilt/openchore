@@ -131,6 +131,17 @@
 :global(.farm-tail) { transform-box: fill-box; transform-origin: 100% 100%; animation: farm-wag 900ms ease-in-out infinite alternate; }
 .lying :global(.farm-tail) { animation: none; }
 
+/* A custom animal with walk frames (FarmAnimal): standing still shows the
+   resting frame; walking swaps between the two walk frames. */
+:global(.farm-frame-walk-a), :global(.farm-frame-walk-b) { visibility: hidden; }
+.walking :global(.farm-frame-rest) { visibility: hidden; }
+.walking :global(.farm-frame-walk-a) { animation: farm-frame 440ms steps(1, end) infinite; }
+.walking :global(.farm-frame-walk-b) { animation: farm-frame 440ms steps(1, end) -220ms infinite; }
+@keyframes farm-frame {
+  0% { visibility: visible; }
+  50%, 100% { visibility: hidden; }
+}
+
 @keyframes farm-step { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
 @keyframes farm-wag { from { transform: rotate(-8deg); } to { transform: rotate(8deg); } }
 
@@ -259,3 +270,10 @@
 @media (prefers-reduced-motion: reduce) {
   .star { animation: none; }
 }
+@media (prefers-reduced-motion: reduce) {
+  .walking :global(.farm-frame-rest) { visibility: visible; }
+  .walking :global(.farm-frame-walk-a), .walking :global(.farm-frame-walk-b) { animation: none; visibility: hidden; }
+}
+
+/* The winner's ribbon on a name tag. */
+.rosette { width: 12px; height: 14px; margin-right: 3px; vertical-align: -2px; }

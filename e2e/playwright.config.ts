@@ -22,14 +22,23 @@ export default defineConfig({
     {
       name: 'main',
       use: { browserName: 'chromium' },
-      testIgnore: /admin-pin-change|sign-in-options/,
+      testIgnore: /admin-pin-change|sign-in-options|leaderboard|custom-animal/,
     },
     {
-      // Specs that change household-wide sign-in state, run after the rest.
+      // Specs that turn a household-wide feature on (farm pets, the
+      // leaderboard), run after the rest so they can't change the screens
+      // other specs are looking at.
+      name: 'shared-state',
+      use: { browserName: 'chromium' },
+      testMatch: /leaderboard|custom-animal/,
+      dependencies: ['main'],
+    },
+    {
+      // Specs that change household-wide sign-in state, run last.
       name: 'pin-change',
       use: { browserName: 'chromium' },
       testMatch: /admin-pin-change|sign-in-options/,
-      dependencies: ['main'],
+      dependencies: ['main', 'shared-state'],
     },
   ],
   webServer: [

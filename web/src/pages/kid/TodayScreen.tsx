@@ -7,6 +7,7 @@ import { GoalNudge } from './GoalCard';
 import { CAT_ORDER, ChoreGroups, Notice, OwnTaskEntry, PausedNotice } from './parts';
 import type { KidData } from './useKidData';
 import { FarmScene } from './farm/FarmScene';
+import { LeaderboardCard } from './board/Leaderboard';
 import s from './kid.module.css';
 import fs from './farm/petSheet.module.css';
 
@@ -30,9 +31,11 @@ interface TodayProps {
   onOwnTasks?: (date?: string) => void;
   /** Open the family farm. */
   onFarm?: () => void;
+  /** Open the weekly leaderboard. */
+  onBoard?: () => void;
 }
 
-export function TodayScreen({ user, data, now, topBar, viewOf, tts, onToggle, onPhoto, onSpeak, onOwnTasks, onFarm }: TodayProps) {
+export function TodayScreen({ user, data, now, topBar, viewOf, tts, onToggle, onPhoto, onSpeak, onOwnTasks, onFarm, onBoard }: TodayProps) {
   const { t } = useTranslation();
   const chores = (data.chores ?? []).filter(c => c.date === data.today);
   const firstName = user.name.split(' ')[0];
@@ -114,9 +117,11 @@ export function TodayScreen({ user, data, now, topBar, viewOf, tts, onToggle, on
           {data.myPet && (
             <p className={fs.farmCardLine}>{t(`kid.farm.mood.${data.myPet.mood}`, { name: data.myPet.name })}</p>
           )}
-          <FarmScene pets={data.farm.pets} meId={user.id} compact onSelect={onFarm} />
+          <FarmScene pets={data.farmPets} meId={user.id} compact onSelect={onFarm} />
         </section>
       )}
+
+      {data.leaderboard && onBoard && <LeaderboardCard board={data.leaderboard} user={user} onOpen={onBoard} />}
 
       {/* Goals: under the list on a phone, under the hero on a tablet. */}
       {commitments.length > 0 && (

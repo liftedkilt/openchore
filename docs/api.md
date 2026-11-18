@@ -97,6 +97,21 @@ Requires a session or an API token.
 | `POST` | `/api/rewards/{id}/redeem` | Redeem a reward |
 | `GET` | `/api/users/{id}/redemptions` | Redemption history |
 
+### Farm pets, leaderboard, friend families
+
+Optional features, off until a parent turns them on. Details in
+[pets.md](pets.md), [custom-animals.md](custom-animals.md) and
+[friends.md](friends.md).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/pets` | The family farm: every animal with its mood (public, like chores and points) |
+| `GET` | `/api/leaderboard/household` | This household's own weekly standings (public, for the wall display) |
+| `GET` `POST` `PATCH` | `/api/me/pet` | This person's animal: view, adopt, rename / change accessory / drop a custom picture |
+| `GET` | `/api/leaderboard?week=this\|last` | The weekly standings, with people shared by linked families |
+| `GET` | `/api/friends/farms` | Linked families' farms, as of their last sync |
+| `GET` | `/api/friends/visitors` | Friends' animals here on a playdate today, and treats friends sent today |
+
 ### Reward commitments
 
 Kids can pledge points toward a specific reward and watch progress accrue,
@@ -171,6 +186,20 @@ Requires an authenticated caller with the `admin` role.
 | `DELETE` | `/api/redemptions/{redemptionID}` | Undo a redemption |
 | `GET` `POST` | `/api/admin/streak-rewards` | List / create streak milestones |
 | `DELETE` | `/api/admin/streak-rewards/{id}` | Delete a milestone |
+
+### Farm pets, leaderboard, friend families
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `PUT` | `/api/admin/pets` | Turn farm pets on or off |
+| `DELETE` | `/api/admin/users/{id}/pet` | Remove a person's animal |
+| `PUT` `DELETE` | `/api/admin/users/{id}/pet/picture` | Allow a custom animal picture to be sent to friend families / remove it |
+| `GET` `PUT` | `/api/admin/friends` | Leaderboard switch, family name, coordination server, and each linked family |
+| `POST` | `/api/admin/friends/invites` | Make an invite for another family |
+| `POST` | `/api/admin/friends/join` | Join with another family's invite |
+| `PUT` | `/api/admin/friends/{id}` | For one linked family: who is sent and shown, pictures, gifts and playdates, and the team goal |
+| `POST` | `/api/admin/friends/{id}/sync` | Sync with one linked family now |
+| `DELETE` | `/api/admin/friends/{id}` | Unlink |
 
 ### Integrations
 

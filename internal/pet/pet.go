@@ -59,6 +59,23 @@ func ApplyDay(p *model.Pet, date string, d DayResult) {
 	p.Health = clamp(p.Health)
 }
 
+// ShowToday previews today's health gain as soon as it is earned: once every
+// chore that counts toward today is done, the pet is shown with the
+// GoodDayHealth that tonight's check will give it, so a kid who has done
+// everything sees their animal perk up now rather than tomorrow.
+//
+// It only changes what is shown. The stored health is untouched, tonight's
+// ApplyDay is still what makes it real, and un-ticking a chore (or a
+// rejection) takes the preview away again. Call it before Describe.
+func ShowToday(p *model.Pet, today []model.ScheduledChore) {
+	d := Summarize(today)
+	if d.Counted == 0 || d.Missed > 0 {
+		return
+	}
+	p.Health = clamp(p.Health + GoodDayHealth)
+	p.HealedToday = true
+}
+
 // Effect is what a pet-care reward does to fullness and joy.
 func Effect(action string) (fullness, joy int) {
 	switch action {

@@ -302,3 +302,25 @@
   color: var(--ink);
 }
 .careThumb { grid-row: 1 / 3; width: 52px; height: 42px; }
+
+/* "Use my own picture": the preview stands on a strip of grass, so a
+   see-through background shows as it will on the farm. */
+.pictureGrass {
+  display: grid;
+  place-items: end center;
+  width: 100%;
+  max-width: 260px;
+  padding: var(--space-2) var(--space-3) 6px;
+  border: var(--outline-w) solid var(--line);
+  border-radius: var(--r-well);
+  background: linear-gradient(to bottom, var(--farm-sky-top, #bfe3f7) 0 62%, var(--farm-hill-near, #a3d47c) 62% 100%);
+}
+a.chip { text-decoration: none; color: inherit; }
+.pictureMoods { display: flex; gap: var(--space-3); }
+.pictureMoods figure { display: flex; flex-direction: column; align-items: center; margin: 0; }
+.pictureMoods svg { width: 70px; height: 56px; }
+.pictureMoods figcaption { color: var(--ink-muted); font-size: 12px; }
+.pictureKit { margin-top: var(--space-2); }
+.friendOwner { color: var(--ink-muted); font-size: 12px; }
+/* Treats friends sent today. */
+.giftLine { margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-3); border-radius: var(--r-row); background: var(--surface-sunk); font-size: 14px; }

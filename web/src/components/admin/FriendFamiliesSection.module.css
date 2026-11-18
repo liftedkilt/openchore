@@ -1,0 +1,18 @@
+.sub { margin: var(--space-5) 0 var(--space-1); font-size: 15px; font-weight: 700; }
+.inline { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2); margin: var(--space-2) 0; }
+.grow { flex: 1 1 180px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.note { margin: 4px 0; color: var(--ink-muted); font-size: 13px; overflow-wrap: anywhere; }
+.error { color: var(--urgent); }
+.people { margin: var(--space-3) 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 2px; }
+.link { padding: var(--space-3); }
+.linkHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.status { padding: 2px 10px; border-radius: 999px; background: var(--surface-sunk); font-size: 12px; font-weight: 700; }
+.active { background: color-mix(in srgb, var(--person-mint) 45%, var(--surface-raised)); }
+.ended { color: var(--urgent); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+.sides { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-2) var(--space-5); }
+.hint { margin-left: 8px; color: var(--ink-muted); font-size: 12.5px; font-weight: 400; }
+.ok { color: var(--ink); font-weight: 700; }
+.goal { margin-top: var(--space-3); }
+.goalInput { width: 84px; flex: none; }

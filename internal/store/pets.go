@@ -11,14 +11,17 @@ import (
 // ErrPetExists is returned when a person who already has a pet adopts another.
 var ErrPetExists = fmt.Errorf("you already have a pet")
 
-const petColumns = `id, user_id, name, species, color, health, fullness, joy, accessory, last_missed_date, last_day_checked, created_at`
+const petColumns = `id, user_id, name, species, color, health, fullness, joy, accessory, sprite, sprite_frames, sprite_approved, last_missed_date, last_day_checked, created_at`
 
 func scanPet(row interface{ Scan(...any) error }) (*model.Pet, error) {
 	p := &model.Pet{}
 	var missed sql.NullString
-	if err := row.Scan(&p.ID, &p.UserID, &p.Name, &p.Species, &p.Color, &p.Health, &p.Fullness, &p.Joy, &p.Accessory,
+	if err := row.Scan(&p.ID, &p.UserID, &p.Name, &p.Species, &p.Color, &p.Health, &p.Fullness, &p.Joy, &p.Accessory, &p.Sprite, &p.SpriteFrames, &p.SpriteApproved,
 		&missed, &p.LastDayChecked, &p.CreatedAt); err != nil {
 		return nil, err
+	}
+	if p.Sprite == "" {
+		p.SpriteFrames, p.SpriteApproved = 0, false
 	}
 	if missed.Valid {
 		m := missed.String
@@ -160,6 +163,37 @@ func (s *Store) RenamePet(ctx context.Context, userID int64, name string) error 
 func (s *Store) SetPetLook(ctx context.Context, userID int64, species, color string) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE pets SET species = ?, color = ? WHERE user_id = ?`, species, color, userID)
 	return err
+}
+
+// SetPetSprite sets (or with "" clears) the person's own animal picture and
+// returns the id it replaced, so the caller can delete that file.
+func (s *Store) SetPetSprite(ctx context.Context, userID int64, id string, frames int) (old string, err error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+	if err := tx.QueryRowContext(ctx, `SELECT sprite FROM pets WHERE user_id = ?`, userID).Scan(&old); err != nil {
+		return "", err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE pets SET sprite = ?, sprite_frames = ?, sprite_approved = 0 WHERE user_id = ?`, id, max(frames, 1), userID); err != nil {
+		return "", err
+	}
+	return old, tx.Commit()
+}
+
+// SetPetSpriteApproved records whether a parent has said the person's
+// picture (the one with this id) may be sent to friend families. It reports
+// whether that picture is still the person's.
+func (s *Store) SetPetSpriteApproved(ctx context.Context, userID int64, sprite string, approved bool) (bool, error) {
+	// For the picture the parent was looking at: if the kid has swapped it
+	// since, this matches nothing rather than approving one nobody has seen.
+	res, err := s.db.ExecContext(ctx, `UPDATE pets SET sprite_approved = ? WHERE user_id = ? AND sprite != '' AND sprite = ?`, approved, userID, sprite)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
 }
 
 // SavePetDay stores the outcome of one or more daily checks. The

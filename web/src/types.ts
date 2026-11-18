@@ -291,9 +291,15 @@ export interface Reward {
 
 // --- Farm pets ---
 
-export type PetAction = 'feed' | 'treat' | 'play' | 'accessory' | 'new_animal' | 'restyle' | 'design';
+export type PetAction = 'feed' | 'treat' | 'play' | 'accessory' | 'new_animal' | 'restyle' | 'design' | 'picture' | 'gift' | 'playdate';
 /** What a person picks when redeeming new_animal / restyle / design rewards. */
-export interface PetPick { species?: PetSpecies; color?: string; slot?: PetItemSlot; image?: string }
+export interface PetPick {
+  species?: PetSpecies; color?: string; slot?: PetItemSlot; image?: string;
+  /** gift: the friend whose animal gets it (a leaderboard key). */
+  friend?: string;
+  /** playdate: the linked family to visit. */
+  link?: number;
+}
 export type PetSpecies = 'horse' | 'dog' | 'cat' | 'chicken' | 'cow' | 'pig' | 'sheep' | 'goat';
 /** A built-in accessory key, or a custom emoji accessory `e:<head|face|neck>:<emoji>`. */
 export type PetItem = string;
@@ -330,9 +336,26 @@ export interface Pet {
   fullness: number;
   joy: number;
   accessory?: PetItem | '';
+  /** The person's own picture, shown in place of the drawn animal (docs/custom-animals.md). */
+  sprite?: string;
+  /** Frames in that picture, side by side: stand, walk, walk, sick, lying down, happy (1 = a single picture). */
+  sprite_frames?: number;
+  /** A parent has said the picture may be sent to friend families. */
+  sprite_approved?: boolean;
+  /** A friend family's animal: its picture as a data: URL (set instead of sprite). */
+  sprite_data?: string;
+  /** The owner came first on last week's leaderboard. */
+  ribbon?: boolean;
+  /** A friend family's animal here on a playdate; family says whose. */
+  visiting?: boolean;
+  family?: string;
+  /** A friend family's animal: its owner's leaderboard key, e.g. to send it a gift. */
+  friend_key?: string;
   items: PetItem[];
   last_missed_date?: string;
   mood: PetMood;
+  /** All of today's chores are done, so health already shows tonight's gain. */
+  healed_today?: boolean;
   hiding: boolean;
   sick: boolean;
   can_play: boolean;
@@ -592,4 +615,84 @@ export interface AIReviewResult {
   feedback: string;
   would_approve: boolean;
   elapsed_ms: number;
+}
+
+// --- Leaderboard & friend families (docs/friends.md) ---
+
+export interface LeaderboardEntry {
+  key: string;
+  name: string;
+  color?: string;
+  /** Set for people from a friend family. */
+  family?: string;
+  link_id?: number;
+  /** Set for this household's people. */
+  user_id?: number;
+  streak: number;
+  paused?: boolean;
+  assigned: number;
+  done: number;
+  bonus: number;
+  /** The score in hundredths, 0 to 10000: what people are ranked on. */
+  share: number;
+  /** The score out of 100: share of assigned chore points earned (of chores, if the chores carry no points). */
+  percent: number;
+  /** 0 = not ranked yet (fewer than min_assigned chores this week). */
+  rank: number;
+  /** Came first last week, so wears the ribbon this week. */
+  winner?: boolean;
+}
+
+export interface LeaderboardFamily { link_id: number; name: string; snapshot_at?: string; pets: number }
+
+export interface Leaderboard {
+  enabled: boolean;
+  week_start: string;
+  week_end: string;
+  min_assigned: number;
+  entries: LeaderboardEntry[];
+  families: LeaderboardFamily[];
+  /** This household and each linked family as two teams. */
+  teams: LeaderboardTeam[];
+}
+
+export interface TeamSide { people: number; score: number }
+export interface TeamGoal { target: number; state: 'active' | 'ours' | 'theirs' | 'differs'; their_target?: number; met: boolean }
+export interface LeaderboardTeam { link_id: number; family: string; ours: TeamSide; theirs: TeamSide; together: TeamSide; goal?: TeamGoal }
+
+/** A treat a friend sent one of this household's animals today. */
+export interface FriendGift { to_user_id: number; from: string; family: string }
+
+export interface FriendFarm { link_id: number; family: string; snapshot_at?: string; pets: Pet[] }
+
+export interface FriendLink {
+  id: number;
+  status: 'waiting' | 'active' | 'ended';
+  peer_name: string;
+  hub_url: string;
+  /** Show this family's custom animal pictures here. */
+  show_pictures: boolean;
+  /** Take gifts and playdates from this family. */
+  allow_visits: boolean;
+  /** The team goal for this week, if either family has put one forward. */
+  goal?: TeamGoal | null;
+  invite?: string;
+  invite_expires?: string;
+  /** This household's people: shared = sent to this family; accepted = they chose to show them. */
+  outbound: { id: number; name: string; color?: string; role: string; shared: boolean; accepted: boolean }[];
+  /** The people this family offers: accepted = shown here. */
+  inbound: { id: string; name: string; color?: string; accepted: boolean }[];
+  snapshot_at?: string;
+  last_sync_at?: string;
+  last_error?: string;
+  created_at: string;
+}
+
+export interface FriendsSettings {
+  leaderboard_enabled: boolean;
+  family_name: string;
+  hub_url: string;
+  hub_key_set: boolean;
+  hub_from_env: boolean;
+  links: FriendLink[];
 }

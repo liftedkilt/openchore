@@ -168,3 +168,9 @@
   .door { min-height: 360px; }
   .family { grid-template-columns: 1fr; }
 }
+
+/* This week's leaderboard: one quiet line under the family strip. */
+.week { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--space-4); margin: var(--space-1) 0 0; max-height: 34px; overflow: hidden; font-size: 15px; }
+.weekEntry { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.weekEntry strong { font-variant-numeric: tabular-nums; }
+.weekRank { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--who, var(--surface-sunk)); color: #1a1a1c; font-size: 12px; font-weight: 700; }
