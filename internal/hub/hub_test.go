@@ -165,6 +165,26 @@ func TestSweepAndLimits(t *testing.T) {
 	}
 }
 
+// The hub doesn't describe itself to someone who just opens its address.
+func TestNoLandingPage(t *testing.T) {
+	_, srv := newHub(t, "key")
+	for _, path := range []string{"/", "/v1", "/v1/links"} {
+		resp, err := srv.Client().Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := make([]byte, 512)
+		n, _ := resp.Body.Read(body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusMethodNotAllowed {
+			t.Errorf("GET %s = %d", path, resp.StatusCode)
+		}
+		if bytes.Contains(bytes.ToLower(body[:n]), []byte("openchore")) {
+			t.Errorf("GET %s names the software: %q", path, body[:n])
+		}
+	}
+}
+
 func TestCallerAddress(t *testing.T) {
 	h, _ := newHub(t)
 	r := httptest.NewRequest("GET", "/", nil)

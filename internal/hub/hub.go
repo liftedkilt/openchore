@@ -92,12 +92,6 @@ func New(db *sql.DB, keys []string) (*Hub, error) {
 		}
 	}
 	h.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok\n")) })
-	h.mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Write([]byte("OpenChore coordination server.\n\n" +
-			"This passes encrypted updates between families who have linked their OpenChore apps.\n" +
-			"It can't read them, and there is nothing to see or sign in to here.\n"))
-	})
 	h.mux.HandleFunc("POST /v1/links", h.create)
 	h.mux.HandleFunc("POST /v1/links/{id}/join", h.join)
 	h.mux.HandleFunc("POST /v1/links/{id}/exchange", h.exchange)
