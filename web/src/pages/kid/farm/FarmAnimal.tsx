@@ -424,14 +424,20 @@ function Tail({ species, r, fast }: { species: PetSpecies; r: Rig; fast?: boolea
 function BodyDetail({ species, r }: { species: PetSpecies; r: Rig }) {
   const { x, y, rx, ry } = r.body;
   switch (species) {
-    case 'horse':
+    case 'horse': {
+      // Neck with mane. Only the crest and throat are outlined, and both stop
+      // at the body's edge; the fill dips into the body to hide the seam.
+      const crest = `M${x + 12} ${y - 12} Q${x + 20} ${y - 26} ${r.head.x - 2} ${r.head.y - 6}`;
+      const throat = `M${r.head.x + 6} ${r.head.y + 8} Q${x + 28} ${y - 12} ${x + 24} ${y - 4}`;
       return (
         <g>
-          {/* neck with mane */}
-          <path d={`M${x + 12} ${y - 10} Q${x + 20} ${y - 26} ${r.head.x - 2} ${r.head.y - 6} L${r.head.x + 6} ${r.head.y + 8} Q${x + 24} ${y} ${x + 18} ${y + 6}z`} fill={r.fur} {...ln(r.line)} />
+          <path d={`${crest} L${r.head.x + 6} ${r.head.y + 8} Q${x + 28} ${y - 12} ${x + 24} ${y - 4} L${x + 12} ${y}z`} fill={r.fur} />
+          <path d={crest} fill="none" {...ln(r.line)} />
+          <path d={throat} fill="none" {...ln(r.line)} />
           <path d={`M${r.head.x - 3} ${r.head.y - r.head.r - 1} q-9 2 -11 9 q-7 2 -8 9 q-6 3 -6 9 q-3 2 -2 6 L${x + 11} ${y - 9} Q${x + 20} ${y - 26} ${r.head.x - 1} ${r.head.y - 5}z`} fill={r.dark} {...ln(r.darkLine)} />
         </g>
       );
+    }
     case 'dog':
       return <ellipse cx={x - 6} cy={y - 4} rx={9} ry={6} fill={r.shade} opacity={0.6} />;
     case 'cat':
@@ -483,6 +489,59 @@ function BodyDetail({ species, r }: { species: PetSpecies; r: Rig }) {
   }
 }
 
+/**
+ * Where the neck leaves the body, as angles round the body ellipse (0 = the
+ * front, 90 = the top): the back of the neck rises from `back`, the throat
+ * meets the chest at `front`. Horses draw their own neck with the mane, and
+ * chickens and sheep sit their heads straight on the body.
+ */
+const NECKS: Partial<Record<PetSpecies, { back: number; front: number }>> = {
+  dog: { back: 62, front: 14 },
+  cat: { back: 60, front: 14 },
+  cow: { back: 58, front: 10 },
+  pig: { back: 55, front: 8 },
+  goat: { back: 62, front: 16 },
+};
+
+/**
+ * A neck joining the head to the body, so the head doesn't float. The fill
+ * covers the body's outline where they meet; only the two sides are outlined,
+ * and the head drawn on top hides their upper ends.
+ */
+function Neck({ species, r }: { species: PetSpecies; r: Rig }) {
+  const n = NECKS[species];
+  if (!n) return null;
+  const { body: b, head: h } = r;
+  const onBody = (deg: number) => {
+    const a = (deg * Math.PI) / 180;
+    return { x: b.x + b.rx * Math.cos(a), y: b.y - b.ry * Math.sin(a) };
+  };
+  const nape = onBody(n.back);
+  const chest = onBody(n.front);
+  // Both sides end inside the head circle so no seam shows.
+  const crown = { x: h.x - h.r * 0.55, y: h.y + h.r * 0.1 };
+  const chin = { x: h.x + h.r * 0.2, y: h.y + h.r * 0.75 };
+  const back = `M${nape.x} ${nape.y} Q${nape.x + 2} ${crown.y + 4} ${crown.x} ${crown.y}`;
+  const front = `M${chin.x} ${chin.y} Q${chest.x - 1} ${chin.y + 3} ${chest.x} ${chest.y}`;
+  return (
+    <g>
+      <path d={`${back} L${chin.x} ${chin.y} Q${chest.x - 1} ${chin.y + 3} ${chest.x} ${chest.y} Q${b.x + b.rx * 0.5} ${b.y - b.ry * 0.3} ${nape.x} ${nape.y}z`} fill={r.fur} />
+      <path d={back} fill="none" {...ln(r.line)} />
+      <path d={front} fill="none" {...ln(r.line)} />
+    </g>
+  );
+}
+
+/** A leaf-shaped ear from a base point on the head to its tip, `w` wide. */
+function earPath(bx: number, by: number, tx: number, ty: number, w: number): string {
+  const len = Math.hypot(tx - bx, ty - by);
+  const nx = -(ty - by) / len;
+  const ny = (tx - bx) / len;
+  const mx = (bx + tx) / 2;
+  const my = (by + ty) / 2;
+  return `M${bx + nx * w * 0.5} ${by + ny * w * 0.5} Q${mx + nx * w} ${my + ny * w} ${tx} ${ty} Q${mx - nx * w * 0.7} ${my - ny * w * 0.7} ${bx - nx * w * 0.5} ${by - ny * w * 0.5}z`;
+}
+
 /** Ears, horns, combs: drawn before the head so they tuck behind hats. */
 function HeadBack({ species, r }: { species: PetSpecies; r: Rig }) {
   const { x, y, r: hr } = r.head;
@@ -518,19 +577,29 @@ function HeadBack({ species, r }: { species: PetSpecies; r: Rig }) {
     case 'pig':
       return (
         <g>
-          <path d={`M${x - 10} ${y - 7} l-3 -11 l11 5z M${x + 4} ${y - 12} l8 -8 l2 11z`} fill={r.fur} {...ln(r.line)} />
-          <path d={`M${x - 8} ${y - 9} l-1 -5 l5 3z M${x + 6} ${y - 12} l4 -4 l1 6z`} fill={r.inner ?? r.shade} />
+          {/* Both ears' bases sit inside the head circle so they join it. */}
+          <path d={`M${x - 10} ${y - 7} l-3 -11 l11 5z M${x + 3} ${y - 12} L${x + 12} ${y - 21} L${x + 11} ${y - 6}z`} fill={r.fur} {...ln(r.line)} />
+          <path d={`M${x - 8} ${y - 9} l-1 -5 l5 3z M${x + 6} ${y - 12} L${x + 10} ${y - 17} L${x + 10} ${y - 10}z`} fill={r.inner ?? r.shade} />
         </g>
       );
-    case 'sheep':
+    case 'sheep': {
+      // Long ears hang from high on each side of the head, under the wool.
+      const inner = pale(r.face, 0.3);
+      const ears = [
+        earPath(x - hr * 0.6, y - hr * 0.5, x - hr - 5, y + 13, 7.5),
+        earPath(x + hr * 0.6, y - hr * 0.5, x + hr + 4, y + 14, 7.5),
+      ];
       return (
         <g>
+          {ears.map((d, i) => <path key={i} d={d} fill={r.face} {...ln(r.darkLine)} />)}
+          <path d={earPath(x - hr * 0.8, y - hr * 0.1, x - hr - 3.5, y + 10, 3)} fill={inner} />
+          <path d={earPath(x + hr * 0.8, y - hr * 0.1, x + hr + 2.5, y + 11, 3)} fill={inner} />
           {[[-6, -9], [2, -11], [8, -8]].map(([dx, dy], i) => (
             <circle key={i} cx={x + dx} cy={y + dy} r={5.5} fill={r.fur} {...ln(r.line)} />
           ))}
-          <ellipse cx={x - hr} cy={y + 1} rx={5} ry={3} fill={r.face} {...ln(r.darkLine)} />
         </g>
       );
+    }
     case 'goat':
       return (
         <g>
@@ -596,7 +665,7 @@ function HeadFront({ species, r }: { species: PetSpecies; r: Rig }) {
         </g>
       );
     case 'sheep':
-      return <ellipse cx={x + hr - 1} cy={y + 1} rx={5} ry={3} fill={r.face} {...ln(r.darkLine)} />;
+      return null;
     case 'goat':
       return (
         <g>
@@ -993,6 +1062,7 @@ export function FarmAnimal({ species, mood, color, accessory, accessoryImageUrl,
         )}
         <ellipse cx={body.x} cy={body.y} rx={body.rx} ry={body.ry} fill={r.fur} {...ln(r.line)} />
         <BodyDetail species={species} r={r} />
+        <Neck species={species} r={r} />
         {!lying && r.legs.map((l, i) => (i === 1 || i === 3) && (
           <g key={i} className={legClass(i)}><Leg species={species} r={r} hip={l} len={l.len} far={false} /></g>
         ))}
