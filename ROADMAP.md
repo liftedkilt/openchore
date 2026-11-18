@@ -45,7 +45,9 @@
 - [x] Streaks tracking and display
 - [x] Streak rewards — admin-configurable rewards for hitting streak milestones
 - [ ] Achievements/badges (milestone-driven, computed server-side)
-- [ ] Leaderboard (optional per-family setting)
+- [x] Leaderboard (optional per-family setting) — weekly, scored by chores done out of chores assigned, not points
+- [x] Friend families — link two households through a coordination server for a shared leaderboard and farm visits
+- [ ] Friend families: playdates, gifts, trophies, family-vs-family and co-op goals
 - [ ] Chore swaps/trading between siblings (parent-approved)
 - [ ] Helper mode — partial credit for helping on someone else's chore
 - [x] Family chores (assignment_type: family — anyone can complete, points only if their own chores are done)

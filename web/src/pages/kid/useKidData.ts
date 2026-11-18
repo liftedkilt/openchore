@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, APIError } from '../../api';
 import type {
-  Farm, PetPick, PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
+  Farm, Leaderboard, PetPick, PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
 } from '../../types';
 import { localDateStr } from '../../utils';
 
@@ -29,6 +29,7 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   const [redemptions, setRedemptions] = useState<RedemptionHistory[]>([]);
   const [people, setPeople] = useState<User[]>([]);
   const [farm, setFarm] = useState<Farm | null>(null);
+  const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null);
   const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -72,14 +73,16 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   const loadExtras = useCallback(async () => {
     if (!userId) return;
     try {
-      const [s, p, f] = await Promise.all([
+      const [s, p, f, lb] = await Promise.all([
         api.streaks.getForUser(userId),
         api.points.getForUser(userId),
         api.pets.farm().catch(() => null),
+        api.leaderboard.get().catch(() => null),
       ]);
       setStreak(s);
       setPoints(p);
       setFarm(f);
+      setLeaderboard(lb);
     } catch (e) {
       console.error(e);
     }
@@ -301,6 +304,7 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   return {
     today, chores, weekChores, streak, points, rewards, redemptions, people,
     farm, myPet: farm?.pets.find(p => p.user_id === userId) ?? null,
+    leaderboard,
     togglingIds, toast, showToast,
     reloadChores, refreshAll, loadRewards, loadExtras, toggle,
     commitmentFor, redeem, redeemingId, redeemedId, saveToward, savingTowardId,

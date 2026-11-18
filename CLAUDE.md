@@ -10,6 +10,7 @@ Family chore-tracking PWA: Go API + React/TypeScript frontend, SQLite storage, o
 
 ## Directory map
 - `cmd/server/` — entry point; runs migrations, seeds config, starts background workers.
+- `cmd/hub/` — the separate friend-families coordination server (`internal/hub`).
 - `internal/model/model.go` — **single source of truth for data structures**.
 - `internal/api/` — chi handlers, middleware, auth; integration tests in `api_test.go`.
 - `internal/store/` — SQLite DAO (one method per query, `context.Context`-aware).
@@ -40,6 +41,7 @@ Family chore-tracking PWA: Go API + React/TypeScript frontend, SQLite storage, o
 - **Bonus chores:** do not award bonus points unless all `required` and `core` chores for the day are complete.
 - **Optional chores:** never count toward the day (streaks, missed penalties, decay, bonus gate) — use `model.CountsTowardDay`; points, if any, pay immediately. Kids add their own via `/api/me/chores` (`internal/api/ownchores.go`): always `optional`, 0 points, `source = "self"`, and only editable by the owner while still 0 points.
 - **Farm pets** (optional, `docs/pets.md`): rules in `internal/pet`, daily checker `internal/webhook/pets.go`, API `internal/api/pets.go`. Points never buy health. Pet care is an ordinary reward with `pet_action`; check pet rules in `checkPetReward` *before* `RedeemReward` so a refusal costs nothing.
+- **Leaderboard & friend families** (optional, `docs/friends.md`): score rules in `internal/score` (chores done out of chores assigned; never points), sync and snapshots in `internal/friends`, API `internal/api/friends.go`. Instances never call each other: both call the hub (`internal/hub`, `cmd/hub`), which only holds encrypted snapshots. A snapshot carries only people with `share_with_friends` on, and never chore names, photos, points or rewards; keep it that way.
 - **Auth:** server-issued HMAC-signed sessions (`openchore_session` cookie or `Bearer ocs1.…`) from `POST /api/auth/login` (tap/PIN), OIDC (`internal/api/oidc.go`) or setup; API tokens (`Bearer <hex>`) act as admin. `X-User-ID` is **not** trusted. Admin is a role on a profile; every admin needs a PIN or linked identity. Middleware: `RequireSession`, `RequireUserOrToken`, `RequireAdmin`. OIDC providers come from `auth.oidc`/`OIDC_*` (read-only) plus the `oidc_providers` table (Settings UI); `OIDCService.Reload` applies changes without a restart. See `docs/authentication.md`.
 - **Parents take part:** don't filter by `role = 'child'` for chores/points/rewards/streaks; role only gates management.
 - **Errors:** respond with JSON `{"error": "..."}` via `writeError(w, status, msg)`. Log with stdlib `log.Printf`.

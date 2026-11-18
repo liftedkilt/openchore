@@ -1,4 +1,4 @@
-import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, OwnChore, OwnChoreInput, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput, SignInOptions, Farm, Pet, PetItem, PetPick, PetSpecies } from './types';
+import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, OwnChore, OwnChoreInput, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput, SignInOptions, Farm, Pet, PetItem, PetPick, PetSpecies, Leaderboard, FriendFarm, FriendLink, FriendsSettings } from './types';
 
 const API_BASE = '/api';
 
@@ -282,6 +282,23 @@ export const api = {
     }),
     listRedemptions: (userId: number) => fetchWithAuth<RedemptionHistory[]>(`/users/${userId}/redemptions`),
     undoRedemption: (redemptionId: number) => fetchWithAuth(`/redemptions/${redemptionId}`, { method: 'DELETE' }),
+  },
+  leaderboard: {
+    get: (week: 'this' | 'last' = 'this') => fetchWithAuth<Leaderboard>(`/leaderboard?week=${week}`),
+  },
+  friends: {
+    farms: () => fetchWithAuth<{ farms: FriendFarm[] }>('/friends/farms'),
+    settings: () => fetchWithAuth<FriendsSettings>('/admin/friends'),
+    update: (data: { leaderboard_enabled?: boolean; family_name?: string; hub_url?: string; hub_key?: string }) =>
+      fetchWithAuth<FriendsSettings>('/admin/friends', { method: 'PUT', body: JSON.stringify(data) }),
+    share: (userId: number, shared: boolean) => fetchWithAuth<{ id: number; shared: boolean }>(`/admin/users/${userId}/share`, {
+      method: 'PUT',
+      body: JSON.stringify({ shared }),
+    }),
+    invite: () => fetchWithAuth<FriendLink>('/admin/friends/invites', { method: 'POST' }),
+    join: (invite: string) => fetchWithAuth<FriendLink>('/admin/friends/join', { method: 'POST', body: JSON.stringify({ invite }) }),
+    sync: (id: number) => fetchWithAuth<FriendLink>(`/admin/friends/${id}/sync`, { method: 'POST' }),
+    unlink: (id: number) => fetchWithAuth(`/admin/friends/${id}`, { method: 'DELETE' }),
   },
   pets: {
     farm: () => fetchWithAuth<Farm>('/pets'),

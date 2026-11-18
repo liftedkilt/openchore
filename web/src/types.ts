@@ -593,3 +593,61 @@ export interface AIReviewResult {
   would_approve: boolean;
   elapsed_ms: number;
 }
+
+// --- Leaderboard & friend families (docs/friends.md) ---
+
+export interface LeaderboardEntry {
+  key: string;
+  name: string;
+  color?: string;
+  /** Set for people from a friend family. */
+  family?: string;
+  link_id?: number;
+  /** Set for this household's people. */
+  user_id?: number;
+  streak: number;
+  paused?: boolean;
+  assigned: number;
+  done: number;
+  bonus: number;
+  percent: number;
+  /** 0 = not ranked yet (fewer than min_assigned chores this week). */
+  rank: number;
+}
+
+export interface LeaderboardFamily { link_id: number; name: string; snapshot_at?: string; pets: number }
+
+export interface Leaderboard {
+  enabled: boolean;
+  week_start: string;
+  week_end: string;
+  min_assigned: number;
+  entries: LeaderboardEntry[];
+  families: LeaderboardFamily[];
+}
+
+export interface FriendFarm { link_id: number; family: string; snapshot_at?: string; pets: Pet[] }
+
+export interface FriendLink {
+  id: number;
+  status: 'waiting' | 'active' | 'ended';
+  peer_name: string;
+  hub_url: string;
+  invite?: string;
+  invite_expires?: string;
+  members: string[];
+  snapshot_at?: string;
+  last_sync_at?: string;
+  last_error?: string;
+  created_at: string;
+}
+
+export interface FriendsSettings {
+  leaderboard_enabled: boolean;
+  family_name: string;
+  hub_url: string;
+  hub_key_set: boolean;
+  hub_from_env: boolean;
+  people: { id: number; name: string; color?: string; role: string; shared: boolean }[];
+  links: FriendLink[];
+}
