@@ -98,20 +98,20 @@ export const FarmPetsSection: React.FC = () => {
               <span className={fp.text}>
                 <strong>{p.name}</strong> · {p.owner_name} · {t(`kid.farm.mood.${p.mood}`, { name: p.name })}
               </span>
-              {p.sprite && (
-                <label className={ui.check} title={t('admin.settingsTab.pets.approveTitle')}>
-                  <input type="checkbox" checked={!!p.sprite_approved} onChange={e => approvePicture(p, e.target.checked)} />
-                  <span className={ui.checkLabel}>{t('admin.settingsTab.pets.approve')}</span>
-                </label>
-              )}
-              {p.sprite && (
-                <button type="button" className={ui.btnGhost} onClick={() => removePicture(p)}>
-                  {t('admin.settingsTab.pets.removePicture')}
-                </button>
-              )}
               <button type="button" className={confirming === p.id ? ui.btnDanger : ui.btnGhost} onClick={() => remove(p)}>
                 {confirming === p.id ? t('admin.settingsTab.pets.confirmRemove') : t('admin.settingsTab.pets.remove')}
               </button>
+              {p.sprite && (
+                <div className={fp.picture}>
+                  <label className={ui.check} title={t('admin.settingsTab.pets.approveTitle')}>
+                    <input type="checkbox" checked={!!p.sprite_approved} onChange={e => approvePicture(p, e.target.checked)} />
+                    <span className={ui.checkLabel}>{t('admin.settingsTab.pets.approve')}</span>
+                  </label>
+                  <button type="button" className={ui.btnGhost} onClick={() => removePicture(p)}>
+                    {t('admin.settingsTab.pets.removePicture')}
+                  </button>
+                </div>
+              )}
             </li>
           ))}
         </ul>
