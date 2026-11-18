@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	_ "image/gif"  // decode uploaded GIFs
@@ -104,7 +105,7 @@ const (
 	spriteMinSide   = 8
 	spriteMaxFrames = 6
 	spriteMaxBytes  = 2 << 20
-	spriteMaxPix    = 4096 * 2048
+	spriteMaxPix    = spriteMaxFrames * 1024 * 1024 // decoded before scaling: bounds the memory an upload can ask for
 )
 
 // spriteFrames says how many frames a w x h picture holds: a picture whose
@@ -185,6 +186,13 @@ func decodeSprite(dataURL string) ([]byte, int, error) {
 	strip := frames > 1
 	for frames > 1 && solid[frames-1] == 0 {
 		frames--
+	}
+	// ...but not one in the middle: the app would show an empty picture
+	// for that mood instead of falling back.
+	for i := 1; i < frames; i++ {
+		if solid[i] == 0 {
+			return nil, 0, fmt.Errorf("picture %d in the row is empty; draw every picture up to the last one you use, or leave the end of the row blank", i+1)
+		}
 	}
 	if strip && frames*dh < dw {
 		cut := image.NewNRGBA(image.Rect(0, 0, frames*dh, dh))

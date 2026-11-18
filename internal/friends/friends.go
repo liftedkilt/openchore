@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/liftedkilt/openchore/internal/model"
@@ -60,14 +62,58 @@ var ErrNoHub = errors.New("no coordination server is set")
 
 // Service does the scoring catch-up and all the talking to hubs.
 type Service struct {
-	store  *store.Store
-	client *http.Client
-	now    func() time.Time
-	mu     sync.Mutex // one sync at a time
+	store   *store.Store
+	client  *http.Client // for this household's own hub
+	guarded *http.Client // for a hub named by someone else's invite
+	now     func() time.Time
+	mu      sync.Mutex // one sync at a time
 }
 
 func New(s *store.Store) *Service {
-	return &Service{store: s, client: &http.Client{Timeout: 20 * time.Second}, now: time.Now}
+	return &Service{store: s, client: hubClient(false), guarded: hubClient(true), now: time.Now}
+}
+
+// hubClient makes the HTTP client for talking to hubs. It never follows
+// redirects (a hub has no reason to send one). A guarded client also refuses
+// to connect to anything but a public address: it is used for hubs named by
+// an invite, which is text someone else wrote, so that a crafted invite
+// can't point this server at its own network.
+func hubClient(guard bool) *http.Client {
+	d := &net.Dialer{Timeout: 10 * time.Second}
+	if guard {
+		d.Control = func(_, address string, _ syscall.RawConn) error {
+			host, _, err := net.SplitHostPort(address)
+			if err != nil {
+				return err
+			}
+			if ip := net.ParseIP(host); ip == nil || !publicIP(ip) {
+				return errPrivateHub
+			}
+			return nil
+		}
+	}
+	return &http.Client{
+		Timeout:       20 * time.Second,
+		Transport:     &http.Transport{DialContext: d.DialContext, TLSHandshakeTimeout: 10 * time.Second, MaxIdleConns: 4, IdleConnTimeout: time.Minute},
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+}
+
+var errPrivateHub = errors.New("that invite points at a private network address, which isn't allowed")
+
+func publicIP(ip net.IP) bool {
+	return !(ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsMulticast() || ip.IsUnspecified())
+}
+
+// clientFor picks the client for a hub: this household's own configured hub
+// is trusted (it may well be on the home network); any other is guarded,
+// unless OPENCHORE_HUB_ALLOW_PRIVATE=true says private hubs are expected.
+func (f *Service) clientFor(ctx context.Context, hubURL string) *http.Client {
+	if own, _, _ := f.Hub(ctx); (own != "" && own == hubURL) || os.Getenv("OPENCHORE_HUB_ALLOW_PRIVATE") == "true" {
+		return f.client
+	}
+	return f.guarded
 }
 
 // SetClock overrides the clock (tests).
@@ -99,9 +145,14 @@ func (f *Service) Start(ctx context.Context) {
 // snapshot window. With recompute, recent days are counted again; without,
 // only missing days are filled in (cheap enough to call before a read).
 //
-// Paused is a current flag with no history, so a day is marked paused if the
-// person is paused when the day is first counted, and a paused row is never
-// recounted.
+// A finished day is counted against the chores that existed on that day: a
+// schedule created afterwards is left out, so adding a chore today can't
+// reach back and mark earlier days as missed.
+//
+// Paused is a current flag with no history. A day is marked paused when it
+// is first counted while the person is paused and they did nothing that day;
+// a paused row is never recounted. (A day they did do chores on is counted
+// even if they have been paused since.)
 func (f *Service) CatchUp(ctx context.Context, recompute bool) error {
 	now := f.now()
 	users, err := f.store.ListUsers(ctx)
@@ -130,13 +181,13 @@ func (f *Service) CatchUp(ctx context.Context, recompute bool) error {
 			if exists && (old.Paused || u.Paused || !recompute || date < recountFrom) {
 				continue
 			}
-			day := model.ScoreDay{Date: date, Paused: true}
-			if !u.Paused {
-				chores, err := f.store.GetScheduledChoresForUser(ctx, u.ID, []string{date}, now)
-				if err != nil {
-					return err
-				}
-				day = score.SummarizeDay(date, chores, true)
+			chores, err := f.choresOn(ctx, u.ID, date, now)
+			if err != nil {
+				return err
+			}
+			day := score.SummarizeDay(date, chores, true)
+			if u.Paused && day.Done == 0 && day.Bonus == 0 {
+				day = model.ScoreDay{Date: date, Paused: true}
 			}
 			if exists && old == day {
 				continue
@@ -147,6 +198,30 @@ func (f *Service) CatchUp(ctx context.Context, recompute bool) error {
 		}
 	}
 	return nil
+}
+
+// choresOn returns a person's chores for a finished day, without any
+// schedule that was only created after that day ended.
+func (f *Service) choresOn(ctx context.Context, userID int64, date string, now time.Time) ([]model.ScheduledChore, error) {
+	chores, err := f.store.GetScheduledChoresForUser(ctx, userID, []string{date}, now)
+	if err != nil {
+		return nil, err
+	}
+	day, err := time.ParseInLocation(model.DateFormat, date, now.Location())
+	if err != nil {
+		return nil, err
+	}
+	later, err := f.store.SchedulesCreatedSince(ctx, userID, day.AddDate(0, 0, 1))
+	if err != nil || len(later) == 0 {
+		return chores, err
+	}
+	kept := chores[:0]
+	for _, c := range chores {
+		if !later[c.ScheduleID] {
+			kept = append(kept, c)
+		}
+	}
+	return kept, nil
 }
 
 // Days returns every person's days for the snapshot window: stored rows for
@@ -300,6 +375,17 @@ func aead(secret string) (cipher.AEAD, error) {
 	return cipher.NewGCM(block)
 }
 
+// aad binds sealed data to the link and to who sealed it, so a blob can't
+// be handed back to its own sender as if it came from the other family.
+func aad(l *model.FriendLink, side string) []byte { return []byte(l.HubLink + ":" + side) }
+
+func otherSide(side string) string {
+	if side == "a" {
+		return "b"
+	}
+	return "a"
+}
+
 func seal(l *model.FriendLink, plain []byte) ([]byte, error) {
 	a, err := aead(l.Secret)
 	if err != nil {
@@ -309,7 +395,7 @@ func seal(l *model.FriendLink, plain []byte) ([]byte, error) {
 	if _, err := rand.Read(nonce); err != nil {
 		return nil, err
 	}
-	return a.Seal(nonce, nonce, plain, []byte(l.HubLink)), nil
+	return a.Seal(nonce, nonce, plain, aad(l, l.Side)), nil
 }
 
 func open(l *model.FriendLink, sealed []byte) ([]byte, error) {
@@ -320,7 +406,7 @@ func open(l *model.FriendLink, sealed []byte) ([]byte, error) {
 	if len(sealed) < a.NonceSize() {
 		return nil, errors.New("snapshot too short")
 	}
-	return a.Open(nil, sealed[:a.NonceSize()], sealed[a.NonceSize():], []byte(l.HubLink))
+	return a.Open(nil, sealed[:a.NonceSize()], sealed[a.NonceSize():], aad(l, otherSide(l.Side)))
 }
 
 // --- Invites ---
@@ -366,6 +452,20 @@ func cleanHubURL(raw string) (string, error) {
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
 		return "", errors.New("the coordination server address must start with https://")
 	}
+	// Just an origin, optionally with a path prefix: nothing that could
+	// smuggle a different request (query, fragment) or credentials.
+	if u.RawQuery != "" || u.Fragment != "" || u.User != nil || strings.ContainsAny(raw, "?#") {
+		return "", errors.New("the coordination server address can't contain ?, # or a user name")
+	}
+	// Keys and tokens travel in the request, so plain http is only for a
+	// hub on this machine or network.
+	if u.Scheme == "http" {
+		host := u.Hostname()
+		ip := net.ParseIP(host)
+		if host != "localhost" && (ip == nil || publicIP(ip)) {
+			return "", errors.New("the coordination server address must start with https://")
+		}
+	}
 	return raw, nil
 }
 
@@ -403,7 +503,8 @@ func Refused(err error) bool {
 	return errors.As(err, &in) || (errors.As(err, &he) && he.status >= 400 && he.status < 500)
 }
 
-func (f *Service) call(ctx context.Context, method, target, token string, body, out any) error {
+func (f *Service) call(ctx context.Context, method, hubURL, path, token string, body, out any) error {
+	target := hubURL + path
 	var rd io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -420,9 +521,14 @@ func (f *Service) call(ctx context.Context, method, target, token string, body, 
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	resp, err := f.client.Do(req)
+	resp, err := f.clientFor(ctx, hubURL).Do(req)
 	if err != nil {
-		return fmt.Errorf("couldn't reach the coordination server: %w", err)
+		if errors.Is(err, errPrivateHub) {
+			return errInput{errPrivateHub}
+		}
+		// The details (addresses, ports) go to the log, not to the screen.
+		log.Printf("friends: calling %s: %v", hubURL, err)
+		return errors.New("couldn't reach the coordination server")
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
@@ -455,14 +561,14 @@ func (f *Service) CreateInvite(ctx context.Context) (*model.FriendLink, error) {
 		JoinCode  string    `json:"join_code"`
 		ExpiresAt time.Time `json:"expires_at"`
 	}
-	if err := f.call(ctx, http.MethodPost, hubURL+"/v1/links", key, nil, &res); err != nil {
+	if err := f.call(ctx, http.MethodPost, hubURL, "/v1/links", key, nil, &res); err != nil {
 		return nil, err
 	}
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
 		return nil, err
 	}
-	l := &model.FriendLink{Status: model.FriendStatusWaiting, HubURL: hubURL, HubLink: res.Link, Token: res.Token,
+	l := &model.FriendLink{Status: model.FriendStatusWaiting, Side: "a", HubURL: hubURL, HubLink: res.Link, Token: res.Token,
 		Secret: base64.RawURLEncoding.EncodeToString(secret), InviteExpires: &res.ExpiresAt}
 	l.Invite = invite{Hub: hubURL, Link: res.Link, Code: res.JoinCode, Key: l.Secret}.String()
 	if err := f.store.CreateFriendLink(ctx, l); err != nil {
@@ -490,11 +596,11 @@ func (f *Service) Join(ctx context.Context, code string) (*model.FriendLink, err
 	var res struct {
 		Token string `json:"token"`
 	}
-	if err := f.call(ctx, http.MethodPost, inv.Hub+"/v1/links/"+url.PathEscape(inv.Link)+"/join", "",
+	if err := f.call(ctx, http.MethodPost, inv.Hub, "/v1/links/"+url.PathEscape(inv.Link)+"/join", "",
 		map[string]string{"code": inv.Code}, &res); err != nil {
 		return nil, err
 	}
-	l := &model.FriendLink{Status: model.FriendStatusActive, HubURL: inv.Hub, HubLink: inv.Link, Token: res.Token, Secret: inv.Key}
+	l := &model.FriendLink{Status: model.FriendStatusActive, Side: "b", HubURL: inv.Hub, HubLink: inv.Link, Token: res.Token, Secret: inv.Key}
 	if err := f.store.CreateFriendLink(ctx, l); err != nil {
 		return nil, err
 	}
@@ -531,10 +637,12 @@ func (f *Service) Sync(ctx context.Context, id int64) error {
 			Data []byte `json:"data"`
 		} `json:"peer"`
 	}
-	err = f.call(ctx, http.MethodPost, l.HubURL+"/v1/links/"+url.PathEscape(l.HubLink)+"/exchange", l.Token,
+	err = f.call(ctx, http.MethodPost, l.HubURL, "/v1/links/"+url.PathEscape(l.HubLink)+"/exchange", l.Token,
 		map[string]any{"data": sealed}, &res)
 	var he *hubError
-	if errors.As(err, &he) && (he.status == http.StatusGone || he.status == http.StatusNotFound) {
+	// Only the hub's own "gone" ends a link. A 404 can come from anything in
+	// front of the hub (a proxy mid-restart), and ending is not undoable.
+	if errors.As(err, &he) && he.status == http.StatusGone {
 		// The other family unlinked (or the invite ran out): drop their data.
 		return f.store.SaveFriendSync(ctx, id, model.FriendStatusEnded, "", "", nil, "", now)
 	}
@@ -556,6 +664,11 @@ func (f *Service) Sync(ctx context.Context, id int64) error {
 		if err := json.Unmarshal(raw, &ps); err != nil || ps.Version != snapshotVersion {
 			return fail(errors.New("the other family runs a version of OpenChore this one can't read"))
 		}
+		// The peer's clock isn't trusted: a time in the future would block
+		// every later snapshot from replacing this one.
+		if ps.GeneratedAt.After(now.Add(10 * time.Minute)) {
+			ps.GeneratedAt = now.UTC()
+		}
 		// Never go back to an older snapshot than the one already held.
 		if old := PeerSnapshot(l); old == nil || !ps.GeneratedAt.Before(old.GeneratedAt) {
 			sanitize(&ps)
@@ -565,11 +678,7 @@ func (f *Service) Sync(ctx context.Context, id int64) error {
 			if err != nil {
 				return fail(err)
 			}
-			for i, m := range ps.Members {
-				if !accepts[m.ID] {
-					ps.Members[i] = model.FriendMember{ID: m.ID, Name: m.Name, Color: m.Color, Weeks: []model.FriendWeek{}}
-				}
-			}
+			strip(&ps, accepts)
 			clean, _ := json.Marshal(ps)
 			peerName, peerJSON = ps.Family, string(clean)
 			at := ps.GeneratedAt
@@ -577,6 +686,43 @@ func (f *Service) Sync(ctx context.Context, id int64) error {
 		}
 	}
 	return f.store.SaveFriendSync(ctx, id, status, peerName, peerJSON, peerAt, "", now)
+}
+
+// strip cuts every member a parent here hasn't accepted down to what's
+// needed to offer them: id, name and colour.
+func strip(s *model.FriendSnapshot, accepts map[string]bool) {
+	for i, m := range s.Members {
+		if !accepts[m.ID] {
+			s.Members[i] = model.FriendMember{ID: m.ID, Name: m.Name, Color: m.Color, Weeks: []model.FriendWeek{}}
+		}
+	}
+}
+
+// SetAccepts replaces which of a linked family's people are shown here, and
+// straight away cuts the stored copy of anyone no longer accepted down to
+// their name. That doesn't wait for the next sync, which might fail: a
+// person a parent has un-ticked isn't kept.
+func (f *Service) SetAccepts(ctx context.Context, id int64, memberIDs []string) error {
+	f.mu.Lock() // not while a sync is reading the accepts and writing the snapshot
+	defer f.mu.Unlock()
+	if err := f.store.SetFriendLinkAccepts(ctx, id, memberIDs); err != nil {
+		return err
+	}
+	l, err := f.store.GetFriendLink(ctx, id)
+	if err != nil || l == nil {
+		return err
+	}
+	snap := PeerSnapshot(l)
+	if snap == nil {
+		return nil
+	}
+	accepts := map[string]bool{}
+	for _, m := range memberIDs {
+		accepts[m] = true
+	}
+	strip(snap, accepts)
+	clean, _ := json.Marshal(snap)
+	return f.store.SetFriendSnapshot(ctx, id, string(clean))
 }
 
 // sanitize bounds what another family's snapshot can put on our screens.
@@ -591,15 +737,38 @@ func sanitize(s *model.FriendSnapshot) {
 	for i := range s.Accepted {
 		s.Accepted[i] = clip(s.Accepted[i], 20)
 	}
+	if !validDate(s.Today) {
+		s.Today = ""
+	}
+	// A member needs an id of its own: accepting is by id, so an empty or
+	// repeated one would let a second person ride in on the first.
+	seen := map[string]bool{}
+	members := s.Members[:0]
+	for _, m := range s.Members {
+		m.ID = clip(m.ID, 20)
+		if m.ID == "" || seen[m.ID] {
+			continue
+		}
+		seen[m.ID] = true
+		members = append(members, m)
+	}
+	s.Members = members
 	for i := range s.Members {
 		m := &s.Members[i]
-		m.ID, m.Name, m.Color = clip(m.ID, 20), clip(m.Name, maxNameLen), clip(m.Color, 20)
+		m.Name, m.Color = clip(m.Name, maxNameLen), clip(m.Color, 20)
+		m.Streak = max(0, min(m.Streak, 9999))
+		weeks := m.Weeks[:0]
+		for _, w := range m.Weeks {
+			if validDate(w.Start) {
+				weeks = append(weeks, w)
+			}
+		}
+		m.Weeks = weeks
 		if len(m.Weeks) > 2 {
 			m.Weeks = m.Weeks[len(m.Weeks)-2:]
 		}
 		for j := range m.Weeks {
 			w := &m.Weeks[j]
-			w.Start = clip(w.Start, 10)
 			w.Assigned, w.Bonus = max(0, min(w.Assigned, 2000)), max(0, min(w.Bonus, 2000))
 			w.Done = max(0, min(w.Done, w.Assigned))
 			w.Share = max(0, min(w.Share, score.ShareScale))
@@ -626,6 +795,11 @@ func sanitize(s *model.FriendSnapshot) {
 
 var knownMoods = map[string]bool{
 	"hiding": true, "very_sick": true, "sick": true, "hungry": true, "bored": true, "happy": true, "content": true,
+}
+
+func validDate(d string) bool {
+	_, err := time.Parse(model.DateFormat, d)
+	return err == nil
 }
 
 func clip(s string, n int) string {
@@ -662,7 +836,7 @@ func (f *Service) Unlink(ctx context.Context, id int64) error {
 		return err
 	}
 	if l.Status != model.FriendStatusEnded {
-		if err := f.call(ctx, http.MethodDelete, l.HubURL+"/v1/links/"+url.PathEscape(l.HubLink), l.Token, nil, nil); err != nil {
+		if err := f.call(ctx, http.MethodDelete, l.HubURL, "/v1/links/"+url.PathEscape(l.HubLink), l.Token, nil, nil); err != nil {
 			log.Printf("friends: couldn't tell the hub about unlinking %q: %v", l.PeerName, err)
 		}
 	}

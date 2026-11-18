@@ -116,7 +116,9 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.Log != nil {
 		// Link ids aren't secret (tokens are, and they're in headers).
-		h.Log.Printf("%s %s %s %d", addr, r.Method, r.URL.Path, rec.status)
+		// The path is quoted: it's the caller's text and mustn't be able
+		// to start a line of its own.
+		h.Log.Printf("%s %s %q %d", addr, r.Method, r.URL.EscapedPath(), rec.status)
 	}
 }
 
@@ -133,9 +135,15 @@ func (s *statusRecorder) WriteHeader(code int) {
 // caller is the address requests are counted against.
 func (h *Hub) caller(r *http.Request) string {
 	if h.TrustProxy {
-		if parts := strings.Split(r.Header.Get("X-Forwarded-For"), ","); len(parts) > 0 {
-			if ip := strings.TrimSpace(parts[len(parts)-1]); ip != "" {
-				return ip
+		// The proxy appends the address it saw, either to the client's own
+		// header line or as a new line, so only the very last entry of the
+		// last line is trustworthy. It must be an IP address: anything else
+		// is the client's invention (and would be an unbounded map key).
+		lines := r.Header.Values("X-Forwarded-For")
+		if len(lines) > 0 {
+			parts := strings.Split(lines[len(lines)-1], ",")
+			if ip := net.ParseIP(strings.TrimSpace(parts[len(parts)-1])); ip != nil {
+				return ip.String()
 			}
 		}
 	}

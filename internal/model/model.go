@@ -665,6 +665,7 @@ const (
 type FriendLink struct {
 	ID            int64      `json:"id"`
 	Status        string     `json:"status"`
+	Side          string     `json:"-"` // "a" made the invite, "b" joined with it
 	HubURL        string     `json:"hub_url"`
 	HubLink       string     `json:"-"`
 	Token         string     `json:"-"`

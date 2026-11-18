@@ -45,7 +45,9 @@ order:
   single picture should be square; pad a wide animal with see-through space.
 - **You can stop early.** Three pictures give a standing and walking animal;
   with only two, walking swaps picture 2 with the standing one. Blank pictures
-  at the end are dropped.
+  at the end are dropped. A blank picture in the middle is refused: draw every
+  picture up to the last one you use (copy the standing one if you have
+  nothing better for a slot).
 - **Missing mood pictures fall back.** Without picture 4 a sick animal is the
   standing picture tinted green; without picture 5 a very sick one is tinted
   and squashed; without picture 6 a happy one just stands.

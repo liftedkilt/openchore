@@ -320,6 +320,14 @@ func TestPetOwnPicture(t *testing.T) {
 	redeem(spritePNG(t, 64, 64, true, 1), http.StatusUnprocessableEntity)
 	redeem(spritePNG(t, 4, 4, false, 1), http.StatusUnprocessableEntity)
 	redeem(spritePNG(t, 192, 64, false, 0), http.StatusUnprocessableEntity) // a strip with nothing in the standing frame
+	// A strip with a gap (pictures 1 to 3 and 6, nothing in 4 and 5).
+	gap := image.NewNRGBA(image.Rect(0, 0, 6*16, 16))
+	for _, f := range []int{0, 1, 2, 5} {
+		gap.SetNRGBA(f*16+8, 8, color.NRGBA{R: 200, A: 255})
+	}
+	var gapBuf bytes.Buffer
+	png.Encode(&gapBuf, gap)
+	redeem("data:image/png;base64,"+base64.StdEncoding.EncodeToString(gapBuf.Bytes()), http.StatusUnprocessableEntity)
 	if env.balance(t, kid) != before {
 		t.Fatal("a refused picture cost points")
 	}
@@ -405,5 +413,14 @@ func TestPetOwnPicture(t *testing.T) {
 	env.expectStatus(t, "DELETE", rm, nil, adminHeaders(), http.StatusNoContent)
 	if p := env.myPet(t, kid); p["sprite"] != nil || p["name"] != "Quackers" {
 		t.Fatalf("after a grown-up removed the picture: %v", p)
+	}
+
+	// Removing the animal removes its picture file too.
+	redeem(spritePNG(t, 32, 32, false, 1), http.StatusCreated)
+	last := env.myPet(t, kid)["sprite"].(string)
+	t.Cleanup(func() { os.Remove(file(last)) })
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/admin/users/%d/pet", kid), nil, adminHeaders(), http.StatusNoContent)
+	if _, err := os.Stat(file(last)); !os.IsNotExist(err) {
+		t.Fatal("a removed animal's picture was left on disk")
 	}
 }

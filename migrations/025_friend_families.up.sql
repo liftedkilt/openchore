@@ -25,6 +25,7 @@ CREATE TABLE score_days (
 CREATE TABLE friend_links (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     status         TEXT    NOT NULL CHECK (status IN ('waiting', 'active', 'ended')),
+    side           TEXT    NOT NULL CHECK (side IN ('a', 'b')), -- a made the invite, b joined with it
     hub_url        TEXT    NOT NULL,
     hub_link       TEXT    NOT NULL,
     token          TEXT    NOT NULL,

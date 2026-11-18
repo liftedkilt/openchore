@@ -198,4 +198,14 @@ func TestCallerAddress(t *testing.T) {
 	if got := h.caller(r); got != "203.0.113.7" {
 		t.Fatalf("behind a proxy = %s", got)
 	}
+	// A proxy may add its own header line instead of appending: still the last one.
+	r.Header.Add("X-Forwarded-For", "198.51.100.9")
+	if got := h.caller(r); got != "198.51.100.9" {
+		t.Fatalf("two header lines = %s", got)
+	}
+	// Something that isn't an address is ignored, not used as a key.
+	r.Header.Set("X-Forwarded-For", "not-an-address")
+	if got := h.caller(r); got != "10.0.0.9" {
+		t.Fatalf("junk header = %s", got)
+	}
 }

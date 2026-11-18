@@ -104,9 +104,16 @@ is 66 and not 92. If she had skipped a "Make bed" instead, it would be
 
 ### Where it lives
 
-Rules: `internal/score`. Finished days are stored in `score_days` (so a paused
-day stays out of the score after the person is unpaused) and recounted for a
-week, which picks up late approvals and rejections.
+Rules: `internal/score`. Finished days are stored in `score_days` and
+recounted for a week, which picks up late approvals and rejections.
+
+- **A finished day only counts the chores that existed on it.** A schedule
+  created later is left out, so adding a chore on Friday doesn't mark Monday
+  to Thursday as missed. (Deleting a chore does remove it from the days still
+  being recounted.)
+- **Paused days** are stored as paused, so they stay out of the score after
+  the person is unpaused. Pausing has no history: a day is treated as paused
+  if the person is paused when it's first counted and did nothing that day.
 
 ## Friend families
 
@@ -130,7 +137,10 @@ the link, a one-time join code, and the key the two families use to encrypt
 their snapshots. That key never goes to the hub.
 
 Either parent can unlink. The hub deletes the link; the other family finds
-out at its next sync, and both sides delete the other family's data.
+out at its next sync, and both sides delete the other family's data. Only the
+hub saying the link is gone ends it: a hub that is down, or a proxy in front
+of it answering with an error, is just a failed sync, shown on the link and
+tried again.
 
 ### What is shared
 
@@ -144,7 +154,8 @@ A person appears on the other family's leaderboard and farm only when both
 parents have ticked them. Each side can see whether the other has ticked the
 people it sends. Until you tick someone you're offered, only their name and
 colour are kept on your server; their chore counts and animal are dropped as
-they arrive.
+they arrive. Un-ticking someone removes what was stored about them at once,
+whether or not the hub can be reached.
 
 A linked family is sent only what its screens show:
 
@@ -225,14 +236,32 @@ OpenChore servers call it, not people, and they can't log in. Then:
 An OpenChore server takes its hub from Settings, or from `OPENCHORE_HUB_URL` /
 `OPENCHORE_HUB_KEY` (which win).
 
+A hub address must be `https://`, with no query or user name in it. Plain
+`http://` is only accepted for a hub on this machine or home network. Changing
+the address in Settings forgets the saved key, since a key belongs to one hub.
+
+**A hub named by someone else's invite must be on the public internet.** An
+invite is text another person wrote, so the server refuses to connect to a
+private or local address on its say-so, never follows redirects from a hub,
+and reports a failure without network details. The exceptions: the hub this
+household has configured itself is always trusted, and
+`OPENCHORE_HUB_ALLOW_PRIVATE=true` allows private hubs from invites (for two
+households sharing a hub on one home network, or when the hub's public name
+resolves to a private address from inside your network and you are the one
+joining).
+
 #### How it protects itself
 
+- **Sealed both ways.** What each family stores at the hub is encrypted with
+  the invite's key and tied to which side wrote it, so the hub can neither
+  read it nor pass a family its own data back as the other family's.
 - **Keys and tokens.** Creating a link needs a hub key. Joining needs the
   one-time code in the invite. Everything after that needs the token that
   member was given; a wrong token gets the same answer as a link that doesn't
   exist.
 - **Rate limits** per address: 120 requests a minute, and 10 a minute for
-  creating or joining links. An honest server makes one request per link every
+  creating or joining links. Behind a proxy (`HUB_TRUST_PROXY`), the address
+  is the last one in `X-Forwarded-For`, and only if it is an IP address. An honest server makes one request per link every
   15 minutes.
 - **Size limits.** A snapshot can be at most 256 KB, and the hub holds at most
   10,000 links.

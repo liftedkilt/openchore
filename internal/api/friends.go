@@ -331,6 +331,11 @@ func (h *FriendsHandler) AdminUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.HubKey != nil {
 		set[friends.SettingHubKey] = strings.TrimSpace(*req.HubKey)
+	} else if u, changing := set[friends.SettingHubURL]; changing {
+		// A key belongs to one hub: never carry it over to a different address.
+		if old, _, _ := h.svc.Hub(ctx); old != u {
+			set[friends.SettingHubKey] = ""
+		}
 	}
 	for k, v := range set {
 		if err := h.store.SetSetting(ctx, k, v); err != nil {
@@ -401,7 +406,7 @@ func (h *FriendsHandler) UpdateLink(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if err := h.store.SetFriendLinkAccepts(ctx, id, *req.Accept); err != nil {
+		if err := h.svc.SetAccepts(ctx, id, *req.Accept); err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to save")
 			return
 		}

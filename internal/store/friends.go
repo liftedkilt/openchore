@@ -121,13 +121,13 @@ func (s *Store) SetFriendLinkAccepts(ctx context.Context, linkID int64, memberID
 
 // --- Friend links ---
 
-const friendLinkColumns = `id, status, hub_url, hub_link, token, secret, invite, invite_expires,
+const friendLinkColumns = `id, status, side, hub_url, hub_link, token, secret, invite, invite_expires,
 	peer_name, snapshot, snapshot_at, last_sync_at, last_error, created_at`
 
 func scanFriendLink(row interface{ Scan(...any) error }) (*model.FriendLink, error) {
 	l := &model.FriendLink{}
 	var expires, snapAt, syncAt sql.NullTime
-	if err := row.Scan(&l.ID, &l.Status, &l.HubURL, &l.HubLink, &l.Token, &l.Secret, &l.Invite, &expires,
+	if err := row.Scan(&l.ID, &l.Status, &l.Side, &l.HubURL, &l.HubLink, &l.Token, &l.Secret, &l.Invite, &expires,
 		&l.PeerName, &l.Snapshot, &snapAt, &syncAt, &l.LastError, &l.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -170,9 +170,9 @@ func (s *Store) GetFriendLink(ctx context.Context, id int64) (*model.FriendLink,
 
 func (s *Store) CreateFriendLink(ctx context.Context, l *model.FriendLink) error {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO friend_links (status, hub_url, hub_link, token, secret, invite, invite_expires)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		l.Status, l.HubURL, l.HubLink, l.Token, l.Secret, l.Invite, l.InviteExpires)
+		`INSERT INTO friend_links (status, side, hub_url, hub_link, token, secret, invite, invite_expires)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		l.Status, l.Side, l.HubURL, l.HubLink, l.Token, l.Secret, l.Invite, l.InviteExpires)
 	if err != nil {
 		return err
 	}
@@ -208,6 +208,33 @@ func (s *Store) SaveFriendSync(ctx context.Context, id int64, status, peerName, 
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE friend_links SET last_sync_at = ?, last_error = '' WHERE id = ?`, now, id)
 	return err
+}
+
+// SetFriendSnapshot replaces the stored copy of the other family's snapshot.
+func (s *Store) SetFriendSnapshot(ctx context.Context, id int64, snapshot string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE friend_links SET snapshot = ? WHERE id = ?`, snapshot, id)
+	return err
+}
+
+// SchedulesCreatedSince returns the ids of a person's schedules that were
+// created at or after cutoff.
+func (s *Store) SchedulesCreatedSince(ctx context.Context, userID int64, cutoff time.Time) (map[int64]bool, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id FROM chore_schedules WHERE assigned_to = ? AND datetime(created_at) >= datetime(?)`,
+		userID, cutoff.UTC().Format("2006-01-02 15:04:05"))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]bool{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
 }
 
 // DeleteFriendLink removes a link and the other family's cached data with it.

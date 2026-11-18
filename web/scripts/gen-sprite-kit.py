@@ -204,7 +204,7 @@ def guide_strip_big(layer, scale=4):
         d.text((ox + 8, top + SIZE * scale + 8), f"{i + 1}. {name}", font=bold, fill=ink)
     y = top + SIZE * scale + 44
     d.text((pad, y), "Every picture: animal facing right, feet on the bottom edge, head in the same place.", font=font, fill=green)
-    d.text((pad, y + 26), "You can stop early: pictures 4, 5 and 6 are optional. A missing one uses picture 1.", font=font, fill=ink)
+    d.text((pad, y + 26), "You can stop early (after picture 3, 4 or 5), but don't leave a gap in the middle.", font=font, fill=ink)
     d.text((pad, y + 52), "Without a sick or lying-down picture the app tints picture 1 green and squashes it.", font=font, fill=ink)
     return im.convert("RGB")
 

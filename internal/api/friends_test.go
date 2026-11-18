@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -61,6 +62,11 @@ func (e *testEnv) yesterdayChores(t *testing.T, kid, n, done int, category strin
 			map[string]any{"assigned_to": kid, "specific_date": yesterday}, adminHeaders(), http.StatusCreated)
 		var sched map[string]any
 		decodeBody(t, resp, &sched)
+		// Made today, for yesterday: a finished day only counts chores that
+		// existed on it, so pretend this one has been there all along.
+		if _, err := e.db.Exec(`UPDATE chore_schedules SET created_at = datetime('now', '-10 days') WHERE id = ?`, int(sched["id"].(float64))); err != nil {
+			t.Fatal(err)
+		}
 		if i < done {
 			if _, err := e.db.Exec(`INSERT INTO chore_completions (chore_schedule_id, completed_by, status, completion_date)
 				VALUES (?, ?, 'approved', ?)`, int(sched["id"].(float64)), kid, yesterday); err != nil {
@@ -129,6 +135,9 @@ func TestLeaderboardScoresByShareOfPointsEarned(t *testing.T) {
 
 func TestFriendFamiliesLinkThroughHub(t *testing.T) {
 	hubSrv := startHub(t)
+	// The test hub is on this machine; a hub named by an invite normally has
+	// to be on a public address (TestFriendInviteCannotPointInward).
+	t.Setenv("OPENCHORE_HUB_ALLOW_PRIVATE", "true")
 	a, b := setupTest(t), setupTest(t)
 	a.createAdmin(t)
 	b.createAdmin(t)
@@ -327,4 +336,177 @@ func TestFriendFamiliesLinkThroughHub(t *testing.T) {
 		t.Fatalf("B still shows A's farm: %v", farms)
 	}
 	b.expectStatus(t, "DELETE", fmt.Sprintf("/api/admin/friends/%d", bLink), nil, adminHeaders(), http.StatusNoContent)
+}
+
+// link pairs two fresh households through hub and returns them with each
+// side's link path. Ava (A) is shared with B and accepted there.
+func linkedPair(t *testing.T, hubSrv *httptest.Server) (a, b *testEnv, aPath, bPath string, ava int) {
+	t.Helper()
+	t.Setenv("OPENCHORE_HUB_ALLOW_PRIVATE", "true")
+	a, b = setupTest(t), setupTest(t)
+	a.createAdmin(t)
+	b.createAdmin(t)
+	ava = a.createChild(t, "Ava")
+	a.enablePets(t)
+	a.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Biscuit", "species": "dog"}, childHeaders(ava), http.StatusCreated)
+	a.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"family_name": "The Avas", "hub_url": hubSrv.URL, "hub_key": "hubkey"}, adminHeaders(), http.StatusOK)
+	b.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"family_name": "The Bos"}, adminHeaders(), http.StatusOK)
+	var link map[string]any
+	decodeBody(t, a.expectStatus(t, "POST", "/api/admin/friends/invites", nil, adminHeaders(), http.StatusCreated), &link)
+	aPath = fmt.Sprintf("/api/admin/friends/%d", int(link["id"].(float64)))
+	invite := link["invite"].(string)
+	decodeBody(t, b.expectStatus(t, "POST", "/api/admin/friends/join", map[string]any{"invite": invite}, adminHeaders(), http.StatusCreated), &link)
+	bPath = fmt.Sprintf("/api/admin/friends/%d", int(link["id"].(float64)))
+	a.expectStatus(t, "PUT", aPath, map[string]any{"share_user_ids": []int{ava}}, adminHeaders(), http.StatusOK)
+	b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	b.expectStatus(t, "PUT", bPath, map[string]any{"accept_member_ids": []string{fmt.Sprint(ava)}}, adminHeaders(), http.StatusOK)
+	return a, b, aPath, bPath, ava
+}
+
+func (e *testEnv) storedSnapshot(t *testing.T) string {
+	t.Helper()
+	var s string
+	if err := e.db.QueryRow(`SELECT snapshot FROM friend_links`).Scan(&s); err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+// An invite is text someone else wrote. The hub it names can't be on this
+// server's own network, can't carry a query, and failures don't describe
+// the network to the person who pasted it.
+func TestFriendInviteCannotPointInward(t *testing.T) {
+	var hits int
+	inner := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.Write([]byte(`{"token":"t"}`))
+	}))
+	defer inner.Close()
+	env := setupTest(t)
+	env.createAdmin(t)
+	env.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"family_name": "Us"}, adminHeaders(), http.StatusOK)
+	invite := func(hub string) string {
+		raw := fmt.Sprintf(`{"h":%q,"l":"L","c":"C","k":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}`, hub)
+		return "ocf1." + base64.RawURLEncoding.EncodeToString([]byte(raw))
+	}
+	join := func(hub string) (int, string) {
+		resp := env.request(t, "POST", "/api/admin/friends/join", map[string]any{"invite": invite(hub)}, adminHeaders())
+		var out map[string]any
+		decodeBody(t, resp, &out)
+		return resp.StatusCode, fmt.Sprint(out["error"])
+	}
+	if code, msg := join(inner.URL); code != http.StatusBadRequest || !strings.Contains(msg, "private network") || hits != 0 {
+		t.Fatalf("invite to a loopback hub: %d %q, %d request(s) reached it", code, msg, hits)
+	}
+	if code, _ := join(inner.URL + "/admin?x="); code != http.StatusBadRequest || hits != 0 {
+		t.Fatalf("invite with a query in the hub address: %d, %d request(s)", code, hits)
+	}
+	if code, _ := join("http://example.com"); code != http.StatusBadRequest {
+		t.Fatalf("plain http to a public host: %d", code)
+	}
+	// Where it is allowed, a dead hub is reported without addresses or ports.
+	t.Setenv("OPENCHORE_HUB_ALLOW_PRIVATE", "true")
+	if code, msg := join("http://127.0.0.1:1"); code != http.StatusBadGateway || strings.Contains(msg, "127.0.0.1") || strings.Contains(msg, "refused") {
+		t.Fatalf("dead hub: %d %q", code, msg)
+	}
+	if links := env.getJSON(t, "/api/admin/friends", adminHeaders())["links"].([]any); len(links) != 0 {
+		t.Fatalf("a failed join left a link: %v", links)
+	}
+}
+
+// A stray 404 from something in front of the hub must not end the link, and
+// un-ticking a person removes what's stored about them even when the hub
+// can't be reached.
+func TestFriendLinkSurvivesHubTrouble(t *testing.T) {
+	hubSrv := startHub(t)
+	_, b, _, bPath, _ := linkedPair(t, hubSrv)
+	if !strings.Contains(b.storedSnapshot(t), "Biscuit") {
+		t.Fatal("setup: B doesn't hold Ava's animal")
+	}
+	// Put a broken proxy in front of the hub, as B sees it.
+	broken := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) }))
+	defer broken.Close()
+	if _, err := b.db.Exec(`UPDATE friend_links SET hub_url = ?`, broken.URL); err != nil {
+		t.Fatal(err)
+	}
+	b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusBadGateway)
+	link := b.getJSON(t, "/api/admin/friends", adminHeaders())["links"].([]any)[0].(map[string]any)
+	if link["status"] != "active" || link["last_error"] == "" || !strings.Contains(b.storedSnapshot(t), "Biscuit") {
+		t.Fatalf("a 404 ended the link or dropped its data: %v", link)
+	}
+	// Un-tick Ava while the hub is still unreachable.
+	b.expectStatus(t, "PUT", bPath, map[string]any{"accept_member_ids": []string{}}, adminHeaders(), http.StatusOK)
+	if stored := b.storedSnapshot(t); strings.Contains(stored, "Biscuit") || strings.Contains(stored, `"share"`) || !strings.Contains(stored, "Ava") {
+		t.Fatalf("after un-ticking with the hub down, B still holds Ava's data (or lost her name): %s", stored)
+	}
+	// The hub comes back: the link carries on.
+	if _, err := b.db.Exec(`UPDATE friend_links SET hub_url = ?`, hubSrv.URL); err != nil {
+		t.Fatal(err)
+	}
+	b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
+}
+
+// Adding a chore today must not reach back and mark earlier days as missed.
+func TestLeaderboardPastDaysIgnoreNewChores(t *testing.T) {
+	if time.Now().Weekday() == time.Monday {
+		t.Skip("yesterday is in last week on a Monday")
+	}
+	env := setupTest(t)
+	env.createAdmin(t)
+	kid := env.createChild(t, "Kid")
+	env.createChild(t, "Sib")
+	env.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"leaderboard_enabled": true}, adminHeaders(), http.StatusOK)
+	if _, err := env.db.Exec(`UPDATE users SET created_at = datetime('now', '-30 days')`); err != nil {
+		t.Fatal(err)
+	}
+	env.yesterdayChores(t, kid, 5, 5, "core", 5)
+	mine := func() map[string]any {
+		for _, e := range env.leaderboard(t) {
+			if e["name"] == "Kid" {
+				return e
+			}
+		}
+		t.Fatal("Kid not on the leaderboard")
+		return nil
+	}
+	if e := mine(); e["assigned"] != 5.0 || e["percent"] != 100.0 {
+		t.Fatalf("before: %v", e)
+	}
+	// A new every-day chore, created now: it applies from today, not to yesterday.
+	resp := env.expectStatus(t, "POST", "/api/chores", map[string]any{"title": "New daily", "category": "required", "points_value": 50}, adminHeaders(), http.StatusCreated)
+	var chore map[string]any
+	decodeBody(t, resp, &chore)
+	for dow := 0; dow < 7; dow++ {
+		env.expectStatus(t, "POST", fmt.Sprintf("/api/chores/%d/schedules", int(chore["id"].(float64))),
+			map[string]any{"assigned_to": kid, "day_of_week": dow}, adminHeaders(), http.StatusCreated)
+	}
+	if _, err := env.db.Exec(`DELETE FROM score_days`); err != nil { // force a recount of the finished days
+		t.Fatal(err)
+	}
+	if e := mine(); e["assigned"] != 5.0 || e["percent"] != 100.0 {
+		t.Fatalf("a chore added today changed yesterday's score: %v", e)
+	}
+}
+
+// A hub key belongs to one hub.
+func TestFriendHubKeyDoesNotFollowANewAddress(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	put := func(body map[string]any) map[string]any {
+		var out map[string]any
+		decodeBody(t, env.expectStatus(t, "PUT", "/api/admin/friends", body, adminHeaders(), http.StatusOK), &out)
+		return out
+	}
+	if out := put(map[string]any{"hub_url": "https://one.example", "hub_key": "k1"}); out["hub_key_set"] != true {
+		t.Fatalf("set: %v", out)
+	}
+	if out := put(map[string]any{"hub_url": "https://one.example"}); out["hub_key_set"] != true {
+		t.Fatalf("same address dropped the key: %v", out)
+	}
+	if out := put(map[string]any{"hub_url": "https://two.example"}); out["hub_key_set"] != false {
+		t.Fatalf("the key followed a new address: %v", out)
+	}
+	env.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"hub_url": "https://two.example/?x=1"}, adminHeaders(), http.StatusBadRequest)
+	env.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"hub_url": "http://two.example"}, adminHeaders(), http.StatusBadRequest)
+	env.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"hub_url": "http://192.168.1.50:8090"}, adminHeaders(), http.StatusOK)
 }
