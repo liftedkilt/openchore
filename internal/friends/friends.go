@@ -42,7 +42,7 @@ const (
 	SettingHubKey      = "friends_hub_key" // secret
 	SettingLeaderboard = "leaderboard_enabled"
 
-	// SnapshotDays is how many days of chore counts a snapshot carries:
+	// SnapshotDays is how many days of chore counts are kept to score from:
 	// enough for this week and last.
 	SnapshotDays = 14
 	// recomputeDays is how far back finished days are recounted, so a late
@@ -186,8 +186,7 @@ func (f *Service) FamilyName(ctx context.Context) string {
 
 // Snapshot builds what this family shares with one linked family: only the
 // people a parent picked for that family, and nothing but names, colours,
-// daily chore counts (with what those chores were worth), streaks and farm
-// animals.
+// weekly scores and chore counts, streaks and farm animals.
 func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnapshot, error) {
 	now := f.now()
 	snap := &model.FriendSnapshot{
@@ -233,7 +232,13 @@ func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnap
 		if !shared[u.ID] {
 			continue
 		}
-		m := model.FriendMember{ID: strconv.FormatInt(u.ID, 10), Name: u.Name, Color: u.Color, Paused: u.Paused, Days: days[u.ID]}
+		m := model.FriendMember{ID: strconv.FormatInt(u.ID, 10), Name: u.Name, Color: u.Color, Paused: u.Paused}
+		// Two weekly totals, not the days behind them, and the share
+		// without the point values it came from.
+		for _, start := range []string{score.WeekStart(now.AddDate(0, 0, -7)), score.WeekStart(now)} {
+			t := score.Sum(days[u.ID], start, score.WeekEnd(start))
+			m.Weeks = append(m.Weeks, model.FriendWeek{Start: start, Assigned: t.Assigned, Done: t.Done, Bonus: t.Bonus, Share: t.Share})
+		}
 		if st, err := f.store.GetUserStreak(ctx, u.ID); err == nil && st != nil {
 			m.Streak = st.CurrentStreak
 		}
@@ -249,7 +254,7 @@ func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnap
 				acc = "" // drawn accessories are pictures on this server; not sent
 			}
 			m.Pet = &model.FriendPet{Name: p.Name, Species: p.Species, Color: p.Color, Accessory: acc,
-				Health: p.Health, Fullness: p.Fullness, Joy: p.Joy, Mood: p.Mood, Hiding: p.Hiding, Sick: p.Sick}
+				Mood: p.Mood, Hiding: p.Hiding, Sick: p.Sick}
 		}
 		snap.Members = append(snap.Members, m)
 	}
@@ -562,7 +567,7 @@ func (f *Service) Sync(ctx context.Context, id int64) error {
 			}
 			for i, m := range ps.Members {
 				if !accepts[m.ID] {
-					ps.Members[i] = model.FriendMember{ID: m.ID, Name: m.Name, Color: m.Color, Days: []model.ScoreDay{}}
+					ps.Members[i] = model.FriendMember{ID: m.ID, Name: m.Name, Color: m.Color, Weeks: []model.FriendWeek{}}
 				}
 			}
 			clean, _ := json.Marshal(ps)
@@ -589,15 +594,15 @@ func sanitize(s *model.FriendSnapshot) {
 	for i := range s.Members {
 		m := &s.Members[i]
 		m.ID, m.Name, m.Color = clip(m.ID, 20), clip(m.Name, maxNameLen), clip(m.Color, 20)
-		if len(m.Days) > SnapshotDays {
-			m.Days = m.Days[len(m.Days)-SnapshotDays:]
+		if len(m.Weeks) > 2 {
+			m.Weeks = m.Weeks[len(m.Weeks)-2:]
 		}
-		for j := range m.Days {
-			d := &m.Days[j]
-			d.Assigned, d.Bonus = max(0, min(d.Assigned, 200)), max(0, min(d.Bonus, 200))
-			d.Done = max(0, min(d.Done, d.Assigned))
-			d.AssignedPoints = max(0, min(d.AssignedPoints, 1_000_000))
-			d.DonePoints = max(0, min(d.DonePoints, d.AssignedPoints))
+		for j := range m.Weeks {
+			w := &m.Weeks[j]
+			w.Start = clip(w.Start, 10)
+			w.Assigned, w.Bonus = max(0, min(w.Assigned, 2000)), max(0, min(w.Bonus, 2000))
+			w.Done = max(0, min(w.Done, w.Assigned))
+			w.Share = max(0, min(w.Share, score.ShareScale))
 		}
 		if p := m.Pet; p != nil {
 			// Only animals, coats and moods this version can draw.
@@ -615,7 +620,6 @@ func sanitize(s *model.FriendSnapshot) {
 			if !knownMoods[p.Mood] {
 				p.Mood = "content"
 			}
-			p.Health, p.Fullness, p.Joy = pct(p.Health), pct(p.Fullness), pct(p.Joy)
 		}
 	}
 }
@@ -623,8 +627,6 @@ func sanitize(s *model.FriendSnapshot) {
 var knownMoods = map[string]bool{
 	"hiding": true, "very_sick": true, "sick": true, "hungry": true, "bored": true, "happy": true, "content": true,
 }
-
-func pct(v int) int { return max(0, min(100, v)) }
 
 func clip(s string, n int) string {
 	s = strings.TrimSpace(s)

@@ -680,9 +680,10 @@ type FriendLink struct {
 }
 
 // FriendSnapshot is what one family sends another: the people a parent chose
-// to share with that family, with their daily chore counts (and what those chores were worth
-// in points), streak and farm animal. It never carries chore names, photos,
-// point balances or rewards.
+// to share with that family, with their weekly score and chore counts,
+// streak and farm animal. It carries only what the other family's screens
+// show: never chore names, photos, point values, point balances, rewards, a
+// day-by-day breakdown or the animal's health numbers.
 type FriendSnapshot struct {
 	Version     int            `json:"version"`
 	Family      string         `json:"family"`
@@ -701,19 +702,29 @@ type FriendMember struct {
 	Color  string     `json:"color,omitempty"`
 	Streak int        `json:"streak"`
 	Paused bool       `json:"paused,omitempty"`
-	Days   []ScoreDay `json:"days"`
-	Pet    *FriendPet `json:"pet,omitempty"`
+	// Weeks holds this week and last week (the sender's own weeks).
+	Weeks []FriendWeek `json:"weeks"`
+	Pet   *FriendPet   `json:"pet,omitempty"`
 }
 
-// FriendPet is a farm animal as shown to a friend family, in its real state.
+// FriendWeek is one person's week as sent to a friend family: how many
+// chores, and the score as a share (0 to 10000, score.ShareScale). The point
+// values the share was worked out from stay at home.
+type FriendWeek struct {
+	Start    string `json:"start"` // the Monday, YYYY-MM-DD
+	Assigned int    `json:"assigned"`
+	Done     int    `json:"done"`
+	Bonus    int    `json:"bonus"`
+	Share    int    `json:"share"`
+}
+
+// FriendPet is a farm animal as shown to a friend family, in its real state:
+// how it looks and how it's doing, without the health, food and joy numbers.
 type FriendPet struct {
 	Name      string `json:"name"`
 	Species   string `json:"species"`
 	Color     string `json:"color,omitempty"`
 	Accessory string `json:"accessory,omitempty"`
-	Health    int    `json:"health"`
-	Fullness  int    `json:"fullness"`
-	Joy       int    `json:"joy"`
 	Mood      string `json:"mood"`
 	Hiding    bool   `json:"hiding"`
 	Sick      bool   `json:"sick"`

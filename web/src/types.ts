@@ -616,8 +616,8 @@ export interface LeaderboardEntry {
   assigned: number;
   done: number;
   bonus: number;
-  assigned_points: number;
-  done_points: number;
+  /** The score in hundredths, 0 to 10000: what people are ranked on. */
+  share: number;
   /** The score out of 100: share of assigned chore points earned (of chores, if the chores carry no points). */
   percent: number;
   /** 0 = not ranked yet (fewer than min_assigned chores this week). */

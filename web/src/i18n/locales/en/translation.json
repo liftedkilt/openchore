@@ -712,7 +712,7 @@
         "familiesDesc": "Link with another family that runs OpenChore so the kids can share a leaderboard and visit each other's farms. The two homes never connect to each other: each one sends encrypted updates to a coordination server every 15 minutes, and the server can't read them.",
         "familyName": "Your family's name",
         "familyNamePlaceholder": "e.g. The Smiths",
-        "shareDesc": "For each person you share, that family gets their first name, colour, how many chores they did each day and what those chores were worth, their streak and their farm animal. Chore names, photos, point balances and rewards are never sent. Until you tick someone they offer, only that person's name is kept here.",
+        "shareDesc": "For each person you share, that family gets their first name, colour, their score and chore counts for this week and last, their streak, and their farm animal with how it's doing. Chore names, photos, point values, point balances and rewards are never sent. Until you tick someone they offer, only that person's name is kept here.",
         "status": {
           "waiting": "Waiting for them",
           "active": "Linked",

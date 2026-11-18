@@ -236,8 +236,8 @@ func allTools() []*Tool {
 	// ---- Leaderboard and friend families ----
 	add(endpoint{name: "get_leaderboard", title: "The weekly leaderboard", readOnly: true,
 		desc: "This week's standings (Monday to Sunday), or last week's. percent is the score out of 100 shown in the app as \"Score 88\": the share of a person's assigned chore points " +
-			"they earned (done_points out of assigned_points, each chore worth its own points; Must-do and Every-day chores only; " +
-			"excused chores and paused days are left out), with the chore counts, bonus chores as a tie-breaker, and rank. " +
+			"they earned (each chore worth its own points; Must-do and Every-day chores only; " +
+			"excused chores and paused days are left out), with share (the same score to two more places, 0 to 10000, used for ranking), the chore counts, bonus chores as a tie-breaker, and rank. " +
 			"People need 5 assigned chores in the week to be ranked (rank 0 = not yet). Includes people shared by linked friend families.",
 		method: http.MethodGet, path: "/leaderboard", query: []string{"week"},
 		props: map[string]any{"week": enum("Which week (default this).", "this", "last")}})
@@ -263,8 +263,8 @@ func allTools() []*Tool {
 		desc: "For one linked family, set who this household shares with them (share_user_ids) and which of the people they offer " +
 			"are shown here (accept_member_ids, from that link's inbound list). Each list replaces the previous one; leave one out to keep it. " +
 			"A person only appears on the other family's leaderboard and farm when both parents picked them. A shared person's first name, " +
-			"colour, daily chore counts (and what those chores were worth in points), streak and farm animal are sent; chore names, photos, " +
-			"point balances and rewards never are. Confirm with the parent first.",
+			"colour, weekly score and chore counts, streak and farm animal are sent; chore names, photos, " +
+			"point values, point balances and rewards never are. Confirm with the parent first.",
 		method: http.MethodPut, path: "/admin/friends/{id}",
 		props: map[string]any{
 			"id":                integer("Link id from get_friend_families."),

@@ -712,7 +712,7 @@
         "familiesDesc": "Verbinde dich mit einer anderen Familie, die OpenChore nutzt, damit die Kinder eine Rangliste teilen und sich gegenseitig auf dem Bauernhof besuchen können. Die beiden Haushalte verbinden sich nie direkt: Jeder schickt alle 15 Minuten verschlüsselte Daten an einen Koordinationsserver, der sie nicht lesen kann.",
         "familyName": "Name eurer Familie",
         "familyNamePlaceholder": "z. B. Familie Müller",
-        "shareDesc": "Von jeder Person, die ihr teilt, erhält diese Familie Vorname, Farbe, die Zahl der erledigten Aufgaben pro Tag und deren Punktwert, die Serie und das Hoftier. Namen von Aufgaben, Fotos, Punktestände und Belohnungen werden nie gesendet. Solange ihr eine angebotene Person nicht ankreuzt, wird hier nur ihr Name gespeichert.",
+        "shareDesc": "Von jeder Person, die ihr teilt, erhält diese Familie Vorname, Farbe, Wertung und Aufgabenzahl dieser und der letzten Woche, die Serie und das Hoftier mit seinem Zustand. Namen von Aufgaben, Fotos, Punktwerte, Punktestände und Belohnungen werden nie gesendet. Solange ihr eine angebotene Person nicht ankreuzt, wird hier nur ihr Name gespeichert.",
         "status": {
           "waiting": "Warten auf die anderen",
           "active": "Verbunden",

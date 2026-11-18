@@ -80,7 +80,7 @@ func TestSumAndRank(t *testing.T) {
 	}
 	got := Sum(days, "2026-11-16", "2026-11-22")
 	// 5 of 6 chores, but only 20 of the 50 points: the percentage follows the points.
-	if got.Assigned != 6 || got.Done != 5 || got.Bonus != 1 || got.AssignedPoints != 50 || got.DonePoints != 20 || got.Percent != 40 {
+	if got.Assigned != 6 || got.Done != 5 || got.Bonus != 1 || got.AssignedPoints != 50 || got.DonePoints != 20 || got.Share != 4000 || got.Percent != 40 {
 		t.Fatalf("Sum = %+v", got)
 	}
 	// A family that doesn't use points is scored by chores.
@@ -88,12 +88,20 @@ func TestSumAndRank(t *testing.T) {
 		t.Fatalf("no-points Sum = %+v", got)
 	}
 
+	// A friend's total is built from the share they send, and ranks against
+	// a local one on that share alone.
+	if ft := FromShare(20, 18, 2, 9000); ft.Percent != 90 || ft.Share != 9000 || ft.Done != 18 {
+		t.Fatalf("FromShare = %+v", ft)
+	}
+	if ft := FromShare(3, 9, -1, 99999); ft.Done != 3 || ft.Bonus != 0 || ft.Share != ShareScale {
+		t.Fatalf("FromShare out of range = %+v", ft)
+	}
 	totals := []Total{
-		{Assigned: 4, Done: 4},             // perfect, but too few chores to rank
-		{Assigned: 10, Done: 9},            // 90%
-		{Assigned: 20, Done: 18, Bonus: 2}, // 90% with bonus: ahead of the plain 90%
-		{Assigned: 20, Done: 18, Bonus: 2}, // tie
-		{Assigned: 8, Done: 8},             // 100%
+		{Assigned: 4, Done: 4, Share: 10000},            // perfect, but too few chores to rank
+		{Assigned: 10, Done: 9, Share: 9000},            // 90
+		FromShare(20, 18, 2, 9000),                      // 90 with bonus, from a friend: ahead of the plain 90
+		{Assigned: 20, Done: 18, Bonus: 2, Share: 9000}, // tie with the friend
+		{Assigned: 8, Done: 8, Share: 10000},            // 100
 	}
 	Rank(len(totals), func(i int) *Total { return &totals[i] }, func(i, j int) { totals[i], totals[j] = totals[j], totals[i] })
 	wantRanks := []int{1, 2, 2, 4, 0}

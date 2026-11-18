@@ -122,7 +122,7 @@ func TestLeaderboardScoresByShareOfPointsEarned(t *testing.T) {
 		t.Fatalf("today's undone chore already counted: %v", g)
 	}
 	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", sched), map[string]any{}, childHeaders(ava), http.StatusCreated)
-	if g := env.leaderboard(t)[0]; g["assigned"] != 6.0 || g["done"] != 5.0 || g["done_points"] != 25.0 || g["percent"] != 83.0 {
+	if g := env.leaderboard(t)[0]; g["assigned"] != 6.0 || g["done"] != 5.0 || g["share"] != 8333.0 || g["percent"] != 83.0 || g["done_points"] != nil {
 		t.Fatalf("today's done chore not counted: %v", g)
 	}
 }
@@ -256,7 +256,7 @@ func TestFriendFamiliesLinkThroughHub(t *testing.T) {
 		}
 		if e["name"] == "Ava" {
 			sawAva = true
-			if e["family"] != "The Avas" || e["done"] != 1.0 || e["assigned"] != 1.0 || e["rank"] != 0.0 {
+			if e["family"] != "The Avas" || e["done"] != 1.0 || e["assigned"] != 1.0 || e["rank"] != 0.0 || e["percent"] != 100.0 {
 				t.Fatalf("Ava on B's leaderboard: %v", e)
 			}
 		}
@@ -275,6 +275,20 @@ func TestFriendFamiliesLinkThroughHub(t *testing.T) {
 	if farm["family"] != "The Avas" || len(pets) != 1 || pets[0].(map[string]any)["name"] != "Biscuit" ||
 		pets[0].(map[string]any)["owner_name"] != "Ava" {
 		t.Fatalf("farm: %v", farm)
+	}
+
+	// What B holds about Ava is only what its screens show: weekly totals
+	// and how the animal is doing. No days, point values or health numbers.
+	if err := b.db.QueryRow(`SELECT snapshot FROM friend_links`).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	for _, leaked := range []string{`"days"`, `"date"`, `points`, `"health"`, `"fullness"`, `"joy"`, "Make bed"} {
+		if strings.Contains(stored, leaked) {
+			t.Fatalf("the snapshot carries %s: %s", leaked, stored)
+		}
+	}
+	if !strings.Contains(stored, `"weeks"`) || !strings.Contains(stored, `"share":10000`) {
+		t.Fatalf("the snapshot has no weekly totals: %s", stored)
 	}
 
 	// The hub only ever held sealed data.

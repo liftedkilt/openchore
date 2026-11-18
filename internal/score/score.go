@@ -72,14 +72,18 @@ func WeekEnd(weekStart string) string {
 
 // Total is a person's score over a set of days.
 type Total struct {
-	Assigned       int `json:"assigned"`
-	Done           int `json:"done"`
-	Bonus          int `json:"bonus"`
-	AssignedPoints int `json:"assigned_points"`
-	DonePoints     int `json:"done_points"`
-	// Percent is the share earned, rounded: DonePoints out of
-	// AssignedPoints, or Done out of Assigned when the person's chores
-	// carry no points at all. 0 when nothing was assigned.
+	Assigned int `json:"assigned"`
+	Done     int `json:"done"`
+	Bonus    int `json:"bonus"`
+	// The point values behind the share. Kept inside this household: what
+	// is shown, ranked on and sent to friend families is only Share.
+	AssignedPoints int `json:"-"`
+	DonePoints     int `json:"-"`
+	// Share is the score in hundredths of a point, 0 to 10000: DonePoints
+	// out of AssignedPoints, or Done out of Assigned when the person's
+	// chores carry no points at all. People are ranked on it.
+	Share int `json:"share"`
+	// Percent is the score as shown, 0 to 100: Share rounded.
 	Percent int `json:"percent"`
 	// Rank is the place among ranked people (ties share one); 0 = not
 	// ranked yet (fewer than MinAssigned chores).
@@ -100,8 +104,24 @@ func Sum(days []model.ScoreDay, from, to string) Total {
 		t.DonePoints += d.DonePoints
 	}
 	if num, den := t.share(); den > 0 {
-		t.Percent = (num*100 + den/2) / den
+		t.Share = (num*ShareScale + den/2) / den
 	}
+	t.Percent = (t.Share + 50) / 100
+	return t
+}
+
+// ShareScale is what a full score is in Total.Share.
+const ShareScale = 10000
+
+// FromShare builds a total from the numbers a friend family sends: chore
+// counts and the share, with no point values.
+func FromShare(assigned, done, bonus, share int) Total {
+	t := Total{Assigned: max(assigned, 0), Bonus: max(bonus, 0)}
+	t.Done = max(0, min(done, t.Assigned))
+	if t.Assigned > 0 {
+		t.Share = max(0, min(share, ShareScale))
+	}
+	t.Percent = (t.Share + 50) / 100
 	return t
 }
 
@@ -119,16 +139,15 @@ func (t Total) share() (num, den int) {
 func (t Total) Ranked() bool { return t.Assigned >= MinAssigned }
 
 // less orders two totals best first: ranked before unranked, then the higher
-// share of chores done (compared exactly, not by the rounded percent), then
-// more bonus chores.
+// share (to a hundredth of a point, finer than the score shown), then more
+// bonus chores. Shares are compared, never point values, so a person in this
+// household and one from a friend family are judged on the same number.
 func less(a, b Total) bool {
 	if a.Ranked() != b.Ranked() {
 		return a.Ranked()
 	}
-	an, ad := a.share()
-	bn, bd := b.share()
-	if l, r := an*max(bd, 1), bn*max(ad, 1); l != r {
-		return l > r
+	if a.Share != b.Share {
+		return a.Share > b.Share
 	}
 	return a.Bonus > b.Bonus
 }

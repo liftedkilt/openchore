@@ -87,8 +87,9 @@ is 66 and not 92. If she had skipped a "Make bed" instead, it would be
 1. People with at least **5 assigned chores** that week are ranked; the rest
    are listed under "Getting started". With fewer chores, a single one swings
    the score too far.
-2. Higher share first. The exact fraction is compared, not the rounded score,
-   so 2 ÷ 3 ranks just below 67 ÷ 100 even though both show 67.
+2. Higher share first, compared to a hundredth of a point, finer than the
+   score shown: 2 ÷ 3 (66.67) ranks just below 67 ÷ 100 (67.00) even though
+   both show 67.
 3. Then more bonus chores.
 4. Anyone still level shares a place.
 
@@ -145,12 +146,22 @@ people it sends. Until you tick someone you're offered, only their name and
 colour are kept on your server; their chore counts and animal are dropped as
 they arrive.
 
+A linked family is sent only what its screens show:
+
 | Shared | Never shared |
 | --- | --- |
 | First name and colour | Chore names and descriptions |
-| Chores done / assigned / bonus per day, and the point value of those chores, last 14 days | Photos |
-| Streak length | Point balances, rewards, redemptions |
-| Farm animal: name, kind, coat, accessory, mood, health, food, joy | Ages, PINs, sign-in details |
+| For this week and last: chores done, chores assigned, bonus count, and the score | A day-by-day breakdown, and the point values the score was worked out from |
+| Streak length | Photos |
+| Farm animal: name, kind, coat, accessory, and how it's doing (mood, sick, hiding) | The animal's health, food and joy numbers, and a custom picture |
+| | Point balances, rewards, redemptions, ages, PINs, sign-in details |
+
+The score travels as a share out of 10,000 (the score to two more decimal
+places), so a family's point scale never leaves the house. Everyone on a
+leaderboard, local or from a friend family, is ranked on that same number.
+A friend's week is their own Monday to Sunday; near midnight on a Sunday,
+families in different time zones can briefly be a week apart, and a friend
+whose week doesn't line up yet shows as having nothing counted.
 
 A friend family sees the farm animal as it really is, sick and hiding
 included. Drawn (uploaded) accessories aren't sent. Kids can't send each other
@@ -236,7 +247,8 @@ linked families see the link as ended and need a new invite.
 ## API
 
 - `GET /api/leaderboard?week=this|last` – the standings, friends included.
-  `percent` is the score out of 100.
+  `percent` is the score out of 100; `share` is the same to two more places
+  (0 to 10000) and is what people are ranked on.
 - `GET /api/friends/farms` – each friend family's farm, shaped like `GET /api/pets`.
 - `GET` / `PUT /api/admin/friends` – leaderboard switch, family name, hub, and
   each linked family with its `outbound` (your people: `shared`, and `accepted`

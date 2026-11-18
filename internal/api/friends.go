@@ -116,7 +116,7 @@ func (h *FriendsHandler) Leaderboard(w http.ResponseWriter, r *http.Request) {
 			}
 			entries = append(entries, leaderboardEntry{
 				Key: fmt.Sprintf("f%d:%s", l.ID, m.ID), Name: m.Name, Color: m.Color, Family: name, LinkID: l.ID,
-				Streak: m.Streak, Paused: m.Paused, Total: score.Sum(m.Days, from, to),
+				Streak: m.Streak, Paused: m.Paused, Total: friendWeek(m.Weeks, from),
 			})
 		}
 		families = append(families, map[string]any{"link_id": l.ID, "name": name, "snapshot_at": l.SnapshotAt, "pets": pets})
@@ -128,6 +128,18 @@ func (h *FriendsHandler) Leaderboard(w http.ResponseWriter, r *http.Request) {
 	}
 	out["families"] = families
 	writeJSON(w, http.StatusOK, out)
+}
+
+// friendWeek is a friend's total for the week starting on start. Their weeks
+// are their own (their time zone); one that doesn't line up with ours yet
+// reads as nothing done so far.
+func friendWeek(weeks []model.FriendWeek, start string) score.Total {
+	for _, w := range weeks {
+		if w.Start == start {
+			return score.FromShare(w.Assigned, w.Done, w.Bonus, w.Share)
+		}
+	}
+	return score.Total{}
 }
 
 func familyLabel(name string) string {
@@ -169,7 +181,7 @@ func (h *FriendsHandler) Farms(w http.ResponseWriter, r *http.Request) {
 			}
 			pets = append(pets, model.Pet{
 				ID: int64(j + 1), Name: p.Name, Species: p.Species, Color: p.Color, Accessory: p.Accessory,
-				Health: p.Health, Fullness: p.Fullness, Joy: p.Joy, Mood: p.Mood, Hiding: p.Hiding, Sick: p.Sick,
+				Mood: p.Mood, Hiding: p.Hiding, Sick: p.Sick,
 				Items: []string{}, OwnerName: m.Name, OwnerColor: m.Color,
 			})
 		}
