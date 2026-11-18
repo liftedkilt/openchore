@@ -95,3 +95,45 @@ func TestCaughtUpIgnoresLaterChores(t *testing.T) {
 		t.Fatal("caught up with an available chore undone")
 	}
 }
+
+func TestShowToday(t *testing.T) {
+	done, approved := true, model.StatusApproved
+	chore := func(cat string, completed bool) model.ScheduledChore {
+		c := model.ScheduledChore{Category: cat, Completed: completed, Available: true}
+		if completed {
+			c.CompletionStatus = &approved
+		}
+		return c
+	}
+	_ = done
+	sick := func() *model.Pet { return &model.Pet{Health: 34, Fullness: 80, Joy: 80} }
+
+	// Everything that counts is done: the gain shows now, and the pet is no longer sick.
+	p := sick()
+	ShowToday(p, []model.ScheduledChore{chore(model.CategoryRequired, true), chore(model.CategoryCore, true), chore(model.CategoryBonus, false)})
+	Describe(p, "2026-11-16", true)
+	if p.Health != 34+GoodDayHealth || !p.HealedToday || p.Sick {
+		t.Fatalf("all done: %+v", p)
+	}
+	// One chore still open (even one that isn't available yet): no preview.
+	p = sick()
+	late := chore(model.CategoryCore, false)
+	late.Available = false
+	ShowToday(p, []model.ScheduledChore{chore(model.CategoryRequired, true), late})
+	Describe(p, "2026-11-16", true)
+	if p.Health != 34 || p.HealedToday || !p.Sick {
+		t.Fatalf("one open: %+v", p)
+	}
+	// A day with nothing that counts gives no preview (tonight's small gain isn't shown early).
+	p = sick()
+	ShowToday(p, []model.ScheduledChore{chore(model.CategoryBonus, true)})
+	if p.Health != 34 || p.HealedToday {
+		t.Fatalf("nothing counted: %+v", p)
+	}
+	// Never past full.
+	p = &model.Pet{Health: 95}
+	ShowToday(p, []model.ScheduledChore{chore(model.CategoryCore, true)})
+	if p.Health != 100 {
+		t.Fatalf("clamp: %+v", p)
+	}
+}

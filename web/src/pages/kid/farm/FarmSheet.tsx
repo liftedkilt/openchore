@@ -208,7 +208,9 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
   };
 
   const hint = pet.hiding ? t('kid.farm.hint.hiding', { name: pet.name })
+    : pet.sick && pet.healed_today ? t('kid.farm.hint.sickHealed', { name: pet.name })
     : pet.sick ? t('kid.farm.hint.sick', { name: pet.name })
+    : pet.healed_today ? t('kid.farm.hint.healed', { name: pet.name })
     : pet.mood === 'hungry' ? t('kid.farm.hint.hungry', { name: pet.name })
     : pet.mood === 'bored' ? t('kid.farm.hint.bored', { name: pet.name })
     : t('kid.farm.hint.ok', { name: pet.name });

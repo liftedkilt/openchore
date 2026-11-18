@@ -1350,7 +1350,9 @@
         "sick": "Wenn du jeden Tag alle Aufgaben machst, wird {{name}} wieder gesund.",
         "hungry": "Füttere {{name}} über die Belohnungen.",
         "bored": "Spiel mit {{name}}, um es aufzumuntern.",
-        "ok": "Mach weiter deine Aufgaben, damit {{name}} gesund bleibt."
+        "ok": "Mach weiter deine Aufgaben, damit {{name}} gesund bleibt.",
+        "sickHealed": "Alle Aufgaben für heute sind erledigt, deshalb geht es {{name}} besser. Mach morgen so weiter!",
+        "healed": "Alle Aufgaben für heute sind erledigt. {{name}} fühlt sich schon stärker!"
       },
       "species": {
         "horse": "Pferd",

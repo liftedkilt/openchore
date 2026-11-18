@@ -48,6 +48,7 @@ func (h *PetHandler) describe(ctx context.Context, p *model.Pet, owner *model.Us
 	if err != nil {
 		return err
 	}
+	pet.ShowToday(p, chores)
 	pet.Describe(p, yesterday, pet.CaughtUp(chores))
 	if owner != nil {
 		p.OwnerName = owner.Name

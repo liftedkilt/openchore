@@ -337,6 +337,8 @@ export interface Pet {
   items: PetItem[];
   last_missed_date?: string;
   mood: PetMood;
+  /** All of today's chores are done, so health already shows tonight's gain. */
+  healed_today?: boolean;
   hiding: boolean;
   sick: boolean;
   can_play: boolean;

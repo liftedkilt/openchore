@@ -30,6 +30,14 @@ once, catching up at most 7 days after downtime), for every animal:
 | Food ran out | Health −10 |
 | Person paused | Nothing changes |
 
+**Today's gain shows straight away.** As soon as every Must-do and Every-day
+chore for today is done, the animal is shown with the +15 health that tonight's
+check will give it, so a sick animal perks up when the kid finishes rather
+than the next morning. It is only a preview: un-ticking a chore or a rejection
+takes it away again, and the nightly check is still what records it (nothing
+is counted twice). A chore that only unlocks later in the day has to be done
+too.
+
 "Done" means completed (approved or waiting for a grown-up), excused, or a
 first-come-first-served chore a sibling got to first. A rejected try doesn't
 count. Bonus and Optional chores never count, same as streaks and penalties.

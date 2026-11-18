@@ -1350,7 +1350,9 @@
         "sick": "Doing all your chores each day helps {{name}} get better.",
         "hungry": "Feed {{name}} from the rewards.",
         "bored": "Play with {{name}} to cheer them up.",
-        "ok": "Keep doing your chores to keep {{name}} healthy."
+        "ok": "Keep doing your chores to keep {{name}} healthy.",
+        "sickHealed": "All of today's chores are done, so {{name}} is getting better. Keep it up tomorrow!",
+        "healed": "All of today's chores are done. {{name}} feels stronger already!"
       },
       "species": {
         "horse": "Horse",

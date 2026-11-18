@@ -481,6 +481,9 @@ type Pet struct {
 
 	// Computed on read.
 	Mood    string `json:"mood"`   // hiding, very_sick, sick, hungry, bored, happy, content
+	// HealedToday: all of today's chores are done, so Health already shows
+	// the gain tonight's check will make real (pet.ShowToday).
+	HealedToday bool `json:"healed_today,omitempty"`
 	Hiding  bool   `json:"hiding"` // missed chores yesterday and today's aren't done yet
 	Sick    bool   `json:"sick"`
 	CanPlay bool   `json:"can_play"`
