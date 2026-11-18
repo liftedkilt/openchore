@@ -11,25 +11,31 @@ Leaderboard & friend families**:
 
 One number per person per week (Monday to Sunday, in the server's time zone):
 
-**chores done ÷ chores assigned**, shown as "18 of 20 · 90%".
+**points earned ÷ points assigned**, shown as "90% · 18 of 20 chores".
 
-Points are never part of it. Every family sets its own point values, so
-points can't be compared between families; a share of assigned chores can.
+Each assigned chore is worth its own point value, so a big chore counts for
+more than a small one. It is a share, never a points total: every family sets
+its own point values, so totals can't be compared between families, but the
+share of your own chores' points can.
 
 | Rule | Detail |
 | --- | --- |
 | Assigned | Must-do and Every-day chores (`required`, `core`) scheduled for that person |
+| Worth | The chore's point value. A schedule's points multiplier isn't applied |
+| No points | If none of a person's chores carry points that week, the score is chores done ÷ chores assigned |
 | Excused | Left out of both sides of the fraction |
 | Paused days | Left out entirely |
 | Done | Completed and approved, or waiting for a grown-up. A rejected try isn't done |
 | Today | A chore due today joins the fraction when it's done, when it expires, or when the day ends. Nobody is marked down in the morning for chores that aren't due yet |
 | Bonus | Bonus chores, and family / first-come chores the person did, are counted on the side ("+3 bonus"). They break ties and never change the percentage |
 | Optional | Optional chores and kids' own tasks count for nothing |
-| Weighting | A plain count, so retuning point values doesn't move anyone's score |
-| Ranking | Share done, then bonus count; ties share a place. A person needs 5 assigned chores in the week to be ranked |
+| Penalties and decay | Not part of the score: it looks only at which chores were done |
+| Ranking | Share earned, then bonus count; ties share a place. A person needs 5 assigned chores in the week to be ranked |
 
 A kid with one chore a day reaches 100% more easily than a kid with eight.
-The fraction is always shown next to the percentage so that stays visible.
+The chore count is always shown next to the percentage so that stays visible.
+Because chores are weighted, the two can differ: 9 of 10 chores is well under
+90% if the one missed was the big one.
 
 Finished days are stored in `score_days` (so a paused day stays out of the
 score after the person is unpaused) and recounted for a week, which picks up
@@ -65,8 +71,8 @@ person and applies to every linked family.
 | Shared | Never shared |
 | --- | --- |
 | First name and colour | Chore names and descriptions |
-| Chores done / assigned / bonus per day, last 14 days | Photos |
-| Streak length | Points, rewards, redemptions |
+| Chores done / assigned / bonus per day, and the point value of those chores, last 14 days | Photos |
+| Streak length | Point balances, rewards, redemptions |
 | Farm animal: name, kind, coat, accessory, mood, health, food, joy | Ages, PINs, sign-in details |
 
 A friend family sees the farm animal as it really is, sick and hiding

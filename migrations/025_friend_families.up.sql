@@ -1,15 +1,19 @@
--- Friend families: a weekly leaderboard scored by chores done out of chores
--- assigned, and links to other families' OpenChore instances so kids can
+-- Friend families: a weekly leaderboard scored by the share of assigned
+-- chore points earned, and links to other families' OpenChore instances so kids can
 -- compete and visit each other's farms. See docs/friends.md.
 
--- One row per person per finished day. Paused days are kept as rows with
--- paused = 1 so they stay out of the score after the person is unpaused.
+-- One row per person per finished day: chores done out of chores assigned,
+-- and the same in the chores' point values (what the score is made from).
+-- Paused days are kept as rows with paused = 1 so they stay out of the score
+-- after the person is unpaused.
 CREATE TABLE score_days (
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     date     TEXT    NOT NULL,
     assigned INTEGER NOT NULL DEFAULT 0,
     done     INTEGER NOT NULL DEFAULT 0,
     bonus    INTEGER NOT NULL DEFAULT 0,
+    assigned_points INTEGER NOT NULL DEFAULT 0,
+    done_points     INTEGER NOT NULL DEFAULT 0,
     paused   INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id, date)
 );

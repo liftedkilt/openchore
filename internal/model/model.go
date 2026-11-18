@@ -625,14 +625,18 @@ type AIReviewResult struct {
 // --- Leaderboard & friend families (docs/friends.md) ---
 
 // ScoreDay is one person's chores on one day, counted for the leaderboard:
-// Done out of Assigned, with Bonus counted on the side. A Paused day is
-// left out of the score.
+// Done out of Assigned chores, the same in the chores' point values
+// (DonePoints out of AssignedPoints, which is what the percentage is made
+// from), and Bonus chores counted on the side. A Paused day is left out of
+// the score.
 type ScoreDay struct {
-	Date     string `json:"date"`
-	Assigned int    `json:"assigned"`
-	Done     int    `json:"done"`
-	Bonus    int    `json:"bonus"`
-	Paused   bool   `json:"paused,omitempty"`
+	Date           string `json:"date"`
+	Assigned       int    `json:"assigned"`
+	Done           int    `json:"done"`
+	Bonus          int    `json:"bonus"`
+	AssignedPoints int    `json:"assigned_points"`
+	DonePoints     int    `json:"done_points"`
+	Paused         bool   `json:"paused,omitempty"`
 }
 
 // Friend link statuses.
@@ -661,8 +665,9 @@ type FriendLink struct {
 }
 
 // FriendSnapshot is what one family sends another: the people a parent chose
-// to share, with their daily chore counts, streak and farm animal. It never
-// carries chore names, photos, points or rewards.
+// to share, with their daily chore counts (and what those chores were worth
+// in points), streak and farm animal. It never carries chore names, photos,
+// point balances or rewards.
 type FriendSnapshot struct {
 	Version     int            `json:"version"`
 	Family      string         `json:"family"`

@@ -46,14 +46,15 @@ func (e *testEnv) leaderboard(t *testing.T) []map[string]any {
 	return out
 }
 
-// yesterdayChores gives a kid n chores yesterday and marks the first done of
-// them complete, straight in the database (the API only completes today's).
-func (e *testEnv) yesterdayChores(t *testing.T, kid, n, done int, category string) {
+// yesterdayChores gives a kid n chores yesterday, each worth points, and
+// marks the first done of them complete, straight in the database (the API
+// only completes today's).
+func (e *testEnv) yesterdayChores(t *testing.T, kid, n, done int, category string, points int) {
 	t.Helper()
 	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
 	for i := 0; i < n; i++ {
 		resp := e.expectStatus(t, "POST", "/api/chores",
-			map[string]any{"title": fmt.Sprintf("Chore %d", i), "category": category, "points_value": 5}, adminHeaders(), http.StatusCreated)
+			map[string]any{"title": fmt.Sprintf("Chore %d", i), "category": category, "points_value": points}, adminHeaders(), http.StatusCreated)
 		var chore map[string]any
 		decodeBody(t, resp, &chore)
 		resp = e.expectStatus(t, "POST", fmt.Sprintf("/api/chores/%d/schedules", int(chore["id"].(float64))),
@@ -69,7 +70,7 @@ func (e *testEnv) yesterdayChores(t *testing.T, kid, n, done int, category strin
 	}
 }
 
-func TestLeaderboardScoresByShareOfChoresDone(t *testing.T) {
+func TestLeaderboardScoresByShareOfPointsEarned(t *testing.T) {
 	if time.Now().Weekday() == time.Monday {
 		t.Skip("yesterday is in last week on a Monday")
 	}
@@ -91,16 +92,19 @@ func TestLeaderboardScoresByShareOfChoresDone(t *testing.T) {
 	if _, err := env.db.Exec(`UPDATE users SET created_at = datetime('now', '-30 days')`); err != nil {
 		t.Fatal(err)
 	}
-	env.yesterdayChores(t, ava, 5, 4, "core")      // 80%
-	env.yesterdayChores(t, ben, 10, 9, "required") // 90%: more chores, better share
-	env.yesterdayChores(t, cat, 2, 2, "core")      // 100% but too few to rank
-	env.yesterdayChores(t, ava, 3, 3, "bonus")     // bonus never moves the percentage
+	env.yesterdayChores(t, ava, 5, 4, "core", 5) // 20 of 25 points: 80%
+	// Ben did nine small chores and skipped the big one: 9 of 10 chores, but
+	// only 18 of 40 points. The score follows the points.
+	env.yesterdayChores(t, ben, 9, 9, "required", 2)
+	env.yesterdayChores(t, ben, 1, 0, "required", 22)
+	env.yesterdayChores(t, cat, 2, 2, "core", 5)  // 100% but too few chores to rank
+	env.yesterdayChores(t, ava, 3, 3, "bonus", 9) // bonus never moves the percentage
 
 	got := env.leaderboard(t)
 	want := []struct {
 		name                                 string
 		rank, done, assigned, bonus, percent float64
-	}{{"Ben", 1, 9, 10, 0, 90}, {"Ava", 2, 4, 5, 3, 80}, {"Cat", 0, 2, 2, 0, 100}}
+	}{{"Ava", 1, 4, 5, 3, 80}, {"Ben", 2, 9, 10, 0, 45}, {"Cat", 0, 2, 2, 0, 100}}
 	if len(got) != len(want) {
 		t.Fatalf("entries: %v", got)
 	}
@@ -114,11 +118,11 @@ func TestLeaderboardScoresByShareOfChoresDone(t *testing.T) {
 
 	// A chore due today doesn't count against anyone until it's done.
 	sched := env.createScheduledChore(t, "Make bed", ava, nil)
-	if g := env.leaderboard(t)[1]; g["assigned"] != 5.0 {
+	if g := env.leaderboard(t)[0]; g["assigned"] != 5.0 {
 		t.Fatalf("today's undone chore already counted: %v", g)
 	}
 	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", sched), map[string]any{}, childHeaders(ava), http.StatusCreated)
-	if g := env.leaderboard(t)[1]; g["assigned"] != 6.0 || g["done"] != 5.0 {
+	if g := env.leaderboard(t)[0]; g["assigned"] != 6.0 || g["done"] != 5.0 || g["done_points"] != 25.0 || g["percent"] != 83.0 {
 		t.Fatalf("today's done chore not counted: %v", g)
 	}
 }

@@ -1,6 +1,7 @@
-// The weekly leaderboard: everyone's chores done out of chores given this
-// week, with the people friend families share mixed in. Points aren't part
-// of it (every family prices chores differently); see docs/friends.md.
+// The weekly leaderboard: the share of this week's chore points each person
+// has earned, with the people friend families share mixed in. It's a share,
+// never a points total (every family prices chores differently); see
+// docs/friends.md.
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';

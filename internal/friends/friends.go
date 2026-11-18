@@ -184,8 +184,8 @@ func (f *Service) FamilyName(ctx context.Context) string {
 }
 
 // Snapshot builds what this family shares: only people a parent switched
-// sharing on for, and nothing but names, colours, chore counts, streaks and
-// farm animals.
+// sharing on for, and nothing but names, colours, daily chore counts (with
+// what those chores were worth), streaks and farm animals.
 func (f *Service) Snapshot(ctx context.Context) (*model.FriendSnapshot, error) {
 	now := f.now()
 	snap := &model.FriendSnapshot{
@@ -555,6 +555,8 @@ func sanitize(s *model.FriendSnapshot) {
 			d := &m.Days[j]
 			d.Assigned, d.Bonus = max(0, min(d.Assigned, 200)), max(0, min(d.Bonus, 200))
 			d.Done = max(0, min(d.Done, d.Assigned))
+			d.AssignedPoints = max(0, min(d.AssignedPoints, 1_000_000))
+			d.DonePoints = max(0, min(d.DonePoints, d.AssignedPoints))
 		}
 		if p := m.Pet; p != nil {
 			p.Name = clip(p.Name, maxNameLen)

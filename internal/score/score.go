@@ -1,9 +1,10 @@
 // Package score holds the leaderboard rules: a person's score for a week is
-// the chores they did out of the chores they were given.
+// the share of their assigned chores' points that they earned, so a big
+// chore counts for more than a small one.
 //
-// Points are deliberately not part of it. Every family sets its own point
-// values, so points can't be compared between families; a share of assigned
-// chores can. Keep docs/friends.md in step.
+// It is a share, never a points total. Every family sets its own point
+// values, so totals can't be compared between families; the share of your
+// own chores' points can. Keep docs/friends.md in step.
 package score
 
 import (
@@ -34,11 +35,17 @@ func SummarizeDay(date string, chores []model.ScheduledChore, finished bool) mod
 		own := c.AssignmentType == "" || c.AssignmentType == model.AssignmentIndividual
 		switch {
 		case model.CountsTowardDay(c.Category) && own:
+			// Worth the chore's own point value (a schedule's multiplier
+			// isn't applied).
+			pts := max(c.PointsValue, 0)
 			if done {
 				d.Assigned++
 				d.Done++
+				d.AssignedPoints += pts
+				d.DonePoints += pts
 			} else if finished || c.Expired {
 				d.Assigned++
+				d.AssignedPoints += pts
 			}
 		case done && (c.Category == model.CategoryBonus || model.CountsTowardDay(c.Category)):
 			// Bonus chores, and family / first-come chores this person did.
@@ -65,10 +72,14 @@ func WeekEnd(weekStart string) string {
 
 // Total is a person's score over a set of days.
 type Total struct {
-	Assigned int `json:"assigned"`
-	Done     int `json:"done"`
-	Bonus    int `json:"bonus"`
-	// Percent is Done out of Assigned, rounded; 0 when nothing was assigned.
+	Assigned       int `json:"assigned"`
+	Done           int `json:"done"`
+	Bonus          int `json:"bonus"`
+	AssignedPoints int `json:"assigned_points"`
+	DonePoints     int `json:"done_points"`
+	// Percent is the share earned, rounded: DonePoints out of
+	// AssignedPoints, or Done out of Assigned when the person's chores
+	// carry no points at all. 0 when nothing was assigned.
 	Percent int `json:"percent"`
 	// Rank is the place among ranked people (ties share one); 0 = not
 	// ranked yet (fewer than MinAssigned chores).
@@ -85,11 +96,23 @@ func Sum(days []model.ScoreDay, from, to string) Total {
 		t.Assigned += d.Assigned
 		t.Done += d.Done
 		t.Bonus += d.Bonus
+		t.AssignedPoints += d.AssignedPoints
+		t.DonePoints += d.DonePoints
 	}
-	if t.Assigned > 0 {
-		t.Percent = (t.Done*100 + t.Assigned/2) / t.Assigned
+	if num, den := t.share(); den > 0 {
+		t.Percent = (num*100 + den/2) / den
 	}
 	return t
+}
+
+// share is the score as a fraction: points earned out of points assigned.
+// A family that doesn't use points (every chore worth 0) is scored by the
+// number of chores instead.
+func (t Total) share() (num, den int) {
+	if t.AssignedPoints > 0 {
+		return t.DonePoints, t.AssignedPoints
+	}
+	return t.Done, t.Assigned
 }
 
 // Ranked reports whether a total has enough chores behind it to be ranked.
@@ -102,7 +125,9 @@ func less(a, b Total) bool {
 	if a.Ranked() != b.Ranked() {
 		return a.Ranked()
 	}
-	if l, r := a.Done*max(b.Assigned, 1), b.Done*max(a.Assigned, 1); l != r {
+	an, ad := a.share()
+	bn, bd := b.share()
+	if l, r := an*max(bd, 1), bn*max(ad, 1); l != r {
 		return l > r
 	}
 	return a.Bonus > b.Bonus

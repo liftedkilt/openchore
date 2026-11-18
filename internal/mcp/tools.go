@@ -235,8 +235,9 @@ func allTools() []*Tool {
 
 	// ---- Leaderboard and friend families ----
 	add(endpoint{name: "get_leaderboard", title: "The weekly leaderboard", readOnly: true,
-		desc: "This week's standings (Monday to Sunday), or last week's: each person's chores done out of chores assigned " +
-			"(Must-do and Every-day chores; excused chores and paused days are left out), bonus chores as a tie-breaker, and rank. " +
+		desc: "This week's standings (Monday to Sunday), or last week's. percent is the share of a person's assigned chore points " +
+			"they earned (done_points out of assigned_points, each chore worth its own points; Must-do and Every-day chores only; " +
+			"excused chores and paused days are left out), with the chore counts, bonus chores as a tie-breaker, and rank. " +
 			"People need 5 assigned chores in the week to be ranked (rank 0 = not yet). Includes people shared by linked friend families.",
 		method: http.MethodGet, path: "/leaderboard", query: []string{"week"},
 		props: map[string]any{"week": enum("Which week (default this).", "this", "last")}})
@@ -258,8 +259,8 @@ func allTools() []*Tool {
 			"hub_key":             str("Key that lets this family create invites on that server."),
 		}})
 	add(endpoint{name: "share_person_with_friends", title: "Share a person with friend families",
-		desc: "Turn sharing on or off for one person. A shared person's first name, colour, daily chore counts, streak and " +
-			"farm animal go to every linked friend family; chore names, photos, points and rewards never do. Confirm with the parent first.",
+		desc: "Turn sharing on or off for one person. A shared person's first name, colour, daily chore counts (and what those chores were worth in points), streak and " +
+			"farm animal go to every linked friend family; chore names, photos, point balances and rewards never do. Confirm with the parent first.",
 		method: http.MethodPut, path: "/admin/users/{id}/share", required: []string{"shared"},
 		props: map[string]any{"id": integer("Person id."), "shared": boolean("Share or stop sharing.")}})
 	add(endpoint{name: "create_friend_invite", title: "Invite a friend family",

@@ -13,7 +13,7 @@ import (
 // ListScoreDays returns every person's stored days from..to, keyed by user.
 func (s *Store) ListScoreDays(ctx context.Context, from, to string) (map[int64][]model.ScoreDay, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT user_id, date, assigned, done, bonus, paused FROM score_days
+		`SELECT user_id, date, assigned, done, bonus, assigned_points, done_points, paused FROM score_days
 		 WHERE date >= ? AND date <= ? ORDER BY user_id, date`, from, to)
 	if err != nil {
 		return nil, err
@@ -23,7 +23,7 @@ func (s *Store) ListScoreDays(ctx context.Context, from, to string) (map[int64][
 	for rows.Next() {
 		var uid int64
 		var d model.ScoreDay
-		if err := rows.Scan(&uid, &d.Date, &d.Assigned, &d.Done, &d.Bonus, &d.Paused); err != nil {
+		if err := rows.Scan(&uid, &d.Date, &d.Assigned, &d.Done, &d.Bonus, &d.AssignedPoints, &d.DonePoints, &d.Paused); err != nil {
 			return nil, err
 		}
 		out[uid] = append(out[uid], d)
@@ -34,10 +34,12 @@ func (s *Store) ListScoreDays(ctx context.Context, from, to string) (map[int64][
 // SaveScoreDay stores (or replaces) one person's day.
 func (s *Store) SaveScoreDay(ctx context.Context, userID int64, d model.ScoreDay) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO score_days (user_id, date, assigned, done, bonus, paused) VALUES (?, ?, ?, ?, ?, ?)
+		`INSERT INTO score_days (user_id, date, assigned, done, bonus, assigned_points, done_points, paused)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(user_id, date) DO UPDATE SET assigned = excluded.assigned, done = excluded.done,
-		   bonus = excluded.bonus, paused = excluded.paused`,
-		userID, d.Date, d.Assigned, d.Done, d.Bonus, d.Paused)
+		   bonus = excluded.bonus, assigned_points = excluded.assigned_points, done_points = excluded.done_points,
+		   paused = excluded.paused`,
+		userID, d.Date, d.Assigned, d.Done, d.Bonus, d.AssignedPoints, d.DonePoints, d.Paused)
 	return err
 }
 

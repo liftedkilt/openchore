@@ -8,7 +8,7 @@ import (
 )
 
 func chore(cat, assign string, completed bool, status string) model.ScheduledChore {
-	c := model.ScheduledChore{Category: cat, AssignmentType: assign, Completed: completed}
+	c := model.ScheduledChore{Category: cat, AssignmentType: assign, Completed: completed, PointsValue: 5}
 	if status != "" {
 		c.CompletionStatus = &status
 	}
@@ -29,8 +29,16 @@ func TestSummarizeDay(t *testing.T) {
 		chore(model.CategoryOptional, model.AssignmentIndividual, true, model.StatusApproved),
 	}
 	got := SummarizeDay("2026-11-16", chores, true)
-	if got.Assigned != 4 || got.Done != 2 || got.Bonus != 2 {
-		t.Fatalf("finished day = %+v, want 2 of 4, 2 bonus", got)
+	if got.Assigned != 4 || got.Done != 2 || got.Bonus != 2 || got.AssignedPoints != 20 || got.DonePoints != 10 {
+		t.Fatalf("finished day = %+v, want 2 of 4 (10 of 20 points), 2 bonus", got)
+	}
+	// A big chore counts for more than a small one.
+	big := chore(model.CategoryCore, model.AssignmentIndividual, false, "")
+	big.PointsValue = 30
+	small := chore(model.CategoryCore, model.AssignmentIndividual, true, model.StatusApproved)
+	got = SummarizeDay("2026-11-16", []model.ScheduledChore{big, small}, true)
+	if got.Assigned != 2 || got.Done != 1 || got.AssignedPoints != 35 || got.DonePoints != 5 {
+		t.Fatalf("weighted day = %+v, want 1 of 2 chores, 5 of 35 points", got)
 	}
 	// While the day is still running, chores that aren't done don't count yet.
 	got = SummarizeDay("2026-11-16", chores, false)
@@ -65,14 +73,19 @@ func TestWeekStart(t *testing.T) {
 
 func TestSumAndRank(t *testing.T) {
 	days := []model.ScoreDay{
-		{Date: "2026-11-15", Assigned: 9, Done: 0}, // last week
-		{Date: "2026-11-16", Assigned: 3, Done: 3, Bonus: 1},
-		{Date: "2026-11-17", Assigned: 4, Done: 4, Paused: true}, // paused: skipped
-		{Date: "2026-11-18", Assigned: 3, Done: 2},
+		{Date: "2026-11-15", Assigned: 9, Done: 0, AssignedPoints: 90}, // last week
+		{Date: "2026-11-16", Assigned: 3, Done: 3, Bonus: 1, AssignedPoints: 15, DonePoints: 15},
+		{Date: "2026-11-17", Assigned: 4, Done: 4, AssignedPoints: 40, DonePoints: 40, Paused: true}, // paused: skipped
+		{Date: "2026-11-18", Assigned: 3, Done: 2, AssignedPoints: 35, DonePoints: 5},                // missed the big one
 	}
 	got := Sum(days, "2026-11-16", "2026-11-22")
-	if got.Assigned != 6 || got.Done != 5 || got.Bonus != 1 || got.Percent != 83 {
+	// 5 of 6 chores, but only 20 of the 50 points: the percentage follows the points.
+	if got.Assigned != 6 || got.Done != 5 || got.Bonus != 1 || got.AssignedPoints != 50 || got.DonePoints != 20 || got.Percent != 40 {
 		t.Fatalf("Sum = %+v", got)
+	}
+	// A family that doesn't use points is scored by chores.
+	if got := Sum([]model.ScoreDay{{Date: "2026-11-16", Assigned: 6, Done: 5}}, "2026-11-16", "2026-11-22"); got.Percent != 83 {
+		t.Fatalf("no-points Sum = %+v", got)
 	}
 
 	totals := []Total{
