@@ -11,7 +11,8 @@ Leaderboard & friend families**:
 
 One number per person per week (Monday to Sunday, in the server's time zone):
 
-**points earned ÷ points assigned**, shown as "90% · 18 of 20 chores".
+**points earned ÷ points assigned × 100**, a score out of 100 shown as
+"88 points (12 of 13 chores)". No percentages are shown.
 
 Each assigned chore is worth its own point value, so a big chore counts for
 more than a small one. It is a share, never a points total: every family sets
@@ -27,15 +28,15 @@ share of your own chores' points can.
 | Paused days | Left out entirely |
 | Done | Completed and approved, or waiting for a grown-up. A rejected try isn't done |
 | Today | A chore due today joins the fraction when it's done, when it expires, or when the day ends. Nobody is marked down in the morning for chores that aren't due yet |
-| Bonus | Bonus chores, and family / first-come chores the person did, are counted on the side ("+3 bonus"). They break ties and never change the percentage |
+| Bonus | Bonus chores, and family / first-come chores the person did, are counted on the side ("+3 bonus"). They break ties and never change the score |
 | Optional | Optional chores and kids' own tasks count for nothing |
 | Penalties and decay | Not part of the score: it looks only at which chores were done |
 | Ranking | Share earned, then bonus count; ties share a place. A person needs 5 assigned chores in the week to be ranked |
 
 A kid with one chore a day reaches 100% more easily than a kid with eight.
-The chore count is always shown next to the percentage so that stays visible.
+The chore count is always shown next to the score so that stays visible.
 Because chores are weighted, the two can differ: 9 of 10 chores is well under
-90% if the one missed was the big one.
+90 points if the one missed was the big one.
 
 Finished days are stored in `score_days` (so a paused day stays out of the
 score after the person is unpaused) and recounted for a week, which picks up
@@ -118,6 +119,7 @@ An instance takes its hub from Settings, or from `OPENCHORE_HUB_URL` /
 ## API
 
 - `GET /api/leaderboard?week=this|last` – the standings, friends included.
+  `percent` is the score out of 100.
 - `GET /api/friends/farms` – each friend family's farm, shaped like `GET /api/pets`.
 - `GET` / `PUT /api/admin/friends` – leaderboard switch, family name, hub, and
   each linked family with its `outbound` (your people: `shared`, and `accepted`
