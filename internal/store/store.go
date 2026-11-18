@@ -931,6 +931,14 @@ func (s *Store) ReviveCompletion(ctx context.Context, id int64) error {
 	return err
 }
 
+// DeleteCompletion hard-deletes one completion row. Used for a soft-deleted
+// row that can't be revived as-is; its credit and uncomplete debit stay in
+// point_transactions and net to zero.
+func (s *Store) DeleteCompletion(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM chore_completions WHERE id = ?`, id)
+	return err
+}
+
 // ReviveCompletionAndReverseDebits atomically revives a soft-deleted completion,
 // removes chore_uncomplete debits, and restores auto-contributions in a single transaction.
 func (s *Store) ReviveCompletionAndReverseDebits(ctx context.Context, id int64) error {
