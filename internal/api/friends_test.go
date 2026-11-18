@@ -300,6 +300,12 @@ func TestFriendFamiliesLinkThroughHub(t *testing.T) {
 		t.Fatalf("the snapshot has no weekly totals: %s", stored)
 	}
 
+	// The wall display's leaderboard is public and has this household only.
+	wall := b.getJSON(t, "/api/leaderboard/household", nil)
+	if es := wall["entries"].([]any); len(es) != 1 || es[0].(map[string]any)["name"] != "Bo" || len(wall["families"].([]any)) != 0 {
+		t.Fatalf("household leaderboard shows other families: %v", wall)
+	}
+
 	// The hub only ever held sealed data.
 	var blob []byte
 	hubDB := hubSrv.Config.Handler.(*hub.Hub)

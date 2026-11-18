@@ -1647,6 +1647,7 @@
     "chartTitle": "Today so far",
     "chartDesc": "How much of their day each person has done, hour by hour. Now: {{summary}}.",
     "chartPerson": "{{name}} {{pct}}%",
-    "farm": "The farm"
+    "farm": "The farm",
+    "week": "This week"
   }
 }

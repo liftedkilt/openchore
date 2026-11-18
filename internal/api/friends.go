@@ -48,8 +48,19 @@ type leaderboardEntry struct {
 }
 
 // Leaderboard returns this week's (or ?week=last) standings: everyone in the
-// household plus the people friend families share.
+// household plus the people friend families share. Signed-in only.
 func (h *FriendsHandler) Leaderboard(w http.ResponseWriter, r *http.Request) {
+	h.leaderboard(w, r, true)
+}
+
+// HouseholdLeaderboard is the same for this household alone, with nobody
+// from a friend family. It is public, like chores and points, so the wall
+// display (which isn't signed in) can show it.
+func (h *FriendsHandler) HouseholdLeaderboard(w http.ResponseWriter, r *http.Request) {
+	h.leaderboard(w, r, false)
+}
+
+func (h *FriendsHandler) leaderboard(w http.ResponseWriter, r *http.Request, withFriends bool) {
 	ctx := r.Context()
 	now := h.svc.Now()
 	if r.URL.Query().Get("week") == "last" {
@@ -87,12 +98,14 @@ func (h *FriendsHandler) Leaderboard(w http.ResponseWriter, r *http.Request) {
 		}
 		entries = append(entries, e)
 	}
-	links, err := h.store.ListFriendLinks(ctx)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list friend families")
-		return
-	}
 	families := []map[string]any{}
+	var links []model.FriendLink
+	if withFriends {
+		if links, err = h.store.ListFriendLinks(ctx); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to list friend families")
+			return
+		}
+	}
 	for i := range links {
 		l := &links[i]
 		snap := friends.PeerSnapshot(l)

@@ -73,6 +73,9 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 		r.Get("/users/{id}/streak", streaks.GetUserStreak)
 		// The farm is on the wall display (no sign-in), like chores and points.
 		r.Get("/pets", pets.Farm)
+		// This household's own leaderboard, for the same reason. The one
+		// with friend families' kids on it needs a sign-in (below).
+		r.Get("/leaderboard/household", friendsH.HouseholdLeaderboard)
 
 		// Sign-in: tap a profile (PIN when set) or continue with an OIDC provider
 		r.Post("/auth/login", authH.Login)

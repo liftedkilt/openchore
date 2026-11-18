@@ -1647,6 +1647,7 @@
     "chartTitle": "Heute bisher",
     "chartDesc": "Wie viel jede Person von ihrem Tag geschafft hat, Stunde für Stunde. Jetzt: {{summary}}.",
     "chartPerson": "{{name}} {{pct}} %",
-    "farm": "Der Bauernhof"
+    "farm": "Der Bauernhof",
+    "week": "Diese Woche"
   }
 }
