@@ -235,7 +235,7 @@ func allTools() []*Tool {
 
 	// ---- Leaderboard and friend families ----
 	add(endpoint{name: "get_leaderboard", title: "The weekly leaderboard", readOnly: true,
-		desc: "This week's standings (Monday to Sunday), or last week's. percent is the score out of 100 shown in the app as \"88 points\": the share of a person's assigned chore points " +
+		desc: "This week's standings (Monday to Sunday), or last week's. percent is the score out of 100 shown in the app as \"Score 88\": the share of a person's assigned chore points " +
 			"they earned (done_points out of assigned_points, each chore worth its own points; Must-do and Every-day chores only; " +
 			"excused chores and paused days are left out), with the chore counts, bonus chores as a tie-breaker, and rank. " +
 			"People need 5 assigned chores in the week to be ranked (rank 0 = not yet). Includes people shared by linked friend families.",

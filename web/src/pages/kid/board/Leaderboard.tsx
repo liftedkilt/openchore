@@ -46,7 +46,7 @@ function Row({ e, user, compact }: { e: LeaderboardEntry; user: User; compact?: 
       <span className={s.score}>
         {/* The share of chore points earned, as a score out of 100. */}
         <span className={s.percent}>
-          {counted ? <>{e.percent} <span className={s.unit}>{t('kid.board.pointsUnit', { count: e.percent })}</span></> : '–'}
+          {counted ? <><span className={s.unit}>{t('kid.board.scoreLabel')}</span> {e.percent}</> : '–'}
         </span>
         <span className={s.count}>
           {counted ? t('kid.board.score', { done: e.done, assigned: e.assigned }) : t('kid.board.noneYet')}

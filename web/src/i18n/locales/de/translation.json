@@ -1470,8 +1470,7 @@
       "farmEmpty": "Hier gibt es noch keine Tiere.",
       "asOf": "Stand: {{when}}",
       "sheetTitle": "Rangliste",
-      "pointsUnit_one": "Punkt",
-      "pointsUnit_other": "Punkte"
+      "scoreLabel": "Wertung"
     }
   },
   "linkedAccounts": {

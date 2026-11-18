@@ -12,7 +12,7 @@ Leaderboard & friend families**:
 One number per person per week (Monday to Sunday, in the server's time zone):
 
 **points earned ÷ points assigned × 100**, a score out of 100 shown as
-"88 points (12 of 13 chores)". No percentages are shown.
+"Score 88 (12 of 13 chores)". No percentages are shown.
 
 Each assigned chore is worth its own point value, so a big chore counts for
 more than a small one. It is a share, never a points total: every family sets
@@ -36,7 +36,7 @@ share of your own chores' points can.
 A kid with one chore a day reaches 100% more easily than a kid with eight.
 The chore count is always shown next to the score so that stays visible.
 Because chores are weighted, the two can differ: 9 of 10 chores is well under
-90 points if the one missed was the big one.
+a score of 90 if the one missed was the big one.
 
 Finished days are stored in `score_days` (so a paused day stays out of the
 score after the person is unpaused) and recounted for a week, which picks up
