@@ -284,7 +284,8 @@ export const api = {
     undoRedemption: (redemptionId: number) => fetchWithAuth(`/redemptions/${redemptionId}`, { method: 'DELETE' }),
   },
   pets: {
-    farm: () => fetchWithAuth<Farm>('/pets'),
+    // Servers before the empty-farm fix sent `pets: null` for a farm with no animals.
+    farm: () => fetchWithAuth<Farm>('/pets').then(f => ({ ...f, pets: f.pets ?? [] })),
     mine: () => fetchWithAuth<{ enabled: boolean; pet: Pet | null }>('/me/pet'),
     adopt: (name: string, species: PetSpecies, color?: string) => fetchWithAuth<Pet>('/me/pet', {
       method: 'POST',
