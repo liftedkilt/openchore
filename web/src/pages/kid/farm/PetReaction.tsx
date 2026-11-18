@@ -84,7 +84,7 @@ export function ReactingAnimal({ pet, reaction, accessory, className, artClassNa
           color={pet.color}
           mood={pet.hiding ? 'bored' : pet.mood}
           accessory={accessory ?? pet.accessory}
-          sprite={pet.sprite}
+          sprite={pet.sprite} spriteFrames={pet.sprite_frames}
           reaction={active && !lying ? FACE[active.kind] : undefined}
           className={artClassName}
         />

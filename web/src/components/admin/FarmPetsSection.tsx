@@ -84,7 +84,7 @@ export const FarmPetsSection: React.FC = () => {
         <ul className={ui.list}>
           {pets.map(p => (
             <li key={p.id} className={fp.row}>
-              <FarmAnimal species={p.species} color={p.color} mood={p.mood} accessory={p.accessory} sprite={p.sprite} className={fp.thumb} />
+              <FarmAnimal species={p.species} color={p.color} mood={p.mood} accessory={p.accessory} sprite={p.sprite} spriteFrames={p.sprite_frames} className={fp.thumb} />
               <span className={fp.text}>
                 <strong>{p.name}</strong> · {p.owner_name} · {t(`kid.farm.mood.${p.mood}`, { name: p.name })}
               </span>

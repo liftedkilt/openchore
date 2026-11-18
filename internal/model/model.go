@@ -364,6 +364,10 @@ const (
 	PetActionPicture   = "picture"    // use your own picture as the animal (docs/custom-animals.md)
 )
 
+// PetSpriteFrames is the order of the frames in a custom animal's picture
+// strip. A strip may stop early: a missing frame falls back to the first.
+var PetSpriteFrames = []string{"stand", "walk1", "walk2", "sick", "lying", "happy"}
+
 // ValidPetAction reports whether a is a pet action or empty (ordinary reward).
 func ValidPetAction(a string) bool {
 	switch a {
@@ -467,6 +471,9 @@ type Pet struct {
 	// place of the drawn animal (uploads/pets/<id>.png). Species and Color
 	// are kept underneath: they are what friend families see.
 	Sprite string `json:"sprite,omitempty"`
+	// SpriteFrames is how many frames the picture holds side by side
+	// (PetSpriteFrames order); 1 for a single picture.
+	SpriteFrames int `json:"sprite_frames,omitempty"`
 	Items          []string  `json:"items"`               // owned accessories
 	LastMissedDate *string   `json:"last_missed_date,omitempty"`
 	LastDayChecked string    `json:"last_day_checked"`

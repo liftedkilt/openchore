@@ -332,6 +332,8 @@ export interface Pet {
   accessory?: PetItem | '';
   /** The person's own picture, shown in place of the drawn animal (docs/custom-animals.md). */
   sprite?: string;
+  /** Frames in that picture, side by side: stand, walk, walk, sick, lying down, happy (1 = a single picture). */
+  sprite_frames?: number;
   items: PetItem[];
   last_missed_date?: string;
   mood: PetMood;

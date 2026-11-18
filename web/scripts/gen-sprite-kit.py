@@ -7,6 +7,11 @@
   guide.png           the guide enlarged and labelled, for reading
   sample-duck.png     a finished example
 
+and the same four for a walking animal, a strip of six 64x64 frames (stand,
+walk 1, walk 2, sick, lying down, happy):
+
+  blank-strip.png  guide-layer-strip.png  guide-strip.png  sample-duck-strip.png
+
 The layout the app expects (docs/custom-animals.md): the animal faces right,
 its feet stand on the bottom edge, and hats, glasses and scarves are placed
 at fixed spots, so the head belongs in the upper right.
@@ -87,39 +92,121 @@ def guide_big(layer, scale=10):
     return im.convert("RGB")
 
 
-def duck():
-    """A duck drawn at 32x32 and doubled, so its pixels are crisp 2x2 blocks."""
+FRAMES = ["stand", "walk 1", "walk 2", "sick", "lying down", "happy"]
+
+
+def duck(pose="stand"):
+    """A duck drawn at 32x32 and doubled, so its pixels are crisp 2x2 blocks.
+
+    pose is one of FRAMES: the same duck with its legs, head, eye and colour
+    changed, which is all a frame strip needs.
+    """
     im = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
-    line, white, shade = (74, 52, 30, 255), (255, 221, 102, 255), (240, 186, 64, 255)  # a yellow duck: body, shaded parts
+    line = (74, 52, 30, 255)
+    body, shade = (255, 221, 102, 255), (240, 186, 64, 255)  # a yellow duck: body, shaded parts
+    if pose in ("sick", "lying down"):
+        body, shade = (214, 222, 122, 255), (176, 190, 92, 255)  # off-colour
     orange, dark_orange = (244, 150, 40, 255), (206, 112, 24, 255)
-    # Feet and legs (drawn first, behind the body).
-    for x in (13, 18):
-        d.line([(x, 25), (x, 29)], fill=dark_orange)
-        d.line([(x - 1, 30), (x + 3, 30)], fill=orange)
-        d.line([(x - 1, 31), (x + 3, 31)], fill=dark_orange)
+    lying = pose == "lying down"
+    by = 4 if lying else 0                                     # body drops onto the ground
+    hy = {"sick": 2, "lying down": 7}.get(pose, 0)             # head hangs when unwell
+    hx = 1 if lying else 0
+    # Legs and feet, behind the body: (x of the leg, how far the foot is lifted).
+    legs = {"walk 1": [(11, 1), (20, 0)], "walk 2": [(15, 0), (17, 1)], "lying down": []}.get(pose, [(13, 0), (18, 0)])
+    for x, lift in legs:
+        d.line([(x, 25), (x, 29 - lift)], fill=dark_orange)
+        d.line([(x - 1, 30 - lift), (x + 3, 30 - lift)], fill=orange)
+        d.line([(x - 1, 31 - lift), (x + 3, 31 - lift)], fill=dark_orange)
     # Body with a tail flick.
-    d.ellipse([4, 14, 23, 27], fill=white, outline=line)
-    d.polygon([(4, 19), (1, 14), (7, 16)], fill=white, outline=line)
-    d.line([(8, 25), (19, 25)], fill=shade)
-    d.line([(10, 26), (17, 26)], fill=shade)
-    # Wing.
-    d.ellipse([8, 17, 17, 23], fill=shade, outline=line)
-    d.line([(10, 21), (15, 21)], fill=line)
+    d.ellipse([4, 14 + by, 23, 27 + by], fill=body, outline=line)
+    tail_up = -2 if pose == "happy" else 0
+    d.polygon([(4, 19 + by), (1, 14 + by + tail_up), (7, 16 + by)], fill=body, outline=line)
+    d.line([(8, 25 + by), (19, 25 + by)], fill=shade)
+    d.line([(10, 26 + by), (17, 26 + by)], fill=shade)
+    # Wing (lifted when happy).
+    wy = -2 if pose == "happy" else 0
+    d.ellipse([8, 17 + by + wy, 17, 23 + by + wy], fill=shade, outline=line)
+    d.line([(10, 21 + by + wy), (15, 21 + by + wy)], fill=line)
     # Neck and head.
-    d.rectangle([19, 11, 23, 18], fill=white)
-    d.line([(18, 12), (18, 17)], fill=line)
-    d.line([(24, 14), (24, 17)], fill=line)
-    d.ellipse([17, 4, 27, 14], fill=white, outline=line)
-    # Bill.
-    d.rectangle([27, 9, 31, 11], fill=orange, outline=dark_orange)
-    d.point((27, 10), fill=orange)
-    # Eye and cheek.
-    d.rectangle([23, 8, 24, 9], fill=line)
-    d.point((23, 8), fill=(255, 255, 255, 255))
-    d.point((22, 11), fill=(246, 178, 170, 255))
-    d.point((23, 11), fill=(246, 178, 170, 255))
+    if not lying:
+        d.rectangle([19, 11 + hy, 23, 18], fill=body)
+        d.line([(18, 12 + hy), (18, 17)], fill=line)
+        d.line([(24, 14 + hy), (24, 17)], fill=line)
+    d.ellipse([17 + hx, 4 + hy, 27 + hx, 14 + hy], fill=body, outline=line)
+    # Bill (open when happy).
+    if pose == "happy":
+        d.rectangle([27, 8, 31, 9], fill=orange, outline=dark_orange)
+        d.rectangle([27, 11, 30, 12], fill=orange, outline=dark_orange)
+    else:
+        d.rectangle([27 + hx, 9 + hy, 31, 11 + hy], fill=orange, outline=dark_orange)
+        d.point((27 + hx, 10 + hy), fill=orange)
+    # Eye: open, half shut when sick, shut when lying down, a smile when happy.
+    ex, ey = 23 + hx, 8 + hy
+    if pose == "happy":
+        d.point((ex - 1, ey + 1), fill=line)
+        d.point((ex, ey), fill=line)
+        d.point((ex + 1, ey + 1), fill=line)
+    elif pose in ("sick", "lying down"):
+        d.line([(ex - 1, ey + 1), (ex + 1, ey + 1)], fill=line)
+        if pose == "sick":
+            d.point((ex + 1, ey), fill=line)
+    else:
+        d.rectangle([ex, ey, ex + 1, ey + 1], fill=line)
+        d.point((ex, ey), fill=(255, 255, 255, 255))
+    # Cheek (flushed when well).
+    if pose not in ("sick", "lying down"):
+        d.point((22, 11), fill=(246, 150, 140, 255))
+        d.point((23, 11), fill=(246, 150, 140, 255))
+    # A little heart when happy.
+    if pose == "happy":
+        heart = (236, 86, 110, 255)
+        for px, py in [(12, 4), (14, 4), (11, 5), (12, 5), (13, 5), (14, 5), (15, 5), (12, 6), (13, 6), (14, 6), (13, 7)]:
+            d.point((px, py), fill=heart)
     return im.resize((SIZE, SIZE), Image.NEAREST)
+
+
+def strip(frames):
+    im = Image.new("RGBA", (SIZE * len(frames), SIZE), (0, 0, 0, 0))
+    for i, fr in enumerate(frames):
+        im.alpha_composite(fr, (i * SIZE, 0))
+    return im
+
+
+def guide_strip_layer(layer):
+    """The single-picture guide repeated six times."""
+    return strip([layer] * len(FRAMES))
+
+
+def guide_strip_big(layer, scale=4):
+    n = len(FRAMES)
+    pad, top = 24, 70
+    w, h = n * SIZE * scale + pad * 2, SIZE * scale + top + 120
+    im = Image.new("RGBA", (w, h), (250, 246, 238, 255))
+    d = ImageDraw.Draw(im)
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 17)
+        bold = ImageFont.truetype("DejaVuSans-Bold.ttf", 21)
+    except OSError:
+        font = bold = ImageFont.load_default()
+    ink, green = (40, 40, 40, 255), (40, 120, 60, 255)
+    d.text((pad, 22), "Walking animal: six 64 x 64 pictures side by side (384 x 64), transparent background", font=bold, fill=ink)
+    big = layer.resize((SIZE * scale, SIZE * scale), Image.NEAREST)
+    for i, name in enumerate(FRAMES):
+        ox = pad + i * SIZE * scale
+        for gy in range(0, SIZE, 8):
+            for gx in range(0, SIZE, 8):
+                c = (255, 255, 255, 255) if (gx // 8 + gy // 8) % 2 == 0 else (236, 236, 236, 255)
+                d.rectangle([ox + gx * scale, top + gy * scale, ox + (gx + 8) * scale - 1, top + (gy + 8) * scale - 1], fill=c)
+        im.alpha_composite(big, (ox, top))
+        d = ImageDraw.Draw(im)
+        d.rectangle([ox, top, ox + SIZE * scale, top + SIZE * scale], outline=(60, 60, 60, 255), width=2)
+        d.text((ox + 8, top + SIZE * scale + 8), f"{i + 1}. {name}", font=bold, fill=ink)
+    y = top + SIZE * scale + 44
+    d.text((pad, y), "Every picture: animal facing right, feet on the bottom edge, head in the same place.", font=font, fill=green)
+    d.text((pad, y + 26), "You can stop early: pictures 4, 5 and 6 are optional. A missing one uses picture 1.", font=font, fill=ink)
+    d.text((pad, y + 52), "Without a sick or lying-down picture the app tints picture 1 green and squashes it.", font=font, fill=ink)
+    return im.convert("RGB")
 
 
 if __name__ == "__main__":
@@ -129,5 +216,10 @@ if __name__ == "__main__":
     layer.save(OUT / "guide-layer-64.png")
     guide_big(layer).save(OUT / "guide.png", optimize=True)
     duck().save(OUT / "sample-duck.png")
+    # The same again as a strip of six frames, for a walking animal.
+    Image.new("RGBA", (SIZE * len(FRAMES), SIZE), (0, 0, 0, 0)).save(OUT / "blank-strip.png")
+    guide_strip_layer(layer).save(OUT / "guide-layer-strip.png")
+    guide_strip_big(layer).save(OUT / "guide-strip.png", optimize=True)
+    strip([duck(f) for f in FRAMES]).save(OUT / "sample-duck-strip.png")
     for p in sorted(OUT.glob("*.png")):
         print(p.name, p.stat().st_size, "bytes")

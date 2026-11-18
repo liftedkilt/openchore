@@ -37,7 +37,7 @@ export function FarmSheet({ user, data, onClose }: FarmSheetProps) {
       <FarmScene pets={pets} meId={user.id} onSelect={setSelected} />
       {other && (
         <div className={s.otherCard} role="status">
-          <FarmAnimal species={other.species} color={other.color} mood={other.mood} accessory={other.accessory} sprite={other.sprite} className={s.otherArt} />
+          <FarmAnimal species={other.species} color={other.color} mood={other.mood} accessory={other.accessory} sprite={other.sprite} spriteFrames={other.sprite_frames} className={s.otherArt} />
           <p>
             <strong>{t('kid.farm.belongsTo', { name: other.name, owner: other.owner_name ?? '' })}</strong>
             <span>{t(`kid.farm.mood.${other.mood}`, { name: other.name })}</span>
@@ -278,7 +278,7 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
         </button>
         {pet.items.map(it => (
           <button key={it} type="button" className={clsx(s.chip, s.wardrobeChip, pet.accessory === it && s.chipOn)} aria-pressed={pet.accessory === it} disabled={busy} onClick={() => wear(it)}>
-            <FarmAnimal species={pet.species} color={pet.color} mood="content" accessory={it} sprite={pet.sprite} className={s.wardrobeArt} />
+            <FarmAnimal species={pet.species} color={pet.color} mood="content" accessory={it} sprite={pet.sprite} spriteFrames={pet.sprite_frames} className={s.wardrobeArt} />
             {itemLabel(t, it)}
           </button>
         ))}
@@ -294,7 +294,7 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
                 <div className={clsx(s.shopItem, tryOn === r.pet_item && s.speciesOn)}>
                   <button type="button" className={s.tryOnBtn} aria-pressed={tryOn === r.pet_item}
                     onClick={() => setTryOn(tryOn === r.pet_item ? null : r.pet_item ?? null)}>
-                    <FarmAnimal species={pet.species} color={pet.color} mood="happy" accessory={r.pet_item} sprite={pet.sprite} className={s.careArt} />
+                    <FarmAnimal species={pet.species} color={pet.color} mood="happy" accessory={r.pet_item} sprite={pet.sprite} spriteFrames={pet.sprite_frames} className={s.careArt} />
                     <span className={s.careName}>{r.name}</span>
                   </button>
                   <button type="button" className={s.buyBtn}

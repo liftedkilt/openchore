@@ -47,8 +47,8 @@
 - [ ] Achievements/badges (milestone-driven, computed server-side)
 - [x] Leaderboard (optional per-family setting) — weekly, scored by the share of assigned chore points earned, not points totals
 - [x] Friend families — link two households through a coordination server for a shared leaderboard and farm visits
-- [x] Custom animals — use your own picture (one PNG) as your farm animal, with a starter kit (blank canvas, guide, example)
-- [ ] Custom animals: walk and mood frames, parent approval, sending pictures to friend families
+- [x] Custom animals — use your own picture as your farm animal: one PNG, or a strip of up to six (stand, two walk steps, sick, lying down, happy), with a starter kit (blank canvases, guides, example duck)
+- [ ] Custom animals: parent approval, sending pictures to friend families
 - [ ] Friend families: playdates, gifts, trophies, family-vs-family and co-op goals
 - [ ] Chore swaps/trading between siblings (parent-approved)
 - [ ] Helper mode — partial credit for helping on someone else's chore

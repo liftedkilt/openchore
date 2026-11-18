@@ -1452,8 +1452,7 @@
         "lead": "Wähle ein Bild, das du gemalt oder gemacht hast. Dein Tier sieht dann überall auf dem Hof so aus.",
         "choose": "Bild auswählen",
         "change": "Anderes Bild auswählen",
-        "rules": "Es muss ein PNG mit durchsichtigem Hintergrund sein, etwa 64 mal 64 Pixel groß. Das Tier schaut nach rechts und steht mit den Füßen am unteren Rand.",
-        "kit": "Du möchtest eins machen? Fang hiermit an:",
+        "rules": "Ein PNG mit durchsichtigem Hintergrund. Ein Bild ist 64 mal 64 Pixel groß: Das Tier schaut nach rechts und steht mit den Füßen am unteren Rand. Für ein laufendes Tier legst du bis zu sechs Bilder nebeneinander in eine Datei: stehend, zwei Schritte, krank, liegend und fröhlich.",
         "kitBlank": "Leere Fläche",
         "kitGuide": "Was wohin gehört",
         "kitLayer": "Hilfsebene",
@@ -1462,7 +1461,17 @@
         "preview": "So wird es aussehen",
         "drop": "Zurück zum gezeichneten Tier",
         "dropConfirm": "Wirklich? Dein Bild wird gelöscht",
-        "dropped": "Zurück beim gezeichneten Tier."
+        "dropped": "Zurück beim gezeichneten Tier.",
+        "kitOne": "Für ein einzelnes Bild fängst du hiermit an:",
+        "kitStrip": "Für ein laufendes Tier (sechs Bilder in einer Reihe):",
+        "frames_one": "{{count}} Bild gefunden.",
+        "frames_other": "{{count}} Bilder in einer Reihe gefunden.",
+        "oneFrame": "Ein Bild. Es wippt beim Laufen.",
+        "mood": {
+          "sick": "Krank",
+          "very_sick": "Sehr krank",
+          "happy": "Fröhlich"
+        }
       }
     },
     "board": {

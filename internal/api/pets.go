@@ -343,7 +343,7 @@ func (h *PetHandler) Remove(w http.ResponseWriter, r *http.Request) {
 
 // clearSprite goes back to the drawn animal and deletes the picture.
 func (h *PetHandler) clearSprite(ctx context.Context, userID int64) error {
-	old, err := h.store.SetPetSprite(ctx, userID, "")
+	old, err := h.store.SetPetSprite(ctx, userID, "", 1)
 	if err == nil && old != "" {
 		removePetImage(old)
 	}
@@ -383,8 +383,9 @@ type PetChoice struct {
 	Slot  string `json:"slot"`
 	Image string `json:"image"`
 
-	png  []byte // the checked, shrunk picture
-	item string // once saved: "img:<slot>:<id>" for an accessory, the bare id for an animal picture
+	png    []byte // the checked, shrunk picture
+	frames int    // for an animal picture: how many frames it holds
+	item   string // once saved: "img:<slot>:<id>" for an accessory, the bare id for an animal picture
 }
 
 // checkPetReward refuses a pet-care redemption that can't take effect,
@@ -447,11 +448,11 @@ func (h *PetHandler) checkPetReward(ctx context.Context, u *model.User, rw *mode
 		if choice == nil || choice.Image == "" {
 			return "choose a picture", nil
 		}
-		png, err := decodeSprite(choice.Image)
+		png, frames, err := decodeSprite(choice.Image)
 		if err != nil {
 			return err.Error(), nil
 		}
-		choice.png = png
+		choice.png, choice.frames = png, frames
 	case model.PetActionRestyle:
 		if choice == nil || !model.ValidPetColor(p.Species, choice.Color) {
 			return "choose a coat colour", nil
@@ -482,7 +483,7 @@ func (h *PetHandler) applyPetReward(ctx context.Context, userID int64, rw *model
 	case model.PetActionDesign:
 		return h.store.AddPetItem(ctx, userID, choice.item)
 	case model.PetActionPicture:
-		old, err := h.store.SetPetSprite(ctx, userID, choice.item)
+		old, err := h.store.SetPetSprite(ctx, userID, choice.item, choice.frames)
 		if err == nil && old != "" {
 			removePetImage(old)
 		}

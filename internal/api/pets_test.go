@@ -273,15 +273,17 @@ func TestPetDesignAccessory(t *testing.T) {
 	}
 }
 
-// spritePNG makes a w x h PNG data URL: a filled square in the middle, on a
-// see-through background unless opaque.
-func spritePNG(t *testing.T, w, h int, opaque bool) string {
+// spritePNG makes a w x h PNG data URL on a see-through background (unless
+// opaque), with a filled square in the middle of each of the first `drawn`
+// frames (frames are h x h, side by side).
+func spritePNG(t *testing.T, w, h int, opaque bool, drawn int) string {
 	t.Helper()
 	img := image.NewNRGBA(image.Rect(0, 0, w, h))
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
+			fx := x % h
 			switch {
-			case x > w/4 && x < 3*w/4 && y > h/4 && y < 3*h/4:
+			case x/h < drawn && fx > h/4 && fx < 3*h/4 && y > h/4 && y < 3*h/4:
 				img.SetNRGBA(x, y, color.NRGBA{R: 200, G: 120, B: 40, A: 255})
 			case opaque:
 				img.SetNRGBA(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
@@ -315,14 +317,15 @@ func TestPetOwnPicture(t *testing.T) {
 	env.expectStatus(t, "POST", path, map[string]any{}, childHeaders(kid), http.StatusUnprocessableEntity)
 	redeem("data:image/jpeg;base64,AAAA", http.StatusUnprocessableEntity)
 	redeem("data:image/png;base64,bm90IGFuIGltYWdl", http.StatusUnprocessableEntity)
-	redeem(spritePNG(t, 64, 64, true), http.StatusUnprocessableEntity)
-	redeem(spritePNG(t, 4, 4, false), http.StatusUnprocessableEntity)
+	redeem(spritePNG(t, 64, 64, true, 1), http.StatusUnprocessableEntity)
+	redeem(spritePNG(t, 4, 4, false, 1), http.StatusUnprocessableEntity)
+	redeem(spritePNG(t, 192, 64, false, 0), http.StatusUnprocessableEntity) // a strip with nothing in the standing frame
 	if env.balance(t, kid) != before {
 		t.Fatal("a refused picture cost points")
 	}
 
 	// A good one is stored, kept at its own size, and shown on the farm.
-	redeem(spritePNG(t, 64, 64, false), http.StatusCreated)
+	redeem(spritePNG(t, 64, 64, false, 1), http.StatusCreated)
 	first, _ := env.myPet(t, kid)["sprite"].(string)
 	if first == "" {
 		t.Fatalf("no picture on the pet: %v", env.myPet(t, kid))
@@ -341,12 +344,12 @@ func TestPetOwnPicture(t *testing.T) {
 	resp := env.expectStatus(t, "GET", "/api/pets", nil, nil, http.StatusOK)
 	var farm map[string]any
 	decodeBody(t, resp, &farm)
-	if p := farm["pets"].([]any)[0].(map[string]any); p["sprite"] != first || p["species"] != "chicken" {
+	if p := farm["pets"].([]any)[0].(map[string]any); p["sprite"] != first || p["species"] != "chicken" || p["sprite_frames"] != 1.0 {
 		t.Fatalf("farm: %v", p)
 	}
 
-	// A big picture is scaled down; the one it replaces is deleted.
-	redeem(spritePNG(t, 640, 320, false), http.StatusCreated)
+	// A big single picture is scaled down; the one it replaces is deleted.
+	redeem(spritePNG(t, 640, 480, false, 1), http.StatusCreated)
 	second := env.myPet(t, kid)["sprite"].(string)
 	t.Cleanup(func() { os.Remove(file(second)) })
 	if _, err := os.Stat(file(first)); !os.IsNotExist(err) {
@@ -355,8 +358,31 @@ func TestPetOwnPicture(t *testing.T) {
 	f, _ = os.Open(file(second))
 	cfg, err = png.DecodeConfig(f)
 	f.Close()
-	if err != nil || cfg.Width != 128 || cfg.Height != 64 {
+	if err != nil || cfg.Width != 128 || cfg.Height != 96 {
 		t.Fatalf("scaled picture: %v %+v", err, cfg)
+	}
+
+	// A strip of six square frames is kept as six frames, scaled by its
+	// height. Blank frames at the end are dropped.
+	redeem(spritePNG(t, 6*320, 320, false, 6), http.StatusCreated)
+	strip := env.myPet(t, kid)
+	stripID := strip["sprite"].(string)
+	t.Cleanup(func() { os.Remove(file(stripID)) })
+	f, _ = os.Open(file(stripID))
+	cfg, err = png.DecodeConfig(f)
+	f.Close()
+	if err != nil || cfg.Width != 6*128 || cfg.Height != 128 || strip["sprite_frames"] != 6.0 {
+		t.Fatalf("strip: %v %+v frames=%v", err, cfg, strip["sprite_frames"])
+	}
+	redeem(spritePNG(t, 6*64, 64, false, 3), http.StatusCreated)
+	short := env.myPet(t, kid)
+	second = short["sprite"].(string)
+	t.Cleanup(func() { os.Remove(file(second)) })
+	f, _ = os.Open(file(second))
+	cfg, err = png.DecodeConfig(f)
+	f.Close()
+	if err != nil || cfg.Width != 3*64 || cfg.Height != 64 || short["sprite_frames"] != 3.0 {
+		t.Fatalf("short strip: %v %+v frames=%v", err, cfg, short["sprite_frames"])
 	}
 
 	// Going back to the drawn animal is free; setting a picture without a reward isn't allowed.
@@ -370,7 +396,7 @@ func TestPetOwnPicture(t *testing.T) {
 	}
 
 	// A grown-up can take a picture away; a kid can't take a sibling's.
-	redeem(spritePNG(t, 32, 32, false), http.StatusCreated)
+	redeem(spritePNG(t, 32, 32, false, 1), http.StatusCreated)
 	third := env.myPet(t, kid)["sprite"].(string)
 	t.Cleanup(func() { os.Remove(file(third)) })
 	sib := env.createChild(t, "Sib")

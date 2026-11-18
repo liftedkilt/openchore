@@ -942,6 +942,15 @@ function spriteRig(): Rig {
   };
 }
 
+/** The frames of a picture strip, left to right. Keep in step with model.PetSpriteFrames. */
+const SPRITE_FRAMES = ['stand', 'walk1', 'walk2', 'sick', 'lying', 'happy'] as const;
+type SpriteFrame = typeof SPRITE_FRAMES[number];
+
+/** How many frames a w x h picture holds: 2 to 6 square frames side by side, else one. The server uses the same rule. */
+export function spriteFrameCount(w: number, h: number): number {
+  return h > 0 && w % h === 0 && w / h >= 2 && w / h <= SPRITE_FRAMES.length ? w / h : 1;
+}
+
 /** The URL of a person's own animal picture. */
 export const spriteUrl = (id: string) => accessoryImageUrl(id);
 
@@ -952,6 +961,8 @@ export interface FarmAnimalProps {
   sprite?: string;
   /** Treat `sprite` as a ready URL (a live preview before upload). */
   spritePreview?: boolean;
+  /** Frames in the picture (see SPRITE_FRAMES); 1 or unset = a single picture. */
+  spriteFrames?: number;
   /** Coat colour key from COAT_COLORS[species]; unknown or empty → the default coat. */
   color?: string;
   /** A built-in item key, `e:<head|face|neck>:<emoji>` or `img:<head|face|neck>:<id>`. */
@@ -984,19 +995,41 @@ function Leg({ species, r, hip, len, far }: { species: PetSpecies; r: Rig; hip: 
 }
 
 /** One farm animal, 100 x 80, facing right, feet on the ground at y = 76. */
-export function FarmAnimal({ species, mood, color, accessory, accessoryImageUrl, reaction, sprite, spritePreview, className, title }: FarmAnimalProps) {
+export function FarmAnimal({ species, mood, color, accessory, accessoryImageUrl, reaction, sprite, spritePreview, spriteFrames, className, title }: FarmAnimalProps) {
   const tintId = `farm-sick-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   if (sprite) {
+    const n = Math.max(1, Math.min(SPRITE_FRAMES.length, spriteFrames ?? 1));
+    const has = (f: SpriteFrame) => SPRITE_FRAMES.indexOf(f) < n;
     const lying = mood === 'very_sick';
     const sick = lying || mood === 'sick';
     const { x, y, size } = SPRITE_BOX;
-    // A sick animal turns green (queasy); more so when it's too sick to stand.
-    // The drawn animals change their faces instead; a picture has only its colour.
+    const href = spritePreview ? sprite : spriteUrl(sprite);
+    // The frame shown while standing still. A strip with a frame for the
+    // mood uses it; otherwise the standing frame is tinted green when sick
+    // and squashed flat when too sick to stand.
+    const rest: SpriteFrame = lying && has('lying') ? 'lying'
+      : sick && has('sick') ? 'sick'
+      : !sick && (mood === 'happy' || reaction) && has('happy') ? 'happy'
+      : 'stand';
+    const tinted = sick && rest === 'stand';
+    const squashed = lying && rest !== 'lying';
+    // Walking swaps between the two walk frames (the first walk frame and
+    // the standing one if there are only two). Sick animals just shuffle.
+    const walks = !sick && n > 1;
     const g = lying ? 0.55 : 0.35;
+    const frame = (f: SpriteFrame, className?: string) => (
+      // A window one frame wide onto the strip, pulled in a hair at the sides
+      // so the edge of the neighbouring frame can't bleed through.
+      <svg x={x} y={y} width={size} height={size} preserveAspectRatio="xMidYMax meet" className={className}
+        viewBox={n > 1 ? `${SPRITE_FRAMES.indexOf(f) + 0.006} 0 0.988 1` : '0 0 1 1'}>
+        <image href={href} x={0} y={0} width={n} height={1} preserveAspectRatio={n > 1 ? 'none' : 'xMidYMax meet'}
+          pointerEvents="none" style={{ imageRendering: 'pixelated' }} filter={tinted ? `url(#${tintId})` : undefined} />
+      </svg>
+    );
     return (
       <svg viewBox="0 0 100 80" overflow="visible" className={className} role={title ? 'img' : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
         <ellipse cx={50} cy={76} rx={26} ry={3.5} fill="#1d1b1a" opacity={0.14} />
-        {sick && (
+        {tinted && (
           <defs>
             {/* Pull every colour part-way toward a sickly green; see-through pixels stay see-through. */}
             <filter id={tintId} colorInterpolationFilters="sRGB" x="0" y="0" width="1" height="1">
@@ -1009,12 +1042,11 @@ export function FarmAnimal({ species, mood, color, accessory, accessoryImageUrl,
             </filter>
           </defs>
         )}
-        {/* Too sick to stand: squashed flat onto the ground line. */}
-        <g transform={lying ? 'translate(0 76) scale(1 0.6) translate(0 -76)' : undefined}>
-          <image href={spritePreview ? sprite : spriteUrl(sprite)} x={x} y={y} width={size} height={size}
-            preserveAspectRatio="xMidYMax meet" pointerEvents="none" style={{ imageRendering: 'pixelated' }}
-            filter={sick ? `url(#${tintId})` : undefined} />
-          <Accessory accessory={accessory} imageUrl={accessoryImageUrl} r={spriteRig()} />
+        <g transform={squashed ? 'translate(0 76) scale(1 0.6) translate(0 -76)' : undefined}>
+          {frame(rest, walks ? 'farm-frame-rest' : undefined)}
+          {walks && frame('walk1', 'farm-frame-walk-a')}
+          {walks && frame(n > 2 ? 'walk2' : 'stand', 'farm-frame-walk-b')}
+          {rest !== 'lying' && <Accessory accessory={accessory} imageUrl={accessoryImageUrl} r={spriteRig()} />}
         </g>
       </svg>
     );

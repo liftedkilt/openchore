@@ -316,3 +316,8 @@
   background: linear-gradient(to bottom, var(--farm-sky-top, #bfe3f7) 0 62%, var(--farm-hill-near, #a3d47c) 62% 100%);
 }
 a.chip { text-decoration: none; color: inherit; }
+.pictureMoods { display: flex; gap: var(--space-3); }
+.pictureMoods figure { display: flex; flex-direction: column; align-items: center; margin: 0; }
+.pictureMoods svg { width: 70px; height: 56px; }
+.pictureMoods figcaption { color: var(--ink-muted); font-size: 12px; }
+.pictureKit { margin-top: var(--space-2); }
