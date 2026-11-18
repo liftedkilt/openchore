@@ -451,11 +451,40 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Fetch chore details to check category and requirements
+	chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
+
+	// For "child" photo source the kid takes the photo at completion time.
+	// For "external" or "both", a photo can be attached later.
+	photoSource := model.PhotoSourceChild
+	if chore != nil {
+		photoSource = chore.PhotoSource
+		if photoSource == "" {
+			photoSource = model.PhotoSourceChild
+		}
+	}
+	// A parent marking a chore done on someone's behalf vouches for it and
+	// doesn't need to supply the photo.
+	needsChildPhoto := chore != nil && chore.RequiresPhoto && photoSource == model.PhotoSourceChild && !actingForOther
+
 	// Check if already completed
 	existing, err := h.store.GetCompletionForScheduleDate(r.Context(), scheduleID, req.CompletionDate)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to check completion")
 		return
+	}
+	if existing != nil && existing.UncompletedAt != nil && needsChildPhoto &&
+		existing.PhotoURL == "" && req.PhotoURL == "" &&
+		(existing.Status == model.StatusApproved || existing.Status == model.StatusPending) {
+		// A photo-less completion from before the chore needed a photo (or
+		// one a parent already let through). Reviving it would skip the
+		// photo, so drop it and take the normal path: photo required, or
+		// skip it and wait for a parent.
+		if err := h.store.DeleteCompletion(r.Context(), existing.ID); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to clear previous attempt")
+			return
+		}
+		existing = nil
 	}
 	if existing != nil {
 		if existing.UncompletedAt != nil {
@@ -548,22 +577,9 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Fetch chore details to check category and requirements
-	chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
-
-	// For "child" photo source the kid takes the photo at completion time.
-	// For "external" or "both", a photo can be attached later.
-	photoSource := model.PhotoSourceChild
-	if chore != nil {
-		photoSource = chore.PhotoSource
-		if photoSource == "" {
-			photoSource = model.PhotoSourceChild
-		}
-	}
-	// A parent marking a chore done on someone's behalf vouches for it and
-	// doesn't need to supply the photo. Anyone else can skip the photo
-	// explicitly, and the chore then waits for a parent.
-	missingPhoto := chore != nil && chore.RequiresPhoto && req.PhotoURL == "" && photoSource == model.PhotoSourceChild && !actingForOther
+	// Anyone else can skip the photo explicitly, and the chore then waits
+	// for a parent.
+	missingPhoto := needsChildPhoto && req.PhotoURL == ""
 	if missingPhoto && !req.SkipPhoto {
 		writeError(w, http.StatusBadRequest, "a photo is required to complete this chore")
 		return

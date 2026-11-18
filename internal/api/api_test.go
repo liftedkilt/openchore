@@ -3155,6 +3155,69 @@ func TestRequiresPhotoChoreCompletion(t *testing.T) {
 	}
 }
 
+// Turning on photo proof after a kid already ticked the chore off must not let
+// an uncheck and recheck revive the old photo-less completion.
+func TestRequiresPhotoAddedAfterCompletion(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+	today := time.Now().Format(model.DateFormat)
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title": "Foot photo", "category": "optional", "points_value": 5,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID, "specific_date": today,
+	}, adminHeaders())
+
+	complete := func(body map[string]any, want int) map[string]any {
+		t.Helper()
+		body["completion_date"] = today
+		resp := env.expectStatus(t, "POST", "/api/schedules/1/complete", body, childHeaders(kidID), want)
+		var out map[string]any
+		decodeBody(t, resp, &out)
+		return out
+	}
+	uncomplete := func() {
+		t.Helper()
+		env.expectStatus(t, "DELETE", "/api/schedules/1/complete?date="+today, nil, childHeaders(kidID), http.StatusNoContent)
+	}
+
+	complete(map[string]any{}, http.StatusCreated)
+	env.expectStatus(t, "PUT", "/api/chores/1", map[string]any{
+		"title": "Foot photo", "category": "optional", "points_value": 5,
+		"requires_photo": true, "photo_source": "child",
+	}, adminHeaders(), http.StatusOK)
+	uncomplete()
+
+	// Rechecking without a photo is refused instead of reviving the old row.
+	complete(map[string]any{}, http.StatusBadRequest)
+	// Skipping the photo waits for a parent.
+	if cc := complete(map[string]any{"skip_photo": true}, http.StatusCreated); cc["status"] != model.StatusPending {
+		t.Fatalf("expected pending after skipping the photo, got %v", cc["status"])
+	}
+	// That pending, photo-less row isn't revived as a way around the photo either.
+	uncomplete()
+	complete(map[string]any{}, http.StatusBadRequest)
+	// With a photo it goes through.
+	if cc := complete(map[string]any{"photo_url": "/uploads/foot.png"}, http.StatusCreated); cc["status"] != model.StatusApproved {
+		t.Fatalf("expected approved with a photo, got %v", cc["status"])
+	}
+	// The photo survives an accidental uncheck and recheck.
+	uncomplete()
+	if cc := complete(map[string]any{}, http.StatusCreated); cc["photo_url"] != "/uploads/foot.png" || cc["status"] != model.StatusApproved {
+		t.Fatalf("expected the revived completion to keep its photo, got %+v", cc)
+	}
+
+	// Points net out: the first completion's credit was reversed, the photo one paid once.
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, childHeaders(kidID), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if pts["balance"] != float64(5) {
+		t.Errorf("expected balance 5, got %v", pts["balance"])
+	}
+}
+
 func TestListSchedulesInvalidChoreID(t *testing.T) {
 	env := setupTest(t)
 	env.createAdmin(t)
