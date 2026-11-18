@@ -23,7 +23,7 @@ test.describe('Leaderboard', () => {
     await expect(section).toBeVisible({ timeout: 5_000 });
 
     const toggle = section.getByLabel('Show the weekly leaderboard');
-    await toggle.check();
+    await toggle.click(); // saved to the server first, then shown as ticked
     await expect(toggle).toBeChecked();
 
     // Linking needs a family name first.
@@ -48,7 +48,7 @@ test.describe('Leaderboard', () => {
     await expect(sheet.getByRole('tab', { name: 'This week' })).toHaveAttribute('aria-selected', 'true');
     // Everyone in the family is listed, and Emma's own row is marked.
     for (const name of ['Emma', 'Lily', 'Noah']) {
-      await expect(sheet.getByText(name, { exact: true })).toBeVisible();
+      await expect(sheet.getByRole('listitem').filter({ hasText: name })).toBeVisible();
     }
     await expect(sheet.getByText('You', { exact: true })).toBeVisible();
     await expect(sheet.getByText(/Your score is out of 100/)).toBeVisible();
