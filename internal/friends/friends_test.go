@@ -1,6 +1,7 @@
 package friends
 
 import (
+	"net"
 	"strings"
 	"testing"
 
@@ -73,5 +74,51 @@ func TestSealIsBoundToTheSender(t *testing.T) {
 	other := &model.FriendLink{HubLink: "M", Secret: key, Side: "b"}
 	if _, err := open(other, sealed); err == nil {
 		t.Fatal("sealed data opened on a different link")
+	}
+}
+
+// Only ordinary internet addresses count as public: a hub named by an invite
+// can't be on a home, carrier-NAT or overlay network, however it's spelled.
+func TestPublicIP(t *testing.T) {
+	for addr, want := range map[string]bool{
+		"93.184.216.34": true, "2606:2800:220:1:248:1893:25c8:1946": true,
+		"127.0.0.1": false, "10.1.2.3": false, "192.168.1.200": false, "172.16.0.1": false, "169.254.1.1": false,
+		"0.0.0.0": false, "100.64.0.1": false, "100.100.100.100": false, "198.18.0.1": false, "192.0.0.8": false,
+		"240.0.0.1": false, "255.255.255.255": false, "224.0.0.1": false,
+		"::1": false, "::": false, "fe80::1": false, "fd00::1": false, "ff02::1": false,
+		"::ffff:127.0.0.1": false, "::ffff:10.0.0.1": false, "::127.0.0.1": false,
+		"64:ff9b::7f00:1": false, "64:ff9b::5db8:d822": true, // NAT64 of 127.0.0.1 and of a public address
+		"2002:7f00:1::": false, "2002:c0a8:101::1": false, // 6to4 of 127.0.0.1 and 192.168.1.1
+	} {
+		if got := publicIP(net.ParseIP(addr)); got != want {
+			t.Errorf("publicIP(%s) = %v, want %v", addr, got, want)
+		}
+	}
+}
+
+func TestCleanHubURL(t *testing.T) {
+	for in, want := range map[string]string{
+		"https://Hub.Example./":     "https://hub.example",
+		"HTTPS://hub.example/base/": "https://hub.example/base",
+		"http://127.0.0.1:8090":     "http://127.0.0.1:8090",
+		"http://localhost:8090/":    "http://localhost:8090",
+		"http://192.168.1.50:8090":  "http://192.168.1.50:8090",
+		"http://hub.example":        "", // plain http to a public host
+		"https://hub.example/?x=1":  "",
+		"https://hub.example/#frag": "",
+		"https://user@hub.example":  "",
+		"https://hub.example/ a":    "",
+		"ftp://hub.example":         "",
+		"hub.example":               "",
+	} {
+		got, err := cleanHubURL(in)
+		if (err != nil) != (want == "") || got != want {
+			t.Errorf("cleanHubURL(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	// An invite keeps the tidied form, so one hub always compares equal.
+	inv, err := parseInvite(invite{Hub: "https://Hub.Example./", Link: "L", Code: "C", Key: "K"}.String())
+	if err != nil || inv.Hub != "https://hub.example" {
+		t.Fatalf("parseInvite hub = %v %v", inv, err)
 	}
 }

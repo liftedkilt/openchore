@@ -104,10 +104,25 @@ func Sum(days []model.ScoreDay, from, to string) Total {
 		t.DonePoints += d.DonePoints
 	}
 	if num, den := t.share(); den > 0 {
-		t.Share = (num*ShareScale + den/2) / den
+		t.Share = num * ShareScale / den
+		// A full score means every assigned chore was done. A missed
+		// chore that happens to be worth no points still shows.
+		if t.Share == ShareScale && t.Done < t.Assigned {
+			t.Share = ShareScale - 1
+		}
 	}
-	t.Percent = (t.Share + 50) / 100
+	t.Percent = percent(t.Share)
 	return t
+}
+
+// percent turns a share into the score shown, 0 to 100. It rounds down, so
+// 100 always means a perfect week, except that any work at all shows as at
+// least 1.
+func percent(share int) int {
+	if share > 0 && share < 100 {
+		return 1
+	}
+	return share / 100
 }
 
 // ShareScale is what a full score is in Total.Share.
@@ -120,8 +135,11 @@ func FromShare(assigned, done, bonus, share int) Total {
 	t.Done = max(0, min(done, t.Assigned))
 	if t.Assigned > 0 {
 		t.Share = max(0, min(share, ShareScale))
+		if t.Share == ShareScale && t.Done < t.Assigned {
+			t.Share = ShareScale - 1
+		}
 	}
-	t.Percent = (t.Share + 50) / 100
+	t.Percent = percent(t.Share)
 	return t
 }
 
@@ -139,8 +157,8 @@ func (t Total) share() (num, den int) {
 func (t Total) Ranked() bool { return t.Assigned >= MinAssigned }
 
 // less orders two totals best first: ranked before unranked, then the higher
-// share (to a hundredth of a point, finer than the score shown), then more
-// bonus chores. Shares are compared, never point values, so a person in this
+// share (to a hundredth of a point, finer than the score shown), then the
+// higher fraction of chores done, then more bonus chores. Shares are compared, never point values, so a person in this
 // household and one from a friend family are judged on the same number.
 func less(a, b Total) bool {
 	if a.Ranked() != b.Ranked() {
@@ -148,6 +166,10 @@ func less(a, b Total) bool {
 	}
 	if a.Share != b.Share {
 		return a.Share > b.Share
+	}
+	// Level on share: the higher fraction of chores done, then bonus chores.
+	if l, r := a.Done*max(b.Assigned, 1), b.Done*max(a.Assigned, 1); l != r {
+		return l > r
 	}
 	return a.Bonus > b.Bonus
 }

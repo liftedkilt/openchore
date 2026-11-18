@@ -510,3 +510,35 @@ func TestFriendHubKeyDoesNotFollowANewAddress(t *testing.T) {
 	env.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"hub_url": "http://two.example"}, adminHeaders(), http.StatusBadRequest)
 	env.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"hub_url": "http://192.168.1.50:8090"}, adminHeaders(), http.StatusOK)
 }
+
+// A link this household made the invite for stays usable when its hub
+// address in Settings changes later, even though that hub is on a private
+// address; and whatever a hub says in an error is kept short.
+func TestFriendLinkKeepsItsOwnHub(t *testing.T) {
+	hubSrv := startHub(t)
+	a := setupTest(t)
+	a.createAdmin(t)
+	a.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"family_name": "The Avas", "hub_url": hubSrv.URL, "hub_key": "hubkey"}, adminHeaders(), http.StatusOK)
+	var link map[string]any
+	decodeBody(t, a.expectStatus(t, "POST", "/api/admin/friends/invites", nil, adminHeaders(), http.StatusCreated), &link)
+	path := fmt.Sprintf("/api/admin/friends/%d", int(link["id"].(float64)))
+	a.expectStatus(t, "POST", path+"/sync", nil, adminHeaders(), http.StatusOK)
+	a.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"hub_url": "https://elsewhere.example"}, adminHeaders(), http.StatusOK)
+	a.expectStatus(t, "POST", path+"/sync", nil, adminHeaders(), http.StatusOK)
+
+	// A hub that answers with a wall of text.
+	loud := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprintf(w, `{"error":%q}`, strings.Repeat("x", 100000)+"\nsecond line")
+	}))
+	defer loud.Close()
+	if _, err := a.db.Exec(`UPDATE friend_links SET hub_url = ?`, loud.URL); err != nil {
+		t.Fatal(err)
+	}
+	resp := a.request(t, "POST", path+"/sync", nil, adminHeaders())
+	var out map[string]any
+	decodeBody(t, resp, &out)
+	if msg := fmt.Sprint(out["error"]); len(msg) > 250 || strings.Contains(msg, "\n") {
+		t.Fatalf("hub error not kept short: %d characters", len(msg))
+	}
+}

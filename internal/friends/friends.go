@@ -22,6 +22,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"sort"
@@ -101,19 +102,73 @@ func hubClient(guard bool) *http.Client {
 
 var errPrivateHub = errors.New("that invite points at a private network address, which isn't allowed")
 
+// notPublic lists address ranges that are not ordinary internet hosts but
+// that net.IP's own checks let through: carrier-grade NAT (also used by
+// overlay networks), benchmarking and protocol-assignment blocks, reserved
+// space and broadcast.
+var notPublic = func() []netip.Prefix {
+	var out []netip.Prefix
+	for _, p := range []string{
+		"0.0.0.0/8", "100.64.0.0/10", "192.0.0.0/24", "192.0.2.0/24", "198.18.0.0/15",
+		"198.51.100.0/24", "203.0.113.0/24", "240.0.0.0/4",
+		"::/128", "::1/128", "100::/64", "2001:db8::/32",
+	} {
+		out = append(out, netip.MustParsePrefix(p))
+	}
+	return out
+}()
+
+// publicIP reports whether ip is an ordinary address on the public internet.
+// IPv6 forms that carry an IPv4 address (mapped, compatible, NAT64, 6to4) are
+// judged by the address inside them.
 func publicIP(ip net.IP) bool {
-	return !(ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
-		ip.IsMulticast() || ip.IsUnspecified())
+	addr, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		return false
+	}
+	addr = addr.Unmap()
+	if addr.Is6() {
+		b := addr.As16()
+		var inner []byte
+		switch {
+		case bytes.Equal(b[:12], make([]byte, 12)): // ::a.b.c.d
+			inner = b[12:]
+		case bytes.Equal(b[:12], []byte{0, 0x64, 0xff, 0x9b, 0, 0, 0, 0, 0, 0, 0, 0}): // 64:ff9b::/96
+			inner = b[12:]
+		case b[0] == 0x20 && b[1] == 0x02: // 2002::/16
+			inner = b[2:6]
+		}
+		if inner != nil {
+			v4, _ := netip.AddrFromSlice(inner)
+			return publicIP(v4.AsSlice())
+		}
+	}
+	if addr.IsLoopback() || addr.IsPrivate() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() ||
+		addr.IsMulticast() || addr.IsUnspecified() || addr.IsInterfaceLocalMulticast() {
+		return false
+	}
+	for _, p := range notPublic {
+		if p.Contains(addr) {
+			return false
+		}
+	}
+	return true
 }
 
-// clientFor picks the client for a hub: this household's own configured hub
-// is trusted (it may well be on the home network); any other is guarded,
-// unless OPENCHORE_HUB_ALLOW_PRIVATE=true says private hubs are expected.
-func (f *Service) clientFor(ctx context.Context, hubURL string) *http.Client {
-	if own, _, _ := f.Hub(ctx); (own != "" && own == hubURL) || os.Getenv("OPENCHORE_HUB_ALLOW_PRIVATE") == "true" {
-		return f.client
-	}
-	return f.guarded
+// trusts reports whether a hub may be on a private address: this
+// household's own configured hub (it may well be on the home network), or
+// any hub when OPENCHORE_HUB_ALLOW_PRIVATE=true says private hubs are
+// expected. Every other hub came from someone else's invite and is guarded.
+func (f *Service) trusts(ctx context.Context, hubURL string) bool {
+	own, _, _ := f.Hub(ctx)
+	return (own != "" && own == hubURL) || os.Getenv("OPENCHORE_HUB_ALLOW_PRIVATE") == "true"
+}
+
+// trustsLink is trusts for an existing link. A link this household made the
+// invite for (side "a") was made on its own hub, and stays trusted even if
+// the configured hub has since been changed.
+func (f *Service) trustsLink(ctx context.Context, l *model.FriendLink) bool {
+	return l.Side == "a" || f.trusts(ctx, l.HubURL)
 }
 
 // SetClock overrides the clock (tests).
@@ -440,7 +495,8 @@ func parseInvite(s string) (*invite, error) {
 	if json.Unmarshal(raw, &inv) != nil || inv.Link == "" || inv.Code == "" || inv.Key == "" {
 		return nil, bad
 	}
-	if _, err := cleanHubURL(inv.Hub); err != nil {
+	// Keep the tidied form, so the same hub always compares equal.
+	if inv.Hub, err = cleanHubURL(inv.Hub); err != nil {
 		return nil, bad
 	}
 	return &inv, nil
@@ -454,7 +510,7 @@ func cleanHubURL(raw string) (string, error) {
 	}
 	// Just an origin, optionally with a path prefix: nothing that could
 	// smuggle a different request (query, fragment) or credentials.
-	if u.RawQuery != "" || u.Fragment != "" || u.User != nil || strings.ContainsAny(raw, "?#") {
+	if u.RawQuery != "" || u.Fragment != "" || u.User != nil || strings.ContainsAny(raw, "?# \t\r\n") {
 		return "", errors.New("the coordination server address can't contain ?, # or a user name")
 	}
 	// Keys and tokens travel in the request, so plain http is only for a
@@ -466,7 +522,8 @@ func cleanHubURL(raw string) (string, error) {
 			return "", errors.New("the coordination server address must start with https://")
 		}
 	}
-	return raw, nil
+	// One spelling per hub: lower-case scheme and host, no trailing dot or slash.
+	return strings.ToLower(u.Scheme) + "://" + strings.ToLower(strings.TrimSuffix(u.Host, ".")) + strings.TrimRight(u.EscapedPath(), "/"), nil
 }
 
 // CleanHubURL validates a hub address typed by a parent.
@@ -503,7 +560,7 @@ func Refused(err error) bool {
 	return errors.As(err, &in) || (errors.As(err, &he) && he.status >= 400 && he.status < 500)
 }
 
-func (f *Service) call(ctx context.Context, method, hubURL, path, token string, body, out any) error {
+func (f *Service) call(ctx context.Context, trusted bool, method, hubURL, path, token string, body, out any) error {
 	target := hubURL + path
 	var rd io.Reader
 	if body != nil {
@@ -521,7 +578,11 @@ func (f *Service) call(ctx context.Context, method, hubURL, path, token string, 
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	resp, err := f.clientFor(ctx, hubURL).Do(req)
+	client := f.guarded
+	if trusted {
+		client = f.client
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		if errors.Is(err, errPrivateHub) {
 			return errInput{errPrivateHub}
@@ -537,6 +598,14 @@ func (f *Service) call(ctx context.Context, method, hubURL, path, token string, 
 			Error string `json:"error"`
 		}
 		_ = json.Unmarshal(raw, &e)
+		// The hub's own words are shown to the parent, so keep them short
+		// and plain whatever the hub sends.
+		e.Error = strings.Map(func(r rune) rune {
+			if r < ' ' || r == 0x7f {
+				return ' '
+			}
+			return r
+		}, clip(e.Error, 200))
 		if e.Error == "" {
 			e.Error = fmt.Sprintf("the coordination server answered %d", resp.StatusCode)
 		}
@@ -561,7 +630,7 @@ func (f *Service) CreateInvite(ctx context.Context) (*model.FriendLink, error) {
 		JoinCode  string    `json:"join_code"`
 		ExpiresAt time.Time `json:"expires_at"`
 	}
-	if err := f.call(ctx, http.MethodPost, hubURL, "/v1/links", key, nil, &res); err != nil {
+	if err := f.call(ctx, true, http.MethodPost, hubURL, "/v1/links", key, nil, &res); err != nil {
 		return nil, err
 	}
 	secret := make([]byte, 32)
@@ -596,7 +665,7 @@ func (f *Service) Join(ctx context.Context, code string) (*model.FriendLink, err
 	var res struct {
 		Token string `json:"token"`
 	}
-	if err := f.call(ctx, http.MethodPost, inv.Hub, "/v1/links/"+url.PathEscape(inv.Link)+"/join", "",
+	if err := f.call(ctx, f.trusts(ctx, inv.Hub), http.MethodPost, inv.Hub, "/v1/links/"+url.PathEscape(inv.Link)+"/join", "",
 		map[string]string{"code": inv.Code}, &res); err != nil {
 		return nil, err
 	}
@@ -637,7 +706,7 @@ func (f *Service) Sync(ctx context.Context, id int64) error {
 			Data []byte `json:"data"`
 		} `json:"peer"`
 	}
-	err = f.call(ctx, http.MethodPost, l.HubURL, "/v1/links/"+url.PathEscape(l.HubLink)+"/exchange", l.Token,
+	err = f.call(ctx, f.trustsLink(ctx, l), http.MethodPost, l.HubURL, "/v1/links/"+url.PathEscape(l.HubLink)+"/exchange", l.Token,
 		map[string]any{"data": sealed}, &res)
 	var he *hubError
 	// Only the hub's own "gone" ends a link. A 404 can come from anything in
@@ -836,7 +905,7 @@ func (f *Service) Unlink(ctx context.Context, id int64) error {
 		return err
 	}
 	if l.Status != model.FriendStatusEnded {
-		if err := f.call(ctx, http.MethodDelete, l.HubURL, "/v1/links/"+url.PathEscape(l.HubLink), l.Token, nil, nil); err != nil {
+		if err := f.call(ctx, f.trustsLink(ctx, l), http.MethodDelete, l.HubURL, "/v1/links/"+url.PathEscape(l.HubLink), l.Token, nil, nil); err != nil {
 			log.Printf("friends: couldn't tell the hub about unlinking %q: %v", l.PeerName, err)
 		}
 	}

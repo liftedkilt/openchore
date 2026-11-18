@@ -15,6 +15,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/liftedkilt/openchore/internal/model"
 )
 
 // Kid-made accessories: a drawing or picture redeemed through a "design"
@@ -228,6 +230,24 @@ func savePetImage(pngData []byte) (string, error) {
 		return "", err
 	}
 	return id, os.WriteFile(filepath.Join(petImageDir, id+".png"), pngData, 0o640)
+}
+
+// removePetFiles deletes every picture that belongs to a pet: its own
+// animal picture and any accessories it drew or uploaded.
+func removePetFiles(p *model.Pet) {
+	if p == nil {
+		return
+	}
+	if p.Sprite != "" {
+		removePetImage(p.Sprite)
+	}
+	for _, it := range p.Items {
+		if rest, ok := strings.CutPrefix(it, "img:"); ok {
+			if _, id, ok := strings.Cut(rest, ":"); ok && model.ValidPetItem(it) {
+				removePetImage(id)
+			}
+		}
+	}
 }
 
 func removePetImage(id string) {

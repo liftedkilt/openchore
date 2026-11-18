@@ -19,7 +19,8 @@ score = 100 × (points of the assigned chores you did)
               ÷ (points of all the chores you were assigned)
 ```
 
-rounded to the nearest whole number.
+rounded **down** to a whole number, so 100 always means nothing was missed.
+(Any work at all shows as at least 1.)
 
 - **"Points" here is each chore's own point value**, the number a parent set
   on the chore. It is not the points balance, and nothing is added to or
@@ -44,7 +45,7 @@ Score = 100 × 39 ÷ 59 = 66.1, shown as **Score 66 (12 of 13 chores)**.
 
 She did 12 of 13 chores, but the one she skipped was the biggest, so her score
 is 66 and not 92. If she had skipped a "Make bed" instead, it would be
-100 × 57 ÷ 59 = **97**.
+100 × 57 ÷ 59 = 96.6, shown as **96**.
 
 ### Why it works this way
 
@@ -76,7 +77,7 @@ is 66 and not 92. If she had skipped a "Make bed" instead, it would be
 | Paused days | Left out entirely |
 | Today | A chore due today joins both sides when it's done, or joins the assigned side when it expires or the day ends. Nobody is marked down in the morning for chores that aren't due yet |
 | No points | If none of a person's assigned chores carry points that week, the score is 100 × chores done ÷ chores assigned |
-| Zero-point chores | In a week that does have points, a chore worth 0 points doesn't move the score (it still shows in the chore count) |
+| Zero-point chores | In a week that does have points, a chore worth 0 points barely moves the score: missing one takes a full 100 down to 99, and it breaks ties |
 | Bonus | Bonus chores, and family / first-come chores the person did, are counted on the side ("+3 bonus") |
 | Optional | Optional chores and kids' own tasks count for nothing |
 | Penalties and decay | Not part of the score: it looks only at which chores were done |
@@ -88,10 +89,11 @@ is 66 and not 92. If she had skipped a "Make bed" instead, it would be
    are listed under "Getting started". With fewer chores, a single one swings
    the score too far.
 2. Higher share first, compared to a hundredth of a point, finer than the
-   score shown: 2 ÷ 3 (66.67) ranks just below 67 ÷ 100 (67.00) even though
-   both show 67.
-3. Then more bonus chores.
-4. Anyone still level shares a place.
+   score shown: 133 ÷ 200 (66.50) ranks just below 2 ÷ 3 (66.66) even though
+   both show 66.
+3. Then the higher fraction of chores done.
+4. Then more bonus chores.
+5. Anyone still level shares a place.
 
 ### What it doesn't fix
 

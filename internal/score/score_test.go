@@ -83,6 +83,25 @@ func TestSumAndRank(t *testing.T) {
 	if got.Assigned != 6 || got.Done != 5 || got.Bonus != 1 || got.AssignedPoints != 50 || got.DonePoints != 20 || got.Share != 4000 || got.Percent != 40 {
 		t.Fatalf("Sum = %+v", got)
 	}
+	// The score rounds down: 100 means nothing was missed, and any work shows.
+	for _, c := range []struct{ assigned, done, aPts, dPts, share, pct int }{
+		{20, 19, 200, 199, 9950, 99}, // one small chore missed: not 100
+		{3, 2, 3, 2, 6666, 66},       // two thirds
+		{300, 1, 300, 1, 33, 1},      // a little work is not 0
+		{6, 5, 10, 10, 9999, 99},     // the missed chore was worth no points: still not a full score
+		{6, 6, 10, 10, 10000, 100},   // everything done
+	} {
+		got := Sum([]model.ScoreDay{{Date: "2026-11-16", Assigned: c.assigned, Done: c.done, AssignedPoints: c.aPts, DonePoints: c.dPts}}, "2026-11-16", "2026-11-22")
+		if got.Share != c.share || got.Percent != c.pct {
+			t.Errorf("%d of %d chores, %d of %d points: share %d percent %d, want %d and %d", c.done, c.assigned, c.dPts, c.aPts, got.Share, got.Percent, c.share, c.pct)
+		}
+	}
+	// Level on share: the one who did more of their chores is ahead.
+	lvl := []Total{{Assigned: 10, Done: 8, Share: 9000}, {Assigned: 10, Done: 9, Share: 9000}}
+	Rank(2, func(i int) *Total { return &lvl[i] }, func(i, j int) { lvl[i], lvl[j] = lvl[j], lvl[i] })
+	if lvl[0].Done != 9 || lvl[0].Rank != 1 || lvl[1].Rank != 2 {
+		t.Errorf("tie on share not broken by chores done: %+v", lvl)
+	}
 	// A family that doesn't use points is scored by chores.
 	if got := Sum([]model.ScoreDay{{Date: "2026-11-16", Assigned: 6, Done: 5}}, "2026-11-16", "2026-11-22"); got.Percent != 83 {
 		t.Fatalf("no-points Sum = %+v", got)

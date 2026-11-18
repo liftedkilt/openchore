@@ -335,15 +335,13 @@ func (h *PetHandler) Remove(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid user id")
 		return
 	}
-	// Its own picture goes with it: nothing should stay fetchable.
+	// Its pictures go with it: nothing should stay fetchable.
 	old, _ := h.store.GetPetForUser(r.Context(), id)
 	if err := h.store.DeletePetForUser(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to remove pet")
 		return
 	}
-	if old != nil && old.Sprite != "" {
-		removePetImage(old.Sprite)
-	}
+	removePetFiles(old)
 	w.WriteHeader(http.StatusNoContent)
 }
 

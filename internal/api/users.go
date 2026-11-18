@@ -442,10 +442,13 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Their farm animal goes with them (the rows cascade); so should its pictures.
+	pet, _ := h.store.GetPetForUser(r.Context(), id)
 	if err := h.store.DeleteUser(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete user")
 		return
 	}
+	removePetFiles(pet)
 	w.WriteHeader(http.StatusNoContent)
 }
 
