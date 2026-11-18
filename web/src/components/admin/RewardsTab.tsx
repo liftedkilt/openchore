@@ -188,7 +188,7 @@ const RewardForm: React.FC<{
           <span className={ui.label} title={t('admin.rewardsTab.fieldPetActionTitle')}>{t('admin.rewardsTab.fieldPetAction')}</span>
           <select className={ui.input} value={petAction} onChange={e => setPetAction(e.target.value as PetAction | '')}>
             <option value="">{t('admin.rewardsTab.petAction.none')}</option>
-            {(['feed', 'treat', 'play', 'accessory', 'design', 'picture', 'restyle', 'new_animal'] as const).map(a => (
+            {(['feed', 'treat', 'play', 'accessory', 'design', 'picture', 'gift', 'playdate', 'restyle', 'new_animal'] as const).map(a => (
               <option key={a} value={a}>{t(`admin.rewardsTab.petAction.${a}`)}</option>
             ))}
           </select>

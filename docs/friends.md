@@ -95,6 +95,15 @@ is 66 and not 92. If she had skipped a "Make bed" instead, it would be
 4. Then more bonus chores.
 5. Anyone still level shares a place.
 
+### The winner's ribbon
+
+Whoever is ranked first when a week ends wears a ribbon for the whole of the
+next week: a rosette by their name on the leaderboard and on their animal's
+name tag on the farm. Ties share it. There has to be someone to beat: with
+only one ranked person there is no ribbon. "First" means first on your own
+leaderboard, friends included; a friend who wins wears the ribbon when you
+visit their farm.
+
 ### What it doesn't fix
 
 - A kid with one chore a day reaches 100 more easily than a kid with eight.
@@ -166,6 +175,8 @@ A linked family is sent only what its screens show:
 | First name and colour | Chore names and descriptions |
 | For this week and last: chores done, chores assigned, bonus count, and the score | A day-by-day breakdown, and the point values the score was worked out from |
 | Streak length | Photos |
+| Its team's weekly total, and a team goal if it has put one forward | |
+| Gifts and playdates its kids sent yours in the last two days | |
 | Farm animal: name, kind, coat, accessory, and how it's doing (mood, sick, hiding) | The animal's health, food and joy numbers |
 | A custom animal picture, only if you approved it and they chose to show pictures ([custom-animals.md](custom-animals.md)) | A custom picture you haven't approved |
 | | Point balances, rewards, redemptions, ages, PINs, sign-in details |
@@ -186,6 +197,45 @@ household's own chores and farm they aren't shown to a device nobody has
 signed in on. The wall display shows a one-line leaderboard of **this
 household only** (`GET /api/leaderboard/household`, which is public like
 chores and points).
+
+### Families as teams, and a goal together
+
+Two linked families are also two teams. The leaderboard shows each family's
+score for the week (the average of the people it shares with the other, among
+those who had chores) and the two together.
+
+Either parent can put forward a **team goal** for the week: the score both
+families aim to average *together*, from 1 to 100. It is set under the linked
+family in Settings. It counts once the other parent agrees to the same number;
+until then each side sees "waiting for them" or "they put forward 85". The
+leaderboard then shows progress ("Both families together: 78 of 85") and, when
+the week is over, whether it was reached. A goal is for one week; either side
+can drop it.
+
+It is a combined score, not a count of chores, so a family with more chores
+doesn't carry more of it. Each family works its side out from the people it
+shares, and sends only the total, so both homes see the same numbers.
+
+### Gifts and playdates
+
+Two pet-care rewards ([pets.md](pets.md)) reach across to a linked family.
+Both cost the kid points at the parents' price, and both show up only when
+there is a friend's animal to send them to.
+
+| Reward | What happens |
+| --- | --- |
+| **Treat for a friend's animal** (`gift`) | The kid picks one friend's animal. It gets a treat (a little food, a lot of joy) at the next sync, and that kid sees "Mia sent Biscuit a treat today!". One per friend's animal per day |
+| **Playdate** (`playdate`) | The kid picks a linked family. Their animal shows up on that family's farm for the rest of the day, tagged "visiting from …", and comes home happier. One per day; not while it is hiding or too sick to play |
+
+- **Both parents' ticks apply here too.** A gift or a visit only goes between
+  people each family has picked: the sender must be shared with that family
+  and shown by them.
+- **Each arrives once**, however often the families sync, and an animal takes
+  at most three treats a day from one family, whatever the other server says.
+- **A parent can turn them off** per family ("Take gifts and playdates from
+  …", on by default).
+- **Visiting animals are for signed-in family members.** They aren't on the
+  wall display or the public farm.
 
 ### The hub
 
@@ -284,11 +334,14 @@ linked families see the link as ended and need a new invite.
   `percent` is the score out of 100; `share` is the same to two more places
   (0 to 10000) and is what people are ranked on.
 - `GET /api/friends/farms` – each friend family's farm, shaped like `GET /api/pets`.
+- `GET /api/friends/visitors` – friends' animals here on a playdate today, and
+  the treats friends sent today.
 - `GET` / `PUT /api/admin/friends` – leaderboard switch, family name, hub, and
   each linked family with its `outbound` (your people: `shared`, and `accepted`
   once they show them) and `inbound` (their people: `accepted` = shown here).
 - `PUT /api/admin/friends/{id}` (`share_user_ids`, `accept_member_ids`; each
-  replaces its list) – who to send to and show from one family.
+  replaces its list) – who to send to and show from one family. Also
+  `show_pictures`, `allow_visits` and `goal_target` (1 to 100; 0 drops it).
 - `POST /api/admin/friends/invites`, `POST /api/admin/friends/join` (`invite`),
   `POST /api/admin/friends/{id}/sync`, `DELETE /api/admin/friends/{id}`.
 
@@ -297,5 +350,5 @@ Hub: `POST /v1/links`, `POST /v1/links/{id}/join`, `POST /v1/links/{id}/exchange
 
 ## Not built yet
 
-Playdates (sending an animal to a friend's farm), gifts, trophies,
-family-vs-family and co-op goals.
+A decoration on both farms when a team goal is reached, a history of past
+winners, and goals that repeat every week.

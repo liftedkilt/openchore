@@ -14,3 +14,5 @@
 .sides { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-2) var(--space-5); }
 .hint { margin-left: 8px; color: var(--ink-muted); font-size: 12.5px; font-weight: 400; }
 .ok { color: var(--ink); font-weight: 700; }
+.goal { margin-top: var(--space-3); }
+.goalInput { width: 84px; flex: none; }

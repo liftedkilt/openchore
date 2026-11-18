@@ -441,7 +441,9 @@
         "restyle": "Neues Fell (Fellfarbe)",
         "new_animal": "Neues Tier (Werte bleiben)",
         "design": "Selbst gestalten (Kind malt)",
-        "picture": "Eigenes Bild (Kind lädt sein Tier hoch)"
+        "picture": "Eigenes Bild (Kind lädt sein Tier hoch)",
+        "gift": "Geschenk (ein Leckerli für das Tier einer befreundeten Familie)",
+        "playdate": "Spielbesuch (den Hof einer befreundeten Familie besuchen)"
       },
       "customEmoji": "Eigenes (Emoji)…",
       "fieldEmoji": "Emoji",
@@ -762,7 +764,21 @@
         "theyHavent": "dort noch nicht angekreuzt",
         "notShown": "hier noch nicht angezeigt",
         "showPictures": "Eigene Tierbilder von {{family}} anzeigen",
-        "showPicturesDesc": "Kinder können eigene Bilder als Hoftiere verwenden. Ist das aus, erscheint das Tier eines Freundes in der eingebauten Form und seine Bilder werden hier nicht gespeichert. Die Bilder eurer eigenen Kinder werden erst gesendet, wenn ihr unter Hoftiere „Darf an befreundete Familien gesendet werden“ ankreuzt."
+        "showPicturesDesc": "Kinder können eigene Bilder als Hoftiere verwenden. Ist das aus, erscheint das Tier eines Freundes in der eingebauten Form und seine Bilder werden hier nicht gespeichert. Die Bilder eurer eigenen Kinder werden erst gesendet, wenn ihr unter Hoftiere „Darf an befreundete Familien gesendet werden“ ankreuzt.",
+        "allowVisits": "Geschenke und Spielbesuche von {{family}} annehmen",
+        "allowVisitsDesc": "Kinder können Punkte ausgeben, um dem Tier eines Freundes ein Leckerli zu schicken (es bekommt etwas Futter und Freude) oder ihr eigenes Tier für den Tag hinüberzuschicken. Ein Besuchstier ist auf eurem Hof für angemeldete Familienmitglieder zu sehen, nicht auf der Wandanzeige.",
+        "goalTitle": "Teamziel für diese Woche",
+        "goalNone": "Noch kein Ziel. Schlagt eins vor: die Wertung, die beide Familien zusammen im Schnitt erreichen wollen.",
+        "goalActive": "Ihr und {{family}} wollt diese Woche gemeinsam {{target}} erreichen.",
+        "goalOurs": "Ihr habt {{target}} vorgeschlagen. {{family}} muss noch zustimmen.",
+        "goalTheirs": "{{family}} schlägt für diese Woche gemeinsam {{target}} vor.",
+        "goalAgree": "{{target}} zustimmen",
+        "goalPropose": "Vorschlagen",
+        "goalChange": "Ändern",
+        "goalDrop": "Ziel verwerfen",
+        "goalInput": "Zielwertung, 1 bis 100",
+        "goalSaved": "Ziel gespeichert.",
+        "goalDropped": "Ziel verworfen."
       }
     },
     "skins": {
@@ -1434,7 +1450,9 @@
           "wear": "{{name}} führt es stolz vor!",
           "restyle": "{{name}} liebt das neue Fell!",
           "new_animal": "Tadaa! Das ist {{name}} in neu!",
-          "picture": "{{name}} sieht ganz neu aus!"
+          "picture": "{{name}} sieht ganz neu aus!",
+          "gift": "Verschickt! Das Tier deines Freundes wird sich freuen.",
+          "playdate": "{{name}} ist unterwegs zum Spielen auf dem Hof deiner Freunde!"
         }
       },
       "design": {
@@ -1480,6 +1498,16 @@
           "very_sick": "Sehr krank",
           "happy": "Fröhlich"
         }
+      },
+      "visiting": "zu Besuch von {{family}}",
+      "giftFrom": "{{from}} ({{family}}) hat {{name}} heute ein Leckerli geschickt!",
+      "friend": {
+        "giftTitle": "Ein Leckerli für das Tier eines Freundes",
+        "giftLead": "Wähle, welches Tier ein Leckerli bekommt. Es kostet dich Punkte und macht das Tier glücklicher.",
+        "playdateTitle": "Ein Spielbesuch",
+        "playdateLead": "Wähle den Hof von Freunden, den {{name}} heute besucht. {{name}} erscheint auf ihrem Hof und kommt glücklicher nach Hause.",
+        "visit": "{{family}} besuchen",
+        "none": "Es gibt noch keine Tiere von Freunden zur Auswahl."
       }
     },
     "board": {
@@ -1508,7 +1536,15 @@
       "farmEmpty": "Hier gibt es noch keine Tiere.",
       "asOf": "Stand: {{when}}",
       "sheetTitle": "Rangliste",
-      "scoreLabel": "Wertung"
+      "scoreLabel": "Wertung",
+      "ribbon": "Sieger der letzten Woche",
+      "teams": "Familien",
+      "us": "Wir",
+      "goalTitle": "Gemeinsam: {{target}} erreichen",
+      "goalOnTrack": "Gemeinsam auf Kurs für {{target}}!",
+      "goalReached": "Ziel erreicht: gemeinsam {{target}}!",
+      "goalMissed": "Das Ziel war gemeinsam {{target}}",
+      "goalSoFar": "Beide Familien zusammen: {{score}} von {{target}}"
     }
   },
   "linkedAccounts": {

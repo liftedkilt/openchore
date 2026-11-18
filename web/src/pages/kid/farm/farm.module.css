@@ -274,3 +274,6 @@
   .walking :global(.farm-frame-rest) { visibility: visible; }
   .walking :global(.farm-frame-walk-a), .walking :global(.farm-frame-walk-b) { animation: none; visibility: hidden; }
 }
+
+/* The winner's ribbon on a name tag. */
+.rosette { width: 12px; height: 14px; margin-right: 3px; vertical-align: -2px; }

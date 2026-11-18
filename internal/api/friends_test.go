@@ -615,3 +615,235 @@ func TestFriendPicturesNeedBothParents(t *testing.T) {
 	a.expectStatus(t, "PATCH", "/api/me/pet", map[string]any{"sprite": ""}, childHeaders(ava), http.StatusOK)
 	a.expectStatus(t, "PUT", approve, map[string]any{"approved": true}, adminHeaders(), http.StatusNotFound)
 }
+
+// lastWeekDay stores one finished day in last week for a person.
+func (e *testEnv) lastWeekDay(t *testing.T, userID, assigned, done int) {
+	t.Helper()
+	now := time.Now()
+	monday := now.AddDate(0, 0, -((int(now.Weekday())+6)%7)-7)
+	if _, err := e.db.Exec(`INSERT OR REPLACE INTO score_days (user_id, date, assigned, done) VALUES (?, ?, ?, ?)`,
+		userID, monday.AddDate(0, 0, 2).Format("2006-01-02"), assigned, done); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Whoever came first last week wears the winner's ribbon this week, on the
+// leaderboard and on the farm. With nobody to beat there is no ribbon.
+func TestLeaderboardWinnerWearsARibbon(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	ava := env.createChild(t, "Ava")
+	ben := env.createChild(t, "Ben")
+	env.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"leaderboard_enabled": true}, adminHeaders(), http.StatusOK)
+	env.enablePets(t)
+	env.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Biscuit", "species": "dog"}, childHeaders(ava), http.StatusCreated)
+	env.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Clover", "species": "horse"}, childHeaders(ben), http.StatusCreated)
+	if _, err := env.db.Exec(`UPDATE users SET created_at = datetime('now', '-30 days')`); err != nil {
+		t.Fatal(err)
+	}
+	ribbons := func() string {
+		var out []string
+		for _, e := range env.leaderboard(t) {
+			if e["winner"] == true {
+				out = append(out, "board:"+e["name"].(string))
+			}
+		}
+		for _, p := range env.getJSON(t, "/api/pets", nil)["pets"].([]any) {
+			if pet := p.(map[string]any); pet["ribbon"] == true {
+				out = append(out, "farm:"+pet["name"].(string))
+			}
+		}
+		return strings.Join(out, " ")
+	}
+	// Only Ava had enough chores to be ranked last week: nobody to beat.
+	env.lastWeekDay(t, ava, 6, 6)
+	if got := ribbons(); got != "" {
+		t.Fatalf("a ribbon with nobody to beat: %s", got)
+	}
+	env.lastWeekDay(t, ben, 6, 4)
+	if got := ribbons(); got != "board:Ava farm:Biscuit" {
+		t.Fatalf("ribbons = %q, want Ava's on the board and on her animal", got)
+	}
+}
+
+// Two linked families are also two teams, and can agree a goal to reach
+// together. Both households work out the same numbers.
+func TestFriendTeamsAndGoal(t *testing.T) {
+	hubSrv := startHub(t)
+	a, b, aPath, bPath, ava := linkedPair(t, hubSrv)
+	bo := b.createChild(t, "Bo")
+	b.expectStatus(t, "PUT", bPath, map[string]any{"share_user_ids": []int{bo}}, adminHeaders(), http.StatusOK)
+	for _, e := range []*testEnv{a, b} {
+		e.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"leaderboard_enabled": true}, adminHeaders(), http.StatusOK)
+		if _, err := e.db.Exec(`UPDATE users SET created_at = datetime('now', '-30 days')`); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a.lastWeekDay(t, ava, 5, 4) // 80
+	b.lastWeekDay(t, bo, 5, 5)  // 100
+	bothSync := func() {
+		t.Helper()
+		for i := 0; i < 2; i++ {
+			a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
+			b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
+		}
+	}
+	bothSync()
+	team := func(e *testEnv, week string) map[string]any {
+		t.Helper()
+		teams := e.getJSON(t, "/api/leaderboard?week="+week, adminHeaders())["teams"].([]any)
+		if len(teams) != 1 {
+			t.Fatalf("teams (%s): %v", week, teams)
+		}
+		return teams[0].(map[string]any)
+	}
+	score := func(m map[string]any, k string) string {
+		s := m[k].(map[string]any)
+		return fmt.Sprintf("%v/%v", s["people"], s["score"])
+	}
+	at, bt := team(a, "last"), team(b, "last")
+	if score(at, "ours") != "1/80" || score(at, "theirs") != "1/100" || score(at, "together") != "2/90" {
+		t.Fatalf("A's view of last week's teams: %v", at)
+	}
+	if score(bt, "ours") != "1/100" || score(bt, "theirs") != "1/80" || score(bt, "together") != "2/90" {
+		t.Fatalf("B's view of last week's teams: %v", bt)
+	}
+	// The public, household-only leaderboard has no teams.
+	if teams := a.getJSON(t, "/api/leaderboard/household", nil)["teams"].([]any); len(teams) != 0 {
+		t.Fatalf("teams on the household leaderboard: %v", teams)
+	}
+
+	// A puts a goal forward; it counts once B agrees to the same one.
+	goal := func(e *testEnv) string {
+		g, _ := e.getJSON(t, "/api/admin/friends", adminHeaders())["links"].([]any)[0].(map[string]any)["goal"].(map[string]any)
+		if g == nil {
+			return "none"
+		}
+		return fmt.Sprintf("%v %v", g["state"], g["target"])
+	}
+	a.expectStatus(t, "PUT", aPath, map[string]any{"goal_target": 101}, adminHeaders(), http.StatusBadRequest)
+	a.expectStatus(t, "PUT", aPath, map[string]any{"goal_target": 85}, adminHeaders(), http.StatusOK)
+	bothSync()
+	if goal(a) != "ours 85" || goal(b) != "theirs 85" {
+		t.Fatalf("after A proposed: A=%q B=%q", goal(a), goal(b))
+	}
+	b.expectStatus(t, "PUT", bPath, map[string]any{"goal_target": 85}, adminHeaders(), http.StatusOK)
+	bothSync()
+	if goal(a) != "active 85" || goal(b) != "active 85" {
+		t.Fatalf("after B agreed: A=%q B=%q", goal(a), goal(b))
+	}
+	if g := team(a, "this")["goal"].(map[string]any); g["state"] != "active" || g["met"] != false {
+		t.Fatalf("this week's goal on the leaderboard: %v", g)
+	}
+	// Either side can drop it.
+	b.expectStatus(t, "PUT", bPath, map[string]any{"goal_target": 0}, adminHeaders(), http.StatusOK)
+	bothSync()
+	if goal(a) != "ours 85" || goal(b) != "theirs 85" {
+		t.Fatalf("after B dropped it: A=%q B=%q", goal(a), goal(b))
+	}
+}
+
+// Kids can spend points to send a friend's animal a treat or send their own
+// animal over for a playdate. Each arrives once, only between people both
+// parents picked, and never more than the receiving side allows.
+func TestFriendGiftsAndPlaydates(t *testing.T) {
+	hubSrv := startHub(t)
+	a, b, aPath, bPath, ava := linkedPair(t, hubSrv)
+	bo := b.createChild(t, "Bo")
+	b.enablePets(t)
+	b.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Clover", "species": "horse"}, childHeaders(bo), http.StatusCreated)
+	b.expectStatus(t, "POST", "/api/points/adjust", map[string]any{"user_id": bo, "amount": 500, "note": "seed"}, adminHeaders(), http.StatusNoContent)
+	bothSync := func() {
+		t.Helper()
+		for i := 0; i < 2; i++ {
+			a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
+			b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
+		}
+	}
+	bothSync()
+	gift, playdate := b.petRewardID(t, bo, "gift"), b.petRewardID(t, bo, "playdate")
+	redeem := func(reward int, pet map[string]any, want int) string {
+		t.Helper()
+		resp := b.request(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", reward), map[string]any{"pet": pet}, childHeaders(bo))
+		var out map[string]any
+		decodeBody(t, resp, &out)
+		if resp.StatusCode != want {
+			t.Fatalf("redeem: %d %v, want %d", resp.StatusCode, out, want)
+		}
+		return fmt.Sprint(out["error"])
+	}
+	avaKey := fmt.Sprintf("f%s:%d", bPath[strings.LastIndex(bPath, "/")+1:], ava)
+	joy := func() float64 { return a.myPet(t, ava)["joy"].(float64) }
+	a.db.Exec(`UPDATE pets SET joy = 40, fullness = 40`)
+
+	// Bo isn't shared with A yet, so nothing he sends would be shown there.
+	link := map[string]any{"link": 1}
+	if msg := redeem(gift, map[string]any{"friend": avaKey}, http.StatusUnprocessableEntity); !strings.Contains(msg, "can't see you yet") {
+		t.Fatalf("gift before sharing: %q", msg)
+	}
+	if msg := redeem(playdate, link, http.StatusUnprocessableEntity); !strings.Contains(msg, "can't see you yet") {
+		t.Fatalf("playdate before sharing: %q", msg)
+	}
+	b.expectStatus(t, "PUT", bPath, map[string]any{"share_user_ids": []int{bo}}, adminHeaders(), http.StatusOK)
+	bothSync()
+	a.expectStatus(t, "PUT", aPath, map[string]any{"accept_member_ids": []string{fmt.Sprint(bo)}}, adminHeaders(), http.StatusOK)
+	bothSync()
+
+	// A treat for Ava's animal: costs Bo points, lands on Biscuit once.
+	before := b.balance(t, bo)
+	redeem(gift, map[string]any{"friend": "f9:9"}, http.StatusUnprocessableEntity)
+	redeem(gift, map[string]any{"friend": avaKey}, http.StatusCreated)
+	if b.balance(t, bo) != before-10 {
+		t.Fatalf("gift cost: %d -> %d", before, b.balance(t, bo))
+	}
+	if msg := redeem(gift, map[string]any{"friend": avaKey}, http.StatusUnprocessableEntity); !strings.Contains(msg, "already sent Biscuit") {
+		t.Fatalf("second gift the same day: %q", msg)
+	}
+	bothSync()
+	bothSync() // arriving again changes nothing
+	if joy() != 60 {
+		t.Fatalf("Biscuit's joy after one treat = %v, want 60", joy())
+	}
+	got := a.getJSON(t, "/api/friends/visitors", childHeaders(ava))
+	if gifts := got["gifts"].([]any); len(gifts) != 1 || gifts[0].(map[string]any)["from"] != "Bo" || gifts[0].(map[string]any)["to_user_id"] != float64(ava) {
+		t.Fatalf("gifts at A: %v", got)
+	}
+
+	// A playdate: Clover shows up on A's farm for the day.
+	redeem(playdate, link, http.StatusCreated)
+	if msg := redeem(playdate, link, http.StatusUnprocessableEntity); !strings.Contains(msg, "already gone on a playdate") {
+		t.Fatalf("second playdate the same day: %q", msg)
+	}
+	bothSync()
+	visitors := a.getJSON(t, "/api/friends/visitors", childHeaders(ava))["visitors"].([]any)
+	if len(visitors) != 1 {
+		t.Fatalf("visitors at A: %v", visitors)
+	}
+	if v := visitors[0].(map[string]any); v["name"] != "Clover" || v["owner_name"] != "Bo" || v["visiting"] != true || v["family"] != "The Bos" {
+		t.Fatalf("visitor: %v", v)
+	}
+	// Visitors are friends' kids' animals: signed-in only, and not on the public farm.
+	a.expectStatus(t, "GET", "/api/friends/visitors", nil, nil, http.StatusUnauthorized)
+	if pets := a.getJSON(t, "/api/pets", nil)["pets"].([]any); len(pets) != 1 {
+		t.Fatalf("the public farm shows visitors: %v", pets)
+	}
+
+	// A's parent turns visits off: no visitors, and later gifts don't land.
+	a.expectStatus(t, "PUT", aPath, map[string]any{"allow_visits": false}, adminHeaders(), http.StatusOK)
+	if v := a.getJSON(t, "/api/friends/visitors", childHeaders(ava))["visitors"].([]any); len(v) != 0 {
+		t.Fatalf("visitors after A turned visits off: %v", v)
+	}
+	// However many gifts the other server claims, an animal takes three a day from one family.
+	a.expectStatus(t, "PUT", aPath, map[string]any{"allow_visits": true}, adminHeaders(), http.StatusOK)
+	for i := 0; i < 6; i++ {
+		if _, err := b.db.Exec(`INSERT INTO friend_sends (id, link_id, kind, from_user, to_member, day) VALUES (?, 1, 'gift', ?, ?, ?)`,
+			fmt.Sprintf("flood%d", i), bo, fmt.Sprint(ava), time.Now().Format("2006-01-02")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a.db.Exec(`UPDATE pets SET joy = 0`)
+	bothSync()
+	if joy() != 40 { // two more on top of the first
+		t.Fatalf("joy after a flood of gifts = %v, want 40 (three gifts a day at most)", joy())
+	}
+}

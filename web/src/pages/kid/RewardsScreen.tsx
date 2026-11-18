@@ -9,6 +9,7 @@ import type { KidData } from './useKidData';
 import { PetLookSheet } from './farm/PetLookSheet';
 import { DesignSheet } from './farm/DesignSheet';
 import { PictureSheet } from './farm/PictureSheet';
+import { FriendPickSheet } from './farm/FriendPickSheet';
 import { ReactingAnimal, reactionLine, type ReactionEvent } from './farm/PetReaction';
 import { Sheet } from './Sheet';
 import { needsPick } from './farm/petLook';
@@ -225,7 +226,11 @@ export function RewardsScreen({ user, data, topBar, onRedeemed, onFarm }: Reward
         <PictureSheet pet={pet} reward={picking} busy={data.redeemingId === picking.id}
           onConfirm={pick => redeem(picking, pick)} onClose={() => setPicking(null)} />
       )}
-      {picking && pet && picking.pet_action !== 'design' && picking.pet_action !== 'picture' && (
+      {picking && pet && (picking.pet_action === 'gift' || picking.pet_action === 'playdate') && (
+        <FriendPickSheet pet={pet} reward={picking} busy={data.redeemingId === picking.id}
+          onConfirm={pick => redeem(picking, pick)} onClose={() => setPicking(null)} />
+      )}
+      {picking && pet && (picking.pet_action === 'new_animal' || picking.pet_action === 'restyle') && (
         <PetLookSheet pet={pet} reward={picking} busy={data.redeemingId === picking.id}
           onConfirm={pick => redeem(picking, pick)} onClose={() => setPicking(null)} />
       )}

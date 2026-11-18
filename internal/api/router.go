@@ -41,6 +41,8 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 		auth.Friends = friends.New(s)
 	}
 	friendsH := NewFriendsHandler(s, auth.Friends)
+	pets.Ribbons = friendsH.Ribbons // last week's leaderboard winner wears a ribbon on the farm
+	pets.Friends = auth.Friends     // gifts and playdates to linked families
 	webhooks := NewWebhookHandler(s)
 	triggers := NewTriggerHandler(s)
 	tokens := NewTokenHandler(s)
@@ -132,6 +134,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 			// only: they show other families' kids.
 			r.Get("/leaderboard", friendsH.Leaderboard)
 			r.Get("/friends/farms", friendsH.Farms)
+			r.Get("/friends/visitors", friendsH.Visitors)
 
 			r.Get("/rewards", rewards.List)
 			r.Post("/rewards/{id}/redeem", rewards.Redeem)

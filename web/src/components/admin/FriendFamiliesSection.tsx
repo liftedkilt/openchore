@@ -12,6 +12,43 @@ import ff from './FriendFamiliesSection.module.css';
 
 type Msg = { type: 'success' | 'error'; text: string } | null;
 
+/** The team goal with one family: put one forward, agree to theirs, or drop it. */
+function GoalRow({ link, busy, tt, onSet }: {
+  link: FriendLink; busy: boolean; tt: (key: string, opts?: Record<string, unknown>) => string; onSet: (target: number) => void;
+}) {
+  const g = link.goal;
+  const [target, setTarget] = useState(g?.target ?? 85);
+  const family = link.peer_name || tt('unnamed');
+  return (
+    <div className={ff.goal}>
+      <span className={ui.label}>{tt('goalTitle')}</span>
+      <p className={ff.note}>
+        {!g ? tt('goalNone')
+          : g.state === 'active' ? tt('goalActive', { target: g.target, family })
+          : g.state === 'ours' ? tt('goalOurs', { target: g.target, family })
+          : tt('goalTheirs', { target: g.target, family })}
+      </p>
+      <div className={ff.inline}>
+        {g?.state === 'theirs' && (
+          <button type="button" className={ui.btnPrimary} disabled={busy} onClick={() => onSet(g.target)}>{tt('goalAgree', { target: g.target })}</button>
+        )}
+        {g?.state !== 'active' && (
+          <>
+            <input className={clsx(ui.input, ff.goalInput)} type="number" min={1} max={100} value={target}
+              aria-label={tt('goalInput')} onChange={e => setTarget(Number(e.target.value))} />
+            <button type="button" className={ui.btn} disabled={busy || !(target >= 1 && target <= 100)} onClick={() => onSet(target)}>
+              {tt(g?.state === 'ours' ? 'goalChange' : 'goalPropose')}
+            </button>
+          </>
+        )}
+        {g && g.state !== 'theirs' && (
+          <button type="button" className={ui.btnGhost} disabled={busy} onClick={() => onSet(0)}>{tt('goalDrop')}</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export const FriendFamiliesSection: React.FC = () => {
   const { t, i18n } = useTranslation();
   const tt = (key: string, opts: Record<string, unknown> = {}): string => t(`admin.settingsTab.friends.${key}`, opts);
@@ -163,6 +200,14 @@ export const FriendFamiliesSection: React.FC = () => {
                     <span className={ui.checkLabel}>{tt('showPictures', { family: l.peer_name || tt('unnamed') })}</span>
                   </label>
                   <p className={ff.note}>{tt('showPicturesDesc')}</p>
+                  <label className={ui.check}>
+                    <input type="checkbox" checked={l.allow_visits} disabled={busy}
+                      onChange={e => run(() => api.friends.updateLink(l.id, { allow_visits: e.target.checked }))} />
+                    <span className={ui.checkLabel}>{tt('allowVisits', { family: l.peer_name || tt('unnamed') })}</span>
+                  </label>
+                  <p className={ff.note}>{tt('allowVisitsDesc')}</p>
+                  <GoalRow link={l} busy={busy} tt={tt}
+                    onSet={target => run(() => api.friends.updateLink(l.id, { goal_target: target }), tt(target ? 'goalSaved' : 'goalDropped'))} />
                   <p className={ff.note}>{tt('shareDesc')}</p>
                 </>
               )}

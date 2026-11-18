@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, APIError } from '../../api';
 import type {
-  Farm, Leaderboard, PetPick, PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
+  Farm, FriendGift, Leaderboard, Pet, PetPick, PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
 } from '../../types';
 import { localDateStr } from '../../utils';
 
@@ -30,6 +30,9 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   const [people, setPeople] = useState<User[]>([]);
   const [farm, setFarm] = useState<Farm | null>(null);
   const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null);
+  // Friend families' animals here on a playdate, and treats friends sent today.
+  const [visitors, setVisitors] = useState<Pet[]>([]);
+  const [gifts, setGifts] = useState<FriendGift[]>([]);
   const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -73,12 +76,15 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   const loadExtras = useCallback(async () => {
     if (!userId) return;
     try {
-      const [s, p, f, lb] = await Promise.all([
+      const [s, p, f, lb, v] = await Promise.all([
         api.streaks.getForUser(userId),
         api.points.getForUser(userId),
         api.pets.farm().catch(() => null),
         api.leaderboard.get().catch(() => null),
+        api.friends.visitors().catch(() => null),
       ]);
+      setVisitors(v?.visitors ?? []);
+      setGifts(v?.gifts ?? []);
       setStreak(s);
       setPoints(p);
       setFarm(f);
@@ -304,7 +310,7 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   return {
     today, chores, weekChores, streak, points, rewards, redemptions, people,
     farm, myPet: farm?.pets.find(p => p.user_id === userId) ?? null,
-    leaderboard,
+    leaderboard, visitors, gifts,
     togglingIds, toast, showToast,
     reloadChores, refreshAll, loadRewards, loadExtras, toggle,
     commitmentFor, redeem, redeemingId, redeemedId, saveToward, savingTowardId,

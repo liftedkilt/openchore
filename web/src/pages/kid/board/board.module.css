@@ -172,3 +172,32 @@
   outline: 2.5px solid var(--ink);
   outline-offset: 2px;
 }
+
+/* The winner's ribbon by a name. */
+.rosette { width: 15px; height: 18px; flex: none; }
+
+/* Family against family, and the goal the two share. */
+.teams { margin-top: var(--space-2); }
+.team {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  row-gap: 4px;
+  padding: var(--space-2) var(--space-3);
+}
+.teamName { font-weight: var(--title-weight); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.goal {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: var(--outline-w) solid var(--line);
+  border-radius: var(--r-row);
+  background: var(--surface-raised);
+  box-shadow: var(--lift);
+  font-size: 14px;
+}
+.goal > span:not(.bar) { color: var(--ink-muted); }
+.goalMet { background: color-mix(in srgb, var(--person-mint) 30%, var(--surface-raised)); }

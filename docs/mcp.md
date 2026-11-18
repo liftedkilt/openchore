@@ -71,7 +71,9 @@ animal or a custom picture, and make pet-care rewards (`pet_action`).
 `update_friend_families` (leaderboard switch, family name, coordination
 server), `create_friend_invite`, `join_friend_family`,
 `set_friend_family_sharing` (who is sent to and shown from one family),
-`sync_friend_family`, `unlink_friend_family`, `list_friend_farms`.
+`sync_friend_family`, `unlink_friend_family`, `list_friend_farms`,
+`list_friend_visitors`. `set_friend_family_sharing` also sets the team goal and
+switches pictures, gifts and playdates for a family.
 
 **Reports and setup**: reports and AI summaries, settings, config export,
 webhooks and their delivery logs, API tokens, sign-in providers and options,

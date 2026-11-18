@@ -66,6 +66,8 @@ store (ledger row, stock, per-person visibility and pricing all apply):
 | `accessory` | Gives `pet_item` and puts it on (refused if already owned) |
 | `restyle` | New coat colour, picked at redemption (`{"pet": {"color": …}}`) |
 | `picture` | The person's own picture is shown in place of the drawn animal, sent at redemption (`{"pet": {"image": …}}`); see [custom-animals.md](custom-animals.md) |
+| `gift` | A treat for an animal on a linked friend family's farm, picked at redemption (`{"pet": {"friend": …}}`); see [friends.md](friends.md) |
+| `playdate` | The person's animal visits a linked family's farm for the day (`{"pet": {"link": …}}`) and gains Joy +25 |
 | `new_animal` | A different animal (and coat), picked at redemption (`{"pet": {"species": …, "color": …}}`). Name, health, food, joy and accessories carry over, so it's never a way out of a sick pet |
 
 Accessories (`pet_item`) are one of 19 built-ins (hats, glasses, neckwear) or a

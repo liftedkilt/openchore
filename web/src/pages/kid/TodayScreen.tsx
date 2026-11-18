@@ -117,7 +117,7 @@ export function TodayScreen({ user, data, now, topBar, viewOf, tts, onToggle, on
           {data.myPet && (
             <p className={fs.farmCardLine}>{t(`kid.farm.mood.${data.myPet.mood}`, { name: data.myPet.name })}</p>
           )}
-          <FarmScene pets={data.farm.pets} meId={user.id} compact onSelect={onFarm} />
+          <FarmScene pets={[...data.farm.pets, ...data.visitors]} meId={user.id} compact onSelect={onFarm} />
         </section>
       )}
 

@@ -110,6 +110,7 @@ Optional features, off until a parent turns them on. Details in
 | `GET` `POST` `PATCH` | `/api/me/pet` | This person's animal: view, adopt, rename / change accessory / drop a custom picture |
 | `GET` | `/api/leaderboard?week=this\|last` | The weekly standings, with people shared by linked families |
 | `GET` | `/api/friends/farms` | Linked families' farms, as of their last sync |
+| `GET` | `/api/friends/visitors` | Friends' animals here on a playdate today, and treats friends sent today |
 
 ### Reward commitments
 
@@ -196,7 +197,7 @@ Requires an authenticated caller with the `admin` role.
 | `GET` `PUT` | `/api/admin/friends` | Leaderboard switch, family name, coordination server, and each linked family |
 | `POST` | `/api/admin/friends/invites` | Make an invite for another family |
 | `POST` | `/api/admin/friends/join` | Join with another family's invite |
-| `PUT` | `/api/admin/friends/{id}` | Choose who is sent to and shown from one linked family |
+| `PUT` | `/api/admin/friends/{id}` | For one linked family: who is sent and shown, pictures, gifts and playdates, and the team goal |
 | `POST` | `/api/admin/friends/{id}/sync` | Sync with one linked family now |
 | `DELETE` | `/api/admin/friends/{id}` | Unlink |
 

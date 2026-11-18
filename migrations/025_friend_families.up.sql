@@ -33,6 +33,9 @@ CREATE TABLE friend_links (
     invite         TEXT    NOT NULL DEFAULT '', -- kept until the other family joins
     invite_expires DATETIME,
     show_pictures  INTEGER NOT NULL DEFAULT 0,  -- show this family's custom animal pictures (off until a parent says so)
+    allow_visits   INTEGER NOT NULL DEFAULT 1,  -- take gifts and playdates from this family
+    goal_week      TEXT    NOT NULL DEFAULT '', -- the Monday of the week this family's team goal is for ('' = none)
+    goal_target    INTEGER NOT NULL DEFAULT 0,  -- the score the two families aim to average together, 1 to 100
     peer_name      TEXT    NOT NULL DEFAULT '',
     snapshot       TEXT    NOT NULL DEFAULT '', -- the other family's last snapshot (JSON)
     snapshot_at    DATETIME,
@@ -49,6 +52,29 @@ CREATE TABLE friend_link_shares (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     PRIMARY KEY (link_id, user_id)
 );
+-- Gifts and playdates a person here sent to a linked family (they travel in
+-- the snapshot for two days), and the ones that arrived from one, each
+-- applied once.
+CREATE TABLE friend_sends (
+    id         TEXT    PRIMARY KEY,
+    link_id    INTEGER NOT NULL REFERENCES friend_links(id) ON DELETE CASCADE,
+    kind       TEXT    NOT NULL CHECK (kind IN ('gift', 'playdate')),
+    from_user  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    to_member  TEXT    NOT NULL DEFAULT '', -- gift: whose animal, by their snapshot id
+    day        TEXT    NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE friend_received (
+    link_id     INTEGER NOT NULL REFERENCES friend_links(id) ON DELETE CASCADE,
+    send_id     TEXT    NOT NULL,
+    kind        TEXT    NOT NULL,
+    from_member TEXT    NOT NULL,
+    to_user     INTEGER NOT NULL DEFAULT 0, -- gift: whose animal here
+    day         TEXT    NOT NULL,           -- the sender's date
+    received_on TEXT    NOT NULL,           -- our date
+    PRIMARY KEY (link_id, send_id)
+);
+
 CREATE TABLE friend_link_accepts (
     link_id   INTEGER NOT NULL REFERENCES friend_links(id) ON DELETE CASCADE,
     member_id TEXT    NOT NULL, -- the person's id in the other family's snapshot

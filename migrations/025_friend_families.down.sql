@@ -1,3 +1,5 @@
+DROP TABLE friend_received;
+DROP TABLE friend_sends;
 DROP TABLE friend_link_accepts;
 DROP TABLE friend_link_shares;
 DROP TABLE friend_links;

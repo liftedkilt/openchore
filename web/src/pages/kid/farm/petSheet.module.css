@@ -321,3 +321,6 @@ a.chip { text-decoration: none; color: inherit; }
 .pictureMoods svg { width: 70px; height: 56px; }
 .pictureMoods figcaption { color: var(--ink-muted); font-size: 12px; }
 .pictureKit { margin-top: var(--space-2); }
+.friendOwner { color: var(--ink-muted); font-size: 12px; }
+/* Treats friends sent today. */
+.giftLine { margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-3); border-radius: var(--r-row); background: var(--surface-sunk); font-size: 14px; }

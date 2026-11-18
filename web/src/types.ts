@@ -291,9 +291,15 @@ export interface Reward {
 
 // --- Farm pets ---
 
-export type PetAction = 'feed' | 'treat' | 'play' | 'accessory' | 'new_animal' | 'restyle' | 'design' | 'picture';
+export type PetAction = 'feed' | 'treat' | 'play' | 'accessory' | 'new_animal' | 'restyle' | 'design' | 'picture' | 'gift' | 'playdate';
 /** What a person picks when redeeming new_animal / restyle / design rewards. */
-export interface PetPick { species?: PetSpecies; color?: string; slot?: PetItemSlot; image?: string }
+export interface PetPick {
+  species?: PetSpecies; color?: string; slot?: PetItemSlot; image?: string;
+  /** gift: the friend whose animal gets it (a leaderboard key). */
+  friend?: string;
+  /** playdate: the linked family to visit. */
+  link?: number;
+}
 export type PetSpecies = 'horse' | 'dog' | 'cat' | 'chicken' | 'cow' | 'pig' | 'sheep' | 'goat';
 /** A built-in accessory key, or a custom emoji accessory `e:<head|face|neck>:<emoji>`. */
 export type PetItem = string;
@@ -338,6 +344,13 @@ export interface Pet {
   sprite_approved?: boolean;
   /** A friend family's animal: its picture as a data: URL (set instead of sprite). */
   sprite_data?: string;
+  /** The owner came first on last week's leaderboard. */
+  ribbon?: boolean;
+  /** A friend family's animal here on a playdate; family says whose. */
+  visiting?: boolean;
+  family?: string;
+  /** A friend family's animal: its owner's leaderboard key, e.g. to send it a gift. */
+  friend_key?: string;
   items: PetItem[];
   last_missed_date?: string;
   mood: PetMood;
@@ -626,6 +639,8 @@ export interface LeaderboardEntry {
   percent: number;
   /** 0 = not ranked yet (fewer than min_assigned chores this week). */
   rank: number;
+  /** Came first last week, so wears the ribbon this week. */
+  winner?: boolean;
 }
 
 export interface LeaderboardFamily { link_id: number; name: string; snapshot_at?: string; pets: number }
@@ -637,7 +652,16 @@ export interface Leaderboard {
   min_assigned: number;
   entries: LeaderboardEntry[];
   families: LeaderboardFamily[];
+  /** This household and each linked family as two teams. */
+  teams: LeaderboardTeam[];
 }
+
+export interface TeamSide { people: number; score: number }
+export interface TeamGoal { target: number; state: 'active' | 'ours' | 'theirs'; met: boolean }
+export interface LeaderboardTeam { link_id: number; family: string; ours: TeamSide; theirs: TeamSide; together: TeamSide; goal?: TeamGoal }
+
+/** A treat a friend sent one of this household's animals today. */
+export interface FriendGift { to_user_id: number; from: string; family: string }
 
 export interface FriendFarm { link_id: number; family: string; snapshot_at?: string; pets: Pet[] }
 
@@ -648,6 +672,10 @@ export interface FriendLink {
   hub_url: string;
   /** Show this family's custom animal pictures here. */
   show_pictures: boolean;
+  /** Take gifts and playdates from this family. */
+  allow_visits: boolean;
+  /** The team goal for this week, if either family has put one forward. */
+  goal?: TeamGoal | null;
   invite?: string;
   invite_expires?: string;
   /** This household's people: shared = sent to this family; accepted = they chose to show them. */

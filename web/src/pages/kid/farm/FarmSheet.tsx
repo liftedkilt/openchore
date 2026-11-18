@@ -13,6 +13,7 @@ import { FarmScene } from './FarmScene';
 import { ColorPicker, PetLookSheet } from './PetLookSheet';
 import { DesignSheet } from './DesignSheet';
 import { PictureSheet } from './PictureSheet';
+import { FriendPickSheet } from './FriendPickSheet';
 import { ReactingAnimal, reactionLine, type ReactionEvent } from './PetReaction';
 import { itemLabel, needsPick } from './petLook';
 import { PetRewardThumb } from './PetRewardThumb';
@@ -27,7 +28,8 @@ interface FarmSheetProps {
 
 export function FarmSheet({ user, data, onClose }: FarmSheetProps) {
   const { t } = useTranslation();
-  const pets = data.farm?.pets ?? [];
+  // Friends' animals here on a playdate join the family's own on the farm.
+  const pets = [...(data.farm?.pets ?? []), ...data.visitors];
   const mine = data.myPet;
   const [selected, setSelected] = useState<Pet | null>(null);
   const other = selected && selected.user_id !== user.id ? pets.find(p => p.id === selected.id) ?? null : null;
@@ -235,6 +237,9 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
             {reaction ? reactionLine(t, pet, reaction.kind) : t(`kid.farm.mood.${pet.mood}`, { name: pet.name })}
           </p>
           <p className={s.hint}>{hint}</p>
+          {data.gifts.filter(g => g.to_user_id === pet.user_id).map((g, i) => (
+            <p key={i} className={s.giftLine}>{t('kid.farm.giftFrom', { from: g.from, family: g.family, name: pet.name })}</p>
+          ))}
           {pet.sprite && (
             <button type="button" className={k.linkBtn} disabled={busy} onClick={dropPicture}>
               {confirmDrop ? t('kid.farm.picture.dropConfirm') : t('kid.farm.picture.drop')}
@@ -318,7 +323,11 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
         <PictureSheet pet={pet} reward={picking} busy={data.redeemingId === picking.id}
           onConfirm={pick => redeem(picking, pick)} onClose={() => setPicking(null)} />
       )}
-      {picking && picking.pet_action !== 'design' && picking.pet_action !== 'picture' && (
+      {picking && (picking.pet_action === 'gift' || picking.pet_action === 'playdate') && (
+        <FriendPickSheet pet={pet} reward={picking} busy={data.redeemingId === picking.id}
+          onConfirm={pick => redeem(picking, pick)} onClose={() => setPicking(null)} />
+      )}
+      {picking && (picking.pet_action === 'new_animal' || picking.pet_action === 'restyle') && (
         <PetLookSheet pet={pet} reward={picking} busy={data.redeemingId === picking.id}
           onConfirm={pick => redeem(picking, pick)} onClose={() => setPicking(null)} />
       )}

@@ -362,6 +362,8 @@ const (
 	PetActionRestyle   = "restyle"    // change coat colour
 	PetActionDesign    = "design"     // draw or upload your own accessory
 	PetActionPicture   = "picture"    // use your own picture as the animal (docs/custom-animals.md)
+	PetActionGift      = "gift"       // send a treat to a friend family's animal (docs/friends.md)
+	PetActionPlaydate  = "playdate"   // send your animal to play on a friend family's farm for the day
 )
 
 // PetSpriteFrames is the order of the frames in a custom animal's picture
@@ -371,7 +373,7 @@ var PetSpriteFrames = []string{"stand", "walk1", "walk2", "sick", "lying", "happ
 // ValidPetAction reports whether a is a pet action or empty (ordinary reward).
 func ValidPetAction(a string) bool {
 	switch a {
-	case "", PetActionFeed, PetActionTreat, PetActionPlay, PetActionAccessory, PetActionNewAnimal, PetActionRestyle, PetActionDesign, PetActionPicture:
+	case "", PetActionFeed, PetActionTreat, PetActionPlay, PetActionAccessory, PetActionNewAnimal, PetActionRestyle, PetActionDesign, PetActionPicture, PetActionGift, PetActionPlaydate:
 		return true
 	}
 	return false
@@ -493,6 +495,16 @@ type Pet struct {
 	Hiding  bool   `json:"hiding"` // missed chores yesterday and today's aren't done yet
 	Sick    bool   `json:"sick"`
 	CanPlay bool   `json:"can_play"`
+
+	// Visiting: a friend family's animal here on a playdate; Family says whose.
+	Visiting bool   `json:"visiting,omitempty"`
+	Family   string `json:"family,omitempty"`
+	// FriendKey identifies a friend family's animal's owner (their
+	// leaderboard key, "f<link>:<member>"), e.g. to send it a gift.
+	FriendKey string `json:"friend_key,omitempty"`
+	// Ribbon: the owner came first on last week's leaderboard, so the
+	// animal wears the winner's ribbon this week.
+	Ribbon bool `json:"ribbon,omitempty"`
 
 	// Owner details for the shared farm view.
 	OwnerName  string `json:"owner_name,omitempty"`
@@ -675,6 +687,15 @@ type FriendLink struct {
 	// ShowPictures: a parent here has chosen to show this family's custom
 	// animal pictures. Off by default; without it they are not even kept.
 	ShowPictures bool `json:"show_pictures"`
+	// GoalWeek / GoalTarget: the team goal this household has put forward
+	// (or agreed to) with this family: for the week starting GoalWeek, the
+	// two families aim to average GoalTarget together. It counts once the
+	// other family's snapshot carries the same goal.
+	GoalWeek   string `json:"-"`
+	GoalTarget int    `json:"-"`
+	// AllowVisits: take gifts and playdates from this family (on unless a
+	// parent turns it off).
+	AllowVisits bool `json:"allow_visits"`
 	HubURL        string     `json:"hub_url"`
 	HubLink       string     `json:"-"`
 	Token         string     `json:"-"`
@@ -700,6 +721,14 @@ type FriendSnapshot struct {
 	GeneratedAt time.Time      `json:"generated_at"`
 	Today       string         `json:"today"` // the sender's date, in its own time zone
 	Members     []FriendMember `json:"members"`
+	// Team is this family's side of family-versus-family and team goals:
+	// how the people it shares with this link are doing together.
+	Team []FriendTeamWeek `json:"team,omitempty"`
+	// Goal is the team goal this family has put forward or agreed to.
+	Goal *FriendGoal `json:"goal,omitempty"`
+	// Sends are the gifts and playdates people here sent this family in the
+	// last two days. The receiver applies each once, by ID.
+	Sends []FriendSend `json:"sends,omitempty"`
 	// Accepted lists the receiver's people (by their FriendMember.ID) that
 	// the sender has chosen to show, so each parent can see whether the
 	// other side has picked a kid up yet.
@@ -715,6 +744,39 @@ type FriendMember struct {
 	// Weeks holds this week and last week (the sender's own weeks).
 	Weeks []FriendWeek `json:"weeks"`
 	Pet   *FriendPet   `json:"pet,omitempty"`
+}
+
+// FriendTeamWeek is a family's week as a team: how many of the people it
+// shares had chores, and their scores added up (each a share, 0 to 10000).
+// The team's score is ShareSum / People.
+type FriendTeamWeek struct {
+	Start    string `json:"start"` // the Monday, YYYY-MM-DD
+	People   int    `json:"people"`
+	ShareSum int    `json:"share_sum"`
+}
+
+// FriendGoal is a team goal: for the week starting Start, the two families
+// together aim to average Target (a score, 1 to 100).
+type FriendGoal struct {
+	Start  string `json:"start"`
+	Target int    `json:"target"`
+}
+
+// FriendSend is a gift (a treat for one of the receiver's animals) or a
+// playdate (the sender's animal visits the receiver's farm for the day).
+type FriendSend struct {
+	ID   string `json:"id"`
+	Kind string `json:"kind"`         // PetActionGift or PetActionPlaydate
+	From string `json:"from"`         // the sender, by their FriendMember.ID
+	To   string `json:"to,omitempty"` // gift: whose animal, by the receiver's FriendMember.ID
+	Day  string `json:"day"`          // the sender's date
+}
+
+// FriendGift is a treat that arrived today for one of this household's animals.
+type FriendGift struct {
+	ToUserID int64  `json:"to_user_id"`
+	From     string `json:"from"`
+	Family   string `json:"family"`
 }
 
 // FriendWeek is one person's week as sent to a friend family: how many

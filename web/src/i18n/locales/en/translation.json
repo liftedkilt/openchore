@@ -441,7 +441,9 @@
         "restyle": "Restyle (new coat colour)",
         "new_animal": "New animal (stats carry over)",
         "design": "Design (kid draws their own)",
-        "picture": "Own picture (kid uploads their animal)"
+        "picture": "Own picture (kid uploads their animal)",
+        "gift": "Gift (a treat for a friend family's animal)",
+        "playdate": "Playdate (visit a friend family's farm)"
       },
       "customEmoji": "Custom (emoji)…",
       "fieldEmoji": "Emoji",
@@ -762,7 +764,21 @@
         "theyHavent": "not ticked there yet",
         "notShown": "not shown here yet",
         "showPictures": "Show custom animal pictures from {{family}}",
-        "showPicturesDesc": "Kids can use their own pictures as farm animals. With this off, a friend's animal shows as the built-in kind and their pictures aren't kept here. Your own kids' pictures are only sent once you tick \"OK to send to friend families\" under Farm pets."
+        "showPicturesDesc": "Kids can use their own pictures as farm animals. With this off, a friend's animal shows as the built-in kind and their pictures aren't kept here. Your own kids' pictures are only sent once you tick \"OK to send to friend families\" under Farm pets.",
+        "allowVisits": "Take gifts and playdates from {{family}}",
+        "allowVisitsDesc": "Kids can spend points to send a friend's animal a treat (it gets a little food and joy) or send their own animal over for the day. A visiting animal shows on your farm for signed-in family members, not on the wall display.",
+        "goalTitle": "Team goal for this week",
+        "goalNone": "No goal yet. Put one forward: the score both families aim to average together.",
+        "goalActive": "You and {{family}} are aiming for {{target}} together this week.",
+        "goalOurs": "You put forward {{target}}. Waiting for {{family}} to agree.",
+        "goalTheirs": "{{family}} put forward {{target}} together this week.",
+        "goalAgree": "Agree to {{target}}",
+        "goalPropose": "Put forward",
+        "goalChange": "Change",
+        "goalDrop": "Drop the goal",
+        "goalInput": "Goal score, 1 to 100",
+        "goalSaved": "Goal saved.",
+        "goalDropped": "Goal dropped."
       }
     },
     "skins": {
@@ -1434,7 +1450,9 @@
           "wear": "{{name}} shows it off!",
           "restyle": "{{name}} loves the new coat!",
           "new_animal": "Ta-da! Meet the new {{name}}!",
-          "picture": "{{name}} has a whole new look!"
+          "picture": "{{name}} has a whole new look!",
+          "gift": "Sent! Your friend's animal will love it.",
+          "playdate": "{{name}} is off to play at your friend's farm!"
         }
       },
       "design": {
@@ -1480,6 +1498,16 @@
           "very_sick": "Very sick",
           "happy": "Happy"
         }
+      },
+      "visiting": "visiting from {{family}}",
+      "giftFrom": "{{from}} ({{family}}) sent {{name}} a treat today!",
+      "friend": {
+        "giftTitle": "A treat for a friend's animal",
+        "giftLead": "Choose which animal gets a treat. It costs you points and makes their animal happier.",
+        "playdateTitle": "A playdate",
+        "playdateLead": "Choose a friend's farm for {{name}} to visit today. {{name}} shows up on their farm and comes home happier.",
+        "visit": "Visit {{family}}",
+        "none": "There aren't any friends' animals to choose yet."
       }
     },
     "board": {
@@ -1508,7 +1536,15 @@
       "farmEmpty": "No animals here yet.",
       "asOf": "As it was {{when}}",
       "sheetTitle": "Leaderboard",
-      "scoreLabel": "Score"
+      "scoreLabel": "Score",
+      "ribbon": "Last week's winner",
+      "teams": "Families",
+      "us": "Us",
+      "goalTitle": "Together: reach {{target}}",
+      "goalOnTrack": "On track for {{target}} together!",
+      "goalReached": "Goal reached: {{target}} together!",
+      "goalMissed": "Goal was {{target}} together",
+      "goalSoFar": "Both families together: {{score}} of {{target}}"
     }
   },
   "linkedAccounts": {

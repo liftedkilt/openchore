@@ -7,10 +7,11 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../../api';
 import { Icon } from '../../../design';
-import type { FriendFarm, Leaderboard, LeaderboardEntry, Pet, User } from '../../../types';
+import type { FriendFarm, Leaderboard, LeaderboardEntry, LeaderboardTeam, Pet, User } from '../../../types';
 import { Sheet } from '../Sheet';
 import { FarmAnimal, petPicture } from '../farm/FarmAnimal';
 import { FarmScene } from '../farm/FarmScene';
+import { Rosette } from '../farm/Rosette';
 import fs from '../farm/petSheet.module.css';
 import s from './board.module.css';
 
@@ -30,6 +31,7 @@ function Row({ e, user, compact }: { e: LeaderboardEntry; user: User; compact?: 
       </span>
       <span className={s.who}>
         <span className={s.name}>
+          {e.winner && <Rosette className={s.rosette} title={t('kid.board.ribbon')} />}
           {e.name}
           {me && <span className={s.youTag}>{t('kid.board.you')}</span>}
         </span>
@@ -74,6 +76,34 @@ export function LeaderboardCard({ board, user, onOpen }: { board: Leaderboard; u
       <ol className={s.list}>
         {rows.map(e => <Row key={e.key} e={e} user={user} compact />)}
       </ol>
+    </section>
+  );
+}
+
+/** This household and a linked family as two teams, and their goal together. */
+function Teams({ team, last }: { team: LeaderboardTeam; last: boolean }) {
+  const { t } = useTranslation();
+  const sides: [string, typeof team.ours][] = [[t('kid.board.us'), team.ours], [team.family, team.theirs]];
+  const g = team.goal;
+  return (
+    <section className={s.teams} aria-label={t('kid.board.teams')}>
+      <h3 className={s.heading}>{t('kid.board.teams')}</h3>
+      {sides.map(([name, side]) => (
+        <div key={name} className={s.team}>
+          <span className={s.teamName}>{name}</span>
+          <span className={s.percent}>{side.people > 0 ? side.score : '–'}</span>
+          <span className={s.bar} aria-hidden="true"><span style={{ width: `${side.people > 0 ? side.score : 0}%` }} /></span>
+        </div>
+      ))}
+      {g && g.state === 'active' && (
+        <div className={clsx(s.goal, g.met && s.goalMet)}>
+          <strong>{t(g.met ? (last ? 'kid.board.goalReached' : 'kid.board.goalOnTrack') : (last ? 'kid.board.goalMissed' : 'kid.board.goalTitle'), { target: g.target })}</strong>
+          <span>{t('kid.board.goalSoFar', { score: team.together.people > 0 ? team.together.score : 0, target: g.target })}</span>
+          <span className={s.bar} aria-hidden="true">
+            <span style={{ width: `${Math.min(100, team.together.people > 0 ? (team.together.score / g.target) * 100 : 0)}%` }} />
+          </span>
+        </div>
+      )}
     </section>
   );
 }
@@ -166,6 +196,8 @@ export function LeaderboardSheet({ user, initial, onClose }: { user: User; initi
       )}
 
       <p className={s.help}>{t('kid.board.how')}</p>
+
+      {(board?.teams ?? []).map(team => <Teams key={team.link_id} team={team} last={week === 'last'} />)}
 
       {farms.length > 0 && (
         <>

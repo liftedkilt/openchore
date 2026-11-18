@@ -241,6 +241,9 @@ func allTools() []*Tool {
 			"People need 5 assigned chores in the week to be ranked (rank 0 = not yet). Includes people shared by linked friend families.",
 		method: http.MethodGet, path: "/leaderboard", query: []string{"week"},
 		props: map[string]any{"week": enum("Which week (default this).", "this", "last")}})
+	add(endpoint{name: "list_friend_visitors", title: "Playdates and gifts today", readOnly: true,
+		desc:   "Friend families' animals that are on this farm for a playdate today, and the treats friends sent this household's animals today.",
+		method: http.MethodGet, path: "/friends/visitors"})
 	add(endpoint{name: "list_friend_farms", title: "Friend families' farms", readOnly: true,
 		desc:   "The farm animals each linked friend family shares, as of their last sync.",
 		method: http.MethodGet, path: "/friends/farms"})
@@ -262,6 +265,7 @@ func allTools() []*Tool {
 	add(endpoint{name: "set_friend_family_sharing", title: "Choose who is shared with a friend family",
 		desc: "For one linked family, set who this household shares with them (share_user_ids) and which of the people they offer " +
 			"are shown here (accept_member_ids, from that link's inbound list). Each list replaces the previous one; leave one out to keep it. " +
+			"Also where a team goal with that family is set (goal_target) and gifts, playdates and custom pictures from them are switched. " +
 			"A person only appears on the other family's leaderboard and farm when both parents picked them. A shared person's first name, " +
 			"colour, weekly score and chore counts, streak and farm animal are sent; chore names, photos, " +
 			"point values, point balances and rewards never are. Confirm with the parent first.",
@@ -271,6 +275,8 @@ func allTools() []*Tool {
 			"share_user_ids":    ids("Ids of the people in this household to share with that family."),
 			"accept_member_ids": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Ids (from that link's inbound list) of the people from that family to show here."},
 			"show_pictures":     boolean("Show that family's custom animal pictures here (off by default; while off they aren't kept)."),
+			"allow_visits":      boolean("Take gifts and playdates from that family (on by default)."),
+			"goal_target":       integer("Put forward, or agree to, a team goal for this week: the score from 1 to 100 the two families aim to average together. It counts once both families have set the same number. 0 drops it."),
 		}})
 	add(endpoint{name: "create_friend_invite", title: "Invite a friend family",
 		desc:   "Make a one-time invite (valid 7 days) for another family's OpenChore to link with this one. Give the invite text to the other parent.",
@@ -310,7 +316,7 @@ func allTools() []*Tool {
 			"cost":        integer("Price in points (positive)."),
 			"stock":       integer("How many are available (omit for unlimited)."),
 			"shareable":   boolean("Kids can pool points toward it together."),
-			"pet_action":  enum("Make it a farm-pet care reward (omit for an ordinary reward): feed, treat, play, accessory, new_animal (trade for another animal; stats carry over), restyle (new coat colour), design (the kid draws or uploads their own accessory) or picture (the kid uploads their own picture to use as the animal).", "feed", "treat", "play", "accessory", "new_animal", "restyle", "design", "picture"),
+			"pet_action":  enum("Make it a farm-pet care reward (omit for an ordinary reward): feed, treat, play, accessory, new_animal (trade for another animal; stats carry over), restyle (new coat colour), design (the kid draws or uploads their own accessory), picture (the kid uploads their own picture to use as the animal), gift (send a treat to a linked friend family's animal) or playdate (send the kid's animal to a friend family's farm for the day).", "feed", "treat", "play", "accessory", "new_animal", "restyle", "design", "picture", "gift", "playdate"),
 			"pet_item":    str(petItemDesc),
 		}})
 	add(endpoint{name: "update_reward", title: "Edit a reward",

@@ -345,6 +345,14 @@ func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnap
 		snap.Accepted = append(snap.Accepted, id)
 	}
 	sort.Strings(snap.Accepted)
+	if l, err := f.store.GetFriendLink(ctx, linkID); err != nil {
+		return nil, err
+	} else if l != nil && l.GoalTarget > 0 && l.GoalWeek != "" {
+		snap.Goal = &model.FriendGoal{Start: l.GoalWeek, Target: l.GoalTarget}
+	}
+	if snap.Sends, err = f.store.FriendSendsSince(ctx, linkID, now.AddDate(0, 0, -1).Format(model.DateFormat)); err != nil {
+		return nil, err
+	}
 	shared, err := f.store.FriendLinkShares(ctx, linkID)
 	if err != nil || len(shared) == 0 {
 		return snap, err
@@ -366,6 +374,21 @@ func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnap
 		for i := range all {
 			pets[all[i].UserID] = &all[i]
 		}
+	}
+	// The team: everyone shared with this family who had chores that week.
+	weekStarts := []string{score.WeekStart(now.AddDate(0, 0, -7)), score.WeekStart(now)}
+	for _, start := range weekStarts {
+		tw := model.FriendTeamWeek{Start: start}
+		for _, u := range users {
+			if !shared[u.ID] {
+				continue
+			}
+			if t := score.Sum(days[u.ID], start, score.WeekEnd(start)); t.Assigned > 0 {
+				tw.People++
+				tw.ShareSum += t.Share
+			}
+		}
+		snap.Team = append(snap.Team, tw)
 	}
 	yesterday := now.AddDate(0, 0, -1).Format(model.DateFormat)
 	pictureBytes := 0
@@ -420,6 +443,27 @@ func Shown(snap *model.FriendSnapshot, accepts map[string]bool) []model.FriendMe
 		}
 	}
 	return out
+}
+
+// TeamWeek is how the people this household shares with a link did together
+// in the week starting start: the same numbers its snapshot sends, so both
+// families work out the same team scores.
+func (f *Service) TeamWeek(ctx context.Context, linkID int64, users []model.User, days map[int64][]model.ScoreDay, start string) (model.FriendTeamWeek, error) {
+	tw := model.FriendTeamWeek{Start: start}
+	shared, err := f.store.FriendLinkShares(ctx, linkID)
+	if err != nil {
+		return tw, err
+	}
+	for _, u := range users {
+		if !shared[u.ID] {
+			continue
+		}
+		if t := score.Sum(days[u.ID], start, score.WeekEnd(start)); t.Assigned > 0 {
+			tw.People++
+			tw.ShareSum += t.Share
+		}
+	}
+	return tw, nil
 }
 
 // PeerSnapshot decodes a link's stored snapshot of the other family (nil if
@@ -768,6 +812,10 @@ func (f *Service) Sync(ctx context.Context, id int64) error {
 			}
 			strip(&ps, accepts)
 			keepPictures(&ps, l.ShowPictures)
+			if err := f.receive(ctx, l, &ps, accepts, now); err != nil {
+				return fail(err)
+			}
+			ps.Sends = nil // applied (or refused) above; not kept with the snapshot
 			clean, _ := json.Marshal(ps)
 			peerName, peerJSON = ps.Family, string(clean)
 			at := ps.GeneratedAt
@@ -785,6 +833,282 @@ func strip(s *model.FriendSnapshot, accepts map[string]bool) {
 			s.Members[i] = model.FriendMember{ID: m.ID, Name: m.Name, Color: m.Color, Weeks: []model.FriendWeek{}}
 		}
 	}
+}
+
+// What a gift does to the animal that gets it: the same as a treat.
+const (
+	giftFullness = 15
+	giftJoy      = 20
+	// maxGiftsPerDay is how many gifts one animal takes from one family in a
+	// day, whatever that family's server says.
+	maxGiftsPerDay = 3
+)
+
+// receive applies the gifts and playdates in a peer's snapshot, each once.
+// A gift only lands on an animal whose owner this household shares with that
+// family; a playdate only counts from a person a parent here has accepted.
+func (f *Service) receive(ctx context.Context, l *model.FriendLink, s *model.FriendSnapshot, accepts map[string]bool, now time.Time) error {
+	if !l.AllowVisits || len(s.Sends) == 0 {
+		return nil
+	}
+	today := now.Format(model.DateFormat)
+	shares, err := f.store.FriendLinkShares(ctx, l.ID)
+	if err != nil {
+		return err
+	}
+	gifts, err := f.store.ListFriendReceived(ctx, model.PetActionGift, "", today)
+	if err != nil {
+		return err
+	}
+	got := map[int64]int{}
+	for _, g := range gifts {
+		if g.LinkID == l.ID {
+			got[g.ToUser]++
+		}
+	}
+	for _, sd := range s.Sends {
+		if !accepts[sd.From] {
+			continue
+		}
+		var to int64
+		if sd.Kind == model.PetActionGift {
+			to, _ = strconv.ParseInt(sd.To, 10, 64)
+			if !shares[to] || got[to] >= maxGiftsPerDay {
+				continue
+			}
+			if p, err := f.store.GetPetForUser(ctx, to); err != nil || p == nil {
+				continue
+			}
+		}
+		first, err := f.store.ReceiveFriendSend(ctx, l.ID, sd, to, today)
+		if err != nil {
+			return err
+		}
+		if first && sd.Kind == model.PetActionGift {
+			got[to]++
+			if err := f.store.AdjustPetNeeds(ctx, to, giftFullness, giftJoy); err != nil {
+				return err
+			}
+		}
+	}
+	return f.store.PruneFriendSends(ctx, now.AddDate(0, 0, -7).Format(model.DateFormat))
+}
+
+// SendTarget is a checked gift or playdate, ready to record.
+type SendTarget struct {
+	LinkID int64
+	Send   model.FriendSend
+	// Name is who it's for, for the message shown to the kid: the animal
+	// for a gift, the family for a playdate.
+	Name string
+}
+
+// CheckSend says whether a person may send a gift (to the animal of the
+// friend with key friendKey, "f<link>:<member>") or a playdate (to the family
+// of link linkID). msg is a refusal to show; "" means go ahead with target.
+// Nothing is recorded and no points move.
+func (f *Service) CheckSend(ctx context.Context, userID int64, kind, friendKey string, linkID int64) (target *SendTarget, msg string, err error) {
+	now := f.now()
+	today := now.Format(model.DateFormat)
+	memberID := ""
+	if kind == model.PetActionGift {
+		var ok bool
+		rest, _ := strings.CutPrefix(friendKey, "f")
+		link, member, ok := strings.Cut(rest, ":")
+		if linkID, _ = strconv.ParseInt(link, 10, 64); !ok || linkID == 0 || member == "" {
+			return nil, "choose a friend's animal", nil
+		}
+		memberID = member
+	}
+	l, err := f.store.GetFriendLink(ctx, linkID)
+	if err != nil {
+		return nil, "", err
+	}
+	snap := (*model.FriendSnapshot)(nil)
+	if l != nil {
+		snap = PeerSnapshot(l)
+	}
+	if l == nil || l.Status != model.FriendStatusActive || snap == nil {
+		return nil, "choose a friend family", nil
+	}
+	name := l.PeerName
+	if name == "" {
+		name = "your friends"
+	}
+	send := model.FriendSend{Kind: kind, From: strconv.FormatInt(userID, 10), Day: today}
+	// A gift or a visit only arrives between people both parents picked:
+	// the other family has to be shown this person.
+	theyShow := false
+	for _, id := range snap.Accepted {
+		theyShow = theyShow || id == send.From
+	}
+	shares, err := f.store.FriendLinkShares(ctx, l.ID)
+	if err != nil {
+		return nil, "", err
+	}
+	if !shares[userID] || !theyShow {
+		return nil, name + " can't see you yet. A grown-up in each family has to tick you first.", nil
+	}
+	switch kind {
+	case model.PetActionGift:
+		accepts, err := f.store.FriendLinkAccepts(ctx, l.ID)
+		if err != nil {
+			return nil, "", err
+		}
+		var pet *model.FriendPet
+		for _, m := range Shown(snap, accepts) {
+			if m.ID == memberID {
+				pet = m.Pet
+			}
+		}
+		if pet == nil {
+			return nil, "that friend doesn't have an animal to give a treat to", nil
+		}
+		n, err := f.store.CountFriendSends(ctx, userID, kind, today, l.ID, memberID)
+		if err != nil {
+			return nil, "", err
+		}
+		if n > 0 {
+			return nil, "you've already sent " + pet.Name + " a treat today", nil
+		}
+		send.To, name = memberID, pet.Name
+	case model.PetActionPlaydate:
+		n, err := f.store.CountFriendSends(ctx, userID, kind, today, 0, "")
+		if err != nil {
+			return nil, "", err
+		}
+		if n > 0 {
+			return nil, "your animal has already gone on a playdate today", nil
+		}
+	default:
+		return nil, "unknown kind", nil
+	}
+	return &SendTarget{LinkID: l.ID, Send: send, Name: name}, "", nil
+}
+
+// RecordSend stores a checked gift or playdate, to go out with the next
+// snapshot, and starts a sync so it arrives soon.
+func (f *Service) RecordSend(ctx context.Context, userID int64, t *SendTarget) error {
+	id := make([]byte, 12)
+	if _, err := rand.Read(id); err != nil {
+		return err
+	}
+	t.Send.ID = base64.RawURLEncoding.EncodeToString(id)
+	if err := f.store.AddFriendSend(ctx, t.LinkID, t.Send, userID); err != nil {
+		return err
+	}
+	go func(linkID int64) { _ = f.Sync(context.WithoutCancel(ctx), linkID) }(t.LinkID)
+	return nil
+}
+
+// Visitors returns the friend families' animals that are here on a playdate
+// today (their today), and the gifts that arrived today for this
+// household's animals.
+func (f *Service) Visitors(ctx context.Context) ([]model.Pet, []model.FriendGift, error) {
+	visitors, gifts := []model.Pet{}, []model.FriendGift{}
+	links, err := f.store.ListFriendLinks(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	today := f.now().Format(model.DateFormat)
+	for i := range links {
+		l := &links[i]
+		snap := PeerSnapshot(l)
+		if l.Status != model.FriendStatusActive || snap == nil || !l.AllowVisits {
+			continue
+		}
+		accepts, err := f.store.FriendLinkAccepts(ctx, l.ID)
+		if err != nil {
+			return nil, nil, err
+		}
+		byID := map[string]model.FriendMember{}
+		for _, m := range Shown(snap, accepts) {
+			byID[m.ID] = m
+		}
+		family := l.PeerName
+		if family == "" {
+			family = "Friend family"
+		}
+		// A playdate lasts for the sender's day.
+		if snap.Today != "" {
+			dates, err := f.store.ListFriendReceived(ctx, model.PetActionPlaydate, snap.Today, "")
+			if err != nil {
+				return nil, nil, err
+			}
+			seen := map[string]bool{}
+			for _, d := range dates {
+				m, ok := byID[d.FromMember]
+				if d.LinkID != l.ID || !ok || m.Pet == nil || seen[m.ID] {
+					continue
+				}
+				seen[m.ID] = true
+				p := m.Pet
+				mood := p.Mood
+				if p.Hiding {
+					mood = "content" // it came out to play; it isn't hiding here
+				}
+				visitors = append(visitors, model.Pet{
+					ID: -(l.ID*1000 + int64(len(visitors)) + 1), Name: p.Name, Species: p.Species, Color: p.Color, Accessory: p.Accessory,
+					Mood: mood, Sick: p.Sick, Items: []string{}, OwnerName: m.Name, OwnerColor: m.Color,
+					SpriteData: pictureURL(p.Picture), SpriteFrames: p.Frames, Visiting: true, Family: family,
+				})
+			}
+		}
+		got, err := f.store.ListFriendReceived(ctx, model.PetActionGift, "", today)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, g := range got {
+			if m, ok := byID[g.FromMember]; ok && g.LinkID == l.ID {
+				gifts = append(gifts, model.FriendGift{ToUserID: g.ToUser, From: m.Name, Family: family})
+			}
+		}
+	}
+	return visitors, gifts, nil
+}
+
+// pictureURL turns a friend's animal picture (checked and re-encoded when it
+// arrived) into a data: URL a page can show.
+func pictureURL(png []byte) string {
+	if len(png) == 0 {
+		return ""
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
+}
+
+// PictureURL is pictureURL for other packages.
+func PictureURL(png []byte) string { return pictureURL(png) }
+
+// HasFriendAnimals reports whether there is any linked family animal a kid
+// could send a gift to (gift and playdate rewards are hidden otherwise).
+func (f *Service) HasFriendAnimals(ctx context.Context) bool {
+	links, err := f.store.ListFriendLinks(ctx)
+	if err != nil {
+		return false
+	}
+	for i := range links {
+		l := &links[i]
+		snap := PeerSnapshot(l)
+		if l.Status != model.FriendStatusActive || snap == nil {
+			continue
+		}
+		accepts, err := f.store.FriendLinkAccepts(ctx, l.ID)
+		if err != nil {
+			continue
+		}
+		for _, m := range Shown(snap, accepts) {
+			if m.Pet != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// SetAllowVisits records whether gifts and playdates from a linked family
+// are taken.
+func (f *Service) SetAllowVisits(ctx context.Context, id int64, allow bool) error {
+	return f.store.SetFriendAllowVisits(ctx, id, allow)
 }
 
 // keepPictures deals with the custom animal pictures in a peer's snapshot.
@@ -879,6 +1203,28 @@ func sanitize(s *model.FriendSnapshot) {
 	if !validDate(s.Today) {
 		s.Today = ""
 	}
+	team := s.Team[:0]
+	for _, tw := range s.Team {
+		if validDate(tw.Start) {
+			tw.People = max(0, min(tw.People, 30))
+			tw.ShareSum = max(0, min(tw.ShareSum, tw.People*score.ShareScale))
+			team = append(team, tw)
+		}
+	}
+	if s.Team = team; len(s.Team) > 2 {
+		s.Team = s.Team[len(s.Team)-2:]
+	}
+	if g := s.Goal; g != nil && (!validDate(g.Start) || g.Target < 1 || g.Target > 100) {
+		s.Goal = nil
+	}
+	sends := s.Sends[:0]
+	for _, sd := range s.Sends {
+		sd.ID, sd.From, sd.To = clip(sd.ID, 40), clip(sd.From, 20), clip(sd.To, 20)
+		if sd.ID != "" && sd.From != "" && validDate(sd.Day) && (sd.Kind == model.PetActionGift || sd.Kind == model.PetActionPlaydate) && len(sends) < 50 {
+			sends = append(sends, sd)
+		}
+	}
+	s.Sends = sends
 	// A member needs an id of its own: accepting is by id, so an empty or
 	// repeated one would let a second person ride in on the first.
 	seen := map[string]bool{}

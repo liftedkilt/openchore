@@ -54,6 +54,16 @@ func (h *RewardHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 		rewards = kept
 	}
+	// Gifts and playdates only show when there's a friend family's animal to send them to.
+	if h.pets == nil || h.pets.Friends == nil || !h.pets.Friends.HasFriendAnimals(r.Context()) {
+		kept := rewards[:0]
+		for _, rw := range rewards {
+			if rw.PetAction != model.PetActionGift && rw.PetAction != model.PetActionPlaydate {
+				kept = append(kept, rw)
+			}
+		}
+		rewards = kept
+	}
 	if rewards == nil {
 		rewards = []model.Reward{}
 	}
@@ -252,7 +262,8 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 	}
 	// New animal / restyle carry the person's pick in the body.
 	var choice *PetChoice
-	if petReward != nil && (petReward.PetAction == model.PetActionNewAnimal || petReward.PetAction == model.PetActionRestyle || petReward.PetAction == model.PetActionDesign || petReward.PetAction == model.PetActionPicture) {
+	if petReward != nil && (petReward.PetAction == model.PetActionNewAnimal || petReward.PetAction == model.PetActionRestyle || petReward.PetAction == model.PetActionDesign || petReward.PetAction == model.PetActionPicture ||
+		petReward.PetAction == model.PetActionGift || petReward.PetAction == model.PetActionPlaydate) {
 		r.Body = http.MaxBytesReader(w, r.Body, 5<<20) // room for a drawn picture
 		var body struct {
 			Pet *PetChoice `json:"pet"`

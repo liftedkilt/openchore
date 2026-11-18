@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"time"
 
 	"github.com/liftedkilt/openchore/internal/model"
@@ -121,13 +122,13 @@ func (s *Store) SetFriendLinkAccepts(ctx context.Context, linkID int64, memberID
 
 // --- Friend links ---
 
-const friendLinkColumns = `id, status, side, show_pictures, hub_url, hub_link, token, secret, invite, invite_expires,
+const friendLinkColumns = `id, status, side, show_pictures, allow_visits, goal_week, goal_target, hub_url, hub_link, token, secret, invite, invite_expires,
 	peer_name, snapshot, snapshot_at, last_sync_at, last_error, created_at`
 
 func scanFriendLink(row interface{ Scan(...any) error }) (*model.FriendLink, error) {
 	l := &model.FriendLink{}
 	var expires, snapAt, syncAt sql.NullTime
-	if err := row.Scan(&l.ID, &l.Status, &l.Side, &l.ShowPictures, &l.HubURL, &l.HubLink, &l.Token, &l.Secret, &l.Invite, &expires,
+	if err := row.Scan(&l.ID, &l.Status, &l.Side, &l.ShowPictures, &l.AllowVisits, &l.GoalWeek, &l.GoalTarget, &l.HubURL, &l.HubLink, &l.Token, &l.Secret, &l.Invite, &expires,
 		&l.PeerName, &l.Snapshot, &snapAt, &syncAt, &l.LastError, &l.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -214,6 +215,128 @@ func (s *Store) SaveFriendSync(ctx context.Context, id int64, status, peerName, 
 // pictures are shown here.
 func (s *Store) SetFriendShowPictures(ctx context.Context, id int64, show bool) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE friend_links SET show_pictures = ? WHERE id = ?`, show, id)
+	return err
+}
+
+// SetFriendAllowVisits records whether gifts and playdates from this family
+// are taken.
+func (s *Store) SetFriendAllowVisits(ctx context.Context, id int64, allow bool) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE friend_links SET allow_visits = ? WHERE id = ?`, allow, id)
+	return err
+}
+
+// --- Gifts and playdates ---
+
+// AddFriendSend records a gift or playdate a person here sent.
+func (s *Store) AddFriendSend(ctx context.Context, linkID int64, send model.FriendSend, fromUser int64) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO friend_sends (id, link_id, kind, from_user, to_member, day) VALUES (?, ?, ?, ?, ?, ?)`,
+		send.ID, linkID, send.Kind, fromUser, send.To, send.Day)
+	return err
+}
+
+// CountFriendSends counts what a person sent on a day of one kind: to one
+// animal if toMember is set, and to one linked family unless linkID is 0.
+func (s *Store) CountFriendSends(ctx context.Context, fromUser int64, kind, day string, linkID int64, toMember string) (int, error) {
+	q := `SELECT COUNT(*) FROM friend_sends WHERE from_user = ? AND kind = ? AND day = ?`
+	args := []any{fromUser, kind, day}
+	if linkID != 0 {
+		q += ` AND link_id = ?`
+		args = append(args, linkID)
+	}
+	if toMember != "" {
+		q += ` AND to_member = ?`
+		args = append(args, toMember)
+	}
+	var n int
+	err := s.db.QueryRowContext(ctx, q, args...).Scan(&n)
+	return n, err
+}
+
+// FriendSendsSince returns what was sent to one linked family on or after day.
+func (s *Store) FriendSendsSince(ctx context.Context, linkID int64, day string) ([]model.FriendSend, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, kind, from_user, to_member, day FROM friend_sends WHERE link_id = ? AND day >= ? ORDER BY created_at, id`, linkID, day)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []model.FriendSend
+	for rows.Next() {
+		var f model.FriendSend
+		var from int64
+		if err := rows.Scan(&f.ID, &f.Kind, &from, &f.To, &f.Day); err != nil {
+			return nil, err
+		}
+		f.From = strconv.FormatInt(from, 10)
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+// ReceiveFriendSend records a gift or playdate that arrived, once. It
+// reports whether this is the first time it has been seen.
+func (s *Store) ReceiveFriendSend(ctx context.Context, linkID int64, send model.FriendSend, toUser int64, today string) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`INSERT OR IGNORE INTO friend_received (link_id, send_id, kind, from_member, to_user, day, received_on) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		linkID, send.ID, send.Kind, send.From, toUser, send.Day, today)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// FriendReceived is one gift or playdate that arrived.
+type FriendReceived struct {
+	LinkID     int64
+	Kind       string
+	FromMember string
+	ToUser     int64
+	Day        string
+}
+
+// ListFriendReceived returns what arrived of one kind: sent on the sender's
+// day (if day is set) and/or received here on receivedOn (if set).
+func (s *Store) ListFriendReceived(ctx context.Context, kind, day, receivedOn string) ([]FriendReceived, error) {
+	q, args := `SELECT link_id, kind, from_member, to_user, day FROM friend_received WHERE kind = ?`, []any{kind}
+	if day != "" {
+		q += ` AND day = ?`
+		args = append(args, day)
+	}
+	if receivedOn != "" {
+		q += ` AND received_on = ?`
+		args = append(args, receivedOn)
+	}
+	rows, err := s.db.QueryContext(ctx, q+` ORDER BY rowid`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []FriendReceived
+	for rows.Next() {
+		var r FriendReceived
+		if err := rows.Scan(&r.LinkID, &r.Kind, &r.FromMember, &r.ToUser, &r.Day); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// PruneFriendSends forgets gifts and playdates older than day, sent and received.
+func (s *Store) PruneFriendSends(ctx context.Context, day string) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM friend_sends WHERE day < ?`, day); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM friend_received WHERE received_on < ?`, day)
+	return err
+}
+
+// SetFriendGoal records this household's team goal with a linked family
+// (week "" and target 0 clear it).
+func (s *Store) SetFriendGoal(ctx context.Context, id int64, week string, target int) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE friend_links SET goal_week = ?, goal_target = ? WHERE id = ?`, week, target, id)
 	return err
 }
 

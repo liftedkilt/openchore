@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -46,6 +45,8 @@ type leaderboardEntry struct {
 	UserID int64  `json:"user_id,omitempty"` // set for this household's people
 	Streak int    `json:"streak"`
 	Paused bool   `json:"paused,omitempty"`
+	// Winner: came first last week, so wears the ribbon this week.
+	Winner bool `json:"winner,omitempty"`
 	score.Total
 }
 
@@ -65,47 +66,161 @@ func (h *FriendsHandler) HouseholdLeaderboard(w http.ResponseWriter, r *http.Req
 func (h *FriendsHandler) leaderboard(w http.ResponseWriter, r *http.Request, withFriends bool) {
 	ctx := r.Context()
 	now := h.svc.Now()
-	if r.URL.Query().Get("week") == "last" {
+	last := r.URL.Query().Get("week") == "last"
+	if last {
 		now = now.AddDate(0, 0, -7)
 	}
 	from := score.WeekStart(now)
-	to := score.WeekEnd(from)
 	out := map[string]any{
-		"enabled": h.leaderboardOn(r), "week_start": from, "week_end": to,
-		"min_assigned": score.MinAssigned, "entries": []leaderboardEntry{}, "families": []any{},
+		"enabled": h.leaderboardOn(r), "week_start": from, "week_end": score.WeekEnd(from),
+		"min_assigned": score.MinAssigned, "entries": []leaderboardEntry{}, "families": []any{}, "teams": []any{},
 	}
 	if !h.leaderboardOn(r) {
 		writeJSON(w, http.StatusOK, out)
 		return
 	}
+	st, err := h.standings(ctx, from, withFriends)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to work out the leaderboard")
+		return
+	}
+	// Whoever came first last week wears the winner's ribbon this week.
+	if !last {
+		prev, err := h.standings(ctx, score.WeekStart(now.AddDate(0, 0, -7)), withFriends)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to work out the leaderboard")
+			return
+		}
+		won := winners(prev.entries)
+		for i := range st.entries {
+			st.entries[i].Winner = won[st.entries[i].Key]
+		}
+	}
+	if st.entries != nil {
+		out["entries"] = st.entries
+	}
+	out["families"] = st.families
+	if withFriends {
+		out["teams"] = st.teams
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// standing is one week's leaderboard.
+type standing struct {
+	entries  []leaderboardEntry
+	families []map[string]any
+	teams    []teamView
+}
+
+// teamView is this household and one linked family as two teams for a week,
+// with their team goal if they have one.
+type teamView struct {
+	LinkID int64    `json:"link_id"`
+	Family string   `json:"family"`
+	Ours   teamSide `json:"ours"`
+	Theirs teamSide `json:"theirs"`
+	// Together is both families' people averaged as one team.
+	Together teamSide  `json:"together"`
+	Goal     *goalView `json:"goal,omitempty"`
+}
+
+type teamSide struct {
+	People int `json:"people"`
+	Score  int `json:"score"` // 0 to 100, rounded down like a person's
+}
+
+func side(people, shareSum int) teamSide {
+	if people <= 0 {
+		return teamSide{}
+	}
+	return teamSide{People: people, Score: shareSum / people / 100}
+}
+
+// goalView is a team goal as one household sees it. State is "active" (both
+// families have the same goal for this week), "ours" (we put one forward and
+// they haven't agreed yet) or "theirs" (they did, and we haven't).
+type goalView struct {
+	Target int    `json:"target"`
+	State  string `json:"state"`
+	// Met: the two families together are at or above the target. For a
+	// finished week that is the result; for this week, the score so far.
+	Met bool `json:"met"`
+}
+
+// goalFor works out the goal between this household's link and the other
+// family's snapshot for the week starting week.
+func goalFor(l *model.FriendLink, snap *model.FriendSnapshot, week string, together teamSide) *goalView {
+	ours, theirs := 0, 0
+	if l.GoalWeek == week {
+		ours = l.GoalTarget
+	}
+	if snap != nil && snap.Goal != nil && snap.Goal.Start == week {
+		theirs = snap.Goal.Target
+	}
+	g := &goalView{}
+	switch {
+	case ours > 0 && ours == theirs:
+		g.Target, g.State = ours, "active"
+	case ours > 0:
+		g.Target, g.State = ours, "ours"
+	case theirs > 0:
+		g.Target, g.State = theirs, "theirs"
+	default:
+		return nil
+	}
+	g.Met = g.State == "active" && together.People > 0 && together.Score >= g.Target
+	return g
+}
+
+// winners are the keys of whoever is ranked first, if there was anyone to
+// beat: with a single ranked person there's no contest and no ribbon.
+func winners(entries []leaderboardEntry) map[string]bool {
+	ranked := 0
+	for _, e := range entries {
+		if e.Rank > 0 {
+			ranked++
+		}
+	}
+	out := map[string]bool{}
+	if ranked < 2 {
+		return out
+	}
+	for _, e := range entries {
+		if e.Rank == 1 {
+			out[e.Key] = true
+		}
+	}
+	return out
+}
+
+// standings works out the leaderboard for the week starting from.
+func (h *FriendsHandler) standings(ctx context.Context, from string, withFriends bool) (*standing, error) {
+	to := score.WeekEnd(from)
+	st := &standing{families: []map[string]any{}, teams: []teamView{}}
 	users, err := h.store.ListUsers(ctx)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to list people")
-		return
+		return nil, err
 	}
 	days, err := h.svc.Days(ctx, users)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to count chores")
-		return
+		return nil, err
 	}
-	var entries []leaderboardEntry
 	for _, u := range users {
 		t := score.Sum(days[u.ID], from, to)
 		if t.Assigned == 0 && t.Bonus == 0 && u.Role != model.RoleChild {
 			continue // a parent with no chores isn't playing
 		}
 		e := leaderboardEntry{Key: fmt.Sprintf("u%d", u.ID), Name: u.Name, Color: u.Color, UserID: u.ID, Paused: u.Paused, Total: t}
-		if st, err := h.store.GetUserStreak(ctx, u.ID); err == nil && st != nil {
-			e.Streak = st.CurrentStreak
+		if s, err := h.store.GetUserStreak(ctx, u.ID); err == nil && s != nil {
+			e.Streak = s.CurrentStreak
 		}
-		entries = append(entries, e)
+		st.entries = append(st.entries, e)
 	}
-	families := []map[string]any{}
 	var links []model.FriendLink
 	if withFriends {
 		if links, err = h.store.ListFriendLinks(ctx); err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to list friend families")
-			return
+			return nil, err
 		}
 	}
 	for i := range links {
@@ -114,35 +229,70 @@ func (h *FriendsHandler) leaderboard(w http.ResponseWriter, r *http.Request, wit
 		if l.Status != model.FriendStatusActive || snap == nil {
 			continue
 		}
+		name := familyLabel(l.PeerName)
+		// The two families as teams: each side's numbers cover the people it
+		// shares with the other, so both households work out the same thing.
+		ours, err := h.svc.TeamWeek(ctx, l.ID, users, days, from)
+		if err != nil {
+			return nil, err
+		}
+		var theirs model.FriendTeamWeek
+		for _, tw := range snap.Team {
+			if tw.Start == from {
+				theirs = tw
+			}
+		}
+		if ours.People > 0 || theirs.People > 0 || l.GoalWeek == from || (snap.Goal != nil && snap.Goal.Start == from) {
+			tv := teamView{LinkID: l.ID, Family: name, Ours: side(ours.People, ours.ShareSum), Theirs: side(theirs.People, theirs.ShareSum),
+				Together: side(ours.People+theirs.People, ours.ShareSum+theirs.ShareSum)}
+			tv.Goal = goalFor(l, snap, from, tv.Together)
+			st.teams = append(st.teams, tv)
+		}
+
 		accepts, err := h.store.FriendLinkAccepts(ctx, l.ID)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to list friend families")
-			return
+			return nil, err
 		}
 		shown := friends.Shown(snap, accepts)
 		if len(shown) == 0 {
 			continue
 		}
-		name := familyLabel(l.PeerName)
 		pets := 0
 		for _, m := range shown {
 			if m.Pet != nil {
 				pets++
 			}
-			entries = append(entries, leaderboardEntry{
+			st.entries = append(st.entries, leaderboardEntry{
 				Key: fmt.Sprintf("f%d:%s", l.ID, m.ID), Name: m.Name, Color: m.Color, Family: name, LinkID: l.ID,
 				Streak: m.Streak, Paused: m.Paused, Total: friendWeek(m.Weeks, from),
 			})
 		}
-		families = append(families, map[string]any{"link_id": l.ID, "name": name, "snapshot_at": l.SnapshotAt, "pets": pets})
+		st.families = append(st.families, map[string]any{"link_id": l.ID, "name": name, "snapshot_at": l.SnapshotAt, "pets": pets})
 	}
-	score.Rank(len(entries), func(i int) *score.Total { return &entries[i].Total },
-		func(i, j int) { entries[i], entries[j] = entries[j], entries[i] })
-	if entries != nil {
-		out["entries"] = entries
+	score.Rank(len(st.entries), func(i int) *score.Total { return &st.entries[i].Total },
+		func(i, j int) { st.entries[i], st.entries[j] = st.entries[j], st.entries[i] })
+	return st, nil
+}
+
+// Ribbons returns who in this household is wearing the winner's ribbon this
+// week: whoever came first on last week's leaderboard (friends included in
+// the contest). Empty when the leaderboard is off.
+func (h *FriendsHandler) Ribbons(ctx context.Context) map[int64]bool {
+	out := map[int64]bool{}
+	if v, _ := h.store.GetSetting(ctx, friends.SettingLeaderboard); v != "true" {
+		return out
 	}
-	out["families"] = families
-	writeJSON(w, http.StatusOK, out)
+	prev, err := h.standings(ctx, score.WeekStart(h.svc.Now().AddDate(0, 0, -7)), true)
+	if err != nil {
+		return out
+	}
+	won := winners(prev.entries)
+	for _, e := range prev.entries {
+		if e.UserID != 0 && won[e.Key] {
+			out[e.UserID] = true
+		}
+	}
+	return out
 }
 
 // friendWeek is a friend's total for the week starting on start. Their weeks
@@ -172,6 +322,13 @@ func (h *FriendsHandler) Farms(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to list friend families")
 		return
 	}
+	// A friend who came first on last week's leaderboard wears the ribbon here too.
+	won := map[string]bool{}
+	if h.leaderboardOn(r) {
+		if prev, err := h.standings(r.Context(), score.WeekStart(h.svc.Now().AddDate(0, 0, -7)), true); err == nil {
+			won = winners(prev.entries)
+		}
+	}
 	farms := []map[string]any{}
 	for i := range links {
 		l := &links[i]
@@ -197,8 +354,9 @@ func (h *FriendsHandler) Farms(w http.ResponseWriter, r *http.Request) {
 			pets = append(pets, model.Pet{
 				ID: int64(j + 1), Name: p.Name, Species: p.Species, Color: p.Color, Accessory: p.Accessory,
 				Mood: p.Mood, Hiding: p.Hiding, Sick: p.Sick,
-				SpriteData: pictureDataURL(p.Picture), SpriteFrames: p.Frames,
-				Items: []string{}, OwnerName: m.Name, OwnerColor: m.Color,
+				SpriteData: friends.PictureURL(p.Picture), SpriteFrames: p.Frames,
+				Ribbon: won[fmt.Sprintf("f%d:%s", l.ID, m.ID)], FriendKey: fmt.Sprintf("f%d:%s", l.ID, m.ID),
+				Items:  []string{}, OwnerName: m.Name, OwnerColor: m.Color,
 			})
 		}
 		farms = append(farms, map[string]any{"link_id": l.ID, "family": familyLabel(l.PeerName), "snapshot_at": l.SnapshotAt, "pets": pets})
@@ -206,13 +364,15 @@ func (h *FriendsHandler) Farms(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"farms": farms})
 }
 
-// pictureDataURL turns a friend's animal picture (already checked and
-// re-encoded when it arrived) into something the page can show.
-func pictureDataURL(png []byte) string {
-	if len(png) == 0 {
-		return ""
+// Visitors returns the friend families' animals that are on this farm for a
+// playdate today, and the treats friends sent this household's animals today.
+func (h *FriendsHandler) Visitors(w http.ResponseWriter, r *http.Request) {
+	visitors, gifts, err := h.svc.Visitors(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list visitors")
+		return
 	}
-	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
+	writeJSON(w, http.StatusOK, map[string]any{"visitors": visitors, "gifts": gifts})
 }
 
 // --- Parents ---
@@ -291,7 +451,8 @@ func (h *FriendsHandler) linkView(ctx context.Context, l *model.FriendLink, user
 		})
 	}
 	return map[string]any{
-		"id": l.ID, "status": l.Status, "peer_name": l.PeerName, "hub_url": l.HubURL, "show_pictures": l.ShowPictures,
+		"id": l.ID, "status": l.Status, "peer_name": l.PeerName, "hub_url": l.HubURL, "show_pictures": l.ShowPictures, "allow_visits": l.AllowVisits,
+		"goal":   goalFor(l, snap, score.WeekStart(h.svc.Now()), teamSide{}),
 		"invite": l.Invite, "invite_expires": l.InviteExpires, "outbound": outbound, "inbound": inbound,
 		"snapshot_at": l.SnapshotAt, "last_sync_at": l.LastSyncAt, "last_error": l.LastError, "created_at": l.CreatedAt,
 	}, nil
@@ -393,10 +554,36 @@ func (h *FriendsHandler) UpdateLink(w http.ResponseWriter, r *http.Request) {
 		Share        *[]int64  `json:"share_user_ids"`
 		Accept       *[]string `json:"accept_member_ids"`
 		ShowPictures *bool     `json:"show_pictures"`
+		// GoalTarget puts forward (or agrees to) a team goal for this week:
+		// the score, 1 to 100, the two families aim to average together.
+		// 0 drops it.
+		GoalTarget *int `json:"goal_target"`
+		// AllowVisits: take gifts and playdates from this family.
+		AllowVisits *bool `json:"allow_visits"`
 	}
-	if err := decodeJSON(r, &req); err != nil || (req.Share == nil && req.Accept == nil && req.ShowPictures == nil) {
-		writeError(w, http.StatusBadRequest, "share_user_ids, accept_member_ids or show_pictures is required")
+	if err := decodeJSON(r, &req); err != nil || (req.Share == nil && req.Accept == nil && req.ShowPictures == nil && req.GoalTarget == nil && req.AllowVisits == nil) {
+		writeError(w, http.StatusBadRequest, "share_user_ids, accept_member_ids, show_pictures, allow_visits or goal_target is required")
 		return
+	}
+	if req.AllowVisits != nil {
+		if err := h.svc.SetAllowVisits(ctx, id, *req.AllowVisits); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to save")
+			return
+		}
+	}
+	if req.GoalTarget != nil {
+		week, target := score.WeekStart(h.svc.Now()), *req.GoalTarget
+		if target < 0 || target > 100 {
+			writeError(w, http.StatusBadRequest, "goal_target must be a score from 1 to 100, or 0 for no goal")
+			return
+		}
+		if target == 0 {
+			week = ""
+		}
+		if err := h.store.SetFriendGoal(ctx, id, week, target); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to save")
+			return
+		}
 	}
 	if req.ShowPictures != nil {
 		if err := h.svc.SetShowPictures(ctx, id, *req.ShowPictures); err != nil {
