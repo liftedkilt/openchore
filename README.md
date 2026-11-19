@@ -36,6 +36,9 @@ front of them.
 - ✅ **Fair rules, enforced for you.** Bonus points only pay out once the
   must-do chores are done. Deadlines, time windows, streaks and penalties run
   on their own, not on you at 9pm.
+- 🐴 **A farm to look after.** Turn on farm pets and each kid adopts an
+  animal on one shared family farm. Doing chores keeps it healthy; missed
+  chores send it into hiding where the whole family can see.
 - 📸 **Proof when you want it.** Mark a chore as needing approval, and kids
   send a photo for you to sign off.
 - 🏠 **Your data stays home.** It's one small server and one database file on
@@ -107,6 +110,19 @@ add-a-task form has no points field. Parents see them in Manage → Chores
 marked "Added by …" and can give one points, after which the kid can no
 longer edit or reschedule it.
 
+### Farm pets (optional)
+
+Turn on **Manage → Settings → Farm pets** and everyone can adopt a horse, dog,
+cat, chicken, cow, pig, sheep or goat. All the animals live on one farm that
+shows on every Today screen, so whose animal is sick or hiding is no secret.
+
+The one rule: **chores keep the animal healthy, points only buy food, play and
+accessories.** Missed chores send it into its shelter until the day is caught
+up, and a run of missed days makes it sick. Health can't be bought, so a pet is
+never a way to pay your way out of chores. Pet care is sold through the
+normal rewards store: feed, treat, play, hats and glasses, a new coat colour,
+or a different animal. See [Farm pets](docs/pets.md) for the details.
+
 ### The other levers
 
 - **Time windows.** A chore can stay hidden until a set time, and the day is
@@ -121,6 +137,11 @@ longer edit or reschedule it.
   pooled with siblings.
 - **Vacation mode.** Pause a kid's chores when they're sick or away, without
   touching the schedule.
+- **Personal links.** `/u/emma` opens one person's chores, for a bookmark or
+  a home dashboard. A PIN is still asked for if they have one.
+- **Ticked off by another app.** Mark a chore so only another app (a
+  learning app, say) can complete it through the API, and the kid can't tick
+  it themselves.
 
 Parents can take part too: give yourself chores and points, or tick a chore
 off on a kid's behalf.
@@ -181,6 +202,12 @@ colour.
 </tr>
 </table>
 
+### The farm
+
+<p align="center">
+<img src="docs/screenshots/farm-pets.png" alt="The farm sheet: a horse in a straw hat, a sheep in a flower crown, a sick spotted pig and a dog in a bandana by the barn, with Biscuit the horse's health, food and joy bars and pet-care rewards below" width="360">
+</p>
+
 ## Features
 
 <table>
@@ -192,6 +219,7 @@ colour.
 - Assign to one kid or several
 - Family and first-come chores
 - Quick-assign for one-off jobs
+- Optional chores and kids' own tasks
 - Vacation mode
 
 </td><td valign="top" width="33%">
@@ -222,6 +250,8 @@ colour.
 - Swipe or tap to complete
 - Big tap targets
 - Shapes as well as colours
+- Farm pets on a shared farm
+- Their own link, like `/u/emma`
 - Wall display mode
 - Installs as an app (PWA)
 
@@ -237,7 +267,8 @@ colour.
 
 **For tinkerers**
 - Signed outbound webhooks
-- Trigger URLs per chore (great with Home Assistant)
+- Trigger URLs per chore (great with Home Assistant), optionally more than once a day
+- [Chores another app ticks off](docs/api.md#chores-another-app-finishes)
 - API tokens and a [REST API](docs/api.md)
 - [MCP server](docs/mcp.md) for AI assistants
 
@@ -313,6 +344,7 @@ Two things need your attention:
 ## Documentation
 
 - [Signing in](docs/authentication.md): PINs, parents, sessions, single sign-on
+- [Farm pets](docs/pets.md): moods, the nightly check, pet-care rewards
 - [AI features](docs/ai.md): photo review, summaries, voices, choosing a model
 - [API reference](docs/api.md): endpoints, tokens and webhook events
 - [AI assistants (MCP)](docs/mcp.md): run the household from Claude or another MCP client
