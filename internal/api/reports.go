@@ -53,7 +53,9 @@ type KidSummary struct {
 	TotalMissed    int     `json:"total_missed"`
 	CompletionRate float64 `json:"completion_rate"`
 	PointsEarned   int     `json:"points_earned"`
-	CurrentStreak  int     `json:"current_streak"`
+	// PointsNet matches the Points card's figure (see PointsSummary).
+	PointsNet     int `json:"points_net"`
+	CurrentStreak int `json:"current_streak"`
 }
 
 type MissedChore struct {
@@ -76,12 +78,19 @@ type CategoryStat struct {
 	CompletionRate float64 `json:"completion_rate"`
 }
 
+// PointsSummary breaks down a person's points for the period. points_net
+// is earned + adjusted - penalties - decayed: what the period added to their
+// balance plus savings before spending. Goal savings are still theirs, so
+// moving points into a goal doesn't count against it.
 type PointsSummary struct {
-	UserID        int64  `json:"user_id"`
-	Name          string `json:"name"`
-	PointsEarned  int    `json:"points_earned"`
-	PointsDecayed int    `json:"points_decayed"`
-	PointsSpent   int    `json:"points_spent"`
+	UserID          int64  `json:"user_id"`
+	Name            string `json:"name"`
+	PointsEarned    int    `json:"points_earned"`
+	PointsAdjusted  int    `json:"points_adjusted"`
+	PointsPenalties int    `json:"points_penalties"`
+	PointsDecayed   int    `json:"points_decayed"`
+	PointsSpent     int    `json:"points_spent"`
+	PointsNet       int    `json:"points_net"`
 }
 
 type DayOfWeekStat struct {
@@ -204,14 +213,23 @@ func (h *ReportsHandler) GetReports(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	points := make([]PointsSummary, 0, len(ptRows))
+	netByUser := make(map[int64]int, len(ptRows))
 	for _, p := range ptRows {
 		points = append(points, PointsSummary{
-			UserID:        p.UserID,
-			Name:          p.Name,
-			PointsEarned:  p.PointsEarned,
-			PointsDecayed: p.PointsDecayed,
-			PointsSpent:   p.PointsSpent,
+			UserID:          p.UserID,
+			Name:            p.Name,
+			PointsEarned:    p.PointsEarned,
+			PointsAdjusted:  p.PointsAdjusted,
+			PointsPenalties: p.PointsPenalties,
+			PointsDecayed:   p.PointsDecayed,
+			PointsSpent:     p.PointsSpent,
+			PointsNet:       p.PointsNet,
 		})
+		netByUser[p.UserID] = p.PointsNet
+	}
+	// The person cards show the same figure as the Points card.
+	for i := range kids {
+		kids[i].PointsNet = netByUser[kids[i].UserID]
 	}
 
 	dowRows, err := h.store.ReportDayOfWeek(r.Context(), startStr, endStr)

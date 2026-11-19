@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import clsx from 'clsx';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
@@ -26,6 +27,7 @@ interface KidSummary {
   total_missed: number;
   completion_rate: number;
   points_earned: number;
+  points_net: number;
   current_streak: number;
 }
 
@@ -53,9 +55,27 @@ interface PointsSummary {
   user_id: number;
   name: string;
   points_earned: number;
+  points_adjusted: number;
+  points_penalties: number;
   points_decayed: number;
   points_spent: number;
+  points_net: number;
 }
+
+const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
+
+// The parts that make up points_net, so the number can be checked against
+// the kid's balance plus savings. Chores alone need no breakdown.
+const pointsNote = (p: PointsSummary, t: TFunction) => {
+  const parts = [
+    p.points_adjusted !== 0 ? t('reports.pointsAdjusted', { amount: signed(p.points_adjusted) }) : null,
+    p.points_penalties !== 0 ? t('reports.pointsPenalties', { amount: signed(-p.points_penalties) }) : null,
+    p.points_decayed !== 0 ? t('reports.pointsDecayedNet', { amount: signed(-p.points_decayed) }) : null,
+  ].filter(Boolean);
+  if (parts.length > 0) parts.unshift(t('reports.pointsFromChores', { amount: signed(p.points_earned) }));
+  if (p.points_spent !== 0) parts.push(t('reports.pointsSpent', { count: p.points_spent }));
+  return parts.join(' · ') || undefined;
+};
 
 interface DayOfWeekStat {
   day_of_week: number;
@@ -277,7 +297,7 @@ function ReportBody({ data, colors, aiSummaries, summaryLoading, onSummary }: Re
                     <h3 className={styles.personName}>{kid.name}</h3>
                     <p className={styles.personStats}>
                       <span>{t('reports.doneCount', { completed: kid.total_completed, assigned: kid.total_assigned })}</span>
-                      <span>{t('reports.pointsEarned', { count: kid.points_earned })}</span>
+                      <span>{t('reports.pointsEarned', { count: kid.points_net })}</span>
                       <span className={styles.streak}><Icon name="flame" />{t('reports.streakDays', { count: kid.current_streak })}</span>
                     </p>
                   </div>
@@ -356,13 +376,10 @@ function ReportBody({ data, colors, aiSummaries, summaryLoading, onSummary }: Re
               key: p.user_id,
               label: p.name,
               lead: <Avatar name={p.name} color={colors[p.user_id]} size="sm" />,
-              value: p.points_earned,
-              valueLabel: `+${p.points_earned}`,
+              value: Math.max(0, p.points_net),
+              valueLabel: signed(p.points_net),
               color: personColorVar(colors[p.user_id]),
-              note: [
-                p.points_decayed > 0 ? t('reports.pointsDecayed', { count: p.points_decayed }) : null,
-                p.points_spent > 0 ? t('reports.pointsSpent', { count: p.points_spent }) : null,
-              ].filter(Boolean).join(' · ') || undefined,
+              note: pointsNote(p, t),
             }))}
           />
         )}

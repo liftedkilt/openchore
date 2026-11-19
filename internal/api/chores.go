@@ -784,17 +784,26 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 	if dateStr == "" {
 		dateStr = time.Now().Format(model.DateFormat)
 	}
+	if status, msg := h.uncomplete(r, scheduleID, dateStr); status != 0 {
+		writeError(w, status, msg)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
 
+// uncomplete unchecks a chore for a date: it debits the points it earned,
+// returns any auto-save, recalculates the streak and fires the webhook.
+// Returns a non-zero HTTP status and message on failure. Shared by the
+// uncheck endpoint and Undo in the points history.
+func (h *ChoreHandler) uncomplete(r *http.Request, scheduleID int64, dateStr string) (int, string) {
 	// Get the schedule to check for FCFS
 	schedule, _ := h.store.GetSchedule(r.Context(), scheduleID)
 	if schedule != nil && !canActOnSchedule(UserFromContext(r.Context()), schedule) {
-		writeError(w, http.StatusForbidden, "this chore is assigned to someone else")
-		return
+		return http.StatusForbidden, "this chore is assigned to someone else"
 	}
 	if schedule != nil && UserFromContext(r.Context()).Role != model.RoleAdmin {
 		if chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID); chore != nil && chore.AutoComplete {
-			writeError(w, http.StatusForbidden, autoCompleteMessage)
-			return
+			return http.StatusForbidden, autoCompleteMessage
 		}
 	}
 
@@ -806,8 +815,7 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 	// UncompleteChore (its fallback DELETE would destroy the preserved row).
 	// The endpoint is idempotent.
 	if existing != nil && existing.UncompletedAt != nil {
-		w.WriteHeader(http.StatusNoContent)
-		return
+		return 0, ""
 	}
 	var completedBy int64
 	var completionID int64
@@ -824,13 +832,11 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 	// FCFS: uncomplete all siblings in the group
 	if schedule != nil && schedule.AssignmentType == model.AssignmentFCFS && schedule.FcfsGroupID != nil {
 		if err := h.store.UncompleteFCFSGroupAndDebitPoints(r.Context(), *schedule.FcfsGroupID, dateStr, completedBy, existing, netPoints); err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to uncomplete FCFS group")
-			return
+			return http.StatusInternalServerError, "failed to uncomplete FCFS group"
 		}
 	} else {
 		if err := h.store.UncompleteChoreAndDebitPoints(r.Context(), scheduleID, dateStr, completedBy, completionID, netPoints); err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to uncomplete chore")
-			return
+			return http.StatusInternalServerError, "failed to uncomplete chore"
 		}
 	}
 
@@ -861,8 +867,7 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 		"user_name":   uncompleteUserName,
 		"date":        dateStr,
 	})
-
-	w.WriteHeader(http.StatusNoContent)
+	return 0, ""
 }
 
 // --- Approvals ---

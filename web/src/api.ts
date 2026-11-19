@@ -258,6 +258,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ user_id: userId, amount, note }),
       }),
+    // Undoes one history entry (unchecks a chore, refunds a reward, or
+    // cancels a penalty, adjustment or goal saving); it then drops out of
+    // the history. Refused (409) if it was already undone.
+    undo: (transactionId: number) =>
+      fetchWithAuth<void>(`/points/transactions/${transactionId}/undo`, { method: 'POST' }),
   },
   rewards: {
     list: () => fetchWithAuth<Reward[]>('/rewards'),
