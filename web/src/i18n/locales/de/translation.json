@@ -4,6 +4,15 @@
       "empty": "Noch keine Aktivitäten",
       "eventCount_one": "{{count}} Ereignis",
       "eventCount_other": "{{count}} Ereignisse",
+      "goalNote": {
+        "autoSaved": "Automatisch von einer Aufgabe gespart",
+        "autoReturned": "Aufgabe zurückgesetzt, Ersparnis zurückgebucht",
+        "manualSaved": "Von Hand gespart"
+      },
+      "goalReason": {
+        "commit_to_goal": "Für {{goal}} gespart",
+        "goal_break": "Von {{goal}} zurückgebucht"
+      },
       "hoursAgo_one": "vor {{count}} Std.",
       "hoursAgo_other": "vor {{count}} Std.",
       "justNow": "gerade eben",
@@ -1468,11 +1477,13 @@
     "period_month": "Monat",
     "period_week": "Woche",
     "period_year": "Jahr",
-    "pointsDecayed_one": "−{{count}} verfallen",
-    "pointsDecayed_other": "−{{count}} verfallen",
+    "pointsAdjusted": "{{amount}} angepasst",
+    "pointsDecayedNet": "{{amount}} verfallen",
     "pointsEarned_one": "{{count}} Pkt.",
     "pointsEarned_other": "{{count}} Pkt.",
     "pointsFlow": "Punkte",
+    "pointsFromChores": "{{amount}} aus Aufgaben",
+    "pointsPenalties": "{{amount}} Strafen",
     "pointsSpent_one": "−{{count}} ausgegeben",
     "pointsSpent_other": "−{{count}} ausgegeben",
     "previous": "Voriger Zeitraum",

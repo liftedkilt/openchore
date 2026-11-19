@@ -43,7 +43,9 @@ func (h *PointsHandler) GetUserPoints(w http.ResponseWriter, r *http.Request) {
 	for _, c := range commitments {
 		committed += c.AmountSaved
 	}
-	txs, err := h.store.ListPointTransactions(r.Context(), userID, 50)
+	// Undone entries are left out (see store.ListVisiblePointTransactions);
+	// the balance above still counts every row, and the hidden ones net to 0.
+	txs, err := h.store.ListVisiblePointTransactions(r.Context(), userID, 50)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to get transactions")
 		return

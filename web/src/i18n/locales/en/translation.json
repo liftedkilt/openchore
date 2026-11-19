@@ -4,6 +4,15 @@
       "empty": "No activity yet",
       "eventCount_one": "{{count}} event",
       "eventCount_other": "{{count}} events",
+      "goalNote": {
+        "autoSaved": "Auto-saved from a chore",
+        "autoReturned": "Chore undone, auto-save returned",
+        "manualSaved": "Added by hand"
+      },
+      "goalReason": {
+        "commit_to_goal": "Saved to {{goal}}",
+        "goal_break": "Returned from {{goal}}"
+      },
       "hoursAgo_one": "{{count}}h ago",
       "hoursAgo_other": "{{count}}h ago",
       "justNow": "just now",
@@ -1468,11 +1477,13 @@
     "period_month": "Month",
     "period_week": "Week",
     "period_year": "Year",
-    "pointsDecayed_one": "−{{count}} decay",
-    "pointsDecayed_other": "−{{count}} decay",
+    "pointsAdjusted": "{{amount}} adjusted",
+    "pointsDecayedNet": "{{amount}} decay",
     "pointsEarned_one": "{{count}} pt",
     "pointsEarned_other": "{{count}} pts",
     "pointsFlow": "Points",
+    "pointsFromChores": "{{amount}} from chores",
+    "pointsPenalties": "{{amount}} penalties",
     "pointsSpent_one": "−{{count}} spent",
     "pointsSpent_other": "−{{count}} spent",
     "previous": "Previous period",

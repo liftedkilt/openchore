@@ -233,6 +233,7 @@ export interface PointTransaction {
   reason: 'chore_complete' | 'chore_uncomplete' | 'reward_redeem' | 'streak_bonus' | 'admin_adjust' | 'expiry_penalty' | 'points_decay' | 'missed_chore' | 'commit_to_goal' | 'goal_break';
   reference_id?: number;
   note?: string;
+  idempotency_key?: string;
   created_at: string;
 }
 

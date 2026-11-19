@@ -60,6 +60,7 @@ const (
 	ReasonMissedChore     = "missed_chore"
 	ReasonCommitToGoal    = "commit_to_goal"
 	ReasonGoalBreak       = "goal_break"
+	ReasonStreakBonus     = "streak_bonus"
 )
 
 // Commitment statuses
@@ -273,7 +274,9 @@ type PointTransaction struct {
 	ReferenceID    *int64    `json:"reference_id,omitempty"`
 	Note           string    `json:"note,omitempty"`
 	IdempotencyKey *string   `json:"idempotency_key,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
+	// ReversesID is set on a row written by Undo: the row it cancels.
+	ReversesID *int64    `json:"reverses_id,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type Reward struct {

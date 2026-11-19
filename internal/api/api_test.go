@@ -2345,8 +2345,8 @@ func TestRequiredChoresGateCoreChorePoints(t *testing.T) {
 	// - award required points (5)
 	// - retroactively credit core points (10)
 	// - retroactively credit bonus points (20)
-	// Net balance earned: 35. With 50% auto-contribute, 17 points saved (5*0.5 + 10*0.5 + 20*0.5 = 2 + 5 + 10 = 17)
-	// and 18 points left in spendable balance.
+	// Net balance earned: 35. With 50% auto-contribute, 18 points saved (5*0.5 + 10*0.5 + 20*0.5 = 3 + 5 + 10 = 18,
+	// rounded to the nearest point) and 17 points left in spendable balance.
 	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
 		"completed_by":    kidID,
 		"completion_date": today,
@@ -2354,11 +2354,11 @@ func TestRequiredChoresGateCoreChorePoints(t *testing.T) {
 
 	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
 	decodeBody(t, resp, &pts)
-	if pts["balance"].(float64) != 18 {
-		t.Fatalf("expected 18 spendable balance (35 total - 17 saved), got %v", pts["balance"])
+	if pts["balance"].(float64) != 17 {
+		t.Fatalf("expected 17 spendable balance (35 total - 18 saved), got %v", pts["balance"])
 	}
-	if pts["committed"].(float64) != 17 {
-		t.Fatalf("expected 17 points saved to goal, got %v", pts["committed"])
+	if pts["committed"].(float64) != 18 {
+		t.Fatalf("expected 18 points saved to goal, got %v", pts["committed"])
 	}
 
 	// Uncheck and recheck the core chore - should not double credit
@@ -2366,12 +2366,12 @@ func TestRequiredChoresGateCoreChorePoints(t *testing.T) {
 	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
 	decodeBody(t, resp, &pts)
 	// Unchecking the 10-point core chore refunds the 5 points that were committed to the goal
-	// and debits 5 points from spendable. Balance becomes 18 - 5 = 13. Committed becomes 17 - 5 = 12.
-	if pts["balance"].(float64) != 13 {
-		t.Fatalf("expected 13 spendable after unchecking core chore, got %v", pts["balance"])
+	// and debits 5 points from spendable. Balance becomes 17 - 5 = 12. Committed becomes 18 - 5 = 13.
+	if pts["balance"].(float64) != 12 {
+		t.Fatalf("expected 12 spendable after unchecking core chore, got %v", pts["balance"])
 	}
-	if pts["committed"].(float64) != 12 {
-		t.Fatalf("expected 12 committed after unchecking core chore, got %v", pts["committed"])
+	if pts["committed"].(float64) != 13 {
+		t.Fatalf("expected 13 committed after unchecking core chore, got %v", pts["committed"])
 	}
 
 	// Recheck core chore -> should revive and re-evaluate gate, crediting the 10 points (5 spendable, 5 committed)
@@ -2382,11 +2382,64 @@ func TestRequiredChoresGateCoreChorePoints(t *testing.T) {
 
 	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
 	decodeBody(t, resp, &pts)
-	if pts["balance"].(float64) != 18 {
-		t.Fatalf("expected 18 spendable after rechecking core chore, got %v", pts["balance"])
+	if pts["balance"].(float64) != 17 {
+		t.Fatalf("expected 17 spendable after rechecking core chore, got %v", pts["balance"])
 	}
-	if pts["committed"].(float64) != 17 {
-		t.Fatalf("expected 17 committed after rechecking core chore, got %v", pts["committed"])
+	if pts["committed"].(float64) != 18 {
+		t.Fatalf("expected 18 committed after rechecking core chore, got %v", pts["committed"])
+	}
+}
+
+// Auto-save rounds to the nearest point, and whatever isn't saved stays in
+// the kid's spendable balance rather than vanishing.
+func TestAutoContributeRoundsAndKeepsRemainder(t *testing.T) {
+	cases := []struct {
+		pct, wantSaved, wantBalance int
+	}{
+		{80, 4, 1},  // 4.0
+		{85, 4, 1},  // 4.25 rounds down
+		{90, 5, 0},  // 4.5 rounds up
+		{95, 5, 0},  // 4.75
+		{50, 3, 2},  // 2.5 rounds up
+		{30, 2, 3},  // 1.5 rounds up
+		{5, 0, 5},   // 0.25 saves nothing
+		{100, 5, 0}, // everything
+	}
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%d%%", tc.pct), func(t *testing.T) {
+			env := setupTest(t)
+			env.createAdmin(t)
+			kidID := env.createChild(t, "Kid")
+
+			env.request(t, "POST", "/api/chores", map[string]any{
+				"title": "Chore", "category": "required", "points_value": 5,
+			}, adminHeaders())
+			env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+				"assigned_to": kidID,
+				"day_of_week": int(time.Now().Weekday()),
+			}, adminHeaders())
+			env.request(t, "POST", "/api/rewards", map[string]any{
+				"name": "Toy", "cost": 100,
+			}, adminHeaders())
+			env.expectStatus(t, "POST", "/api/rewards/1/commit", map[string]any{
+				"auto_contribute_percent": tc.pct,
+			}, childHeaders(kidID), http.StatusCreated)
+
+			env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+				"completed_by":    kidID,
+				"completion_date": time.Now().Format(model.DateFormat),
+			}, adminHeaders(), http.StatusCreated)
+
+			resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", kidID), nil, adminHeaders(), http.StatusOK)
+			var pts map[string]any
+			decodeBody(t, resp, &pts)
+			if got := int(pts["committed"].(float64)); got != tc.wantSaved {
+				t.Errorf("saved = %d, want %d", got, tc.wantSaved)
+			}
+			if got := int(pts["balance"].(float64)); got != tc.wantBalance {
+				t.Errorf("balance = %d, want %d", got, tc.wantBalance)
+			}
+		})
 	}
 }
 

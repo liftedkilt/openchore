@@ -9,6 +9,36 @@ import { personColor } from './pickers';
 import ui from './ui.module.css';
 import styles from './ActivityTab.module.css';
 
+// Goal savings rows carry machine notes ("auto:completion:34", "manual",
+// "auto_revert:completion:34") that the store matches on, so they're turned
+// into plain words here instead of being shown raw.
+const GOAL_NOTE_KEY: { prefix: string; key: string }[] = [
+  { prefix: 'auto:completion:', key: 'autoSaved' },
+  { prefix: 'auto_revert:completion:', key: 'autoReturned' },
+  { prefix: 'manual', key: 'manualSaved' },
+];
+
+// Undo happens on the server (POST /points/transactions/{id}/undo), and the
+// entry then drops out of the history, so the log never gains "Undo:" rows.
+// Rows that are themselves an undo (chore unchecked, savings returned) have
+// no Undo: checking the chore again is how you reverse those.
+const canUndo = (txn: PointTransaction) => {
+  switch (txn.reason) {
+    case 'chore_complete':
+    case 'reward_redeem':
+    case 'admin_adjust':
+    case 'streak_bonus':
+      return true;
+    case 'expiry_penalty':
+    case 'missed_chore':
+    case 'points_decay':
+    case 'commit_to_goal':
+      return txn.amount < 0;
+    default:
+      return false;
+  }
+};
+
 const REASON_ICON: Partial<Record<PointTransaction['reason'], IconName>> = {
   chore_complete: 'check',
   chore_uncomplete: 'back',
@@ -26,6 +56,8 @@ export const ActivityTab: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [users, setUsers] = useState<User[]>([]);
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
+  const [goalNames, setGoalNames] = useState<Map<number, string>>(new Map());
+  const [undoError, setUndoError] = useState('');
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -35,12 +67,17 @@ export const ActivityTab: React.FC = () => {
       const usrs = await api.users.list();
       setUsers(usrs);
 
+      const names = new Map<number, string>();
       const allTxns = await Promise.all(
         usrs.map(async (u: User) => {
           const data = await api.points.getForUser(u.id);
+          for (const c of data.active_commitments ?? []) {
+            if (c.reward_name) names.set(c.id, c.reward_name);
+          }
           return data.transactions.map(tx => ({ ...tx, user_id: u.id }));
         })
       );
+      setGoalNames(names);
       // Flatten and sort by date descending
       const flat = allTxns.flat().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setTransactions(flat);
@@ -71,13 +108,28 @@ export const ActivityTab: React.FC = () => {
     return i18n.exists(key) ? t(key) : reason;
   };
 
+  const isGoalRow = (txn: PointTransaction) =>
+    txn.reason === 'commit_to_goal' || txn.reason === 'goal_break';
+
+  // "Saved to Gift Card" when the goal is still active, else the generic label.
+  const getTxnLabel = (txn: PointTransaction) => {
+    const goal = isGoalRow(txn) && txn.reference_id ? goalNames.get(txn.reference_id) : undefined;
+    if (goal) return t(`admin.activityTab.goalReason.${txn.reason}`, { goal });
+    return getReasonLabel(txn.reason);
+  };
+
+  const getTxnNote = (txn: PointTransaction) => {
+    if (!txn.note || !isGoalRow(txn)) return txn.note;
+    const match = GOAL_NOTE_KEY.find(n => txn.note!.startsWith(n.prefix));
+    return match ? t(`admin.activityTab.goalNote.${match.key}`) : txn.note;
+  };
+
   const handleUndo = async (txn: PointTransaction) => {
-    if (txn.reason === 'reward_redeem' && txn.reference_id) {
-      await api.rewards.undoRedemption(txn.reference_id);
-    } else {
-      // An adjustment, so the undo is itself a point_transactions row.
-      const note = `Undo: ${txn.note || getReasonLabel(txn.reason)}`;
-      await api.points.adjust(txn.user_id, -txn.amount, note);
+    setUndoError('');
+    try {
+      await api.points.undo(txn.id);
+    } catch (err) {
+      setUndoError(err instanceof Error ? err.message : String(err));
     }
     load();
   };
@@ -92,6 +144,8 @@ export const ActivityTab: React.FC = () => {
           <p className={ui.pageSub}>{t('admin.activityTab.eventCount', { count: transactions.length })}</p>
         </div>
       </div>
+
+      {undoError && <p className={ui.msgError} role="alert">{undoError}</p>}
 
       {transactions.length === 0 ? (
         <div className={ui.empty}>
@@ -114,23 +168,27 @@ export const ActivityTab: React.FC = () => {
                 <div className={ui.rowMain}>
                   <span className={styles.line}>
                     <span className={styles.user}>{name}</span>
-                    <span className={styles.reason}>{getReasonLabel(txn.reason)}</span>
+                    <span className={styles.reason}>{getTxnLabel(txn)}</span>
                   </span>
-                  {txn.note && <span className={ui.rowDesc}>{txn.note}</span>}
+                  {txn.note && <span className={ui.rowDesc}>{getTxnNote(txn)}</span>}
                   <span className={styles.time}>{formatTime(txn.created_at)}</span>
                 </div>
                 <span className={clsx(styles.amount, txn.amount < 0 && styles.amountNeg)}>
                   {txn.amount > 0 ? '+' : txn.amount < 0 ? '−' : ''}{Math.abs(txn.amount)}
                 </span>
-                <button
-                  type="button"
-                  className={ui.iconBtn}
-                  title={t('admin.activityTab.undoTitle')}
-                  aria-label={t('admin.activityTab.undoTitle')}
-                  onClick={() => handleUndo(txn)}
-                >
-                  <Undo2 aria-hidden />
-                </button>
+                {canUndo(txn) ? (
+                  <button
+                    type="button"
+                    className={ui.iconBtn}
+                    title={t('admin.activityTab.undoTitle')}
+                    aria-label={t('admin.activityTab.undoTitle')}
+                    onClick={() => handleUndo(txn)}
+                  >
+                    <Undo2 aria-hidden />
+                  </button>
+                ) : (
+                  <span className={styles.undoSpacer} aria-hidden />
+                )}
               </li>
             );
           })}
