@@ -177,6 +177,15 @@
      --farm-rail-w / --farm-post-w     fence plank thickness
      --farm-post-cap                   butt | round: square-cut or rounded post tops
      --farm-field-ink                  text drawn straight on the field
+   Christmas season (only drawn from Nov 20 to Jan 1; see farm/season.ts)
+     --farm-snow-field / --farm-snow-hill-far / --farm-snow-hill-near
+                                       the snowy field and hills
+     --farm-snow                       snow on trees, roof and fence
+     --farm-snow-fence-rail / -post    fence wood in the snow (dark enough for snow to show)
+     --farm-snow-ink                   text drawn straight on the snow
+     --farm-flake / --farm-flake-ring  falling snowflakes, and a box-shadow ring so they show on snow
+     --farm-tree / --farm-tree-shade   pine needles, lit and shaded side
+     --farm-light-wire / --farm-light-glow   light string wire, bulb glow filter
    Animals and shelters
      --farm-art-filter   filter on animals + shelters in the scene only
      --farm-ink          the bold outline colour
@@ -197,6 +206,10 @@
   --farm-rail-w: 3px; --farm-post-w: 5px; --farm-post-cap: butt;
   --farm-field-ink: #2f4a22;
   --farm-art-filter: none; --farm-ink: #2b2522; --farm-ink-mix: 0%; --farm-line-k: 1;
+  --farm-snow-field: #f1f6fa; --farm-snow-hill-far: #f1f6fa; --farm-snow-hill-near: #e2ecf3;
+  --farm-snow: #ffffff; --farm-snow-ink: #2c3f4f; --farm-flake: #ffffff; --farm-flake-ring: 0 0 0 1px rgb(110 140 175 / 0.45);
+  --farm-tree: #2f7a52; --farm-tree-shade: #24603f; --farm-snow-fence-rail: #c09a6c; --farm-snow-fence-post: #a9845a;
+  --farm-light-wire: #3a4a3f; --farm-light-glow: drop-shadow(0 0 1px rgb(255 240 200 / 0.8));
 }
 /* Dusk: a deep blue evening, calm dark greens, the barn in shadow with warm
    windows. No large bright areas; the animals are dimmed a little so they sit
@@ -214,6 +227,10 @@
   --farm-rail-w: 3px; --farm-post-w: 5px; --farm-post-cap: butt;
   --farm-field-ink: #d9e4d2;
   --farm-art-filter: brightness(0.86) saturate(0.88) drop-shadow(0 0 1.2px rgb(214 224 255 / 0.4)); --farm-ink: #2b2522; --farm-ink-mix: 0%; --farm-line-k: 1;
+  --farm-snow-field: #36425a; --farm-snow-hill-far: #36425a; --farm-snow-hill-near: #46536e;
+  --farm-snow: #c8d2e6; --farm-snow-ink: #e3e9f4; --farm-flake: #e6ecf8; --farm-flake-ring: none;
+  --farm-tree: #1d4532; --farm-tree-shade: #163627; --farm-snow-fence-rail: #6e6252; --farm-snow-fence-post: #5b5144;
+  --farm-light-wire: #1b1d24; --farm-light-glow: drop-shadow(0 0 2px rgb(255 228 160 / 0.9));
 }
 /* House Dark's evening is a touch warmer, to sit on its warm brown ground. */
 [data-theme="house-dark"] {
@@ -233,4 +250,8 @@
   --farm-rail-w: 4px; --farm-post-w: 7px; --farm-post-cap: round;
   --farm-field-ink: #121212;
   --farm-art-filter: none; --farm-ink: #121212; --farm-ink-mix: 90%; --farm-line-k: 2;
+  --farm-snow-field: #ffffff; --farm-snow-hill-far: #ffffff; --farm-snow-hill-near: #d6ecff;
+  --farm-snow: #ffffff; --farm-snow-ink: #121212; --farm-flake: #ffffff; --farm-flake-ring: 0 0 0 1px #121212;
+  --farm-tree: #1fb36b; --farm-tree-shade: #128a50; --farm-snow-fence-rail: #c98a4b; --farm-snow-fence-post: #b0733a;
+  --farm-light-wire: #121212; --farm-light-glow: none;
 }
