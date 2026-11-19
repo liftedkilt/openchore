@@ -73,7 +73,7 @@ func (h *ChoreHandler) UndoPointsEntry(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, store.ErrCannotUndo):
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
-		case errors.Is(err, store.ErrAlreadyUndone):
+		case errors.Is(err, store.ErrAlreadyUndone), errors.Is(err, store.ErrSavingsUsed):
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		case err != nil:

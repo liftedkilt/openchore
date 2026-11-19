@@ -1344,8 +1344,21 @@ func (s *Store) ListPointTransactions(ctx context.Context, userID int64, limit i
 var ErrCannotUndo = fmt.Errorf("that entry can't be undone")
 
 // ErrAlreadyUndone is returned when a row was already undone (or, for a
-// missed-chore penalty, already refunded by excusing the chore).
+// missed-chore penalty, already refunded by excusing the chore), including
+// rows the history hides because unchecking their chore cancelled them.
 var ErrAlreadyUndone = fmt.Errorf("that entry was already undone")
+
+// ErrSavingsUsed is returned when undoing a goal saving whose points have
+// since left the goal (taken back for points decay, for example), so taking
+// the whole saving back out would leave the goal below zero.
+var ErrSavingsUsed = fmt.Errorf("some of those savings have already left the goal")
+
+// decayReclaimNote is the note on the goal_break rows that take savings back
+// out of a goal to pay for points decay on a date. Undoing that day's decay
+// finds them by it and puts the points back in the goal.
+func decayReclaimNote(date string) string {
+	return fmt.Sprintf("Reclaimed for points decay on %s", date)
+}
 
 // penaltyReasons are penalties: undoing one gives the points back.
 var penaltyReasons = map[string]bool{
@@ -1419,8 +1432,23 @@ func (s *Store) ReversePointTransaction(ctx context.Context, txnID int64) (*mode
 	if key.Valid {
 		orig.IdempotencyKey = &key.String
 	}
+	var reversed, visible bool
+	if err := tx.QueryRowContext(ctx,
+		`SELECT EXISTS (SELECT 1 FROM point_transactions WHERE reverses_id = ?),
+		        EXISTS (SELECT 1 FROM point_transactions pt WHERE pt.id = ? AND `+visibleTxnFilter+`)`,
+		orig.ID, orig.ID).Scan(&reversed, &visible); err != nil {
+		return nil, err
+	}
+	if reversed {
+		return nil, ErrAlreadyUndone
+	}
 	if orig.ReversesID != nil || !reversibleReasons[orig.Reason] || orig.Amount == 0 {
 		return nil, ErrCannotUndo
+	}
+	if !visible {
+		// Hidden rows were already cancelled, e.g. the late penalty or
+		// auto-save of a chore that has since been unchecked.
+		return nil, ErrAlreadyUndone
 	}
 	if penaltyReasons[orig.Reason] && orig.Amount > 0 {
 		return nil, ErrCannotUndo
@@ -1441,6 +1469,18 @@ func (s *Store) ReversePointTransaction(ctx context.Context, txnID int64) (*mode
 			`SELECT status FROM reward_commitments WHERE id = ?`, *orig.ReferenceID).Scan(&status); err != nil || status != model.CommitmentActive {
 			return nil, ErrCannotUndo
 		}
+		// And only if they're all still there: decay may have taken some
+		// back out, and the goal must never go below zero.
+		var saved int
+		if err := tx.QueryRowContext(ctx,
+			`SELECT COALESCE(-SUM(amount), 0) FROM point_transactions
+			 WHERE reference_id = ? AND reason IN (?, ?)`,
+			*orig.ReferenceID, model.ReasonCommitToGoal, model.ReasonGoalBreak).Scan(&saved); err != nil {
+			return nil, err
+		}
+		if saved < -orig.Amount {
+			return nil, ErrSavingsUsed
+		}
 	}
 
 	res, err := tx.ExecContext(ctx,
@@ -1454,6 +1494,24 @@ func (s *Store) ReversePointTransaction(ctx context.Context, txnID int64) (*mode
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
+
+	// Decay that took savings out of goals to pay for itself puts them back
+	// in, as long as the goal is still active; otherwise they stay spendable.
+	if orig.Reason == model.ReasonPointsDecay && orig.IdempotencyKey != nil {
+		if parts := strings.SplitN(*orig.IdempotencyKey, ":", 3); len(parts) == 3 && parts[0] == "points_decay" {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note, reverses_id)
+				 SELECT g.user_id, -g.amount, g.reason, g.reference_id, 'Undone', g.id
+				 FROM point_transactions g
+				 JOIN reward_commitments rc ON rc.id = g.reference_id
+				 WHERE g.user_id = ? AND g.reason = ? AND g.note = ? AND rc.status = ?
+				   AND NOT EXISTS (SELECT 1 FROM point_transactions r WHERE r.reverses_id = g.id)`,
+				orig.UserID, model.ReasonGoalBreak, decayReclaimNote(parts[2]), model.CommitmentActive); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
@@ -1469,7 +1527,11 @@ func (s *Store) ReversePointTransaction(ctx context.Context, txnID int64) (*mode
 //   - a reversal row and the row it reverses;
 //   - a chore that is currently unchecked: its credit, late penalty and the
 //     debit written when it was unchecked (all reference the completion);
-//   - an auto-save from that chore and the goal_break that returned it.
+//   - an auto-save from that chore and the goal_break that returned it;
+//   - the same chore rows after an unchecked completion was deleted outright
+//     (DeleteCompletion, when a re-check needs a photo): they still net to
+//     zero, recognised by the debit written when it was unchecked. A chore
+//     deleted while checked has no such debit, so its points stay visible.
 //
 // Rechecking a chore deletes its unchecked debit and returned auto-save
 // (ReviveCompletionAndReverseDebits), so its rows reappear.
@@ -1479,6 +1541,11 @@ const visibleTxnFilter = `
 	AND NOT (pt.reason IN ('chore_complete', 'chore_uncomplete', 'expiry_penalty')
 		AND EXISTS (SELECT 1 FROM chore_completions cc
 			WHERE cc.id = pt.reference_id AND cc.uncompleted_at IS NOT NULL))
+	AND NOT (pt.reason IN ('chore_complete', 'chore_uncomplete', 'expiry_penalty')
+		AND NOT EXISTS (SELECT 1 FROM chore_completions cc WHERE cc.id = pt.reference_id)
+		AND EXISTS (SELECT 1 FROM point_transactions u
+			WHERE u.reason = 'chore_uncomplete' AND u.user_id = pt.user_id
+			  AND u.reference_id = pt.reference_id))
 	AND NOT (pt.reason = 'commit_to_goal' AND pt.note LIKE 'auto:completion:%'
 		AND EXISTS (SELECT 1 FROM point_transactions g
 			WHERE g.reason = 'goal_break' AND g.reference_id = pt.reference_id
@@ -3324,7 +3391,7 @@ func (s *Store) clawBackFromGoalsTx(ctx context.Context, tx *sql.Tx, userID int6
 		return 0, nil, err
 	}
 
-	reclaimNote := fmt.Sprintf("Reclaimed for points decay on %s", date)
+	reclaimNote := decayReclaimNote(date)
 	reclaimed := 0
 	var clawbacks []DecayClawback
 	for _, g := range goals {

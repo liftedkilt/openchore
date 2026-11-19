@@ -270,3 +270,119 @@ func TestUndoRefusesUndoRows(t *testing.T) {
 	// The goal was cancelled, so its saving can't be taken back out.
 	env.expectStatus(t, "POST", undoURL(saved), nil, adminHeaders(), http.StatusUnprocessableEntity)
 }
+
+// Decay took savings back out of the goal, so the original saving can't be
+// undone (the goal would go below zero). Undoing the decay puts the savings
+// back in the goal, and then the saving can be undone.
+func TestUndoGoalSavingAfterDecay(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+	ctx := context.Background()
+	env.request(t, "POST", "/api/rewards", map[string]any{"name": "Bike", "cost": 500}, adminHeaders())
+	seedPoints(t, env, kidID, 100)
+	env.expectStatus(t, "POST", "/api/rewards/1/commit", nil, childHeaders(kidID), http.StatusCreated)
+	env.expectStatus(t, "POST", "/api/commitments/1/contribute", map[string]any{"amount": 100}, childHeaders(kidID), http.StatusOK)
+
+	if _, _, err := env.store.DebitDecayWithClawback(ctx, int64(kidID), 70, "2026-01-01", "Points decay"); err != nil {
+		t.Fatal(err)
+	}
+	pv := getPoints(t, env, kidID)
+	if pv.Balance != 0 || pv.Committed != 30 {
+		t.Fatalf("after decay: balance %d, saved %d; want 0 and 30", pv.Balance, pv.Committed)
+	}
+	saving := pv.newest(model.ReasonCommitToGoal)
+	decay := pv.newest(model.ReasonPointsDecay)
+	env.expectStatus(t, "POST", undoURL(saving), nil, adminHeaders(), http.StatusConflict)
+	if pv = getPoints(t, env, kidID); pv.Balance != 0 || pv.Committed != 30 {
+		t.Fatalf("refused undo changed points: balance %d, saved %d", pv.Balance, pv.Committed)
+	}
+
+	env.expectStatus(t, "POST", undoURL(decay), nil, adminHeaders(), http.StatusNoContent)
+	pv = getPoints(t, env, kidID)
+	if pv.Balance != 0 || pv.Committed != 100 || len(pv.Transactions) != 2 {
+		t.Fatalf("after undoing decay: balance %d, saved %d, history %v; want 0, 100, seed and saving", pv.Balance, pv.Committed, pv.reasons())
+	}
+
+	env.expectStatus(t, "POST", undoURL(saving), nil, adminHeaders(), http.StatusNoContent)
+	if pv = getPoints(t, env, kidID); pv.Balance != 100 || pv.Committed != 0 || len(pv.Transactions) != 1 {
+		t.Fatalf("after undoing the saving: balance %d, saved %d, history %v", pv.Balance, pv.Committed, pv.reasons())
+	}
+}
+
+// Unchecking a chore already cancels its late penalty and auto-save, so
+// those hidden rows can't be undone to pay the kid a second time.
+func TestUndoRefusesRowsOfUncheckedChore(t *testing.T) {
+	ensureAfterMidnight(t)
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+	seedPoints(t, env, kidID, 50)
+
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title": "Feed the dog", "category": "bonus", "points_value": 10,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID, "day_of_week": int(time.Now().Weekday()),
+		"due_by": "00:01", "expiry_penalty": "penalty", "expiry_penalty_value": 5,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title": "Dishes", "category": "required", "points_value": 10,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/2/schedules", map[string]any{
+		"assigned_to": kidID, "day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+	env.request(t, "POST", "/api/rewards", map[string]any{"name": "Toy", "cost": 100}, adminHeaders())
+	env.expectStatus(t, "POST", "/api/rewards/1/commit", map[string]any{
+		"auto_contribute_percent": 100,
+	}, childHeaders(kidID), http.StatusCreated)
+
+	today := time.Now().Format(model.DateFormat)
+	for _, sched := range []int{1, 2} {
+		env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", sched), map[string]any{
+			"completed_by": kidID, "completion_date": today,
+		}, adminHeaders(), http.StatusCreated)
+	}
+	pv := getPoints(t, env, kidID)
+	penalty := pv.newest(model.ReasonExpiryPenalty)
+	saving := pv.newest(model.ReasonCommitToGoal)
+	if penalty == nil || saving == nil {
+		t.Fatalf("expected a late penalty and an auto-save, got %v", pv.reasons())
+	}
+	for _, sched := range []int{1, 2} {
+		env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/%d/complete?date=%s", sched, today), nil, adminHeaders(), http.StatusNoContent)
+	}
+	before := getPoints(t, env, kidID)
+
+	env.expectStatus(t, "POST", undoURL(penalty), nil, adminHeaders(), http.StatusConflict)
+	env.expectStatus(t, "POST", undoURL(saving), nil, adminHeaders(), http.StatusConflict)
+	if pv = getPoints(t, env, kidID); pv.Balance != before.Balance || pv.Committed != before.Committed {
+		t.Fatalf("refused undo changed points: balance %d->%d, saved %d->%d", before.Balance, pv.Balance, before.Committed, pv.Committed)
+	}
+}
+
+// When an unchecked completion is deleted outright (a re-check that now
+// needs a photo), its old rows stay hidden instead of coming back.
+func TestDeletedUncheckedCompletionStaysHidden(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kidID := env.createChild(t, "Kid")
+	seedPoints(t, env, kidID, 5)
+	env.request(t, "POST", "/api/chores", map[string]any{
+		"title": "Dishes", "category": "required", "points_value": 10,
+	}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{
+		"assigned_to": kidID, "day_of_week": int(time.Now().Weekday()),
+	}, adminHeaders())
+	today := time.Now().Format(model.DateFormat)
+	env.expectStatus(t, "POST", "/api/schedules/1/complete", map[string]any{
+		"completed_by": kidID, "completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/1/complete?date=%s", today), nil, adminHeaders(), http.StatusNoContent)
+	if err := env.store.DeleteCompletion(context.Background(), 1); err != nil {
+		t.Fatal(err)
+	}
+	if pv := getPoints(t, env, kidID); pv.Balance != 5 || len(pv.Transactions) != 1 {
+		t.Fatalf("balance %d, history %v; want 5 and only the seed", pv.Balance, pv.reasons())
+	}
+}

@@ -22,7 +22,9 @@ const GOAL_NOTE_KEY: { prefix: string; key: string }[] = [
 // entry then drops out of the history, so the log never gains "Undo:" rows.
 // Rows that are themselves an undo (chore unchecked, savings returned) have
 // no Undo: checking the chore again is how you reverse those.
-const canUndo = (txn: PointTransaction) => {
+// activeGoals holds the ids of active savings goals: a saving can only be
+// taken back out of one of those (the server refuses the rest).
+const canUndo = (txn: PointTransaction, activeGoals: Map<number, string>) => {
   switch (txn.reason) {
     case 'chore_complete':
     case 'reward_redeem':
@@ -32,8 +34,9 @@ const canUndo = (txn: PointTransaction) => {
     case 'expiry_penalty':
     case 'missed_chore':
     case 'points_decay':
-    case 'commit_to_goal':
       return txn.amount < 0;
+    case 'commit_to_goal':
+      return txn.amount < 0 && txn.reference_id != null && activeGoals.has(txn.reference_id);
     default:
       return false;
   }
@@ -176,7 +179,7 @@ export const ActivityTab: React.FC = () => {
                 <span className={clsx(styles.amount, txn.amount < 0 && styles.amountNeg)}>
                   {txn.amount > 0 ? '+' : txn.amount < 0 ? '−' : ''}{Math.abs(txn.amount)}
                 </span>
-                {canUndo(txn) ? (
+                {canUndo(txn, goalNames) ? (
                   <button
                     type="button"
                     className={ui.iconBtn}
