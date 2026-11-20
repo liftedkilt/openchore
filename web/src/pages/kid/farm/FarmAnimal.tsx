@@ -8,9 +8,11 @@
 // Colours live in a per-species palette (one per coat colour) that the rig is
 // merged with, so a black horse gets a black mane and a red cow a white face
 // without any species drawing needing to know which coat it is wearing.
-import { useId } from 'react';
+import { useId, type CSSProperties } from 'react';
+import clsx from 'clsx';
 import type { PetMood, PetSpecies } from '../../../types';
 import s from './farm.module.css';
+import type { FarmSeason } from './season';
 
 const INK = '#2b2522';
 const LIGHT_INK = '#f6f1e8';
@@ -1116,14 +1118,97 @@ const STARS: readonly [number, number, number][] = [
 ];
 
 /**
+ * Christmas pines along the far hill as [left %, ground %, size]: the ground
+ * is the far hill's ridge at that spot plus a little, so each trunk stands on
+ * the hill. They stay left of the barn (which reaches in to about 75%).
+ */
+const PINES: readonly [number, number, number][] = [
+  [3, 46.5, 0.95], [8, 45, 0.75], [13.5, 43, 1.1], [19, 42, 0.8], [26, 42, 0.95],
+  [45, 46.5, 0.8], [51, 48, 1.05], [57.5, 49, 0.75], [64, 49.5, 0.9],
+];
+
+/** A snow-dusted pine: three tiers with drifts along their lower edges. */
+function SnowyPine({ className, style }: { className?: string; style?: CSSProperties }) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 30 40" aria-hidden="true">
+      <rect className={s.pineTrunk} x={13} y={33} width={4} height={7} />
+      <path className={s.pineTier} d="M15 15 L2 35 H28z" />
+      <path className={s.pineTier} d="M15 7 L4.5 24 H25.5z" />
+      <path className={s.pineTier} d="M15 0.5 L7 13.5 H23z" />
+      <path className={s.pineShade} d="M15 15 L28 35 H19z M15 7 L25.5 24 H18.5z M15 0.5 L23 13.5 H17.5z" />
+      <path className={s.pineSnow} d="M2 35 Q5.5 31.5 9 33.5 Q12 30.5 15 33 Q18 30.5 21 33.5 Q24.5 31.5 28 35z" />
+      <path className={s.pineSnow} d="M4.5 24 Q7.5 21 10.5 22.8 Q13 20.3 15.5 22.5 Q18.5 20.3 21 22.8 Q23.5 21 25.5 24z" />
+      <path className={s.pineSnow} d="M7 13.5 Q9.5 11 12 12.6 Q15 10.5 18 12.6 Q20.5 11 23 13.5z" />
+      <path className={s.pineSnow} d="M15 0.5 L11.6 6 Q13.3 7.2 15 6 Q16.7 7.2 18.4 6z" />
+    </svg>
+  );
+}
+
+interface LightString { wire: string; bulbs: [number, number][] }
+
+/**
+ * A string of lights along a polyline in barn coordinates: the wire droops
+ * between hooks (each run split into `spans`), and a bulb hangs from the
+ * bottom of every droop.
+ */
+function lightString(points: readonly [number, number][], spans: number, sag: number): LightString {
+  let wire = `M${points[0][0]} ${points[0][1]}`;
+  const bulbs: [number, number][] = [];
+  for (let i = 1; i < points.length; i++) {
+    const [ax, ay] = points[i - 1];
+    const [bx, by] = points[i];
+    for (let j = 1; j <= spans; j++) {
+      const x0 = ax + ((bx - ax) * (j - 1)) / spans;
+      const y0 = ay + ((by - ay) * (j - 1)) / spans;
+      const x1 = ax + ((bx - ax) * j) / spans;
+      const y1 = ay + ((by - ay) * j) / spans;
+      const mx = (x0 + x1) / 2;
+      const my = (y0 + y1) / 2;
+      // A quadratic's midpoint sits halfway to its control point.
+      wire += ` Q${mx.toFixed(1)} ${(my + sag * 2).toFixed(1)} ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+      bulbs.push([+mx.toFixed(1), +(my + sag + 2.2).toFixed(1)]);
+    }
+  }
+  return { wire, bulbs };
+}
+
+/** Lights along both roof slopes and draped under the eave. */
+const BARN_LIGHTS: readonly LightString[] = [
+  lightString([[13, 43.5], [60, 11.5], [107, 43.5]], 5, 1.6),
+  lightString([[19, 45.5], [101, 45.5]], 7, 2.2),
+];
+const BULB_COLORS = ['#e8383d', '#2fae5a', '#f6c445', '#3b82f6'] as const;
+
+/**
+ * Falling snowflakes as [left %, size px, fall seconds, phase seconds, still top %, sway seconds].
+ * Spread with fixed steps so the scene looks the same on every load; the
+ * still top % places each flake when reduced motion stops the fall, and each
+ * flake sways at its own pace. The compact scene shows only the first 18.
+ */
+const FLAKES: readonly [number, number, number, number, number, number][] = Array.from({ length: 34 }, (_, i) => [
+  (i * 29.3 + 3) % 100,
+  2 + (i % 3),
+  9 + ((i * 7) % 6),
+  (i * 2.9) % 15,
+  (i * 37) % 95,
+  2.6 + ((i * 3) % 7) * 0.3,
+]);
+
+/**
  * The farm's scenery: sky extras (stars, moon or sun), two rolling hills, the
  * barn and the fence. Every colour and every theme-dependent part comes from
  * the --farm-* dials in themes.css, so the same markup is a sunny pastel farm,
  * a dusk farm or a bold flat farm depending on the skin around it.
  * Render it first inside the scene root (s.farm).
+ *
+ * In the Christmas season (pass `season="christmas"` and put s.christmas on
+ * the scene root, which swaps the field and hills to the --farm-snow-* dials)
+ * it adds snowy pines along the far hill, snow on the barn roof and fence,
+ * strings of lights on the barn, and gently falling snow.
  */
-export function FarmBackdrop() {
+export function FarmBackdrop({ season }: { season?: FarmSeason } = {}) {
   const posts = `farm-posts-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  const christmas = season === 'christmas';
   return (
     <>
       <div className={s.sky} aria-hidden="true">
@@ -1146,6 +1231,13 @@ export function FarmBackdrop() {
         <path className={s.hillNear} d="M0 104 Q120 88 240 104 T400 100 V200 H0z" />
         <path className={s.ridge} d="M-2 104 Q120 88 240 104 T402 100" />
       </svg>
+      {christmas && (
+        <div className={s.pines} aria-hidden="true">
+          {PINES.map(([x, ground, k], i) => (
+            <SnowyPine key={i} className={s.pine} style={{ left: `${x}%`, top: `${ground}%`, ['--k' as string]: k }} />
+          ))}
+        </div>
+      )}
       <svg className={s.barn} viewBox="0 0 120 100" preserveAspectRatio="xMaxYMax meet" aria-hidden="true">
         <rect className={s.barnWall} x={18} y={42} width={84} height={56} />
         <path className={s.barnRoof} d="M10 44 L60 10 L110 44z" />
@@ -1157,12 +1249,37 @@ export function FarmBackdrop() {
           <rect className={s.barnWindow} x={83} y={60} width={12} height={12} rx={1.5} />
           <path className={s.barnMullion} d="M31 60 v12 M25 66 h12 M89 60 v12 M83 66 h12" />
         </g>
+        {christmas && (
+          <g className={s.barnHoliday}>
+            <path className={s.roofSnowEdge} d="M9.5 44.5 L60 9.5 L110.5 44.5" />
+            <path className={s.roofSnow} d="M9.5 44.5 L60 9.5 L110.5 44.5" />
+            {BARN_LIGHTS.map((str, i) => <path key={i} className={s.lightWire} d={str.wire} />)}
+            {BARN_LIGHTS.flatMap(str => str.bulbs).map(([x, y], i) => (
+              // Every other bulb blinks in turn, so the barn repaints only twice a cycle.
+              <circle
+                key={i}
+                className={clsx(s.bulb, i % 2 === 1 && s.bulbAlt)}
+                cx={x}
+                cy={y}
+                r={2.3}
+                style={{ fill: BULB_COLORS[i % BULB_COLORS.length] }}
+              />
+            ))}
+          </g>
+        )}
       </svg>
       <svg className={s.fence} aria-hidden="true">
         <defs>
           <pattern id={posts} width={34} height={34} patternUnits="userSpaceOnUse">
             <line className={s.postEdge} x1={6} y1={8} x2={6} y2={30} />
             <line className={s.post} x1={6} y1={8} x2={6} y2={30} />
+            {christmas && (
+              <>
+                {/* A zero-length round-capped line is a dot the post's width; CSS squashes it into a mound on the post top. */}
+                <line className={s.postSnowEdge} x1={6} y1={8} x2={6} y2={8} />
+                <line className={s.postSnow} x1={6} y1={8} x2={6} y2={8} />
+              </>
+            )}
           </pattern>
         </defs>
         <rect x={0} y={0} width="100%" height={34} fill={`url(#${posts})`} />
@@ -1170,7 +1287,29 @@ export function FarmBackdrop() {
         <line className={s.railEdge} x1={-10} y1={23.5} x2="110%" y2={23.5} />
         <line className={s.rail} x1={-10} y1={15.5} x2="110%" y2={15.5} />
         <line className={s.rail} x1={-10} y1={23.5} x2="110%" y2={23.5} />
+        {/* Snow strips are drawn on each rail's centre line; CSS lifts them onto its top edge. */}
+        {christmas && <line className={s.railSnow} x1={-10} y1={15.5} x2="110%" y2={15.5} />}
+        {christmas && <line className={s.railSnow} x1={-10} y1={23.5} x2="110%" y2={23.5} />}
       </svg>
+      {christmas && (
+        <div className={s.snowfall} aria-hidden="true">
+          {FLAKES.map(([x, d, t, delay, y, sway], i) => (
+            <span
+              key={i}
+              className={s.flake}
+              style={{
+                left: `${x}%`,
+                animationDuration: `${t}s`,
+                animationDelay: `${-delay}s`,
+                ['--d' as string]: `${d}px`,
+                ['--y' as string]: `${y}%`,
+                ['--sway' as string]: `${sway}s`,
+                ['--sway-delay' as string]: `${-delay * 0.7}s`,
+              }}
+            />
+          ))}
+        </div>
+      )}
     </>
   );
 }

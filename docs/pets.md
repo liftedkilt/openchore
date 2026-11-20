@@ -70,6 +70,10 @@ saved for, and are hidden while farm pets are off. Owned accessories can be
 switched on and off for free (`PATCH /api/me/pet`). Undoing a pet-care
 redemption refunds the points but leaves the effect.
 
+## Christmas season
+
+From five weeks before Christmas (November 20) through one week after (January 1), the farm scene dresses for winter: snow covers the field and hills, snowy pines line the far hill, the barn gets a snowy roof and strings of lights, and snow falls across the scene (it stays still when the device asks for reduced motion). The season follows the device's own date, needs no setting, and is purely visual. To preview it on any day, add `?season=christmas` to a page URL (`?season=none` forces it off, `?season=auto` returns to the calendar); the choice lasts for that browser tab. The logic lives in `web/src/pages/kid/farm/season.ts`, and the colours come from the `--farm-snow-*` / `--farm-tree*` dials in `web/src/design/themes.css`.
+
 ## API
 
 - `GET /api/pets` – the farm: `enabled` and every animal with mood and owner.
