@@ -266,9 +266,114 @@
    filters on the SVG itself still stack on top of it. */
 .farm .body, .farm .shelter { filter: var(--farm-art-filter); }
 
+/* --- Christmas season (pages/kid/farm/season.ts) ---
+   The scene root gets .christmas: the field and hills turn to snow, and the
+   backdrop adds pines, roof and fence snow, barn lights and falling snow.
+   Colours come from the --farm-snow-* / --farm-tree* dials in themes.css. */
+.christmas {
+  --farm-field: var(--farm-snow-field);
+  --farm-hill-far: var(--farm-snow-hill-far);
+  --farm-hill-near: var(--farm-snow-hill-near);
+  --farm-field-ink: var(--farm-snow-ink);
+  --farm-fence-rail: var(--farm-snow-fence-rail);
+  --farm-fence-post: var(--farm-snow-fence-post);
+  --farm-fence-opacity: 1;
+}
+
+/* Pines stand on the far hill behind the barn and fence; each is sized by
+   the scene's height (--k scales it) and keeps its shape. */
+.pines { position: absolute; inset: 0; pointer-events: none; }
+.pine {
+  position: absolute;
+  height: calc(24% * var(--k, 1));
+  aspect-ratio: 3 / 4;
+  transform: translate(-50%, -100%);
+  overflow: visible;
+}
+.pineTier, .pineTrunk, .pineSnow {
+  stroke: var(--farm-line);
+  stroke-width: var(--farm-line-w);
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.pineTier { fill: var(--farm-tree); }
+.pineShade { fill: var(--farm-tree-shade); }
+.pineTrunk { fill: var(--farm-barn-door); }
+.pineSnow { fill: var(--farm-snow); }
+
+.roofSnow, .roofSnowEdge {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.roofSnow { stroke: var(--farm-snow); stroke-width: 4.5; }
+/* Outlines the roof snow on the skins that outline scenery (nothing on soft skins). */
+.roofSnowEdge { stroke: var(--farm-line); stroke-width: calc(4.5px + 2 * var(--farm-line-w)); }
+.lightWire { fill: none; stroke: var(--farm-light-wire); stroke-width: 0.8; }
+.bulb {
+  stroke: var(--farm-line);
+  stroke-width: calc(var(--farm-line-w) * 0.6);
+  vector-effect: non-scaling-stroke;
+  filter: var(--farm-light-glow);
+  /* Two groups blink in turn with a hard step, not a fade: SVG can't be
+     composited, so each change repaints the barn, and stepping keeps that to
+     twice a cycle instead of every frame. */
+  animation: farm-bulb 2.4s steps(1, end) infinite;
+}
+.bulbAlt { animation-delay: -1.2s; }
+@keyframes farm-bulb { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+/* Snow on the fence. A rail's snow is a strip 70% of the rail's thickness,
+   lifted from the rail's centre so it rests on its top edge (inside any
+   outline). A post's snow is a dot a little wider than the post, centred on
+   the post top and squashed into a low mound; its edge copy outlines it on
+   the skins that outline scenery. */
+.railSnow {
+  stroke: var(--farm-snow);
+  stroke-width: calc(var(--farm-rail-w) * 0.7);
+  stroke-linecap: butt;
+  transform: translateY(calc(var(--farm-rail-w) * -0.5));
+}
+.postSnow, .postSnowEdge {
+  stroke-linecap: round;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: translateY(-0.5px) scaleY(0.6);
+}
+.postSnow { stroke: var(--farm-snow); stroke-width: calc(var(--farm-post-w) + 1.5px); }
+.postSnowEdge { stroke: var(--farm-line); stroke-width: calc(var(--farm-post-w) + 1.5px + 1.6 * var(--farm-line-w)); }
+
+/* Snow falls in front of the scenery but behind the animals (z 10+), and
+   never takes a tap. Each flake is a full-height column whose dot sits at
+   its top, so translating the column by its own height crosses the scene. */
+.snowfall { position: absolute; inset: 0; z-index: 5; overflow: hidden; pointer-events: none; }
+.flake {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: var(--d);
+  transform: translateY(var(--y));
+  animation: farm-fall 12s linear infinite;
+}
+.flake::before {
+  content: '';
+  display: block;
+  width: var(--d);
+  height: var(--d);
+  border-radius: 50%;
+  background: var(--farm-flake);
+  /* A faint ring keeps white flakes visible over white snow. */
+  box-shadow: var(--farm-flake-ring);
+  animation: farm-sway var(--sway, 3.2s) ease-in-out var(--sway-delay, 0s) infinite alternate;
+}
+/* The small farm strip needs fewer flakes to look just as snowy. */
+.compact .flake:nth-child(n + 19) { display: none; }
+@keyframes farm-fall { from { transform: translateY(-4%); } to { transform: translateY(102%); } }
+@keyframes farm-sway { from { transform: translateX(-4px); } to { transform: translateX(4px); } }
+
 @keyframes farm-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) {
-  .star { animation: none; }
+  .star, .bulb, .flake, .flake::before { animation: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .walking :global(.farm-frame-rest) { visibility: visible; }

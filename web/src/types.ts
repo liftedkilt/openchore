@@ -172,6 +172,8 @@ export interface Chore {
   requires_approval: boolean;
   requires_photo: boolean;
   photo_source?: 'child' | 'external' | 'both';
+  /** Another app finishes it through the API; the assignee can't tick it. */
+  auto_complete?: boolean;
   tts_audio_url?: string;
   /** "manual", "self" (a person added it for themselves), … */
   source?: string;
@@ -231,6 +233,7 @@ export interface PointTransaction {
   reason: 'chore_complete' | 'chore_uncomplete' | 'reward_redeem' | 'streak_bonus' | 'admin_adjust' | 'expiry_penalty' | 'points_decay' | 'missed_chore' | 'commit_to_goal' | 'goal_break';
   reference_id?: number;
   note?: string;
+  idempotency_key?: string;
   created_at: string;
 }
 
@@ -426,6 +429,8 @@ export interface ScheduledChore {
   requires_approval: boolean;
   requires_photo: boolean;
   photo_source?: 'child' | 'external' | 'both';
+  /** Another app finishes it through the API; the assignee can't tick it. */
+  auto_complete?: boolean;
   assignment_type: string;
   available_at?: string;
   due_by?: string;

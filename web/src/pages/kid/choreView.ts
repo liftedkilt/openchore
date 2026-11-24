@@ -99,6 +99,8 @@ export function choreView(c: ScheduledChore, ctx: ChoreViewContext): ChoreView {
       case 'excused':
         return { ...base, state: 'done', meta: t('kid.chore.excused') };
       default:
+        // Another app ticked it; the person can't untick it.
+        if (c.auto_complete) base.canToggle = false;
         if (isToday && c.category === 'core' && !ctx.requiredDone) {
           return { ...base, state: 'done', meta: t('kid.chore.pointsPending', { count: c.points_value }) };
         }
@@ -145,6 +147,11 @@ export function choreView(c: ScheduledChore, ctx: ChoreViewContext): ChoreView {
   // --- Bonus waits for everything else ---
   if (c.category === 'bonus' && !ctx.bonusOpen) {
     return { ...base, state: 'locked', canToggle: false, photo: false };
+  }
+
+  // --- Another app ticks it off when the work is done ---
+  if (c.auto_complete) {
+    return { ...base, canToggle: false, photo: false, meta: t('kid.chore.autoComplete'), points: pts };
   }
 
   // --- To do ---

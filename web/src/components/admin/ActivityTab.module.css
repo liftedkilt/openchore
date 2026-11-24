@@ -64,3 +64,9 @@
 .amountNeg {
   color: var(--urgent);
 }
+
+/* Keeps amounts aligned on rows without an Undo button. */
+.undoSpacer {
+  width: 44px;
+  flex: none;
+}

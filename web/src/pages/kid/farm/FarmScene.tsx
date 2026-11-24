@@ -9,6 +9,7 @@ import type { Pet } from '../../../types';
 import { FarmAnimal, petPicture, FarmBackdrop, Shelter } from './FarmAnimal';
 import { Rosette } from './Rosette';
 import s from './farm.module.css';
+import { useFarmSeason } from './season';
 
 interface Spot { x: number; y: number; face: 1 | -1; ms: number; walking: boolean }
 
@@ -52,6 +53,7 @@ export interface FarmSceneProps {
 
 export function FarmScene({ pets, meId, compact, owners = !compact, onSelect, className }: FarmSceneProps) {
   const { t } = useTranslation();
+  const season = useFarmSeason();
   const out = pets.filter(p => !p.hiding);
   const hiding = pets.filter(p => p.hiding);
   const [spots, setSpots] = useState<Record<number, Spot>>({});
@@ -117,8 +119,13 @@ export function FarmScene({ pets, meId, compact, owners = !compact, onSelect, cl
   );
 
   return (
-    <div className={clsx(s.farm, compact && s.compact, className)} role="group" aria-label={t('kid.farm.title')}>
-      <FarmBackdrop />
+    <div
+      className={clsx(s.farm, compact && s.compact, season === 'christmas' && s.christmas, className)}
+      role="group"
+      aria-label={t('kid.farm.title')}
+      data-season={season ?? undefined}
+    >
+      <FarmBackdrop season={season} />
 
       {hiding.length > 0 && (
         <ul className={s.shelters} aria-label={t('kid.farm.hidingTitle')}>

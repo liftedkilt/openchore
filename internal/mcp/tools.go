@@ -187,6 +187,10 @@ func allTools() []*Tool {
 			"amount":  integer("Points to add (negative to remove). Not zero."),
 			"note":    str("Reason shown in the history."),
 		}})
+	add(endpoint{name: "undo_points_entry", title: "Undo a points entry",
+		desc:   "Undo one entry from get_person_points' history, and it disappears from the history: chore points uncheck the chore, a reward purchase is refunded, and a penalty, manual adjustment, streak bonus or goal saving is cancelled. Each entry can be undone once; entries that are themselves an undo (chore unchecked, savings returned) can't be.",
+		method: http.MethodPost, path: "/points/transactions/{id}/undo",
+		props:  map[string]any{"id": integer("The entry's transaction id from the points history.")}})
 	add(endpoint{name: "get_decay_settings", title: "Point decay settings", readOnly: true,
 		desc:   "A person's point decay settings (balances slowly shrinking).",
 		method: http.MethodGet, path: "/admin/users/{id}/decay", props: map[string]any{"id": integer("Person id.")}})

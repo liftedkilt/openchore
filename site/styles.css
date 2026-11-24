@@ -200,6 +200,8 @@ figcaption b { display: block; color: var(--ink); font-size: 18px; }
 .split h2 { margin-bottom: 22px; }
 .split__shots { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .split__shots img:last-child { transform: translateY(40px); }
+.split__shots--one { grid-template-columns: 1fr; max-width: 340px; justify-self: center; }
+.split__shots--one img:last-child { transform: none; }
 @media (max-width: 860px) {
   .split { grid-template-columns: 1fr; gap: 40px; }
   .split__shots img:last-child { transform: none; }

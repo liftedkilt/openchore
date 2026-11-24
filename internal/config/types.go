@@ -124,6 +124,7 @@ type ChoreConfig struct {
 	MissedPenalty    int              `yaml:"missed_penalty,omitempty"`
 	RequiresApproval bool             `yaml:"requires_approval,omitempty"`
 	RequiresPhoto    bool             `yaml:"requires_photo,omitempty"`
+	AutoComplete     bool             `yaml:"auto_complete,omitempty"`
 	PhotoSource      string           `yaml:"photo_source,omitempty"`
 	Schedules        []ScheduleConfig `yaml:"schedules,omitempty"`
 }

@@ -495,6 +495,52 @@ func TestMCPUnassignPartialFailure(t *testing.T) {
 	}
 }
 
+func TestMCPAssignPartialFailure(t *testing.T) {
+	env := setupMCP(t)
+	kid := env.mustTool(t, "create_person", map[string]any{"name": "Kid", "role": "child"})
+	const missing = 99999 // no such person, so this schedule is refused
+
+	// create_chore: the chore is made, one of two assignments fails.
+	text, isErr := env.callTool(t, adminHeaders(), "create_chore", map[string]any{
+		"title": "Feed the cat", "category": "core",
+		"user_ids": []any{kid["id"], missing}, "days": []any{"monday"},
+	})
+	if !isErr {
+		t.Fatalf("create_chore partial failure should set isError: %v", text)
+	}
+	var created map[string]any
+	if err := json.Unmarshal([]byte(text.(string)), &created); err != nil {
+		t.Fatalf("result is not JSON: %v", text)
+	}
+	assignment := created["assignment"].(map[string]any)
+	if assignment["created"] != float64(1) || len(assignment["errors"].([]any)) != 1 {
+		t.Errorf("create_chore assignment = %v, want one created and one error", assignment)
+	}
+	choreID := created["chore"].(map[string]any)["id"]
+
+	// assign_chore: same split.
+	text, isErr = env.callTool(t, adminHeaders(), "assign_chore", map[string]any{
+		"chore_id": choreID, "user_ids": []any{kid["id"], missing}, "days": []any{"tuesday"},
+	})
+	if !isErr {
+		t.Fatalf("assign_chore partial failure should set isError: %v", text)
+	}
+	var res map[string]any
+	if err := json.Unmarshal([]byte(text.(string)), &res); err != nil {
+		t.Fatalf("result is not JSON: %v", text)
+	}
+	if res["created"] != float64(1) || len(res["errors"].([]any)) != 1 {
+		t.Errorf("assign_chore = %v, want one created and one error", res)
+	}
+
+	// A clean assign is still a plain success.
+	if out := env.mustTool(t, "assign_chore", map[string]any{
+		"chore_id": choreID, "user_ids": []any{kid["id"]}, "days": []any{"wednesday"},
+	}); out["created"] != float64(1) {
+		t.Errorf("assign_chore = %v, want one created", out)
+	}
+}
+
 func TestMCPBatchLimit(t *testing.T) {
 	env := setupMCP(t)
 	batch := func(n int) []any {

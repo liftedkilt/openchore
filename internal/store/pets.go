@@ -103,14 +103,15 @@ func (s *Store) SetPetAccessory(ctx context.Context, userID int64, item string) 
 	return err
 }
 
-// ListPets returns every pet in the household.
+// ListPets returns every pet in the household. The result is never nil, so
+// an empty farm serialises as [] rather than null.
 func (s *Store) ListPets(ctx context.Context) ([]model.Pet, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT `+petColumns+` FROM pets ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var pets []model.Pet
+	pets := []model.Pet{}
 	for rows.Next() {
 		p, err := scanPet(rows)
 		if err != nil {

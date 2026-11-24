@@ -87,6 +87,9 @@ type createChoreRequest struct {
 	RequiresApproval   bool   `json:"requires_approval"`
 	RequiresPhoto      bool   `json:"requires_photo"`
 	PhotoSource        string `json:"photo_source"`
+	// AutoComplete is a pointer so clients that don't know the field (older
+	// integrations) leave it alone on update.
+	AutoComplete *bool `json:"auto_complete"`
 }
 
 func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -132,6 +135,7 @@ func (h *ChoreHandler) Create(w http.ResponseWriter, r *http.Request) {
 		RequiresApproval:   req.RequiresApproval,
 		RequiresPhoto:      req.RequiresPhoto,
 		PhotoSource:        photoSource,
+		AutoComplete:       req.AutoComplete != nil && *req.AutoComplete,
 		Source:             "manual",
 		CreatedBy:          createdBy,
 	}
@@ -200,6 +204,9 @@ func (h *ChoreHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Always update booleans as they might be toggled off (or we could rely on a PATCH approach, but here we just assign)
 	existing.RequiresApproval = req.RequiresApproval
 	existing.RequiresPhoto = req.RequiresPhoto
+	if req.AutoComplete != nil {
+		existing.AutoComplete = *req.AutoComplete
+	}
 	if req.PhotoSource != "" {
 		if req.PhotoSource != model.PhotoSourceChild && req.PhotoSource != model.PhotoSourceExternal && req.PhotoSource != model.PhotoSourceBoth {
 			writeError(w, http.StatusBadRequest, "photo_source must be child, external, or both")
@@ -407,6 +414,15 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	}
 	actingForOther := caller.Role == model.RoleAdmin && completedBy != caller.ID
 
+	// Fetch chore details to check category and requirements
+	chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
+
+	// A chore another app finishes can't be ticked by the person doing it.
+	if chore != nil && chore.AutoComplete && caller.Role != model.RoleAdmin {
+		writeError(w, http.StatusForbidden, autoCompleteMessage)
+		return
+	}
+
 	// Enforce time lock
 	now := time.Now()
 	nowTime := now.Format("15:04")
@@ -451,11 +467,37 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// For "child" photo source the kid takes the photo at completion time.
+	// For "external" or "both", a photo can be attached later.
+	photoSource := model.PhotoSourceChild
+	if chore != nil {
+		photoSource = chore.PhotoSource
+		if photoSource == "" {
+			photoSource = model.PhotoSourceChild
+		}
+	}
+	// A parent marking a chore done on someone's behalf vouches for it and
+	// doesn't need to supply the photo.
+	needsChildPhoto := chore != nil && chore.RequiresPhoto && photoSource == model.PhotoSourceChild && !actingForOther
+
 	// Check if already completed
 	existing, err := h.store.GetCompletionForScheduleDate(r.Context(), scheduleID, req.CompletionDate)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to check completion")
 		return
+	}
+	if existing != nil && existing.UncompletedAt != nil && needsChildPhoto &&
+		existing.PhotoURL == "" && req.PhotoURL == "" &&
+		(existing.Status == model.StatusApproved || existing.Status == model.StatusPending) {
+		// A photo-less completion from before the chore needed a photo (or
+		// one a parent already let through). Reviving it would skip the
+		// photo, so drop it and take the normal path: photo required, or
+		// skip it and wait for a parent.
+		if err := h.store.DeleteCompletion(r.Context(), existing.ID); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to clear previous attempt")
+			return
+		}
+		existing = nil
 	}
 	if existing != nil {
 		if existing.UncompletedAt != nil {
@@ -548,22 +590,9 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Fetch chore details to check category and requirements
-	chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID)
-
-	// For "child" photo source the kid takes the photo at completion time.
-	// For "external" or "both", a photo can be attached later.
-	photoSource := model.PhotoSourceChild
-	if chore != nil {
-		photoSource = chore.PhotoSource
-		if photoSource == "" {
-			photoSource = model.PhotoSourceChild
-		}
-	}
-	// A parent marking a chore done on someone's behalf vouches for it and
-	// doesn't need to supply the photo. Anyone else can skip the photo
-	// explicitly, and the chore then waits for a parent.
-	missingPhoto := chore != nil && chore.RequiresPhoto && req.PhotoURL == "" && photoSource == model.PhotoSourceChild && !actingForOther
+	// Anyone else can skip the photo explicitly, and the chore then waits
+	// for a parent.
+	missingPhoto := needsChildPhoto && req.PhotoURL == ""
 	if missingPhoto && !req.SkipPhoto {
 		writeError(w, http.StatusBadRequest, "a photo is required to complete this chore")
 		return
@@ -755,12 +784,27 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 	if dateStr == "" {
 		dateStr = time.Now().Format(model.DateFormat)
 	}
+	if status, msg := h.uncomplete(r, scheduleID, dateStr); status != 0 {
+		writeError(w, status, msg)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
 
+// uncomplete unchecks a chore for a date: it debits the points it earned,
+// returns any auto-save, recalculates the streak and fires the webhook.
+// Returns a non-zero HTTP status and message on failure. Shared by the
+// uncheck endpoint and Undo in the points history.
+func (h *ChoreHandler) uncomplete(r *http.Request, scheduleID int64, dateStr string) (int, string) {
 	// Get the schedule to check for FCFS
 	schedule, _ := h.store.GetSchedule(r.Context(), scheduleID)
 	if schedule != nil && !canActOnSchedule(UserFromContext(r.Context()), schedule) {
-		writeError(w, http.StatusForbidden, "this chore is assigned to someone else")
-		return
+		return http.StatusForbidden, "this chore is assigned to someone else"
+	}
+	if schedule != nil && UserFromContext(r.Context()).Role != model.RoleAdmin {
+		if chore, _ := h.store.GetChore(r.Context(), schedule.ChoreID); chore != nil && chore.AutoComplete {
+			return http.StatusForbidden, autoCompleteMessage
+		}
 	}
 
 	// Get completion before deleting so we can reverse points
@@ -771,8 +815,7 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 	// UncompleteChore (its fallback DELETE would destroy the preserved row).
 	// The endpoint is idempotent.
 	if existing != nil && existing.UncompletedAt != nil {
-		w.WriteHeader(http.StatusNoContent)
-		return
+		return 0, ""
 	}
 	var completedBy int64
 	var completionID int64
@@ -789,13 +832,11 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 	// FCFS: uncomplete all siblings in the group
 	if schedule != nil && schedule.AssignmentType == model.AssignmentFCFS && schedule.FcfsGroupID != nil {
 		if err := h.store.UncompleteFCFSGroupAndDebitPoints(r.Context(), *schedule.FcfsGroupID, dateStr, completedBy, existing, netPoints); err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to uncomplete FCFS group")
-			return
+			return http.StatusInternalServerError, "failed to uncomplete FCFS group"
 		}
 	} else {
 		if err := h.store.UncompleteChoreAndDebitPoints(r.Context(), scheduleID, dateStr, completedBy, completionID, netPoints); err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to uncomplete chore")
-			return
+			return http.StatusInternalServerError, "failed to uncomplete chore"
 		}
 	}
 
@@ -826,8 +867,7 @@ func (h *ChoreHandler) Uncomplete(w http.ResponseWriter, r *http.Request) {
 		"user_name":   uncompleteUserName,
 		"date":        dateStr,
 	})
-
-	w.WriteHeader(http.StatusNoContent)
+	return 0, ""
 }
 
 // --- Approvals ---
@@ -1209,3 +1249,7 @@ func completerFor(caller *model.User, schedule *model.ChoreSchedule, requested i
 	}
 	return requested, nil
 }
+
+// autoCompleteMessage is what the assignee is told when they try to tick (or
+// untick) a chore that another app finishes for them.
+const autoCompleteMessage = "this chore is ticked off for you when the work is done"

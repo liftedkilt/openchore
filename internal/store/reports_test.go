@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/liftedkilt/openchore/internal/model"
+	"github.com/liftedkilt/openchore/internal/store"
 )
 
 // --- Empty data tests ---
@@ -510,5 +511,79 @@ func TestReportDateRangeFiltering(t *testing.T) {
 	}
 	if !strings.HasPrefix(trend[0].Date, "2026-03-25") {
 		t.Errorf("expected date prefix 2026-03-25, got %s", trend[0].Date)
+	}
+}
+
+// The Points report adds up the same way as a kid's balance plus savings:
+// chores in, penalties and decay out, removed penalties cancelled, goal
+// savings not counted as lost. Mirrors Gabe's Nov 16-18 history.
+func TestReportPointsSummary_NetBreakdown(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+	today := time.Now().Format("2006-01-02")
+
+	admin := createTestUser(t, s, "Admin", "admin")
+	kid := createTestUser(t, s, "Gabe", "child")
+	chore := createTestChore(t, s, "Feed Hondo", 5, admin.ID)
+	sched := createTestSchedule(t, s, chore.ID, kid.ID, 1)
+	cc := &model.ChoreCompletion{ChoreScheduleID: sched.ID, CompletedBy: kid.ID, Status: "approved", CompletionDate: today}
+	if err := s.CompleteChore(ctx, cc); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 11; i++ {
+		if err := s.CreditChorePoints(ctx, kid.ID, cc.ID, 5); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 4; i++ {
+		if err := s.DebitExpiryPenalty(ctx, kid.ID, cc.ID, 5); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// One of the four penalties is removed again.
+	txs, err := s.ListPointTransactions(ctx, kid.ID, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ReversePointTransaction(ctx, txs[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	// A +5 / -5 pair of manual adjustments cancels out.
+	if err := s.AdminAdjustPoints(ctx, kid.ID, 5, "oops"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AdminAdjustPoints(ctx, kid.ID, -5, "Undo: oops"); err != nil {
+		t.Fatal(err)
+	}
+	// Saving toward a goal moves points but doesn't lose them.
+	r := &model.Reward{Name: "Gift Card", Cost: 50, Active: true, CreatedBy: admin.ID}
+	if err := s.CreateReward(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	c, err := s.CreateCommitment(ctx, kid.ID, r.ID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ContributeToCommitment(ctx, kid.ID, c.ID, 40); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := s.ReportPointsSummary(ctx, today, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got *store.PointsSummaryRow
+	for i := range rows {
+		if rows[i].UserID == kid.ID {
+			got = &rows[i]
+		}
+	}
+	if got == nil {
+		t.Fatal("kid missing from report")
+	}
+	want := store.PointsSummaryRow{UserID: kid.ID, Name: "Gabe", PointsEarned: 55, PointsAdjusted: 0, PointsPenalties: 15, PointsNet: 40}
+	if *got != want {
+		t.Errorf("got %+v, want %+v", *got, want)
 	}
 }

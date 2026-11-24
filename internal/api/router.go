@@ -188,6 +188,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 				// Points management
 				r.Get("/points/balances", points.GetAllBalances)
 				r.Post("/points/adjust", points.Adjust)
+				r.Post("/points/transactions/{id}/undo", chores.UndoPointsEntry)
 				r.Get("/admin/users/{id}/decay", points.GetDecayConfig)
 				r.Put("/admin/users/{id}/decay", points.SetDecayConfig)
 

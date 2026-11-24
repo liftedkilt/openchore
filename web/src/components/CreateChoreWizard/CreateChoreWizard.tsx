@@ -21,6 +21,7 @@ interface ChoreData {
   estimatedMinutes: number;
   requiresApproval: boolean;
   requiresPhoto: boolean;
+  autoComplete: boolean;
   photoSource: 'child' | 'external' | 'both';
 }
 
@@ -51,7 +52,7 @@ const WEEKENDS = [0, 6];
 
 const defaultChoreData: ChoreData = {
   title: '', description: '', category: 'core', icon: '', points: 5, missedPenalty: 0,
-  estimatedMinutes: 5, requiresApproval: false, requiresPhoto: false, photoSource: 'child',
+  estimatedMinutes: 5, requiresApproval: false, requiresPhoto: false, autoComplete: false, photoSource: 'child',
 };
 
 const defaultScheduleData: ScheduleData = {
@@ -147,6 +148,7 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
         requires_approval: chore.requiresApproval,
         requires_photo: chore.requiresPhoto,
         photo_source: chore.requiresPhoto ? chore.photoSource : 'child',
+        auto_complete: chore.autoComplete,
       });
 
       if (!skipSchedule && schedule.selectedUsers.length > 0) {
@@ -254,6 +256,10 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
         <label className={styles.checkRow}>
           <input type="checkbox" checked={chore.requiresPhoto} onChange={e => setChore(c => ({ ...c, requiresPhoto: e.target.checked }))} />
           <span className={styles.checkLabel}>{t('admin.createChore.field.requiresPhoto')}</span>
+        </label>
+        <label className={styles.checkRow}>
+          <input type="checkbox" checked={chore.autoComplete} onChange={e => setChore(c => ({ ...c, autoComplete: e.target.checked }))} />
+          <span className={styles.checkLabel}>{t('admin.createChore.field.autoComplete')}</span>
         </label>
       </div>
       {chore.requiresPhoto && (
@@ -404,13 +410,14 @@ const CreateChoreWizard: React.FC<Props> = ({ isOpen, onClose, onComplete, users
                 <dd className={styles.reviewValue}>{chore.estimatedMinutes} {t('admin.createChore.review.min')}</dd>
               </div>
             )}
-            {(chore.requiresApproval || chore.requiresPhoto) && (
+            {(chore.requiresApproval || chore.requiresPhoto || chore.autoComplete) && (
               <div className={styles.reviewRow}>
                 <dt className={styles.reviewLabel}>{t('admin.createChore.review.flagsLabel')}</dt>
                 <dd className={styles.reviewValue}>
                   {[
                     chore.requiresApproval && t('admin.createChore.review.flagApproval'),
                     chore.requiresPhoto && t('admin.createChore.review.flagPhoto', { source: chore.photoSource === 'child' ? t('admin.createChore.review.photoSourceChild') : chore.photoSource === 'external' ? t('admin.createChore.review.photoSourceExternal') : t('admin.createChore.review.photoSourceBoth') }),
+                    chore.autoComplete && t('admin.createChore.review.flagAutoComplete'),
                   ].filter(Boolean).join(', ')}
                 </dd>
               </div>

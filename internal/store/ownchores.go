@@ -30,7 +30,7 @@ func insertSchedulesTx(ctx context.Context, tx *sql.Tx, choreID int64, schedules
 // ListOwnChores returns the chores userID added for themselves, by title.
 func (s *Store) ListOwnChores(ctx context.Context, userID int64) ([]model.Chore, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_audio_url, created_by, created_at
+		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_audio_url, created_by, created_at, auto_complete
 		 FROM chores WHERE source = ? AND created_by = ? ORDER BY title, id`, model.ChoreSourceSelf, userID)
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func (s *Store) ListOwnChores(ctx context.Context, userID int64) ([]model.Chore,
 	for rows.Next() {
 		var c model.Chore
 		var reqApp, reqPho int
-		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &reqApp, &reqPho, &c.PhotoSource, &c.Source, &c.ExternalID, &c.TTSAudioURL, &c.CreatedBy, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &reqApp, &reqPho, &c.PhotoSource, &c.Source, &c.ExternalID, &c.TTSAudioURL, &c.CreatedBy, &c.CreatedAt, &c.AutoComplete); err != nil {
 			return nil, err
 		}
 		c.RequiresApproval = reqApp == 1
@@ -63,9 +63,9 @@ func (s *Store) CreateChoreWithSchedules(ctx context.Context, c *model.Chore, sc
 	}
 	defer tx.Rollback()
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO chores (title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_audio_url, created_by)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, boolToInt(c.RequiresApproval), boolToInt(c.RequiresPhoto), photoSource, c.Source, c.ExternalID, c.TTSAudioURL, c.CreatedBy)
+		`INSERT INTO chores (title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_audio_url, created_by, auto_complete)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, boolToInt(c.RequiresApproval), boolToInt(c.RequiresPhoto), photoSource, c.Source, c.ExternalID, c.TTSAudioURL, c.CreatedBy, boolToInt(c.AutoComplete))
 	if err != nil {
 		return err
 	}

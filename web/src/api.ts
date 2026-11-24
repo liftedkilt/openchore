@@ -258,6 +258,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ user_id: userId, amount, note }),
       }),
+    // Undoes one history entry (unchecks a chore, refunds a reward, or
+    // cancels a penalty, adjustment or goal saving); it then drops out of
+    // the history. Refused (409) if it was already undone.
+    undo: (transactionId: number) =>
+      fetchWithAuth<void>(`/points/transactions/${transactionId}/undo`, { method: 'POST' }),
   },
   rewards: {
     list: () => fetchWithAuth<Reward[]>('/rewards'),
@@ -300,7 +305,8 @@ export const api = {
     unlink: (id: number) => fetchWithAuth(`/admin/friends/${id}`, { method: 'DELETE' }),
   },
   pets: {
-    farm: () => fetchWithAuth<Farm>('/pets'),
+    // Servers before the empty-farm fix sent `pets: null` for a farm with no animals.
+    farm: () => fetchWithAuth<Farm>('/pets').then(f => ({ ...f, pets: f.pets ?? [] })),
     mine: () => fetchWithAuth<{ enabled: boolean; pet: Pet | null }>('/me/pet'),
     adopt: (name: string, species: PetSpecies, color?: string) => fetchWithAuth<Pet>('/me/pet', {
       method: 'POST',

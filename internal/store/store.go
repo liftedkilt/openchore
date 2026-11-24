@@ -360,9 +360,9 @@ func (s *Store) CreateChore(ctx context.Context, c *model.Chore) error {
 		photoSource = model.PhotoSourceChild
 	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO chores (title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_audio_url, created_by)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, requiresApproval, requiresPhoto, photoSource, c.Source, c.ExternalID, c.TTSAudioURL, c.CreatedBy)
+		`INSERT INTO chores (title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_audio_url, created_by, auto_complete)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, requiresApproval, requiresPhoto, photoSource, c.Source, c.ExternalID, c.TTSAudioURL, c.CreatedBy, boolToInt(c.AutoComplete))
 	if err != nil {
 		return err
 	}
@@ -374,9 +374,9 @@ func (s *Store) GetChore(ctx context.Context, id int64) (*model.Chore, error) {
 	c := &model.Chore{}
 	var reqApp, reqPho int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_audio_url, created_by, created_at
+		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_audio_url, created_by, created_at, auto_complete
 		 FROM chores WHERE id = ?`, id).
-		Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &reqApp, &reqPho, &c.PhotoSource, &c.Source, &c.ExternalID, &c.TTSAudioURL, &c.CreatedBy, &c.CreatedAt)
+		Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &reqApp, &reqPho, &c.PhotoSource, &c.Source, &c.ExternalID, &c.TTSAudioURL, &c.CreatedBy, &c.CreatedAt, &c.AutoComplete)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -387,7 +387,7 @@ func (s *Store) GetChore(ctx context.Context, id int64) (*model.Chore, error) {
 
 func (s *Store) ListChores(ctx context.Context) ([]model.Chore, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_audio_url, created_by, created_at
+		`SELECT id, title, description, category, icon, points_value, missed_penalty_value, estimated_minutes, requires_approval, requires_photo, photo_source, source, external_id, tts_audio_url, created_by, created_at, auto_complete
 		 FROM chores ORDER BY title`)
 	if err != nil {
 		return nil, err
@@ -397,7 +397,7 @@ func (s *Store) ListChores(ctx context.Context) ([]model.Chore, error) {
 	for rows.Next() {
 		var c model.Chore
 		var reqApp, reqPho int
-		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &reqApp, &reqPho, &c.PhotoSource, &c.Source, &c.ExternalID, &c.TTSAudioURL, &c.CreatedBy, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Category, &c.Icon, &c.PointsValue, &c.MissedPenaltyValue, &c.EstimatedMinutes, &reqApp, &reqPho, &c.PhotoSource, &c.Source, &c.ExternalID, &c.TTSAudioURL, &c.CreatedBy, &c.CreatedAt, &c.AutoComplete); err != nil {
 			return nil, err
 		}
 		c.RequiresApproval = reqApp == 1
@@ -415,9 +415,9 @@ func (s *Store) UpdateChore(ctx context.Context, c *model.Chore) error {
 		photoSource = model.PhotoSourceChild
 	}
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE chores SET title=?, description=?, category=?, icon=?, points_value=?, missed_penalty_value=?, estimated_minutes=?, requires_approval=?, requires_photo=?, photo_source=?, source=?, external_id=?
+		`UPDATE chores SET title=?, description=?, category=?, icon=?, points_value=?, missed_penalty_value=?, estimated_minutes=?, requires_approval=?, requires_photo=?, photo_source=?, source=?, external_id=?, auto_complete=?
 		 WHERE id=?`,
-		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, requiresApproval, requiresPhoto, photoSource, c.Source, c.ExternalID, c.ID)
+		c.Title, c.Description, c.Category, c.Icon, c.PointsValue, c.MissedPenaltyValue, c.EstimatedMinutes, requiresApproval, requiresPhoto, photoSource, c.Source, c.ExternalID, boolToInt(c.AutoComplete), c.ID)
 	return err
 }
 
@@ -502,7 +502,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 
 	query := `
 		SELECT
-			cs.id, c.id, c.title, c.description, c.category, c.icon, c.points_value, c.missed_penalty_value, c.estimated_minutes, c.requires_approval, c.requires_photo, c.photo_source,
+			cs.id, c.id, c.title, c.description, c.category, c.icon, c.points_value, c.missed_penalty_value, c.estimated_minutes, c.requires_approval, c.requires_photo, c.photo_source, c.auto_complete,
 			cs.assignment_type, cs.available_at, cs.due_by, cs.expiry_penalty, cs.expiry_penalty_value,
 			cs.day_of_week, cs.specific_date,
 			cc.id, cc.completed_at, cc.photo_url, cc.status, cc.ai_feedback,
@@ -567,7 +567,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			var siblingName sql.NullString
 			var reqApp, reqPho int
 			if err := rows.Scan(&sc.ScheduleID, &sc.ChoreID, &sc.Title, &sc.Description, &sc.Category, &sc.Icon,
-				&sc.PointsValue, &sc.MissedPenaltyValue, &sc.EstimatedMinutes, &reqApp, &reqPho, &sc.PhotoSource, &sc.AssignmentType, &sc.AvailableAt, &sc.DueBy,
+				&sc.PointsValue, &sc.MissedPenaltyValue, &sc.EstimatedMinutes, &reqApp, &reqPho, &sc.PhotoSource, &sc.AutoComplete, &sc.AssignmentType, &sc.AvailableAt, &sc.DueBy,
 				&sc.ExpiryPenalty, &sc.ExpiryPenaltyValue,
 				&dayOfWeek, &specificDate,
 				&compID, &completedAt, &photoURL, &compStatus, &aiFeedback,
@@ -779,18 +779,19 @@ func (s *Store) ExcuseChoreAndRefundPenalty(ctx context.Context, scheduleID int6
 	// Refund any missed chore penalty that was applied for this schedule + date
 	key := missedChorePenaltyKey(userID, scheduleID, date)
 	var penaltyAmount int
+	var penaltyTxnID int64
 	err = tx.QueryRowContext(ctx,
-		`SELECT -amount FROM point_transactions WHERE idempotency_key = ? AND reason = ?`,
-		key, model.ReasonMissedChore).Scan(&penaltyAmount)
+		`SELECT id, -amount FROM point_transactions WHERE idempotency_key = ? AND reason = ?`,
+		key, model.ReasonMissedChore).Scan(&penaltyTxnID, &penaltyAmount)
 	if err == nil && penaltyAmount > 0 {
 		refundKey := fmt.Sprintf("waived:%s", key)
 		var alreadyRefunded int
 		if err := tx.QueryRowContext(ctx,
 			`SELECT COUNT(*) FROM point_transactions WHERE idempotency_key = ?`, refundKey).Scan(&alreadyRefunded); err == nil && alreadyRefunded == 0 {
 			if _, err := tx.ExecContext(ctx,
-				`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note, idempotency_key)
-				 VALUES (?, ?, ?, ?, 'Penalty waived: chore excused', ?)`,
-				userID, penaltyAmount, model.ReasonAdminAdjust, completionID, refundKey); err != nil {
+				`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note, idempotency_key, reverses_id)
+				 VALUES (?, ?, ?, ?, 'Penalty waived: chore excused', ?, ?)`,
+				userID, penaltyAmount, model.ReasonAdminAdjust, completionID, refundKey, penaltyTxnID); err != nil {
 				return nil, err
 			}
 		}
@@ -928,6 +929,14 @@ func (s *Store) ReviveCompletion(ctx context.Context, id int64) error {
 		   SET uncompleted_at = NULL,
 		       completed_at   = CURRENT_TIMESTAMP
 		 WHERE id = ?`, id)
+	return err
+}
+
+// DeleteCompletion hard-deletes one completion row. Used for a soft-deleted
+// row that can't be revived as-is; its credit and uncomplete debit stay in
+// point_transactions and net to zero.
+func (s *Store) DeleteCompletion(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM chore_completions WHERE id = ?`, id)
 	return err
 }
 
@@ -1323,6 +1332,250 @@ func (s *Store) ListPointTransactions(ctx context.Context, userID int64, limit i
 		if idempotencyKey.Valid {
 			k := idempotencyKey.String
 			t.IdempotencyKey = &k
+		}
+		txs = append(txs, t)
+	}
+	return txs, rows.Err()
+}
+
+// ErrCannotUndo is returned for history rows that Undo doesn't apply to:
+// rows that are themselves an undo (chore unchecked, goal savings returned,
+// a reversal) and goal savings whose goal is no longer active.
+var ErrCannotUndo = fmt.Errorf("that entry can't be undone")
+
+// ErrAlreadyUndone is returned when a row was already undone (or, for a
+// missed-chore penalty, already refunded by excusing the chore), including
+// rows the history hides because unchecking their chore cancelled them.
+var ErrAlreadyUndone = fmt.Errorf("that entry was already undone")
+
+// ErrSavingsUsed is returned when undoing a goal saving whose points have
+// since left the goal (taken back for points decay, for example), so taking
+// the whole saving back out would leave the goal below zero.
+var ErrSavingsUsed = fmt.Errorf("some of those savings have already left the goal")
+
+// decayReclaimNote is the note on the goal_break rows that take savings back
+// out of a goal to pay for points decay on a date. Undoing that day's decay
+// finds them by it and puts the points back in the goal.
+func decayReclaimNote(date string) string {
+	return fmt.Sprintf("Reclaimed for points decay on %s", date)
+}
+
+// penaltyReasons are penalties: undoing one gives the points back.
+var penaltyReasons = map[string]bool{
+	model.ReasonExpiryPenalty: true,
+	model.ReasonMissedChore:   true,
+	model.ReasonPointsDecay:   true,
+}
+
+// reversibleReasons can be undone with ReversePointTransaction. Chore
+// credits and reward purchases are undone by unchecking the chore and
+// refunding the redemption instead (see the API's undo handler).
+var reversibleReasons = map[string]bool{
+	model.ReasonExpiryPenalty: true,
+	model.ReasonMissedChore:   true,
+	model.ReasonPointsDecay:   true,
+	model.ReasonAdminAdjust:   true,
+	model.ReasonStreakBonus:   true,
+	model.ReasonCommitToGoal:  true,
+}
+
+// PenaltyRemovalKey is the idempotency key of the row that cancels a
+// penalty. Missed-chore penalties share the "waived:" key with
+// ExcuseChoreAndRefundPenalty, so excusing a chore and undoing its penalty
+// can never both refund it.
+func PenaltyRemovalKey(t model.PointTransaction) string {
+	if t.IdempotencyKey != nil && *t.IdempotencyKey != "" {
+		return "waived:" + *t.IdempotencyKey
+	}
+	return fmt.Sprintf("waived:txn:%d", t.ID)
+}
+
+// GetPointTransaction returns one ledger row, or sql.ErrNoRows.
+func (s *Store) GetPointTransaction(ctx context.Context, id int64) (*model.PointTransaction, error) {
+	var t model.PointTransaction
+	var key sql.NullString
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, user_id, amount, reason, reference_id, note, idempotency_key, reverses_id, created_at
+		 FROM point_transactions WHERE id = ?`, id).
+		Scan(&t.ID, &t.UserID, &t.Amount, &t.Reason, &t.ReferenceID, &t.Note, &key, &t.ReversesID, &t.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if key.Valid {
+		t.IdempotencyKey = &key.String
+	}
+	return &t, nil
+}
+
+// ReversePointTransaction undoes a penalty, manual adjustment, streak bonus
+// or goal saving by writing an equal and opposite row with the same reason
+// and reference, linked through reverses_id. The history hides both rows
+// (ListVisiblePointTransactions), so the entry simply disappears, while the
+// ledger stays complete: the daily checkers still find a penalty's
+// idempotency key and don't charge it again, and per-completion and
+// per-goal totals net to zero. Returns the reversal row.
+func (s *Store) ReversePointTransaction(ctx context.Context, txnID int64) (*model.PointTransaction, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var orig model.PointTransaction
+	var key sql.NullString
+	if err := tx.QueryRowContext(ctx,
+		`SELECT id, user_id, amount, reason, reference_id, note, idempotency_key, reverses_id
+		 FROM point_transactions WHERE id = ?`, txnID).
+		Scan(&orig.ID, &orig.UserID, &orig.Amount, &orig.Reason, &orig.ReferenceID, &orig.Note, &key, &orig.ReversesID); err != nil {
+		return nil, err
+	}
+	if key.Valid {
+		orig.IdempotencyKey = &key.String
+	}
+	var reversed, visible bool
+	if err := tx.QueryRowContext(ctx,
+		`SELECT EXISTS (SELECT 1 FROM point_transactions WHERE reverses_id = ?),
+		        EXISTS (SELECT 1 FROM point_transactions pt WHERE pt.id = ? AND `+visibleTxnFilter+`)`,
+		orig.ID, orig.ID).Scan(&reversed, &visible); err != nil {
+		return nil, err
+	}
+	if reversed {
+		return nil, ErrAlreadyUndone
+	}
+	if orig.ReversesID != nil || !reversibleReasons[orig.Reason] || orig.Amount == 0 {
+		return nil, ErrCannotUndo
+	}
+	if !visible {
+		// Hidden rows were already cancelled, e.g. the late penalty or
+		// auto-save of a chore that has since been unchecked.
+		return nil, ErrAlreadyUndone
+	}
+	if penaltyReasons[orig.Reason] && orig.Amount > 0 {
+		return nil, ErrCannotUndo
+	}
+
+	var removalKey *string
+	switch {
+	case penaltyReasons[orig.Reason]:
+		k := PenaltyRemovalKey(orig)
+		removalKey = &k
+	case orig.Reason == model.ReasonCommitToGoal:
+		// Only savings still sitting in an active goal can come back out.
+		if orig.Amount > 0 || orig.ReferenceID == nil {
+			return nil, ErrCannotUndo
+		}
+		var status string
+		if err := tx.QueryRowContext(ctx,
+			`SELECT status FROM reward_commitments WHERE id = ?`, *orig.ReferenceID).Scan(&status); err != nil || status != model.CommitmentActive {
+			return nil, ErrCannotUndo
+		}
+		// And only if they're all still there: decay may have taken some
+		// back out, and the goal must never go below zero.
+		var saved int
+		if err := tx.QueryRowContext(ctx,
+			`SELECT COALESCE(-SUM(amount), 0) FROM point_transactions
+			 WHERE reference_id = ? AND reason IN (?, ?)`,
+			*orig.ReferenceID, model.ReasonCommitToGoal, model.ReasonGoalBreak).Scan(&saved); err != nil {
+			return nil, err
+		}
+		if saved < -orig.Amount {
+			return nil, ErrSavingsUsed
+		}
+	}
+
+	res, err := tx.ExecContext(ctx,
+		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note, idempotency_key, reverses_id)
+		 VALUES (?, ?, ?, ?, 'Undone', ?, ?)`,
+		orig.UserID, -orig.Amount, orig.Reason, orig.ReferenceID, removalKey, orig.ID)
+	if err != nil {
+		if isUniqueConstraintErr(err) {
+			return nil, ErrAlreadyUndone
+		}
+		return nil, err
+	}
+	id, _ := res.LastInsertId()
+
+	// Decay that took savings out of goals to pay for itself puts them back
+	// in, as long as the goal is still active; otherwise they stay spendable.
+	if orig.Reason == model.ReasonPointsDecay && orig.IdempotencyKey != nil {
+		if parts := strings.SplitN(*orig.IdempotencyKey, ":", 3); len(parts) == 3 && parts[0] == "points_decay" {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note, reverses_id)
+				 SELECT g.user_id, -g.amount, g.reason, g.reference_id, 'Undone', g.id
+				 FROM point_transactions g
+				 JOIN reward_commitments rc ON rc.id = g.reference_id
+				 WHERE g.user_id = ? AND g.reason = ? AND g.note = ? AND rc.status = ?
+				   AND NOT EXISTS (SELECT 1 FROM point_transactions r WHERE r.reverses_id = g.id)`,
+				orig.UserID, model.ReasonGoalBreak, decayReclaimNote(parts[2]), model.CommitmentActive); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	reversesID := orig.ID
+	return &model.PointTransaction{
+		ID: id, UserID: orig.UserID, Amount: -orig.Amount, Reason: orig.Reason,
+		ReferenceID: orig.ReferenceID, Note: "Undone", IdempotencyKey: removalKey, ReversesID: &reversesID,
+	}, nil
+}
+
+// visibleTxnFilter hides undone entries from the points history, in pairs
+// that net to zero so the history still adds up:
+//   - a reversal row and the row it reverses;
+//   - a chore that is currently unchecked: its credit, late penalty and the
+//     debit written when it was unchecked (all reference the completion);
+//   - an auto-save from that chore and the goal_break that returned it;
+//   - the same chore rows after an unchecked completion was deleted outright
+//     (DeleteCompletion, when a re-check needs a photo): they still net to
+//     zero, recognised by the debit written when it was unchecked. A chore
+//     deleted while checked has no such debit, so its points stay visible.
+//
+// Rechecking a chore deletes its unchecked debit and returned auto-save
+// (ReviveCompletionAndReverseDebits), so its rows reappear.
+const visibleTxnFilter = `
+	pt.reverses_id IS NULL
+	AND NOT EXISTS (SELECT 1 FROM point_transactions r WHERE r.reverses_id = pt.id)
+	AND NOT (pt.reason IN ('chore_complete', 'chore_uncomplete', 'expiry_penalty')
+		AND EXISTS (SELECT 1 FROM chore_completions cc
+			WHERE cc.id = pt.reference_id AND cc.uncompleted_at IS NOT NULL))
+	AND NOT (pt.reason IN ('chore_complete', 'chore_uncomplete', 'expiry_penalty')
+		AND NOT EXISTS (SELECT 1 FROM chore_completions cc WHERE cc.id = pt.reference_id)
+		AND EXISTS (SELECT 1 FROM point_transactions u
+			WHERE u.reason = 'chore_uncomplete' AND u.user_id = pt.user_id
+			  AND u.reference_id = pt.reference_id))
+	AND NOT (pt.reason = 'commit_to_goal' AND pt.note LIKE 'auto:completion:%'
+		AND EXISTS (SELECT 1 FROM point_transactions g
+			WHERE g.reason = 'goal_break' AND g.reference_id = pt.reference_id
+			  AND g.note = 'auto_revert:completion:' || substr(pt.note, 17)))
+	AND NOT (pt.reason = 'goal_break' AND pt.note LIKE 'auto_revert:completion:%'
+		AND EXISTS (SELECT 1 FROM point_transactions c
+			WHERE c.reason = 'commit_to_goal' AND c.reference_id = pt.reference_id
+			  AND c.note = 'auto:completion:' || substr(pt.note, 24)))`
+
+// ListVisiblePointTransactions is a person's points history without the
+// entries that were undone (see visibleTxnFilter), newest first.
+func (s *Store) ListVisiblePointTransactions(ctx context.Context, userID int64, limit int) ([]model.PointTransaction, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT pt.id, pt.user_id, pt.amount, pt.reason, pt.reference_id, pt.note, pt.idempotency_key, pt.created_at
+		 FROM point_transactions pt
+		 WHERE pt.user_id = ? AND `+visibleTxnFilter+`
+		 ORDER BY pt.id DESC LIMIT ?`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var txs []model.PointTransaction
+	for rows.Next() {
+		var t model.PointTransaction
+		var key sql.NullString
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Amount, &t.Reason, &t.ReferenceID, &t.Note, &key, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		if key.Valid {
+			t.IdempotencyKey = &key.String
 		}
 		txs = append(txs, t)
 	}
@@ -2548,7 +2801,10 @@ func (s *Store) applyAutoContributeTx(ctx context.Context, tx *sql.Tx, userID, c
 		if remaining <= 0 {
 			continue
 		}
-		contribution := creditAmount * sl.pct / 100
+		// Round to the nearest point (halves round up) so 90% of 5 saves 5,
+		// not 4. Whatever isn't saved stays in the spendable balance, since
+		// only the contribution is debited from the full credit.
+		contribution := (creditAmount*sl.pct + 50) / 100
 		if contribution <= 0 {
 			continue
 		}
@@ -2584,6 +2840,7 @@ func (s *Store) reverseAutoContributeTx(ctx context.Context, tx *sql.Tx, userID,
 		   AND pt.reason = ?
 		   AND pt.note = ?
 		   AND rc.status = ?
+		   AND NOT EXISTS (SELECT 1 FROM point_transactions u WHERE u.reverses_id = pt.id)
 		   AND NOT EXISTS (
 			 SELECT 1 FROM point_transactions p2
 			 WHERE p2.reason = ? AND p2.reference_id = pt.reference_id AND p2.note = ?
@@ -3134,7 +3391,7 @@ func (s *Store) clawBackFromGoalsTx(ctx context.Context, tx *sql.Tx, userID int6
 		return 0, nil, err
 	}
 
-	reclaimNote := fmt.Sprintf("Reclaimed for points decay on %s", date)
+	reclaimNote := decayReclaimNote(date)
 	reclaimed := 0
 	var clawbacks []DecayClawback
 	for _, g := range goals {
@@ -3957,22 +4214,32 @@ func (s *Store) ReportCategoryBreakdown(ctx context.Context, startDate, endDate 
 }
 
 type PointsSummaryRow struct {
-	UserID        int64
-	Name          string
-	PointsEarned  int
-	PointsDecayed int
-	PointsSpent   int
+	UserID          int64
+	Name            string
+	PointsEarned    int // chores and streak bonuses, less chores unchecked
+	PointsAdjusted  int // parents' manual changes (either sign)
+	PointsPenalties int // late and missed-chore penalties, less any removed
+	PointsDecayed   int // points decay, less any removed
+	PointsSpent     int // rewards bought, less any refunded
+	PointsNet       int // earned + adjusted - penalties - decayed
 }
 
-// ReportPointsSummary returns earned/decayed/spent points per kid.
+// ReportPointsSummary returns, per person, where their points came from and
+// went in the period. Every bucket is a net sum, so a removed penalty or an
+// undone chore cancels out instead of counting twice. Moving points into or
+// out of a savings goal isn't counted: those points are still the kid's.
+// PointsNet is what the period added to the kid's points (balance plus
+// savings), before anything was spent.
 func (s *Store) ReportPointsSummary(ctx context.Context, startDate, endDate string) ([]PointsSummaryRow, error) {
 	query := `
 		SELECT
 			u.id,
 			u.name,
-			COALESCE(SUM(CASE WHEN pt.amount > 0 THEN pt.amount ELSE 0 END), 0) AS earned,
-			COALESCE(SUM(CASE WHEN pt.reason = 'points_decay' THEN ABS(pt.amount) ELSE 0 END), 0) AS decayed,
-			COALESCE(SUM(CASE WHEN pt.reason = 'reward_redeem' THEN ABS(pt.amount) ELSE 0 END), 0) AS spent
+			COALESCE(SUM(CASE WHEN pt.reason IN ('chore_complete', 'chore_uncomplete', 'streak_bonus') THEN pt.amount ELSE 0 END), 0) AS earned,
+			COALESCE(SUM(CASE WHEN pt.reason = 'admin_adjust' THEN pt.amount ELSE 0 END), 0) AS adjusted,
+			COALESCE(-SUM(CASE WHEN pt.reason IN ('expiry_penalty', 'missed_chore') THEN pt.amount ELSE 0 END), 0) AS penalties,
+			COALESCE(-SUM(CASE WHEN pt.reason = 'points_decay' THEN pt.amount ELSE 0 END), 0) AS decayed,
+			COALESCE(-SUM(CASE WHEN pt.reason = 'reward_redeem' THEN pt.amount ELSE 0 END), 0) AS spent
 		FROM users u
 		LEFT JOIN point_transactions pt
 			ON pt.user_id = u.id
@@ -3990,9 +4257,10 @@ func (s *Store) ReportPointsSummary(ctx context.Context, startDate, endDate stri
 	var results []PointsSummaryRow
 	for rows.Next() {
 		var r PointsSummaryRow
-		if err := rows.Scan(&r.UserID, &r.Name, &r.PointsEarned, &r.PointsDecayed, &r.PointsSpent); err != nil {
+		if err := rows.Scan(&r.UserID, &r.Name, &r.PointsEarned, &r.PointsAdjusted, &r.PointsPenalties, &r.PointsDecayed, &r.PointsSpent); err != nil {
 			return nil, err
 		}
+		r.PointsNet = r.PointsEarned + r.PointsAdjusted - r.PointsPenalties - r.PointsDecayed
 		results = append(results, r)
 	}
 	return results, rows.Err()

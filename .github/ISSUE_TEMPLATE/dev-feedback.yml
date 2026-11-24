@@ -1,0 +1,57 @@
+name: Dev site feedback
+description: Something you noticed while trying a build that isn't released yet
+labels: ["dev-feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One issue per thing, please: each can then be fixed and closed on its own.
+        If it's about a feature that has a tracking issue, mention it (for example `#139`).
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - chores-dev (The Demos)
+        - chores-dev2 (The Parkers)
+        - Both dev sites
+        - My own install
+    validations:
+      required: true
+  - type: input
+    id: who
+    attributes:
+      label: Signed in as
+      description: Which person, and whether you were in Manage.
+      placeholder: e.g. Theo (kid), or Dana in Manage → Settings
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of feedback
+      options:
+        - Something looks broken
+        - Confusing or hard to use
+        - Idea or request
+        - Question
+    validations:
+      required: true
+  - type: textarea
+    id: did
+    attributes:
+      label: What you did
+      description: The taps or steps, in order.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots and anything else
+      description: Drag pictures in here. A screenshot helps most when it's about how something looks.

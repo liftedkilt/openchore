@@ -111,6 +111,7 @@ func Apply(ctx context.Context, s *store.Store, cfg *Config) error {
 			RequiresApproval: c.RequiresApproval,
 			RequiresPhoto:    c.RequiresPhoto,
 			PhotoSource:      c.PhotoSource,
+			AutoComplete:     c.AutoComplete,
 		}
 		// Find admin user for created_by
 		for _, u := range cfg.Users {
