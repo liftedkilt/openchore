@@ -287,3 +287,155 @@ func TestPetDesignAccessory(t *testing.T) {
 		t.Fatalf("picture size %dx%d (%v)", cfg.Width, cfg.Height, err)
 	}
 }
+
+// spritePNG makes a w x h PNG data URL on a see-through background (unless
+// opaque), with a filled square in the middle of each of the first `drawn`
+// frames (frames are h x h, side by side).
+func spritePNG(t *testing.T, w, h int, opaque bool, drawn int) string {
+	t.Helper()
+	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			fx := x % h
+			switch {
+			case x/h < drawn && fx > h/4 && fx < 3*h/4 && y > h/4 && y < 3*h/4:
+				img.SetNRGBA(x, y, color.NRGBA{R: 200, G: 120, B: 40, A: 255})
+			case opaque:
+				img.SetNRGBA(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+			}
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+func TestPetOwnPicture(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kid := env.createChild(t, "Kid")
+	env.enablePets(t)
+	env.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Quackers", "species": "chicken"}, childHeaders(kid), http.StatusCreated)
+	env.expectStatus(t, "POST", "/api/points/adjust", map[string]any{"user_id": kid, "amount": 500, "note": "seed"}, adminHeaders(), http.StatusNoContent)
+	reward := env.petRewardID(t, kid, "picture")
+	path := fmt.Sprintf("/api/rewards/%d/redeem", reward)
+	redeem := func(image string, want int) {
+		t.Helper()
+		env.expectStatus(t, "POST", path, map[string]any{"pet": map[string]any{"image": image}}, childHeaders(kid), want).Body.Close()
+	}
+
+	// Refused before any points move: nothing sent, not a PNG, no
+	// see-through background, too small.
+	before := env.balance(t, kid)
+	env.expectStatus(t, "POST", path, map[string]any{}, childHeaders(kid), http.StatusUnprocessableEntity)
+	redeem("data:image/jpeg;base64,AAAA", http.StatusUnprocessableEntity)
+	redeem("data:image/png;base64,bm90IGFuIGltYWdl", http.StatusUnprocessableEntity)
+	redeem(spritePNG(t, 64, 64, true, 1), http.StatusUnprocessableEntity)
+	redeem(spritePNG(t, 4, 4, false, 1), http.StatusUnprocessableEntity)
+	redeem(spritePNG(t, 192, 64, false, 0), http.StatusUnprocessableEntity) // a strip with nothing in the standing frame
+	// A strip with a gap (pictures 1 to 3 and 6, nothing in 4 and 5).
+	gap := image.NewNRGBA(image.Rect(0, 0, 6*16, 16))
+	for _, f := range []int{0, 1, 2, 5} {
+		gap.SetNRGBA(f*16+8, 8, color.NRGBA{R: 200, A: 255})
+	}
+	var gapBuf bytes.Buffer
+	png.Encode(&gapBuf, gap)
+	redeem("data:image/png;base64,"+base64.StdEncoding.EncodeToString(gapBuf.Bytes()), http.StatusUnprocessableEntity)
+	if env.balance(t, kid) != before {
+		t.Fatal("a refused picture cost points")
+	}
+
+	// A good one is stored, kept at its own size, and shown on the farm.
+	redeem(spritePNG(t, 64, 64, false, 1), http.StatusCreated)
+	first, _ := env.myPet(t, kid)["sprite"].(string)
+	if first == "" {
+		t.Fatalf("no picture on the pet: %v", env.myPet(t, kid))
+	}
+	file := func(id string) string { return "data/uploads/pets/" + id + ".png" }
+	t.Cleanup(func() { os.Remove(file(first)) })
+	f, err := os.Open(file(first))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := png.DecodeConfig(f)
+	f.Close()
+	if err != nil || cfg.Width != 64 || cfg.Height != 64 {
+		t.Fatalf("stored picture: %v %+v", err, cfg)
+	}
+	resp := env.expectStatus(t, "GET", "/api/pets", nil, nil, http.StatusOK)
+	var farm map[string]any
+	decodeBody(t, resp, &farm)
+	if p := farm["pets"].([]any)[0].(map[string]any); p["sprite"] != first || p["species"] != "chicken" || p["sprite_frames"] != 1.0 {
+		t.Fatalf("farm: %v", p)
+	}
+
+	// A big single picture is scaled down; the one it replaces is deleted.
+	redeem(spritePNG(t, 640, 480, false, 1), http.StatusCreated)
+	second := env.myPet(t, kid)["sprite"].(string)
+	t.Cleanup(func() { os.Remove(file(second)) })
+	if _, err := os.Stat(file(first)); !os.IsNotExist(err) {
+		t.Fatal("the replaced picture was left on disk")
+	}
+	f, _ = os.Open(file(second))
+	cfg, err = png.DecodeConfig(f)
+	f.Close()
+	if err != nil || cfg.Width != 128 || cfg.Height != 96 {
+		t.Fatalf("scaled picture: %v %+v", err, cfg)
+	}
+
+	// A strip of six square frames is kept as six frames, scaled by its
+	// height. Blank frames at the end are dropped.
+	redeem(spritePNG(t, 6*320, 320, false, 6), http.StatusCreated)
+	strip := env.myPet(t, kid)
+	stripID := strip["sprite"].(string)
+	t.Cleanup(func() { os.Remove(file(stripID)) })
+	f, _ = os.Open(file(stripID))
+	cfg, err = png.DecodeConfig(f)
+	f.Close()
+	if err != nil || cfg.Width != 6*128 || cfg.Height != 128 || strip["sprite_frames"] != 6.0 {
+		t.Fatalf("strip: %v %+v frames=%v", err, cfg, strip["sprite_frames"])
+	}
+	redeem(spritePNG(t, 6*64, 64, false, 3), http.StatusCreated)
+	short := env.myPet(t, kid)
+	second = short["sprite"].(string)
+	t.Cleanup(func() { os.Remove(file(second)) })
+	f, _ = os.Open(file(second))
+	cfg, err = png.DecodeConfig(f)
+	f.Close()
+	if err != nil || cfg.Width != 3*64 || cfg.Height != 64 || short["sprite_frames"] != 3.0 {
+		t.Fatalf("short strip: %v %+v frames=%v", err, cfg, short["sprite_frames"])
+	}
+
+	// Going back to the drawn animal is free; setting a picture without a reward isn't allowed.
+	env.expectStatus(t, "PATCH", "/api/me/pet", map[string]any{"sprite": "abcdef0123456789abcdef01"}, childHeaders(kid), http.StatusUnprocessableEntity)
+	env.expectStatus(t, "PATCH", "/api/me/pet", map[string]any{"sprite": ""}, childHeaders(kid), http.StatusOK)
+	if p := env.myPet(t, kid); p["sprite"] != nil {
+		t.Fatalf("picture not cleared: %v", p)
+	}
+	if _, err := os.Stat(file(second)); !os.IsNotExist(err) {
+		t.Fatal("a cleared picture was left on disk")
+	}
+
+	// A grown-up can take a picture away; a kid can't take a sibling's.
+	redeem(spritePNG(t, 32, 32, false, 1), http.StatusCreated)
+	third := env.myPet(t, kid)["sprite"].(string)
+	t.Cleanup(func() { os.Remove(file(third)) })
+	sib := env.createChild(t, "Sib")
+	rm := fmt.Sprintf("/api/admin/users/%d/pet/picture", kid)
+	env.expectStatus(t, "DELETE", rm, nil, childHeaders(sib), http.StatusForbidden)
+	env.expectStatus(t, "DELETE", rm, nil, adminHeaders(), http.StatusNoContent)
+	if p := env.myPet(t, kid); p["sprite"] != nil || p["name"] != "Quackers" {
+		t.Fatalf("after a grown-up removed the picture: %v", p)
+	}
+
+	// Removing the animal removes its picture file too.
+	redeem(spritePNG(t, 32, 32, false, 1), http.StatusCreated)
+	last := env.myPet(t, kid)["sprite"].(string)
+	t.Cleanup(func() { os.Remove(file(last)) })
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/admin/users/%d/pet", kid), nil, adminHeaders(), http.StatusNoContent)
+	if _, err := os.Stat(file(last)); !os.IsNotExist(err) {
+		t.Fatal("a removed animal's picture was left on disk")
+	}
+}

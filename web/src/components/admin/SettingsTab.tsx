@@ -7,6 +7,7 @@ import type { Webhook, WebhookDelivery } from '../../types';
 import { Icon } from '../../design';
 import { ExportConfigSection } from './ExportConfigSection';
 import { FarmPetsSection } from './FarmPetsSection';
+import { FriendFamiliesSection } from './FriendFamiliesSection';
 import { APITokensSection } from './APITokensSection';
 import { PhotoReviewTester } from './PhotoReviewTester';
 import { AIConnectionSection } from './AIConnectionSection';
@@ -484,6 +485,8 @@ export const SettingsTab: React.FC = () => {
           <APITokensSection />
 
           <FarmPetsSection />
+
+          <FriendFamiliesSection />
 
           <ExportConfigSection />
         </div>

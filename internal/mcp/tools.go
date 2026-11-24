@@ -237,6 +237,76 @@ func allTools() []*Tool {
 		method: http.MethodDelete, path: "/admin/users/{id}/pet",
 		props: map[string]any{"id": integer("Person id.")}})
 
+	// ---- Leaderboard and friend families ----
+	add(endpoint{name: "get_leaderboard", title: "The weekly leaderboard", readOnly: true,
+		desc: "This week's standings (Monday to Sunday), or last week's. percent is the score out of 100 shown in the app as \"Score 88\": the share of a person's assigned chore points " +
+			"they earned (each chore worth its own points; Must-do and Every-day chores only; " +
+			"excused chores and paused days are left out), with share (the same score to two more places, 0 to 10000, used for ranking), the chore counts, bonus chores as a tie-breaker, and rank. " +
+			"People need 5 assigned chores in the week to be ranked (rank 0 = not yet). Includes people shared by linked friend families.",
+		method: http.MethodGet, path: "/leaderboard", query: []string{"week"},
+		props: map[string]any{"week": enum("Which week (default this).", "this", "last")}})
+	add(endpoint{name: "list_friend_visitors", title: "Playdates, gifts and team goal celebrations", readOnly: true,
+		desc:   "Friend families' animals that are on this farm for a playdate today, the treats friends sent this household's animals today, and any agreed weekly team goals reached with linked families.",
+		method: http.MethodGet, path: "/friends/visitors"})
+	add(endpoint{name: "list_friend_farms", title: "Friend families' farms", readOnly: true,
+		desc:   "The farm animals each linked friend family shares, as of their last sync, along with any reached weekly team goal celebration.",
+		method: http.MethodGet, path: "/friends/farms"})
+	add(endpoint{name: "get_friend_families", title: "Friend families settings", readOnly: true,
+		desc: "Leaderboard on/off, this family's name, the coordination server (hub), and each linked family with its status and last sync, " +
+			"who this household shares with them (outbound: shared, and accepted once they chose to show that person) and who they offer " +
+			"(inbound: accepted when shown here). A waiting link carries the invite to send.",
+		method: http.MethodGet, path: "/admin/friends"})
+	add(endpoint{name: "update_friend_families", title: "Change leaderboard and friend families settings",
+		desc: "Turn the leaderboard on or off, set the family name other families see, or set the coordination server " +
+			"(hub) used to create invites. Only the fields given change.",
+		method: http.MethodPut, path: "/admin/friends",
+		props: map[string]any{
+			"leaderboard_enabled": boolean("Show the weekly leaderboard."),
+			"family_name":         str("Name other families see, e.g. \"The Smiths\"."),
+			"hub_url":             str("Coordination server address, https://…"),
+			"hub_key":             str("Key that lets this family create invites on that server."),
+		}})
+	add(endpoint{name: "set_friend_family_sharing", title: "Choose who is shared with a friend family",
+		desc: "For one linked family, set who this household shares with them (share_user_ids) and which of the people they offer " +
+			"are shown here (accept_member_ids, from that link's inbound list). Each list replaces the previous one; leave one out to keep it. " +
+			"Also where a team goal with that family is set (goal_target) and gifts, playdates and custom pictures from them are switched. " +
+			"A person only appears on the other family's leaderboard and farm when both parents picked them. A shared person's first name, " +
+			"colour, weekly score and chore counts, streak and farm animal are sent; chore names, photos, " +
+			"point values, point balances and rewards never are. Confirm with the parent first.",
+		method: http.MethodPut, path: "/admin/friends/{id}",
+		props: map[string]any{
+			"id":                integer("Link id from get_friend_families."),
+			"share_user_ids":    ids("Ids of the people in this household to share with that family."),
+			"accept_member_ids": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Ids (from that link's inbound list) of the people from that family to show here."},
+			"show_pictures":     boolean("Show that family's custom animal pictures here (off by default; while off they aren't kept)."),
+			"allow_visits":      boolean("Take gifts and playdates from that family (on by default)."),
+			"goal_target":       integer("Put forward, or agree to, a team goal for this week: the score from 1 to 100 the two families aim to average together. It counts once both families have set the same number. 0 drops it."),
+		}})
+	add(endpoint{name: "create_friend_invite", title: "Invite a friend family",
+		desc:   "Make a one-time invite (valid 7 days) for another family's OpenChore to link with this one. Give the invite text to the other parent.",
+		method: http.MethodPost, path: "/admin/friends/invites"})
+	add(endpoint{name: "join_friend_family", title: "Join a friend family",
+		desc:   "Link to another family using the invite their parent sent.",
+		method: http.MethodPost, path: "/admin/friends/join", required: []string{"invite"},
+		props: map[string]any{"invite": str("The invite text, starting ocf1.")}})
+	add(endpoint{name: "sync_friend_family", title: "Sync with a friend family now",
+		desc:   "Exchange the latest data with one linked family now, without waiting for the 15-minute sync.",
+		method: http.MethodPost, path: "/admin/friends/{id}/sync", props: map[string]any{"id": integer("Link id from get_friend_families.")}})
+	add(endpoint{name: "unlink_friend_family", title: "Unlink a friend family",
+		desc:   "End a link with another family and delete their data here. They are told at their next sync. Confirm first.",
+		method: http.MethodDelete, path: "/admin/friends/{id}", props: map[string]any{"id": integer("Link id from get_friend_families.")}})
+
+	add(endpoint{name: "approve_farm_pet_picture", title: "Allow a custom animal picture to be shared",
+		desc: "Say whether a person's own animal picture may be sent to linked friend families. A parent should have looked at the picture first; " +
+			"ask them before approving. It always shows on the family's own farm either way, and a new picture needs approving again.",
+		method: http.MethodPut, path: "/admin/users/{id}/pet/picture", required: []string{"approved"},
+		props: map[string]any{"id": integer("Person id."), "approved": boolean("May be sent to friend families."),
+			"sprite": str("The id of the picture the parent looked at (the pet's sprite from list_farm_pets); needed to approve, so a picture swapped since isn't approved unseen.")}})
+	add(endpoint{name: "remove_farm_pet_picture", title: "Remove a person's own animal picture",
+		desc:   "Take away the picture a person uploaded for their farm animal (a \"picture\" reward), e.g. if it isn't suitable. The animal goes back to its drawn look and keeps everything else. Confirm first.",
+		method: http.MethodDelete, path: "/admin/users/{id}/pet/picture",
+		props: map[string]any{"id": integer("Person id.")}})
+
 	// ---- Rewards ----
 	add(endpoint{name: "list_rewards", title: "List rewards", readOnly: true,
 		desc:   "Every reward, including hidden ones, with per-kid visibility and prices.",
@@ -251,7 +321,7 @@ func allTools() []*Tool {
 			"cost":        integer("Price in points (positive)."),
 			"stock":       integer("How many are available (omit for unlimited)."),
 			"shareable":   boolean("Kids can pool points toward it together."),
-			"pet_action":  enum("Make it a farm-pet care reward (omit for an ordinary reward): feed, treat, play, accessory, new_animal (trade for another animal; stats carry over), restyle (new coat colour) or design (the kid draws or uploads their own accessory).", "feed", "treat", "play", "accessory", "new_animal", "restyle", "design"),
+			"pet_action":  enum("Make it a farm-pet care reward (omit for an ordinary reward): feed, treat, play, accessory, new_animal (trade for another animal; stats carry over), restyle (new coat colour), design (the kid draws or uploads their own accessory), picture (the kid uploads their own picture to use as the animal), gift (send a treat to a linked friend family's animal) or playdate (send the kid's animal to a friend family's farm for the day).", "feed", "treat", "play", "accessory", "new_animal", "restyle", "design", "picture", "gift", "playdate"),
 			"pet_item":    str(petItemDesc),
 		}})
 	add(endpoint{name: "update_reward", title: "Edit a reward",

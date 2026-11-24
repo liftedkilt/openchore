@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import { api, fetchPublicUserData } from '../api';
-import type { Farm, User, ScheduledChore, UserStreakData, PointsData } from '../types';
+import type { Farm, Leaderboard, User, ScheduledChore, UserStreakData, PointsData } from '../types';
 import { FarmScene } from './kid/farm/FarmScene';
 import { localDateStr } from '../utils';
 import {
@@ -13,6 +13,7 @@ import {
 } from '../design';
 import { LineChart, type LineSeries, type Tick } from '../components/charts/LineChart';
 import { personColorVar } from '../components/charts/personColor';
+import { isPersonColor } from '../design/types';
 import { CAT_ORDER, nextRows, type NextRow } from './AmbientDashboard.data';
 import { isChoreDone } from '../choreRules';
 import styles from './AmbientDashboard.module.css';
@@ -154,12 +155,15 @@ export const AmbientDashboard: React.FC = () => {
   const [people, setPeople] = useState<PersonDay[]>([]);
   // Farm pets (optional): everyone's animals, on the shared farm.
   const [farm, setFarm] = useState<Farm | null>(null);
+  // This week's leaderboard (optional), for this household only: the wall isn't signed in.
+  const [board, setBoard] = useState<Leaderboard | null>(null);
   const [loading, setLoading] = useState(true);
   const now = useMinuteClock();
 
   const fetchData = useCallback(async () => {
     try {
       fetchPublicUserData<Farm>('/pets').then(setFarm).catch(() => setFarm(null));
+      fetchPublicUserData<Leaderboard>('/leaderboard/household').then(setBoard).catch(() => setBoard(null));
       const users: User[] = await api.users.list();
       const today = localDateStr(new Date());
       const results = await Promise.allSettled(users.filter((u) => !u.paused).map((u) => loadPerson(u, today)));
@@ -251,6 +255,17 @@ export const AmbientDashboard: React.FC = () => {
                     <FamilyMember key={p.user.id} name={p.user.name} color={p.user.color} done={p.completed} total={p.total} />
                   ))}
                 </div>
+                {board?.enabled && board.entries.some((e) => e.rank > 0) && (
+                  <p className={styles.week} aria-label={t('wall.week')}>
+                    <span className={styles.label}>{t('wall.week')}</span>
+                    {board.entries.filter((e) => e.rank > 0).slice(0, 5).map((e) => (
+                      <span key={e.key} className={styles.weekEntry} style={{ ['--who' as string]: isPersonColor(e.color) ? `var(--person-${e.color})` : undefined }}>
+                        <span className={styles.weekRank}>{e.rank}</span>
+                        {e.name} <strong>{e.percent}</strong>
+                      </span>
+                    ))}
+                  </p>
+                )}
               </div>
               {showChart && <DayChart people={people} now={now} />}
               {showFarm && farm && (

@@ -368,12 +368,19 @@ const (
 	PetActionNewAnimal = "new_animal" // swap species (and coat); health, food and joy carry over
 	PetActionRestyle   = "restyle"    // change coat colour
 	PetActionDesign    = "design"     // draw or upload your own accessory
+	PetActionPicture   = "picture"    // use your own picture as the animal (docs/custom-animals.md)
+	PetActionGift      = "gift"       // send a treat to a friend family's animal (docs/friends.md)
+	PetActionPlaydate  = "playdate"   // send your animal to play on a friend family's farm for the day
 )
+
+// PetSpriteFrames is the order of the frames in a custom animal's picture
+// strip. A strip may stop early: a missing frame falls back to the first.
+var PetSpriteFrames = []string{"stand", "walk1", "walk2", "sick", "lying", "happy"}
 
 // ValidPetAction reports whether a is a pet action or empty (ordinary reward).
 func ValidPetAction(a string) bool {
 	switch a {
-	case "", PetActionFeed, PetActionTreat, PetActionPlay, PetActionAccessory, PetActionNewAnimal, PetActionRestyle, PetActionDesign:
+	case "", PetActionFeed, PetActionTreat, PetActionPlay, PetActionAccessory, PetActionNewAnimal, PetActionRestyle, PetActionDesign, PetActionPicture, PetActionGift, PetActionPlaydate:
 		return true
 	}
 	return false
@@ -469,6 +476,19 @@ type Pet struct {
 	Joy            int       `json:"joy"`
 	Color          string    `json:"color,omitempty"`     // coat colour (PetColors); "" = default
 	Accessory      string    `json:"accessory,omitempty"` // worn item, from Items
+	// Sprite, when set, is the id of the person's own picture, shown in
+	// place of the drawn animal (uploads/pets/<id>.png). Species and Color
+	// are kept underneath: they are what friend families see.
+	Sprite string `json:"sprite,omitempty"`
+	// SpriteFrames is how many frames the picture holds side by side
+	// (PetSpriteFrames order); 1 for a single picture.
+	SpriteFrames int `json:"sprite_frames,omitempty"`
+	// SpriteApproved: a parent has said the picture may be sent to friend
+	// families. Cleared whenever the picture changes.
+	SpriteApproved bool `json:"sprite_approved,omitempty"`
+	// SpriteData is set instead of Sprite for a friend family's animal:
+	// its picture as a data: URL (it isn't a file on this server).
+	SpriteData string `json:"sprite_data,omitempty"`
 	Items          []string  `json:"items"`               // owned accessories
 	LastMissedDate *string   `json:"last_missed_date,omitempty"`
 	LastDayChecked string    `json:"last_day_checked"`
@@ -476,9 +496,22 @@ type Pet struct {
 
 	// Computed on read.
 	Mood    string `json:"mood"`   // hiding, very_sick, sick, hungry, bored, happy, content
+	// HealedToday: all of today's chores are done, so Health already shows
+	// the gain tonight's check will make real (pet.ShowToday).
+	HealedToday bool `json:"healed_today,omitempty"`
 	Hiding  bool   `json:"hiding"` // missed chores yesterday and today's aren't done yet
 	Sick    bool   `json:"sick"`
 	CanPlay bool   `json:"can_play"`
+
+	// Visiting: a friend family's animal here on a playdate; Family says whose.
+	Visiting bool   `json:"visiting,omitempty"`
+	Family   string `json:"family,omitempty"`
+	// FriendKey identifies a friend family's animal's owner (their
+	// leaderboard key, "f<link>:<member>"), e.g. to send it a gift.
+	FriendKey string `json:"friend_key,omitempty"`
+	// Ribbon: the owner came first on last week's leaderboard, so the
+	// animal wears the winner's ribbon this week.
+	Ribbon bool `json:"ribbon,omitempty"`
 
 	// Owner details for the shared farm view.
 	OwnerName  string `json:"owner_name,omitempty"`
@@ -628,4 +661,160 @@ type AIReviewResult struct {
 	Complete   bool    `json:"complete"`
 	Confidence float64 `json:"confidence"`
 	Feedback   string  `json:"feedback"`
+}
+
+// --- Leaderboard & friend families (docs/friends.md) ---
+
+// ScoreDay is one person's chores on one day, counted for the leaderboard:
+// Done out of Assigned chores, the same in the chores' point values
+// (DonePoints out of AssignedPoints, which is what the percentage is made
+// from), and Bonus chores counted on the side. A Paused day is left out of
+// the score.
+type ScoreDay struct {
+	Date           string `json:"date"`
+	Assigned       int    `json:"assigned"`
+	Done           int    `json:"done"`
+	Bonus          int    `json:"bonus"`
+	AssignedPoints int    `json:"assigned_points"`
+	DonePoints     int    `json:"done_points"`
+	Paused         bool   `json:"paused,omitempty"`
+}
+
+// Friend link statuses.
+const (
+	FriendStatusWaiting = "waiting" // invite made, the other family hasn't joined yet
+	FriendStatusActive  = "active"
+	FriendStatusEnded   = "ended" // the other family unlinked
+)
+
+// FriendLink is a link to another family's OpenChore, kept through a hub.
+type FriendLink struct {
+	ID            int64      `json:"id"`
+	Status        string     `json:"status"`
+	Side          string     `json:"-"` // "a" made the invite, "b" joined with it
+	// ShowPictures: a parent here has chosen to show this family's custom
+	// animal pictures. Off by default; without it they are not even kept.
+	ShowPictures bool `json:"show_pictures"`
+	// GoalWeek / GoalTarget: the team goal this household has put forward
+	// (or agreed to) with this family: for the week starting GoalWeek, the
+	// two families aim to average GoalTarget together. It counts once the
+	// other family's snapshot carries the same goal.
+	GoalWeek   string `json:"-"`
+	GoalTarget int    `json:"-"`
+	// AllowVisits: take gifts and playdates from this family (on unless a
+	// parent turns it off).
+	AllowVisits bool `json:"allow_visits"`
+	HubURL        string     `json:"hub_url"`
+	HubLink       string     `json:"-"`
+	Token         string     `json:"-"`
+	Secret        string     `json:"-"`
+	Invite        string     `json:"invite,omitempty"`
+	InviteExpires *time.Time `json:"invite_expires,omitempty"`
+	PeerName      string     `json:"peer_name"`
+	Snapshot      string     `json:"-"`
+	SnapshotAt    *time.Time `json:"snapshot_at,omitempty"`
+	LastSyncAt    *time.Time `json:"last_sync_at,omitempty"`
+	LastError     string     `json:"last_error,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+}
+
+// FriendSnapshot is what one family sends another: the people a parent chose
+// to share with that family, with their weekly score and chore counts,
+// streak and farm animal. It carries only what the other family's screens
+// show: never chore names, photos, point values, point balances, rewards, a
+// day-by-day breakdown or the animal's health numbers.
+type FriendSnapshot struct {
+	Version     int            `json:"version"`
+	Family      string         `json:"family"`
+	GeneratedAt time.Time      `json:"generated_at"`
+	Today       string         `json:"today"` // the sender's date, in its own time zone
+	Members     []FriendMember `json:"members"`
+	// Team is this family's side of family-versus-family and team goals:
+	// how the people it shares with this link are doing together.
+	Team []FriendTeamWeek `json:"team,omitempty"`
+	// Goal is the team goal this family has put forward or agreed to.
+	Goal *FriendGoal `json:"goal,omitempty"`
+	// NoVisits: this family isn't taking gifts or playdates from the
+	// receiver, so there is no point sending (or charging for) one.
+	NoVisits bool `json:"no_visits,omitempty"`
+	// Sends are the gifts and playdates people here sent this family in the
+	// last two days. The receiver applies each once, by ID.
+	Sends []FriendSend `json:"sends,omitempty"`
+	// Accepted lists the receiver's people (by their FriendMember.ID) that
+	// the sender has chosen to show, so each parent can see whether the
+	// other side has picked a kid up yet.
+	Accepted []string `json:"accepted"`
+}
+
+type FriendMember struct {
+	ID     string     `json:"id"` // stable within the sending family
+	Name   string     `json:"name"`
+	Color  string     `json:"color,omitempty"`
+	Streak int        `json:"streak"`
+	Paused bool       `json:"paused,omitempty"`
+	// Weeks holds this week and last week (the sender's own weeks).
+	Weeks []FriendWeek `json:"weeks"`
+	Pet   *FriendPet   `json:"pet,omitempty"`
+}
+
+// FriendTeamWeek is a family's week as a team: how many of the people it
+// shares had chores, and their scores added up (each a share, 0 to 10000).
+// The team's score is ShareSum / People.
+type FriendTeamWeek struct {
+	Start    string `json:"start"` // the Monday, YYYY-MM-DD
+	People   int    `json:"people"`
+	ShareSum int    `json:"share_sum"`
+}
+
+// FriendGoal is a team goal: for the week starting Start, the two families
+// together aim to average Target (a score, 1 to 100).
+type FriendGoal struct {
+	Start  string `json:"start"`
+	Target int    `json:"target"`
+}
+
+// FriendSend is a gift (a treat for one of the receiver's animals) or a
+// playdate (the sender's animal visits the receiver's farm for the day).
+type FriendSend struct {
+	ID   string `json:"id"`
+	Kind string `json:"kind"`         // PetActionGift or PetActionPlaydate
+	From string `json:"from"`         // the sender, by their FriendMember.ID
+	To   string `json:"to,omitempty"` // gift: whose animal, by the receiver's FriendMember.ID
+	Day  string `json:"day"`          // the sender's date
+}
+
+// FriendGift is a treat that arrived today for one of this household's animals.
+type FriendGift struct {
+	ToUserID int64  `json:"to_user_id"`
+	From     string `json:"from"`
+	Family   string `json:"family"`
+}
+
+// FriendWeek is one person's week as sent to a friend family: how many
+// chores, and the score as a share (0 to 10000, score.ShareScale). The point
+// values the share was worked out from stay at home.
+type FriendWeek struct {
+	Start    string `json:"start"` // the Monday, YYYY-MM-DD
+	Assigned int    `json:"assigned"`
+	Done     int    `json:"done"`
+	Bonus    int    `json:"bonus"`
+	Share    int    `json:"share"`
+}
+
+// FriendPet is a farm animal as shown to a friend family, in its real state:
+// how it looks and how it's doing, without the health, food and joy numbers.
+type FriendPet struct {
+	Name      string `json:"name"`
+	Species   string `json:"species"`
+	Color     string `json:"color,omitempty"`
+	Accessory string `json:"accessory,omitempty"`
+	Mood      string `json:"mood"`
+	Hiding    bool   `json:"hiding"`
+	Sick      bool   `json:"sick"`
+	// Picture is the animal's custom picture, sent only when a parent in
+	// the sending family approved it for sharing. PNG data (a strip of
+	// Frames square frames); the receiving server re-checks and re-encodes
+	// it, and only keeps it if a parent there chose to show pictures.
+	Picture []byte `json:"picture,omitempty"`
+	Frames  int    `json:"frames,omitempty"`
 }

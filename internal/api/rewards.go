@@ -1,9 +1,11 @@
 package api
 
 import (
+	"context"
 	"log"
 	"net/http"
 
+	"github.com/liftedkilt/openchore/internal/friends"
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/webhook"
@@ -49,6 +51,16 @@ func (h *RewardHandler) List(w http.ResponseWriter, r *http.Request) {
 		kept := rewards[:0]
 		for _, rw := range rewards {
 			if rw.PetAction == "" {
+				kept = append(kept, rw)
+			}
+		}
+		rewards = kept
+	}
+	// Gifts and playdates only show when there's a friend family's animal to send them to.
+	if h.pets == nil || h.pets.Friends == nil || !h.pets.Friends.HasFriendAnimals(r.Context()) {
+		kept := rewards[:0]
+		for _, rw := range rewards {
+			if rw.PetAction != model.PetActionGift && rw.PetAction != model.PetActionPlaydate {
 				kept = append(kept, rw)
 			}
 		}
@@ -252,7 +264,8 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 	}
 	// New animal / restyle carry the person's pick in the body.
 	var choice *PetChoice
-	if petReward != nil && (petReward.PetAction == model.PetActionNewAnimal || petReward.PetAction == model.PetActionRestyle || petReward.PetAction == model.PetActionDesign) {
+	if petReward != nil && (petReward.PetAction == model.PetActionNewAnimal || petReward.PetAction == model.PetActionRestyle || petReward.PetAction == model.PetActionDesign || petReward.PetAction == model.PetActionPicture ||
+		petReward.PetAction == model.PetActionGift || petReward.PetAction == model.PetActionPlaydate) {
 		r.Body = http.MaxBytesReader(w, r.Body, 5<<20) // room for a drawn picture
 		var body struct {
 			Pet *PetChoice `json:"pet"`
@@ -272,7 +285,7 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// A drawn accessory is saved first and removed again if paying fails.
+	// A drawn accessory or animal picture is saved first and removed again if paying fails.
 	if choice != nil && choice.png != nil {
 		id, err := savePetImage(choice.png)
 		if err != nil {
@@ -280,19 +293,43 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		choice.item = "img:" + choice.Slot + ":" + id
+		if petReward.PetAction == model.PetActionPicture {
+			choice.item = id
+		}
 		defer func() {
 			if choice.item == "" {
 				removePetImage(id)
 			}
 		}()
 	}
-	redemption, err := h.store.RedeemReward(r.Context(), user.ID, rewardID)
+	// A gift or playdate is recorded first, where today's limit is enforced,
+	// and taken back if paying fails: never charged for and not sent.
+	if choice != nil && choice.send != nil {
+		msg, err := h.pets.Friends.ReserveSend(r.Context(), user.ID, choice.send)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to send")
+			return
+		}
+		if msg != "" {
+			writeError(w, http.StatusUnprocessableEntity, msg)
+			return
+		}
+	}
+	sendID := "" // a reserved gift or playdate is marked paid in the same transaction
+	if choice != nil && choice.send != nil {
+		sendID = choice.send.Send.ID
+	}
+	redemption, err := h.store.RedeemRewardFor(r.Context(), user.ID, rewardID, sendID)
 	if err != nil {
 		if choice != nil {
 			choice.item = ""
+			h.pets.Friends.CancelSend(r.Context(), choice.send)
 		}
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
+	}
+	if choice != nil && choice.send != nil {
+		h.pets.Friends.ConfirmSend(r.Context(), choice.send)
 	}
 	if petReward != nil {
 		if err := h.pets.applyPetReward(r.Context(), user.ID, petReward, choice); err != nil {
@@ -323,7 +360,11 @@ func (h *RewardHandler) UndoRedemption(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid redemption id")
 		return
 	}
-	if err := h.store.UndoRedemption(r.Context(), id); err != nil {
+	var f *friends.Service
+	if h.pets != nil {
+		f = h.pets.Friends
+	}
+	if err := undoRedemption(r.Context(), h.store, f, id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to undo redemption")
 		return
 	}
@@ -481,4 +522,23 @@ func (h *RewardHandler) GetSharedPool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, pool)
+}
+
+// undoRedemption refunds a redemption (store.UndoRedemption). A gift or
+// playdate it paid for is taken back with it, and if one was queued the link
+// is synced straight away: the hub already holds the snapshot it went out
+// in, and until this family leaves a new one the other family could still
+// pick it up. (If they sync in the moment before that, it has arrived.)
+func undoRedemption(ctx context.Context, s *store.Store, f *friends.Service, id int64) error {
+	linkID, err := s.FriendSendLink(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := s.UndoRedemption(ctx, id); err != nil {
+		return err
+	}
+	if linkID != 0 && f != nil {
+		f.SyncSoon(ctx, linkID)
+	}
+	return nil
 }

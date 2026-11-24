@@ -2,11 +2,11 @@
 // The business rules live on the server; this keeps the old dashboard's
 // client behaviour: double-tap guards, photo flow fallbacks,
 // optimistic auto-save and the same error toasts.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, APIError } from '../../api';
 import type {
-  Farm, PetPick, PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
+  Farm, FriendGift, GoalCelebration, Leaderboard, Pet, PetPick, PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
 } from '../../types';
 import { localDateStr } from '../../utils';
 
@@ -29,6 +29,11 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   const [redemptions, setRedemptions] = useState<RedemptionHistory[]>([]);
   const [people, setPeople] = useState<User[]>([]);
   const [farm, setFarm] = useState<Farm | null>(null);
+  const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null);
+  // Friend families' animals here on a playdate, treats sent today, and reached team goals.
+  const [visitors, setVisitors] = useState<Pet[]>([]);
+  const [gifts, setGifts] = useState<FriendGift[]>([]);
+  const [goalCelebrations, setGoalCelebrations] = useState<GoalCelebration[]>([]);
   const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -72,14 +77,20 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   const loadExtras = useCallback(async () => {
     if (!userId) return;
     try {
-      const [s, p, f] = await Promise.all([
+      const [s, p, f, lb, v] = await Promise.all([
         api.streaks.getForUser(userId),
         api.points.getForUser(userId),
         api.pets.farm().catch(() => null),
+        api.leaderboard.get().catch(() => null),
+        api.friends.visitors().catch(() => null),
       ]);
+      setVisitors(v?.visitors ?? []);
+      setGifts(v?.gifts ?? []);
+      setGoalCelebrations(v?.goal_celebrations ?? []);
       setStreak(s);
       setPoints(p);
       setFarm(f);
+      setLeaderboard(lb);
     } catch (e) {
       console.error(e);
     }
@@ -298,9 +309,20 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
     }
   }, [showToast, loadExtras, t]);
 
+  // The farm as a signed-in person sees it: the family's animals, with the
+  // winner's ribbon taken from the full leaderboard (friends included; the
+  // public farm only knows the household's own), plus friends' animals here
+  // on a playdate.
+  const farmPets = useMemo(() => {
+    const winners = new Set((leaderboard?.entries ?? []).filter(e => e.winner && e.user_id).map(e => e.user_id));
+    const own = (farm?.pets ?? []).map(p => (leaderboard?.enabled ? { ...p, ribbon: winners.has(p.user_id) } : p));
+    return [...own, ...visitors];
+  }, [farm, leaderboard, visitors]);
+
   return {
     today, chores, weekChores, streak, points, rewards, redemptions, people,
     farm, myPet: farm?.pets.find(p => p.user_id === userId) ?? null,
+    leaderboard, visitors, gifts, goalCelebrations, farmPets,
     togglingIds, toast, showToast,
     reloadChores, refreshAll, loadRewards, loadExtras, toggle,
     commitmentFor, redeem, redeemingId, redeemedId, saveToward, savingTowardId,

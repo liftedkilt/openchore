@@ -1,4 +1,4 @@
-import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, OwnChore, OwnChoreInput, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput, SignInOptions, Farm, Pet, PetItem, PetPick, PetSpecies } from './types';
+import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, OwnChore, OwnChoreInput, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput, SignInOptions, Farm, Pet, PetItem, PetPick, PetSpecies, Leaderboard, FriendFarm, FriendGift, FriendLink, FriendsSettings, GoalCelebration } from './types';
 
 const API_BASE = '/api';
 
@@ -288,6 +288,22 @@ export const api = {
     listRedemptions: (userId: number) => fetchWithAuth<RedemptionHistory[]>(`/users/${userId}/redemptions`),
     undoRedemption: (redemptionId: number) => fetchWithAuth(`/redemptions/${redemptionId}`, { method: 'DELETE' }),
   },
+  leaderboard: {
+    get: (week: 'this' | 'last' = 'this') => fetchWithAuth<Leaderboard>(`/leaderboard?week=${week}`),
+  },
+  friends: {
+    farms: () => fetchWithAuth<{ farms: FriendFarm[] }>('/friends/farms'),
+    visitors: () => fetchWithAuth<{ visitors: Pet[]; gifts: FriendGift[]; goal_celebrations?: GoalCelebration[] }>('/friends/visitors'),
+    settings: () => fetchWithAuth<FriendsSettings>('/admin/friends'),
+    update: (data: { leaderboard_enabled?: boolean; family_name?: string; hub_url?: string; hub_key?: string }) =>
+      fetchWithAuth<FriendsSettings>('/admin/friends', { method: 'PUT', body: JSON.stringify(data) }),
+    updateLink: (id: number, data: { share_user_ids?: number[]; accept_member_ids?: string[]; show_pictures?: boolean; allow_visits?: boolean; goal_target?: number }) =>
+      fetchWithAuth<FriendLink>(`/admin/friends/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    invite: () => fetchWithAuth<FriendLink>('/admin/friends/invites', { method: 'POST' }),
+    join: (invite: string) => fetchWithAuth<FriendLink>('/admin/friends/join', { method: 'POST', body: JSON.stringify({ invite }) }),
+    sync: (id: number) => fetchWithAuth<FriendLink>(`/admin/friends/${id}/sync`, { method: 'POST' }),
+    unlink: (id: number) => fetchWithAuth(`/admin/friends/${id}`, { method: 'DELETE' }),
+  },
   pets: {
     // Servers before the empty-farm fix sent `pets: null` for a farm with no animals.
     farm: () => fetchWithAuth<Farm>('/pets').then(f => ({ ...f, pets: f.pets ?? [] })),
@@ -296,7 +312,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ name, species, color }),
     }),
-    update: (data: { name?: string; accessory?: PetItem | '' }) => fetchWithAuth<Pet>('/me/pet', {
+    update: (data: { name?: string; accessory?: PetItem | ''; sprite?: '' }) => fetchWithAuth<Pet>('/me/pet', {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
@@ -305,6 +321,12 @@ export const api = {
       body: JSON.stringify({ enabled }),
     }),
     remove: (userId: number) => fetchWithAuth(`/admin/users/${userId}/pet`, { method: 'DELETE' }),
+    removePicture: (userId: number) => fetchWithAuth(`/admin/users/${userId}/pet/picture`, { method: 'DELETE' }),
+    // sprite: the id of the picture the parent is looking at, so one swapped since isn't approved unseen.
+    approvePicture: (userId: number, approved: boolean, sprite?: string) => fetchWithAuth(`/admin/users/${userId}/pet/picture`, {
+      method: 'PUT',
+      body: JSON.stringify({ approved, sprite }),
+    }),
   },
   commitments: {
     listForUser: (userId: number) => fetchWithAuth<RewardCommitment[]>(`/users/${userId}/commitments`),

@@ -11,6 +11,9 @@ const PET_ACTION_ICON: Record<string, IconName> = {
   play: 'ball',
   restyle: 'brush',
   design: 'pencil',
+  picture: 'camera',
+  gift: 'gift',
+  playdate: 'people',
   new_animal: 'swap',
   accessory: 'hat',
 };

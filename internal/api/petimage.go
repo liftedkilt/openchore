@@ -14,6 +14,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/liftedkilt/openchore/internal/model"
+	"github.com/liftedkilt/openchore/internal/sprite"
 )
 
 // Kid-made accessories: a drawing or picture redeemed through a "design"
@@ -95,6 +98,20 @@ func shrink(src image.Image, max int) image.Image {
 	return dst
 }
 
+// decodeSprite checks a data: URL holding a custom animal picture (a PNG)
+// and returns it re-encoded with its number of frames. See internal/sprite.
+func decodeSprite(dataURL string) ([]byte, int, error) {
+	meta, payload, ok := strings.Cut(dataURL, ",")
+	if !ok || meta != "data:image/png;base64" {
+		return nil, 0, errors.New("the picture must be a PNG file")
+	}
+	raw, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil || len(raw) == 0 {
+		return nil, 0, errors.New("couldn't read that picture")
+	}
+	return sprite.Decode(raw)
+}
+
 func maxInt(a, b int) int {
 	if a > b {
 		return a
@@ -113,6 +130,44 @@ func savePetImage(pngData []byte) (string, error) {
 		return "", err
 	}
 	return id, os.WriteFile(filepath.Join(petImageDir, id+".png"), pngData, 0o640)
+}
+
+// removePetFiles deletes every picture that belongs to a pet: its own
+// animal picture and any accessories it drew or uploaded.
+func removePetFiles(p *model.Pet) {
+	if p == nil {
+		return
+	}
+	if p.Sprite != "" {
+		removePetImage(p.Sprite)
+	}
+	for _, it := range p.Items {
+		if rest, ok := strings.CutPrefix(it, "img:"); ok {
+			if _, id, ok := strings.Cut(rest, ":"); ok && model.ValidPetItem(it) {
+				removePetImage(id)
+			}
+		}
+	}
+}
+
+// readPetImage loads a stored pet picture by id.
+func readPetImage(id string) ([]byte, error) {
+	if !validPetImageID(id) {
+		return nil, errors.New("bad picture id")
+	}
+	return os.ReadFile(filepath.Join(petImageDir, id+".png"))
+}
+
+func validPetImageID(id string) bool {
+	if len(id) < 16 || len(id) > 64 {
+		return false
+	}
+	for _, c := range id {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func removePetImage(id string) {

@@ -192,6 +192,9 @@
      --farm-ink-mix      0% = the art's own soft tinted outlines, up to 100%
                          = fully --farm-ink (applies everywhere, also cards)
      --farm-line-k       outline width multiplier (1 = as drawn)
+   Team goal celebration bunting & badge
+     --farm-goal-cord / --farm-goal-a..d / --farm-goal-glow
+     --farm-goal-pill-bg / --farm-goal-pill-border
    ============================================================ */
 :root, [data-theme="house"], [data-theme="sunroom"] {
   --farm-sky-top: #bfe3f7; --farm-sky-low: #e8f5fb; --farm-field: #b6dc8e;
@@ -210,6 +213,10 @@
   --farm-snow: #ffffff; --farm-snow-ink: #2c3f4f; --farm-flake: #ffffff; --farm-flake-ring: 0 0 0 1px rgb(110 140 175 / 0.45);
   --farm-tree: #2f7a52; --farm-tree-shade: #24603f; --farm-snow-fence-rail: #c09a6c; --farm-snow-fence-post: #a9845a;
   --farm-light-wire: #3a4a3f; --farm-light-glow: drop-shadow(0 0 1px rgb(255 240 200 / 0.8));
+  --farm-goal-cord: #8c7056;
+  --farm-goal-a: #f26b3a; --farm-goal-b: #f5b83d; --farm-goal-c: #3ca37c; --farm-goal-d: #e87fa5;
+  --farm-goal-glow: none;
+  --farm-goal-pill-bg: var(--celebrate); --farm-goal-pill-border: color-mix(in srgb, var(--star) 45%, var(--line));
 }
 /* Dusk: a deep blue evening, calm dark greens, the barn in shadow with warm
    windows. No large bright areas; the animals are dimmed a little so they sit
@@ -231,6 +238,10 @@
   --farm-snow: #c8d2e6; --farm-snow-ink: #e3e9f4; --farm-flake: #e6ecf8; --farm-flake-ring: none;
   --farm-tree: #1d4532; --farm-tree-shade: #163627; --farm-snow-fence-rail: #6e6252; --farm-snow-fence-post: #5b5144;
   --farm-light-wire: #1b1d24; --farm-light-glow: drop-shadow(0 0 2px rgb(255 228 160 / 0.9));
+  --farm-goal-cord: #7b84a3;
+  --farm-goal-a: #e8846a; --farm-goal-b: #f0c96a; --farm-goal-c: #65c9a3; --farm-goal-d: #d884b0;
+  --farm-goal-glow: drop-shadow(0 0 2px rgb(255 232 170 / 0.35));
+  --farm-goal-pill-bg: var(--surface-raised); --farm-goal-pill-border: color-mix(in srgb, var(--star) 40%, var(--line));
 }
 /* House Dark's evening is a touch warmer, to sit on its warm brown ground. */
 [data-theme="house-dark"] {
@@ -254,4 +265,8 @@
   --farm-snow: #ffffff; --farm-snow-ink: #121212; --farm-flake: #ffffff; --farm-flake-ring: 0 0 0 1px #121212;
   --farm-tree: #1fb36b; --farm-tree-shade: #128a50; --farm-snow-fence-rail: #c98a4b; --farm-snow-fence-post: #b0733a;
   --farm-light-wire: #121212; --farm-light-glow: none;
+  --farm-goal-cord: #121212;
+  --farm-goal-a: #ff5a2e; --farm-goal-b: #ffc62b; --farm-goal-c: #2ad193; --farm-goal-d: #ff6fae;
+  --farm-goal-glow: none;
+  --farm-goal-pill-bg: var(--celebrate); --farm-goal-pill-border: var(--line);
 }

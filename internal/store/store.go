@@ -1877,6 +1877,35 @@ func (s *Store) DeleteReward(ctx context.Context, id int64) error {
 }
 
 func (s *Store) RedeemReward(ctx context.Context, userID, rewardID int64) (*model.RewardRedemption, error) {
+	return s.RedeemRewardFor(ctx, userID, rewardID, "")
+}
+
+// errFriendSendGone means the reserved send a redemption was paying for is
+// no longer there.
+var errFriendSendGone = errors.New("that gift or playdate couldn't be sent; try again")
+
+func markFriendSendPaid(ctx context.Context, tx *sql.Tx, sendID string, redemptionID int64) error {
+	if sendID == "" {
+		return nil
+	}
+	res, err := tx.ExecContext(ctx, `UPDATE friend_sends SET redemption_id = ? WHERE id = ? AND redemption_id = 0`, redemptionID, sendID)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n != 1 {
+		return errFriendSendGone
+	}
+	return nil
+}
+
+// RedeemRewardFor is RedeemReward that also marks a reserved friend send
+// (friendSendID, "" for none) as paid by the new redemption, in the same
+// transaction: a send is only ever paid for and marked paid together, so a
+// dropped connection can't leave points charged for a gift that's never
+// sent. If the reserved send is gone, nothing is charged.
+func (s *Store) RedeemRewardFor(ctx context.Context, userID, rewardID int64, friendSendID string) (*model.RewardRedemption, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -1928,6 +1957,9 @@ func (s *Store) RedeemReward(ctx context.Context, userID, rewardID int64) (*mode
 	if shareable == 1 {
 		out, err := s.redeemSharedPoolTx(ctx, tx, userID, rewardID, stock)
 		if err != nil {
+			return nil, err
+		}
+		if err := markFriendSendPaid(ctx, tx, friendSendID, out.ID); err != nil {
 			return nil, err
 		}
 		if err := tx.Commit(); err != nil {
@@ -2025,6 +2057,10 @@ func (s *Store) RedeemReward(ctx context.Context, userID, rewardID int64) (*mode
 		if _, err := tx.ExecContext(ctx, `UPDATE rewards SET stock = stock - 1 WHERE id = ?`, rewardID); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := markFriendSendPaid(ctx, tx, friendSendID, redemptionID); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -3074,6 +3110,14 @@ func (s *Store) UndoRedemption(ctx context.Context, redemptionID int64) error {
 		model.ReasonRewardRedeem,
 		redemptionID)
 	if err != nil {
+		return err
+	}
+
+	// A gift or playdate this paid for is taken back too, whichever way the
+	// purchase is undone (one that already reached the other family stays
+	// arrived: it was in a snapshot they've picked up).
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM friend_sends WHERE redemption_id = ? AND redemption_id != 0`, redemptionID); err != nil {
 		return err
 	}
 

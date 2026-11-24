@@ -6,7 +6,7 @@ import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { Pet, PetAction } from '../../../types';
-import { FarmAnimal, type PetReaction as FaceReaction } from './FarmAnimal';
+import { FarmAnimal, petPicture, type PetReaction as FaceReaction } from './FarmAnimal';
 import s from './reaction.module.css';
 
 export interface ReactionEvent {
@@ -30,15 +30,18 @@ const BURST: Record<ReactionEvent['kind'], string[]> = {
   play: ['⭐', '✨', '💫', '🎉'],
   accessory: ['✨', '⭐', '✨', '💫'],
   design: ['🎨', '✨', '⭐', '✨'],
+  picture: ['🖼️', '✨', '⭐', '✨'],
+  gift: ['🎁', '💛', '✨'],
+  playdate: ['🎉', '💨', '⭐', '✨'],
   wear: ['✨', '✨'],
   restyle: ['🎨', '🌈', '✨'],
   new_animal: ['💨', '✨', '💨', '⭐'],
 };
 const MOTION: Record<ReactionEvent['kind'], string> = {
-  feed: s.munch, treat: s.munch, play: s.hop, accessory: s.pose, design: s.pose, wear: s.pose, restyle: s.pose, new_animal: s.poof,
+  feed: s.munch, treat: s.munch, play: s.hop, accessory: s.pose, design: s.pose, picture: s.poof, gift: s.pose, playdate: s.hop, wear: s.pose, restyle: s.pose, new_animal: s.poof,
 };
 const FACE: Record<ReactionEvent['kind'], FaceReaction> = {
-  feed: 'eat', treat: 'eat', play: 'play', accessory: 'love', design: 'love', wear: 'love', restyle: 'love', new_animal: 'love',
+  feed: 'eat', treat: 'eat', play: 'play', accessory: 'love', design: 'love', picture: 'love', gift: 'love', playdate: 'play', wear: 'love', restyle: 'love', new_animal: 'love',
 };
 
 interface ReactingAnimalProps {
@@ -83,6 +86,7 @@ export function ReactingAnimal({ pet, reaction, accessory, className, artClassNa
           color={pet.color}
           mood={pet.hiding ? 'bored' : pet.mood}
           accessory={accessory ?? pet.accessory}
+          {...petPicture(pet)}
           reaction={active && !lying ? FACE[active.kind] : undefined}
           className={artClassName}
         />

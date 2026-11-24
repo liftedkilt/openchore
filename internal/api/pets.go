@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/liftedkilt/openchore/internal/friends"
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/pet"
 	"github.com/liftedkilt/openchore/internal/store"
@@ -28,6 +29,11 @@ const (
 type PetHandler struct {
 	store *store.Store
 	now   func() time.Time
+	// Ribbons, when set, says whose animals wear the leaderboard winner's
+	// ribbon this week (set by the router; the leaderboard lives elsewhere).
+	Ribbons func(ctx context.Context) map[int64]bool
+	// Friends, when set, handles gifts and playdates to linked families.
+	Friends *friends.Service
 }
 
 func NewPetHandler(s *store.Store) *PetHandler {
@@ -48,6 +54,7 @@ func (h *PetHandler) describe(ctx context.Context, p *model.Pet, owner *model.Us
 	if err != nil {
 		return err
 	}
+	pet.ShowToday(p, chores)
 	pet.Describe(p, yesterday, pet.CaughtUp(chores))
 	if owner != nil {
 		p.OwnerName = owner.Name
@@ -85,11 +92,16 @@ func (h *PetHandler) Farm(w http.ResponseWriter, r *http.Request) {
 	for i := range users {
 		byID[users[i].ID] = &users[i]
 	}
+	ribbons := map[int64]bool{}
+	if h.Ribbons != nil {
+		ribbons = h.Ribbons(ctx)
+	}
 	for i := range pets {
 		if err := h.describe(ctx, &pets[i], byID[pets[i].UserID]); err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to describe pet")
 			return
 		}
+		pets[i].Ribbon = ribbons[pets[i].UserID]
 	}
 	out["pets"] = pets
 	writeJSON(w, http.StatusOK, out)
@@ -211,6 +223,9 @@ func (h *PetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name      *string `json:"name"`
 		Accessory *string `json:"accessory"`
+		// Sprite can only be cleared here (""): going back to the drawn
+		// animal is free; a new picture comes from a "picture" reward.
+		Sprite *string `json:"sprite"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -224,6 +239,16 @@ func (h *PetHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := h.store.RenamePet(ctx, u.ID, name); err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to rename pet")
+			return
+		}
+	}
+	if req.Sprite != nil {
+		if *req.Sprite != "" {
+			writeError(w, http.StatusUnprocessableEntity, "get a picture reward to use your own picture")
+			return
+		}
+		if err := h.clearSprite(ctx, u.ID); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to change picture")
 			return
 		}
 	}
@@ -253,6 +278,9 @@ func (h *PetHandler) Update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, p)
 }
 
+// playdateJoy is what a day out at a friend's farm does for an animal.
+const playdateJoy = 25
+
 // defaultPetRewards are added the first time pets are turned on.
 var defaultPetRewards = []model.Reward{
 	{Name: "Feed my animal", Description: "A full meal for your farm animal.", Icon: "🥕", Cost: 5, PetAction: model.PetActionFeed},
@@ -265,6 +293,9 @@ var defaultPetRewards = []model.Reward{
 	{Name: "Round glasses", Description: "Smart round glasses for your farm animal.", Icon: "👓", Cost: 20, PetAction: model.PetActionAccessory, PetItem: "round_glasses"},
 	{Name: "Restyle coat", Description: "Give your farm animal a new coat colour.", Icon: "🎨", Cost: 30, PetAction: model.PetActionRestyle},
 	{Name: "Design an accessory", Description: "Draw your own accessory, or use a picture, and your animal will wear it.", Icon: "🖍️", Cost: 40, PetAction: model.PetActionDesign},
+	{Name: "Use my own picture", Description: "Make your farm animal look like a picture you drew or made.", Icon: "🖼️", Cost: 60, PetAction: model.PetActionPicture},
+	{Name: "Treat for a friend's animal", Description: "Send a treat to an animal on a friend family's farm.", Icon: "🎁", Cost: 10, PetAction: model.PetActionGift},
+	{Name: "Playdate", Description: "Send your animal to play on a friend family's farm for the day.", Icon: "🚜", Cost: 15, PetAction: model.PetActionPlaydate},
 	{Name: "New animal", Description: "Trade for a different farm animal. Health, food and joy come along.", Icon: "🔁", Cost: 150, PetAction: model.PetActionNewAnimal},
 }
 
@@ -320,11 +351,94 @@ func (h *PetHandler) Remove(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid user id")
 		return
 	}
+	// Its pictures go with it: nothing should stay fetchable.
+	old, _ := h.store.GetPetForUser(r.Context(), id)
 	if err := h.store.DeletePetForUser(r.Context(), id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to remove pet")
 		return
 	}
+	removePetFiles(old)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// clearSprite goes back to the drawn animal and deletes the picture.
+func (h *PetHandler) clearSprite(ctx context.Context, userID int64) error {
+	old, err := h.store.SetPetSprite(ctx, userID, "", 1)
+	if err == nil && old != "" {
+		removePetImage(old)
+	}
+	return err
+}
+
+// RemovePicture takes a person's own animal picture away (grown-ups), e.g.
+// when it isn't suitable. The animal goes back to its drawn look.
+func (h *PetHandler) RemovePicture(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+	p, err := h.store.GetPetForUser(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load pet")
+		return
+	}
+	if p == nil {
+		writeError(w, http.StatusNotFound, "that person has no farm animal")
+		return
+	}
+	if err := h.clearSprite(r.Context(), id); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to remove picture")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ApprovePicture records whether a grown-up has looked at a person's own
+// animal picture and said it may be sent to friend families. It never
+// affects the family's own farm, where the picture shows either way.
+func (h *PetHandler) ApprovePicture(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user id")
+		return
+	}
+	var req struct {
+		Approved *bool `json:"approved"`
+		// Sprite is the id of the picture the parent was looking at. If
+		// the kid has changed it since, nothing is approved.
+		Sprite string `json:"sprite"`
+	}
+	if err := decodeJSON(r, &req); err != nil || req.Approved == nil {
+		writeError(w, http.StatusBadRequest, "approved (true or false) is required")
+		return
+	}
+	p, err := h.store.GetPetForUser(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load pet")
+		return
+	}
+	if p == nil || p.Sprite == "" {
+		writeError(w, http.StatusNotFound, "that person's animal has no picture of its own")
+		return
+	}
+	if req.Sprite == "" {
+		req.Sprite = p.Sprite
+		if *req.Approved {
+			writeError(w, http.StatusBadRequest, "sprite (the id of the picture you looked at) is required to approve it")
+			return
+		}
+	}
+	found, err := h.store.SetPetSpriteApproved(r.Context(), id, req.Sprite, *req.Approved)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save")
+		return
+	}
+	if !found {
+		writeError(w, http.StatusConflict, "the picture has changed since you looked at it; have another look first")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": id, "approved": *req.Approved})
 }
 
 // PetChoice is what a person picks when redeeming a "new_animal" or
@@ -335,9 +449,16 @@ type PetChoice struct {
 	// For "design": where it's worn and the picture as a data: URL.
 	Slot  string `json:"slot"`
 	Image string `json:"image"`
+	// For "gift": the friend whose animal gets it, by leaderboard key
+	// ("f<link>:<member>"). For "playdate": the linked family to visit.
+	Friend string `json:"friend"`
+	Link   int64  `json:"link"`
 
-	png  []byte // the checked, shrunk picture
-	item string // "img:<slot>:<id>" once saved
+	send *friends.SendTarget // the checked gift or playdate
+
+	png    []byte // the checked, shrunk picture
+	frames int    // for an animal picture: how many frames it holds
+	item   string // once saved: "img:<slot>:<id>" for an accessory, the bare id for an animal picture
 }
 
 // checkPetReward refuses a pet-care redemption that can't take effect,
@@ -396,6 +517,35 @@ func (h *PetHandler) checkPetReward(ctx context.Context, u *model.User, rw *mode
 			return err.Error(), nil
 		}
 		choice.png = png
+	case model.PetActionGift, model.PetActionPlaydate:
+		if h.Friends == nil || choice == nil {
+			return "choose a friend", nil
+		}
+		if rw.PetAction == model.PetActionPlaydate {
+			if err := h.describe(ctx, p, u); err != nil {
+				return "", err
+			}
+			if p.Hiding {
+				return p.Name + " is hiding and doesn't want to go out. Finish today's chores first!", nil
+			}
+			if !p.CanPlay {
+				return p.Name + " is too sick to go on a playdate. Doing your chores will help them get better.", nil
+			}
+		}
+		target, msg, err := h.Friends.CheckSend(ctx, u.ID, rw.PetAction, choice.Friend, choice.Link)
+		if err != nil || msg != "" {
+			return msg, err
+		}
+		choice.send = target
+	case model.PetActionPicture:
+		if choice == nil || choice.Image == "" {
+			return "choose a picture", nil
+		}
+		png, frames, err := decodeSprite(choice.Image)
+		if err != nil {
+			return err.Error(), nil
+		}
+		choice.png, choice.frames = png, frames
 	case model.PetActionRestyle:
 		if choice == nil || !model.ValidPetColor(p.Species, choice.Color) {
 			return "choose a coat colour", nil
@@ -425,6 +575,19 @@ func (h *PetHandler) applyPetReward(ctx context.Context, userID int64, rw *model
 		return h.store.SetPetLook(ctx, userID, choice.Species, choice.Color)
 	case model.PetActionDesign:
 		return h.store.AddPetItem(ctx, userID, choice.item)
+	case model.PetActionGift:
+		// The treat goes to the friend's animal, not this one. It was
+		// recorded before the points moved (see Redeem).
+		return nil
+	case model.PetActionPlaydate:
+		// A day out: the animal comes home happier.
+		return h.store.AdjustPetNeeds(ctx, userID, 0, playdateJoy)
+	case model.PetActionPicture:
+		old, err := h.store.SetPetSprite(ctx, userID, choice.item, choice.frames)
+		if err == nil && old != "" {
+			removePetImage(old)
+		}
+		return err
 	}
 	f, j := pet.Effect(rw.PetAction)
 	return h.store.AdjustPetNeeds(ctx, userID, f, j)
