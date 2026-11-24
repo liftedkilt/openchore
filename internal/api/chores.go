@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/liftedkilt/openchore/internal/discord"
+	"github.com/liftedkilt/openchore/internal/friends"
 	"github.com/liftedkilt/openchore/internal/llm"
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/store"
@@ -22,6 +23,7 @@ type ChoreHandler struct {
 	discord    *discord.Notifier
 	aiSvc      *AIServices    // optional AI and read-aloud audio
 	reviews    sync.WaitGroup // in-flight background photo reviews
+	friends    *friends.Service // optional; undoing a gift's purchase resyncs its link
 }
 
 func NewChoreHandler(s *store.Store, d *webhook.Dispatcher, dn *discord.Notifier, ai *AIServices) *ChoreHandler {

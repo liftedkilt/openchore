@@ -248,15 +248,22 @@ func (s *Store) SetFriendSendRedemption(ctx context.Context, sendID string, rede
 	return err
 }
 
-// DeleteFriendSend takes back a send by its id, or (id "") the one a
-// redemption paid for.
-func (s *Store) DeleteFriendSend(ctx context.Context, sendID string, redemptionID int64) error {
-	if sendID != "" {
-		_, err := s.db.ExecContext(ctx, `DELETE FROM friend_sends WHERE id = ?`, sendID)
-		return err
-	}
-	_, err := s.db.ExecContext(ctx, `DELETE FROM friend_sends WHERE redemption_id = ? AND redemption_id != 0`, redemptionID)
+// DeleteFriendSend takes back a send by its id. (One a redemption paid for
+// is taken back by UndoRedemption.)
+func (s *Store) DeleteFriendSend(ctx context.Context, sendID string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM friend_sends WHERE id = ?`, sendID)
 	return err
+}
+
+// FriendSendLink returns the link a redemption's gift or playdate goes to,
+// or 0 if it didn't pay for one.
+func (s *Store) FriendSendLink(ctx context.Context, redemptionID int64) (int64, error) {
+	var id int64
+	err := s.db.QueryRowContext(ctx, `SELECT link_id FROM friend_sends WHERE redemption_id = ? AND redemption_id != 0`, redemptionID).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return id, err
 }
 
 // CountFriendSends counts what a person sent on a day of one kind: to one

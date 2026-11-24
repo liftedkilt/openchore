@@ -28,16 +28,80 @@ func startHub(t *testing.T) *httptest.Server {
 // gets a 503 as if the hub were unreachable.
 func startFlakyHub(t *testing.T) (*httptest.Server, *atomic.Bool) {
 	t.Helper()
-	h, down := newTestHub(t), &atomic.Bool{}
+	srv, down, _ := startWatchedHub(t)
+	return srv, down
+}
+
+// startWatchedHub is startFlakyHub that also counts finished exchanges, so a
+// test can wait for a background sync.
+func startWatchedHub(t *testing.T) (*httptest.Server, *atomic.Bool, *atomic.Int64) {
+	t.Helper()
+	h, down, exchanges := newTestHub(t), &atomic.Bool{}, &atomic.Int64{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if down.Load() {
 			http.Error(w, "unavailable", http.StatusServiceUnavailable)
 			return
 		}
 		h.ServeHTTP(w, r)
+		if strings.HasSuffix(r.URL.Path, "/exchange") {
+			exchanges.Add(1)
+		}
 	}))
 	t.Cleanup(srv.Close)
-	return srv, down
+	return srv, down, exchanges
+}
+
+// waitFor waits up to five seconds for n to reach want.
+func waitFor(t *testing.T, n *atomic.Int64, want int64, what string) {
+	t.Helper()
+	for deadline := time.Now().Add(5 * time.Second); n.Load() < want; {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s (%d of %d)", what, n.Load(), want)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// A gift goes to the hub as soon as it's bought. Undoing the purchase leaves
+// a new snapshot without it straight away, so the other family's next sync
+// doesn't pick it up.
+func TestFriendUndoneGiftDoesNotArrive(t *testing.T) {
+	hubSrv, _, exchanges := startWatchedHub(t)
+	a, b, aPath, bPath, ava := linkedPair(t, hubSrv)
+	bo := b.createChild(t, "Bo")
+	b.enablePets(t)
+	b.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Clover", "species": "horse"}, childHeaders(bo), http.StatusCreated)
+	b.expectStatus(t, "POST", "/api/points/adjust", map[string]any{"user_id": bo, "amount": 100, "note": "seed"}, adminHeaders(), http.StatusNoContent)
+	b.expectStatus(t, "PUT", bPath, map[string]any{"share_user_ids": []int{bo}}, adminHeaders(), http.StatusOK)
+	a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	a.expectStatus(t, "PUT", aPath, map[string]any{"accept_member_ids": []string{fmt.Sprint(bo)}}, adminHeaders(), http.StatusOK)
+	b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	avaKey := fmt.Sprintf("f%s:%d", bPath[strings.LastIndex(bPath, "/")+1:], ava)
+	gift := b.petRewardID(t, bo, "gift")
+
+	for _, undo := range []string{"points history", "redemption"} {
+		base := exchanges.Load()
+		resp := b.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", gift), map[string]any{"pet": map[string]any{"friend": avaKey}}, childHeaders(bo), http.StatusCreated)
+		var redemption map[string]any
+		decodeBody(t, resp, &redemption)
+		id := int64(redemption["id"].(float64))
+		waitFor(t, exchanges, base+1, "the sync after buying the gift")
+		if undo == "redemption" {
+			b.expectStatus(t, "DELETE", fmt.Sprintf("/api/redemptions/%d", id), nil, adminHeaders(), http.StatusNoContent)
+		} else {
+			var txn int64
+			if err := b.db.QueryRow(`SELECT id FROM point_transactions WHERE reason = 'reward_redeem' AND reference_id = ?`, id).Scan(&txn); err != nil {
+				t.Fatal(err)
+			}
+			b.expectStatus(t, "POST", fmt.Sprintf("/api/points/transactions/%d/undo", txn), nil, adminHeaders(), http.StatusNoContent)
+		}
+		waitFor(t, exchanges, base+2, "the sync after undoing it ("+undo+")")
+		a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
+		var got int
+		if err := a.db.QueryRow(`SELECT COUNT(*) FROM friend_received`).Scan(&got); err != nil || got != 0 {
+			t.Fatalf("a gift undone from the %s still arrived: %d %v", undo, got, err)
+		}
+	}
 }
 
 func newTestHub(t *testing.T) *hub.Hub {

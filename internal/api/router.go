@@ -41,6 +41,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 		auth.Friends = friends.New(s)
 	}
 	friendsH := NewFriendsHandler(s, auth.Friends)
+	chores.friends = auth.Friends
 	pets.Ribbons = friendsH.Ribbons // last week's leaderboard winner wears a ribbon on the farm
 	pets.Friends = auth.Friends     // gifts and playdates to linked families
 	webhooks := NewWebhookHandler(s)

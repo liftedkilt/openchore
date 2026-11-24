@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -244,5 +247,94 @@ func TestCallerAddress(t *testing.T) {
 	r.Header.Set("X-Forwarded-For", "not-an-address")
 	if got := h.caller(r); got != "10.0.0.9" {
 		t.Fatalf("junk header = %s", got)
+	}
+}
+
+// Limits count an IPv6 caller by its /64: one host normally holds a whole
+// /64 and could otherwise rotate addresses for a fresh budget.
+func TestLimitKey(t *testing.T) {
+	for addr, want := range map[string]string{
+		"203.0.113.7":          "203.0.113.7",
+		"::ffff:203.0.113.7":   "203.0.113.7",
+		"2001:db8:1:2::1":      "2001:db8:1:2::/64",
+		"2001:db8:1:2:ffff::9": "2001:db8:1:2::/64",
+		"2001:db8:1:3::1":      "2001:db8:1:3::/64",
+		"fe80::1%eth0":         "fe80::/64",
+		"not-an-address":       "not-an-address",
+	} {
+		if got := limitKey(addr); got != want {
+			t.Errorf("limitKey(%s) = %s, want %s", addr, got, want)
+		}
+	}
+}
+
+// On an open hub, addresses in one IPv6 /64 share the cap on waiting
+// invites; a different /64 has its own.
+func TestOpenHubCapsWaitingInvitesPerIPv6Prefix(t *testing.T) {
+	h, srv := newHub(t)
+	h.TrustProxy = true
+	now := time.Now()
+	h.SetClock(func() time.Time { return now })
+	create := func(from string) int {
+		t.Helper()
+		now = now.Add(time.Minute) // stay inside the signup rate
+		req, _ := http.NewRequest("POST", srv.URL+"/v1/links", nil)
+		req.Header.Set("X-Forwarded-For", from)
+		resp, err := srv.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	for i := 0; i < MaxWaitingPerCaller; i++ {
+		if code := create(fmt.Sprintf("2001:db8:1:2::%x", i+1)); code != http.StatusCreated {
+			t.Fatalf("invite %d = %d", i+1, code)
+		}
+	}
+	if code := create("2001:db8:1:2::ffff"); code != http.StatusTooManyRequests {
+		t.Fatalf("a new address in the same /64 = %d, want 429", code)
+	}
+	if code := create("2001:db8:1:3::1"); code != http.StatusCreated {
+		t.Fatalf("another /64 = %d", code)
+	}
+}
+
+// Opening a hub database made by this or an older version works, and a
+// joined link no longer says who made it.
+func TestHubReopensAndForgetsWhoMadeAJoinedLink(t *testing.T) {
+	h, srv := newHub(t)
+	if _, err := New(h.DB(), nil); err != nil {
+		t.Fatalf("reopening a database that already has created_by: %v", err)
+	}
+	_, l := do(t, srv, "POST", "/v1/links", "", nil)
+	var by string
+	h.DB().QueryRow(`SELECT created_by FROM links WHERE id = ?`, l["link"]).Scan(&by)
+	if by == "" || strings.Contains(by, "127.0.0.1") || by == hash("127.0.0.1") {
+		t.Fatalf("created_by = %q, want a keyed hash", by)
+	}
+	do(t, srv, "POST", "/v1/links/"+l["link"].(string)+"/join", "", map[string]any{"code": l["join_code"]})
+	h.DB().QueryRow(`SELECT created_by FROM links WHERE id = ?`, l["link"]).Scan(&by)
+	if by != "" {
+		t.Fatalf("a joined link still says who made it: %q", by)
+	}
+}
+
+// Requests through a proxy the hub hasn't been told to trust get one warning.
+func TestHubWarnsAboutAnUntrustedProxy(t *testing.T) {
+	h, srv := newHub(t)
+	var buf bytes.Buffer
+	h.Log = log.New(&buf, "", 0)
+	for i := 0; i < 2; i++ {
+		req, _ := http.NewRequest("POST", srv.URL+"/v1/links", nil)
+		req.Header.Set("X-Forwarded-For", "203.0.113.7")
+		resp, err := srv.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	if n := strings.Count(buf.String(), "HUB_TRUST_PROXY"); n != 1 {
+		t.Fatalf("proxy warnings = %d:\n%s", n, buf.String())
 	}
 }

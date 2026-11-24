@@ -244,8 +244,7 @@ there is a friend's animal to send them to.
   the other server says.
 - **A parent can turn them off** per family ("Take gifts and playdates from
   …", on by default). The other family's kids are told and aren't charged.
-- **Undoing the redemption** takes back a treat or visit that hasn't been
-  picked up yet, along with the points. One that has already arrived stays.
+- **Undoing the redemption** (from the points history or the redemption list) takes back a treat or visit that hasn't been picked up yet, along with the points. A gift goes to the hub as soon as it's bought, so undoing it syncs straight away to replace that snapshot. If the other family synced in between, the gift has already arrived and stays.
 - **Visiting animals are for signed-in family members.** They aren't on the
   wall display or the public farm.
 
@@ -297,8 +296,8 @@ OpenChore servers call it, not people, and they can't log in. Then:
 | `HUB_DB` | SQLite file (default `hub.db`) |
 | `HUB_KEYS` | Comma-separated keys allowed to create links. If set, no key file is made |
 | `HUB_KEY_FILE` | Where the made-on-first-start key lives (default `hub.key` next to `HUB_DB`) |
-| `HUB_OPEN` | `true` lets anyone create links without a key. Each address can then have at most 20 invites waiting to be joined |
-| `HUB_TRUST_PROXY` | `true` behind one reverse proxy, so rate limits use the caller's real address |
+| `HUB_OPEN` | `true` lets anyone create links without a key. Each address (each /64 for IPv6) can then have at most 20 invites waiting to be joined |
+| `HUB_TRUST_PROXY` | `true` behind one reverse proxy, so rate limits use the caller's real address. Without it every caller counts as the proxy and shares one limit, which on an open hub lets 20 requests block all new invites for a week; the hub logs a warning when it sees `X-Forwarded-For` without this set |
 
 An OpenChore server takes its hub from Settings, or from `OPENCHORE_HUB_URL` /
 `OPENCHORE_HUB_KEY` (which win).

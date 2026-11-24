@@ -1125,7 +1125,7 @@ func (f *Service) ReserveSend(ctx context.Context, userID int64, t *SendTarget) 
 // CancelSend takes back a reserved send (paying for it failed).
 func (f *Service) CancelSend(ctx context.Context, t *SendTarget) {
 	if t != nil && t.Send.ID != "" {
-		_ = f.store.DeleteFriendSend(ctx, t.Send.ID, 0)
+		_ = f.store.DeleteFriendSend(ctx, t.Send.ID)
 	}
 }
 
@@ -1133,7 +1133,13 @@ func (f *Service) CancelSend(ctx context.Context, t *SendTarget) {
 // the redemption can take it back) and starts a sync so it arrives soon.
 func (f *Service) ConfirmSend(ctx context.Context, t *SendTarget, redemptionID int64) {
 	_ = f.store.SetFriendSendRedemption(ctx, t.Send.ID, redemptionID)
-	go func(linkID int64) { _ = f.Sync(context.WithoutCancel(ctx), linkID) }(t.LinkID)
+	f.SyncSoon(ctx, t.LinkID)
+}
+
+// SyncSoon syncs a link in the background, without holding up the request
+// that asked for it.
+func (f *Service) SyncSoon(ctx context.Context, linkID int64) {
+	go func() { _ = f.Sync(context.WithoutCancel(ctx), linkID) }()
 }
 
 // Visitors returns the friend families' animals that are here on a playdate

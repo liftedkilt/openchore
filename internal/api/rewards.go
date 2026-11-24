@@ -1,9 +1,11 @@
 package api
 
 import (
+	"context"
 	"log"
 	"net/http"
 
+	"github.com/liftedkilt/openchore/internal/friends"
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/webhook"
@@ -354,11 +356,14 @@ func (h *RewardHandler) UndoRedemption(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid redemption id")
 		return
 	}
-	if err := h.store.UndoRedemption(r.Context(), id); err != nil {
+	var f *friends.Service
+	if h.pets != nil {
+		f = h.pets.Friends
+	}
+	if err := undoRedemption(r.Context(), h.store, f, id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to undo redemption")
 		return
 	}
-	// store.UndoRedemption also takes back a gift or playdate it paid for.
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -513,4 +518,23 @@ func (h *RewardHandler) GetSharedPool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, pool)
+}
+
+// undoRedemption refunds a redemption (store.UndoRedemption). A gift or
+// playdate it paid for is taken back with it, and if one was queued the link
+// is synced straight away: the hub already holds the snapshot it went out
+// in, and until this family leaves a new one the other family could still
+// pick it up. (If they sync in the moment before that, it has arrived.)
+func undoRedemption(ctx context.Context, s *store.Store, f *friends.Service, id int64) error {
+	linkID, err := s.FriendSendLink(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := s.UndoRedemption(ctx, id); err != nil {
+		return err
+	}
+	if linkID != 0 && f != nil {
+		f.SyncSoon(ctx, linkID)
+	}
+	return nil
 }

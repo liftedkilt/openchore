@@ -62,7 +62,7 @@ func (h *ChoreHandler) UndoPointsEntry(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusUnprocessableEntity, store.ErrCannotUndo.Error())
 			return
 		}
-		if err := h.store.UndoRedemption(r.Context(), *txn.ReferenceID); err != nil {
+		if err := undoRedemption(r.Context(), h.store, h.friends, *txn.ReferenceID); err != nil {
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}

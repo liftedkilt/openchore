@@ -11,6 +11,7 @@ package hub
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -22,6 +23,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -67,7 +69,9 @@ CREATE TABLE IF NOT EXISTS links (
 // migrations are added to a hub database made by an older version; an
 // error that the column already exists is expected and ignored.
 var migrations = []string{
-	// sha256 of the address that made the link (for MaxWaitingPerCaller).
+	// Who made a link that's still waiting to be joined (for
+	// MaxWaitingPerCaller): a keyed hash of the caller (see Hub.callerID),
+	// cleared once the link is joined.
 	`ALTER TABLE links ADD COLUMN created_by TEXT NOT NULL DEFAULT ''`,
 }
 
@@ -89,6 +93,12 @@ type Hub struct {
 	window  time.Time
 	hits    map[string]int
 	signups map[string]int
+
+	// salt keys the caller hashes kept in links.created_by. It's made fresh
+	// at every start, so a stored hash can't be matched back to an address
+	// by trying them all; a restart only forgets who made which invite.
+	salt      []byte
+	proxyOnce sync.Once
 }
 
 // New prepares the database and returns the hub. keys are the secrets that
@@ -102,7 +112,10 @@ func New(db *sql.DB, keys []string) (*Hub, error) {
 			return nil, err
 		}
 	}
-	h := &Hub{db: db, now: time.Now, mux: http.NewServeMux()}
+	h := &Hub{db: db, now: time.Now, mux: http.NewServeMux(), salt: make([]byte, 32)}
+	if _, err := rand.Read(h.salt); err != nil {
+		return nil, err
+	}
 	for _, k := range keys {
 		if k = strings.TrimSpace(k); k != "" {
 			h.keys = append(h.keys, hash(k))
@@ -118,13 +131,18 @@ func New(db *sql.DB, keys []string) (*Hub, error) {
 
 func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	addr := h.caller(r)
+	if !h.TrustProxy && r.Header.Get("X-Forwarded-For") != "" && h.Log != nil {
+		h.proxyOnce.Do(func() {
+			h.Log.Printf("requests come through a proxy (X-Forwarded-For) but HUB_TRUST_PROXY isn't set: every caller is counted as the proxy, so they all share one rate limit and one cap on waiting invites")
+		})
+	}
 	rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 	signup := r.Method == http.MethodPost && (r.URL.Path == "/v1/links" || strings.HasSuffix(r.URL.Path, "/join"))
 	switch {
 	case r.URL.Path == "/healthz":
 		h.mux.ServeHTTP(rec, r) // probes aren't counted or logged
 		return
-	case !h.allow(addr, signup):
+	case !h.allow(limitKey(addr), signup):
 		rec.Header().Set("Retry-After", "60")
 		fail(rec, http.StatusTooManyRequests, "too many requests; try again in a minute")
 	default:
@@ -168,6 +186,29 @@ func (h *Hub) caller(r *http.Request) string {
 		return host
 	}
 	return r.RemoteAddr
+}
+
+// limitKey is what a caller's limits are counted against: its address, or
+// for IPv6 its /64, since one host is normally given a whole /64 and could
+// otherwise rotate through addresses to get a fresh budget each time.
+func limitKey(addr string) string {
+	a, err := netip.ParseAddr(addr)
+	if err != nil {
+		return addr
+	}
+	if a = a.Unmap(); a.Is6() {
+		if p, err := a.WithZone("").Prefix(64); err == nil {
+			return p.String()
+		}
+	}
+	return a.String()
+}
+
+// callerID is the keyed hash of a caller's limit key kept on a waiting link.
+func (h *Hub) callerID(r *http.Request) string {
+	m := hmac.New(sha256.New, h.salt)
+	m.Write([]byte(limitKey(h.caller(r))))
+	return hex.EncodeToString(m.Sum(nil))
 }
 
 // allow counts a request against the caller's budget for this minute.
@@ -249,25 +290,23 @@ func (h *Hub) create(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusServiceUnavailable, "this hub is full")
 		return
 	}
-	by := hash(h.caller(r)) // not the address itself: the hub doesn't keep those
-	if len(h.keys) == 0 {
-		var waiting int
-		if err := h.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM links WHERE created_by = ? AND b_token = ''`, by).Scan(&waiting); err != nil {
-			fail(w, http.StatusInternalServerError, "hub storage error")
-			return
-		}
-		if waiting >= MaxWaitingPerCaller {
-			fail(w, http.StatusTooManyRequests, "too many invites waiting to be joined; use or let one expire first")
-			return
-		}
-	}
+	by := h.callerID(r)
 	id, token, code := random(12), random(32), random(18)
 	now := h.now()
 	expires := now.Add(InviteTTL)
-	if _, err := h.db.ExecContext(ctx,
-		`INSERT INTO links (id, created_at, touched_at, join_hash, join_expires, a_token, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		id, now, now, hash(code), expires, hash(token), by); err != nil {
+	// One statement, so two requests at once can't both slip under the cap
+	// on waiting invites (only checked on a hub without keys).
+	res, err := h.db.ExecContext(ctx,
+		`INSERT INTO links (id, created_at, touched_at, join_hash, join_expires, a_token, created_by)
+		 SELECT ?, ?, ?, ?, ?, ?, ?
+		 WHERE ? OR (SELECT COUNT(*) FROM links WHERE created_by = ? AND b_token = '') < ?`,
+		id, now, now, hash(code), expires, hash(token), by, len(h.keys) > 0, by, MaxWaitingPerCaller)
+	if err != nil {
 		fail(w, http.StatusInternalServerError, "hub storage error")
+		return
+	}
+	if n, err := res.RowsAffected(); err != nil || n == 0 {
+		fail(w, http.StatusTooManyRequests, "too many invites waiting to be joined; use or let one expire first")
 		return
 	}
 	reply(w, http.StatusCreated, map[string]any{"link": id, "token": token, "join_code": code, "expires_at": expires})
@@ -284,7 +323,7 @@ func (h *Hub) join(w http.ResponseWriter, r *http.Request) {
 	}
 	token := random(32)
 	res, err := h.db.ExecContext(r.Context(),
-		`UPDATE links SET b_token = ?, join_hash = '', touched_at = ?
+		`UPDATE links SET b_token = ?, join_hash = '', created_by = '', touched_at = ?
 		 WHERE id = ? AND b_token = '' AND join_hash = ? AND join_expires >= ?`,
 		hash(token), h.now(), r.PathValue("id"), hash(req.Code), h.now())
 	if err != nil {
