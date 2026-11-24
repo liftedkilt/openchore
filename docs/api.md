@@ -109,8 +109,8 @@ Optional features, off until a parent turns them on. Details in
 | `GET` | `/api/leaderboard/household` | This household's own weekly standings (public, for the wall display) |
 | `GET` `POST` `PATCH` | `/api/me/pet` | This person's animal: view, adopt, rename / change accessory / drop a custom picture |
 | `GET` | `/api/leaderboard?week=this\|last` | The weekly standings, with people shared by linked families |
-| `GET` | `/api/friends/farms` | Linked families' farms, as of their last sync |
-| `GET` | `/api/friends/visitors` | Friends' animals here on a playdate today, and treats friends sent today |
+| `GET` | `/api/friends/farms` | Linked families' farms, as of their last sync (including reached team goal celebration) |
+| `GET` | `/api/friends/visitors` | Friends' animals here on a playdate today, treats friends sent today, and reached team goal celebrations |
 
 ### Reward commitments
 

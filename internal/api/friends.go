@@ -179,6 +179,100 @@ func goalFor(l *model.FriendLink, snap *model.FriendSnapshot, week string, toget
 	return g
 }
 
+// goalCelebration describes an agreed weekly team goal that two linked
+// families have reached together, shown as a celebratory decoration on both
+// farms for the rest of that week and the week after.
+type goalCelebration struct {
+	LinkID    int64  `json:"link_id"`
+	Family    string `json:"family"`
+	Week      string `json:"week"`       // "this" or "last"
+	WeekStart string `json:"week_start"` // Monday YYYY-MM-DD
+	Target    int    `json:"target"`
+	Score     int    `json:"score"`
+}
+
+// goalCelebrations returns every active friend link whose agreed team goal for
+// this week or last week has been reached.
+func (h *FriendsHandler) goalCelebrations(ctx context.Context) ([]goalCelebration, error) {
+	links, err := h.store.ListFriendLinks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return h.goalCelebrationsForLinks(ctx, links)
+}
+
+func (h *FriendsHandler) goalCelebrationsForLinks(ctx context.Context, links []model.FriendLink) ([]goalCelebration, error) {
+	now := h.svc.Now()
+	weeks := []struct {
+		key   string
+		start string
+	}{
+		{key: "this", start: score.WeekStart(now)},
+		{key: "last", start: score.WeekStart(now.AddDate(0, 0, -7))},
+	}
+
+	type candidate struct {
+		link *model.FriendLink
+		snap *model.FriendSnapshot
+		week string
+		key  string
+	}
+	var cands []candidate
+	for i := range links {
+		l := &links[i]
+		snap := friends.PeerSnapshot(l)
+		if l.Status != model.FriendStatusActive || snap == nil || l.GoalTarget <= 0 || snap.Goal == nil {
+			continue
+		}
+		for _, w := range weeks {
+			if l.GoalWeek == w.start && snap.Goal.Start == w.start && l.GoalTarget == snap.Goal.Target {
+				cands = append(cands, candidate{link: l, snap: snap, week: w.start, key: w.key})
+				break
+			}
+		}
+	}
+	out := []goalCelebration{}
+	if len(cands) == 0 {
+		return out, nil
+	}
+
+	users, err := h.store.ListUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	days, err := h.svc.Days(ctx, users)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range cands {
+		ours, err := h.svc.TeamWeek(ctx, c.link, users, days, c.week)
+		if err != nil {
+			return nil, err
+		}
+		var theirs model.FriendTeamWeek
+		for _, tw := range c.snap.Team {
+			if tw.Start == c.week {
+				theirs = tw
+				break
+			}
+		}
+		together := side(ours.People+theirs.People, ours.ShareSum+theirs.ShareSum)
+		g := goalFor(c.link, c.snap, c.week, together)
+		if g != nil && g.Met {
+			out = append(out, goalCelebration{
+				LinkID:    c.link.ID,
+				Family:    familyLabel(c.link.PeerName),
+				Week:      c.key,
+				WeekStart: c.week,
+				Target:    g.Target,
+				Score:     together.Score,
+			})
+		}
+	}
+	return out, nil
+}
+
 // winners are the keys of whoever is ranked first, if there was anyone to
 // beat: with a single ranked person there's no contest and no ribbon.
 func winners(entries []leaderboardEntry) map[string]bool {
@@ -332,9 +426,15 @@ func (h *FriendsHandler) Farms(w http.ResponseWriter, r *http.Request) {
 	}
 	// A friend who came first on last week's leaderboard wears the ribbon here too.
 	won := map[string]bool{}
+	celebrationsByLink := map[int64]goalCelebration{}
 	if h.leaderboardOn(r) {
 		if prev, err := h.standings(r.Context(), score.WeekStart(h.svc.Now().AddDate(0, 0, -7)), true); err == nil {
 			won = winners(prev.entries)
+		}
+		if goals, err := h.goalCelebrationsForLinks(r.Context(), links); err == nil {
+			for _, gc := range goals {
+				celebrationsByLink[gc.LinkID] = gc
+			}
 		}
 	}
 	farms := []map[string]any{}
@@ -367,20 +467,35 @@ func (h *FriendsHandler) Farms(w http.ResponseWriter, r *http.Request) {
 				Items: []string{}, OwnerName: m.Name, OwnerColor: m.Color,
 			})
 		}
-		farms = append(farms, map[string]any{"link_id": l.ID, "family": familyLabel(l.PeerName), "snapshot_at": l.SnapshotAt, "pets": pets})
+		farm := map[string]any{"link_id": l.ID, "family": familyLabel(l.PeerName), "snapshot_at": l.SnapshotAt, "pets": pets}
+		if gc, ok := celebrationsByLink[l.ID]; ok && len(pets) > 0 {
+			farm["goal_celebration"] = gc
+		}
+		farms = append(farms, farm)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"farms": farms})
 }
 
 // Visitors returns the friend families' animals that are on this farm for a
-// playdate today, and the treats friends sent this household's animals today.
+// playdate today, the treats friends sent this household's animals today,
+// and any agreed weekly team goals reached with linked families.
 func (h *FriendsHandler) Visitors(w http.ResponseWriter, r *http.Request) {
 	visitors, gifts, err := h.svc.Visitors(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list visitors")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"visitors": visitors, "gifts": gifts})
+	celebrations := []goalCelebration{}
+	if petsEnabled(r.Context(), h.store) && h.leaderboardOn(r) {
+		if got, err := h.goalCelebrations(r.Context()); err == nil {
+			celebrations = got
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"visitors":          visitors,
+		"gifts":             gifts,
+		"goal_celebrations": celebrations,
+	})
 }
 
 // --- Parents ---

@@ -5,8 +5,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import type { Pet } from '../../../types';
+import type { GoalCelebration, Pet } from '../../../types';
 import { FarmAnimal, petPicture, FarmBackdrop, Shelter } from './FarmAnimal';
+import { GoalDecoration } from './GoalDecoration';
 import { Rosette } from './Rosette';
 import s from './farm.module.css';
 import { useFarmSeason } from './season';
@@ -48,11 +49,15 @@ export interface FarmSceneProps {
   compact?: boolean;
   /** Show owners' names under the animals (default: unless compact). */
   owners?: boolean;
+  /** Reached weekly team goals celebrated on this farm. */
+  goalCelebrations?: readonly GoalCelebration[];
+  /** True when viewing a visited friend family's farm. */
+  friendFarm?: boolean;
   onSelect?: (pet: Pet) => void;
   className?: string;
 }
 
-export function FarmScene({ pets, meId, compact, owners = !compact, onSelect, className }: FarmSceneProps) {
+export function FarmScene({ pets, meId, compact, owners = !compact, goalCelebrations, friendFarm, onSelect, className }: FarmSceneProps) {
   const { t } = useTranslation();
   const season = useFarmSeason();
   const out = pets.filter(p => !p.hiding);
@@ -127,6 +132,9 @@ export function FarmScene({ pets, meId, compact, owners = !compact, onSelect, cl
       data-season={season ?? undefined}
     >
       <FarmBackdrop season={season} />
+      {goalCelebrations && goalCelebrations.length > 0 && (
+        <GoalDecoration goals={goalCelebrations} compact={compact} friendFarm={friendFarm} />
+      )}
 
       {hiding.length > 0 && (
         <ul className={s.shelters} aria-label={t('kid.farm.hidingTitle')}>

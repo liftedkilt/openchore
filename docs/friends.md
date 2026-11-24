@@ -221,6 +221,13 @@ It is a combined score, not a count of chores, so a family with more chores
 doesn't carry more of it. Each family works its side out from the people it
 shares, and sends only the total, so both homes see the same numbers.
 
+When an agreed team goal is reached, both families' farms (your own farm and
+the other family's farm when you visit it) hang celebratory bunting and a
+team-goal badge. The decoration stays up for the rest of that week and through
+the following week (until a new goal is put forward or another week rolls over)
+whenever farm pets and the leaderboard are on. Like the rest of friend-family
+data, it is signed-in only and never appears on the public wall display.
+
 ### Gifts and playdates
 
 Two pet-care rewards ([pets.md](pets.md)) reach across to a linked family.
@@ -344,9 +351,11 @@ linked families see the link as ended and need a new invite.
 - `GET /api/leaderboard?week=this|last` – the standings, friends included.
   `percent` is the score out of 100; `share` is the same to two more places
   (0 to 10000) and is what people are ranked on.
-- `GET /api/friends/farms` – each friend family's farm, shaped like `GET /api/pets`.
-- `GET /api/friends/visitors` – friends' animals here on a playdate today, and
-  the treats friends sent today.
+- `GET /api/friends/farms` – each friend family's farm, shaped like `GET /api/pets`,
+  with `goal_celebration` when an agreed team goal with that family was reached.
+- `GET /api/friends/visitors` – friends' animals here on a playdate today,
+  the treats friends sent today, and `goal_celebrations` for any linked
+  families whose agreed team goal was reached.
 - `GET` / `PUT /api/admin/friends` – leaderboard switch, family name, hub, and
   each linked family with its `outbound` (your people: `shared`, and `accepted`
   once they show them) and `inbound` (their people: `accepted` = shown here).
@@ -361,5 +370,4 @@ Hub: `POST /v1/links`, `POST /v1/links/{id}/join`, `POST /v1/links/{id}/exchange
 
 ## Not built yet
 
-A decoration on both farms when a team goal is reached, a history of past
-winners, and goals that repeat every week.
+A history of past winners, and goals that repeat every week.

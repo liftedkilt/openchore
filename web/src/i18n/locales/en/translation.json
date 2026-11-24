@@ -1525,6 +1525,19 @@
         "playdateLead": "Choose a friend's farm for {{name}} to visit today. {{name}} shows up on their farm and comes home happier.",
         "visit": "Visit {{family}}",
         "none": "There aren't any friends' animals to choose yet."
+      },
+      "goal": {
+        "badgeCompact_one": "Team goal!",
+        "badgeCompact_other": "{{count}} team goals!",
+        "badgeOne": "Team goal with {{family}}: {{target}}!",
+        "badgeFriend": "Team goal reached: {{target}}!",
+        "badgeMany_one": "{{count}} team goal reached!",
+        "badgeMany_other": "{{count}} team goals reached!",
+        "detail": "{{family}}: goal of {{target}} reached together!",
+        "ariaOne": "Celebration bunting: team goal of {{target}} reached with {{family}}.",
+        "ariaFriend": "Celebration bunting: team goal of {{target}} reached together with {{family}}.",
+        "ariaMany": "Celebration bunting: {{count}} team goals reached ({{list}}).",
+        "item": "{{family}} ({{target}})"
       }
     },
     "board": {

@@ -1,4 +1,4 @@
-import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, OwnChore, OwnChoreInput, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput, SignInOptions, Farm, Pet, PetItem, PetPick, PetSpecies, Leaderboard, FriendFarm, FriendGift, FriendLink, FriendsSettings } from './types';
+import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, OwnChore, OwnChoreInput, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput, SignInOptions, Farm, Pet, PetItem, PetPick, PetSpecies, Leaderboard, FriendFarm, FriendGift, FriendLink, FriendsSettings, GoalCelebration } from './types';
 
 const API_BASE = '/api';
 
@@ -293,7 +293,7 @@ export const api = {
   },
   friends: {
     farms: () => fetchWithAuth<{ farms: FriendFarm[] }>('/friends/farms'),
-    visitors: () => fetchWithAuth<{ visitors: Pet[]; gifts: FriendGift[] }>('/friends/visitors'),
+    visitors: () => fetchWithAuth<{ visitors: Pet[]; gifts: FriendGift[]; goal_celebrations?: GoalCelebration[] }>('/friends/visitors'),
     settings: () => fetchWithAuth<FriendsSettings>('/admin/friends'),
     update: (data: { leaderboard_enabled?: boolean; family_name?: string; hub_url?: string; hub_key?: string }) =>
       fetchWithAuth<FriendsSettings>('/admin/friends', { method: 'PUT', body: JSON.stringify(data) }),

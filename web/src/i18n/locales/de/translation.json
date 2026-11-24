@@ -1525,6 +1525,19 @@
         "playdateLead": "Wähle den Hof von Freunden, den {{name}} heute besucht. {{name}} erscheint auf ihrem Hof und kommt glücklicher nach Hause.",
         "visit": "{{family}} besuchen",
         "none": "Es gibt noch keine Tiere von Freunden zur Auswahl."
+      },
+      "goal": {
+        "badgeCompact_one": "Teamziel!",
+        "badgeCompact_other": "{{count}} Teamziele!",
+        "badgeOne": "Teamziel mit {{family}}: {{target}}!",
+        "badgeFriend": "Teamziel erreicht: {{target}}!",
+        "badgeMany_one": "{{count}} Teamziel erreicht!",
+        "badgeMany_other": "{{count}} Teamziele erreicht!",
+        "detail": "{{family}}: gemeinsames Ziel von {{target}} erreicht!",
+        "ariaOne": "Festwimpel: gemeinsames Teamziel von {{target}} mit {{family}} erreicht.",
+        "ariaFriend": "Festwimpel: gemeinsames Teamziel von {{target}} mit {{family}} erreicht.",
+        "ariaMany": "Festwimpel: {{count}} Teamziele erreicht ({{list}}).",
+        "item": "{{family}} ({{target}})"
       }
     },
     "board": {

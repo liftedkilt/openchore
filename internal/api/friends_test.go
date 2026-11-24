@@ -1179,3 +1179,366 @@ func TestFriendGiftsAndPlaydates(t *testing.T) {
 		t.Fatalf("joy after a flood of gifts = %v, want 60 (three gifts a day at most)", joy())
 	}
 }
+
+// Reaching an agreed weekly team goal shows a celebratory decoration on both
+// families' farms (own farm via /api/friends/visitors, visited friend farm via
+// /api/friends/farms) while preserving privacy, feature switches, rounding, and
+// agreement rules.
+func TestTeamGoalFarmCelebration(t *testing.T) {
+	hubSrv := startHub(t)
+	a, b, aPath, bPath, ava := linkedPair(t, hubSrv)
+
+	// Pin both clocks to next week's Wednesday so GeneratedAt stays monotonic
+	// after linkedPair's initial sync and Tuesday of the same week is always a
+	// finished day inside "this" week, regardless of when the test runs.
+	base := time.Now().AddDate(0, 0, 7)
+	monday := time.Date(base.Year(), base.Month(), base.Day()-((int(base.Weekday())+6)%7), 12, 0, 0, 0, time.Local)
+	wed := monday.AddDate(0, 0, 2)
+	weekStart := monday.Format("2006-01-02")
+	tue := monday.AddDate(0, 0, 1).Format("2006-01-02")
+	a.friends.SetClock(func() time.Time { return wed })
+	b.friends.SetClock(func() time.Time { return wed })
+
+	bo := b.createChild(t, "Bo")
+	b.enablePets(t)
+	b.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Clover", "species": "horse"}, childHeaders(bo), http.StatusCreated)
+	for _, e := range []*testEnv{a, b} {
+		e.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"leaderboard_enabled": true}, adminHeaders(), http.StatusOK)
+		if _, err := e.db.Exec(`UPDATE users SET created_at = '2020-01-01 00:00:00'`); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	bothSync := func() {
+		t.Helper()
+		for i := 0; i < 2; i++ {
+			a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
+			b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
+		}
+	}
+	b.expectStatus(t, "PUT", bPath, map[string]any{"share_user_ids": []int{bo}}, adminHeaders(), http.StatusOK)
+	bothSync()
+	a.expectStatus(t, "PUT", aPath, map[string]any{"accept_member_ids": []string{fmt.Sprint(bo)}}, adminHeaders(), http.StatusOK)
+	bothSync()
+
+	setScore := func(e *testEnv, userID, assigned, done int) {
+		t.Helper()
+		if _, err := e.db.Exec(`INSERT OR REPLACE INTO score_days (user_id, date, assigned, done) VALUES (?, ?, ?, ?)`,
+			userID, tue, assigned, done); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ownCelebrations := func(e *testEnv, hdr map[string]string) []any {
+		t.Helper()
+		out := e.getJSON(t, "/api/friends/visitors", hdr)
+		raw, ok := out["goal_celebrations"]
+		if !ok || raw == nil {
+			t.Fatalf("goal_celebrations missing or null: %v", out)
+		}
+		return raw.([]any)
+	}
+	friendFarmGoal := func(e *testEnv, hdr map[string]string) map[string]any {
+		t.Helper()
+		farms := e.getJSON(t, "/api/friends/farms", hdr)["farms"].([]any)
+		if len(farms) != 1 {
+			t.Fatalf("expected 1 friend farm, got %v", farms)
+		}
+		gc, _ := farms[0].(map[string]any)["goal_celebration"].(map[string]any)
+		return gc
+	}
+
+	// 1. No goal yet -> hidden on both farms even with 100% scores.
+	setScore(a, ava, 10000, 10000)
+	setScore(b, bo, 10000, 10000)
+	bothSync()
+	if got := ownCelebrations(a, childHeaders(ava)); len(got) != 0 {
+		t.Fatalf("expected no own celebration before goal: %v", got)
+	}
+	if gc := friendFarmGoal(a, childHeaders(ava)); gc != nil {
+		t.Fatalf("expected no friend farm celebration before goal: %v", gc)
+	}
+
+	// 2. Unagreed goals ("ours", "theirs", "differs") stay hidden.
+	a.expectStatus(t, "PUT", aPath, map[string]any{"goal_target": 80}, adminHeaders(), http.StatusOK)
+	bothSync()
+	if len(ownCelebrations(a, childHeaders(ava))) != 0 || len(ownCelebrations(b, childHeaders(bo))) != 0 {
+		t.Fatalf("one-sided goal should not celebrate")
+	}
+	if friendFarmGoal(a, childHeaders(ava)) != nil || friendFarmGoal(b, childHeaders(bo)) != nil {
+		t.Fatalf("one-sided goal should not celebrate on visited farm")
+	}
+	b.expectStatus(t, "PUT", bPath, map[string]any{"goal_target": 75}, adminHeaders(), http.StatusOK)
+	bothSync()
+	if len(ownCelebrations(a, childHeaders(ava))) != 0 || len(ownCelebrations(b, childHeaders(bo))) != 0 {
+		t.Fatalf("differing goals should not celebrate")
+	}
+
+	// 3. Agreed goal 80, floor-rounding boundary: (5998 + 10000) / 2 / 100 = 7999 / 100 = 79 < 80 -> hidden.
+	b.expectStatus(t, "PUT", bPath, map[string]any{"goal_target": 80}, adminHeaders(), http.StatusOK)
+	setScore(a, ava, 10000, 5998)
+	setScore(b, bo, 10000, 10000)
+	bothSync()
+	if len(ownCelebrations(a, childHeaders(ava))) != 0 || len(ownCelebrations(b, childHeaders(bo))) != 0 {
+		t.Fatalf("79.99%% floored to 79 should stay below target 80")
+	}
+	if friendFarmGoal(a, childHeaders(ava)) != nil || friendFarmGoal(b, childHeaders(bo)) != nil {
+		t.Fatalf("79.99%% floored to 79 should stay hidden on friend farms")
+	}
+
+	// 4. Exact boundary: (6000 + 10000) / 2 / 100 = 80 >= 80 -> celebrates on BOTH farms for BOTH households!
+	setScore(a, ava, 10000, 6000)
+	bothSync()
+	checkGoal := func(label string, m map[string]any, wantFamily string, wantScore float64) {
+		t.Helper()
+		if m == nil {
+			t.Fatalf("%s: expected goal celebration, got nil", label)
+		}
+		if m["family"] != wantFamily || m["week"] != "this" || m["week_start"] != weekStart || m["target"] != 80.0 || m["score"] != wantScore {
+			t.Fatalf("%s: unexpected celebration %v", label, m)
+		}
+	}
+	aOwn := ownCelebrations(a, childHeaders(ava))
+	bOwn := ownCelebrations(b, childHeaders(bo))
+	if len(aOwn) != 1 || len(bOwn) != 1 {
+		t.Fatalf("expected 1 own celebration on each side: A=%v B=%v", aOwn, bOwn)
+	}
+	checkGoal("A own farm", aOwn[0].(map[string]any), "The Bos", 80)
+	checkGoal("B own farm", bOwn[0].(map[string]any), "The Avas", 80)
+	checkGoal("A visited farm", friendFarmGoal(a, childHeaders(ava)), "The Bos", 80)
+	checkGoal("B visited farm", friendFarmGoal(b, childHeaders(bo)), "The Avas", 80)
+
+	// 5. Public privacy invariant: /api/pets leaks nothing; unauthenticated friend endpoints return 401.
+	pubPets := a.getJSON(t, "/api/pets", nil)
+	if _, has := pubPets["goal_celebrations"]; has {
+		t.Fatalf("public /api/pets leaked goal_celebrations: %v", pubPets)
+	}
+	if _, has := pubPets["goal_celebration"]; has {
+		t.Fatalf("public /api/pets leaked goal_celebration: %v", pubPets)
+	}
+	a.expectStatus(t, "GET", "/api/friends/visitors", nil, nil, http.StatusUnauthorized)
+	a.expectStatus(t, "GET", "/api/friends/farms", nil, nil, http.StatusUnauthorized)
+
+	// 6. allow_visits: false MUST NOT suppress team goal celebrations (gifts/playdates only).
+	a.expectStatus(t, "PUT", aPath, map[string]any{"allow_visits": false}, adminHeaders(), http.StatusOK)
+	bothSync()
+	if len(ownCelebrations(a, childHeaders(ava))) != 1 || friendFarmGoal(a, childHeaders(ava)) == nil {
+		t.Fatalf("allow_visits=false suppressed team goal celebration on A")
+	}
+	if len(ownCelebrations(b, childHeaders(bo))) != 1 || friendFarmGoal(b, childHeaders(bo)) == nil {
+		t.Fatalf("allow_visits=false suppressed team goal celebration on B")
+	}
+	a.expectStatus(t, "PUT", aPath, map[string]any{"allow_visits": true}, adminHeaders(), http.StatusOK)
+	bothSync()
+
+	// 7. Farm pets disabled on A hides A's own celebration and hides A's celebration on B's /api/friends/farms (pets: []).
+	a.expectStatus(t, "PUT", "/api/admin/pets", map[string]any{"enabled": false}, adminHeaders(), http.StatusOK)
+	bothSync()
+	if got := ownCelebrations(a, childHeaders(ava)); len(got) != 0 {
+		t.Fatalf("expected empty own celebrations when pets disabled on A: %v", got)
+	}
+	if gc := friendFarmGoal(b, childHeaders(bo)); gc != nil {
+		t.Fatalf("expected no friend farm celebration on B when A turned pets off: %v", gc)
+	}
+	a.enablePets(t)
+	bothSync()
+
+	// 8. Leaderboard disabled on A hides both own-farm and visited-farm celebrations on A.
+	a.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"leaderboard_enabled": false}, adminHeaders(), http.StatusOK)
+	if got := ownCelebrations(a, childHeaders(ava)); len(got) != 0 {
+		t.Fatalf("expected empty own celebrations when leaderboard disabled: %v", got)
+	}
+	if gc := friendFarmGoal(a, childHeaders(ava)); gc != nil {
+		t.Fatalf("expected no friend farm celebration when leaderboard disabled: %v", gc)
+	}
+	a.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"leaderboard_enabled": true}, adminHeaders(), http.StatusOK)
+
+	// 9. Dropping the goal (goal_target: 0) hides the celebration on both sides.
+	b.expectStatus(t, "PUT", bPath, map[string]any{"goal_target": 0}, adminHeaders(), http.StatusOK)
+	bothSync()
+	if len(ownCelebrations(a, childHeaders(ava))) != 0 || len(ownCelebrations(b, childHeaders(bo))) != 0 {
+		t.Fatalf("dropped goal should clear own celebrations")
+	}
+	if friendFarmGoal(a, childHeaders(ava)) != nil || friendFarmGoal(b, childHeaders(bo)) != nil {
+		t.Fatalf("dropped goal should clear friend farm celebrations")
+	}
+}
+
+// Deterministic weekly rollover (this -> last -> cleared after 2 weeks or new
+// proposal), unlinking, and multiple linked friend families.
+func TestTeamGoalFarmCelebrationRolloverAndMultipleLinks(t *testing.T) {
+	hubSrv := startHub(t)
+	a, b, aPath, bPath, ava := linkedPair(t, hubSrv)
+
+	base := time.Now().AddDate(0, 0, 7)
+	mondayW := time.Date(base.Year(), base.Month(), base.Day()-((int(base.Weekday())+6)%7), 12, 0, 0, 0, time.Local)
+	now := mondayW.AddDate(0, 0, 2) // Wednesday week W
+	weekW := mondayW.Format("2006-01-02")
+	tueW := mondayW.AddDate(0, 0, 1).Format("2006-01-02")
+	tueW1 := mondayW.AddDate(0, 0, 8).Format("2006-01-02")
+	a.friends.SetClock(func() time.Time { return now })
+	b.friends.SetClock(func() time.Time { return now })
+
+	bo := b.createChild(t, "Bo")
+	b.enablePets(t)
+	b.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Clover", "species": "horse"}, childHeaders(bo), http.StatusCreated)
+	for _, e := range []*testEnv{a, b} {
+		e.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"leaderboard_enabled": true}, adminHeaders(), http.StatusOK)
+		if _, err := e.db.Exec(`UPDATE users SET created_at = '2020-01-01 00:00:00'`); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	syncPair := func(x *testEnv, xPath string, y *testEnv, yPath string) {
+		t.Helper()
+		for i := 0; i < 2; i++ {
+			x.expectStatus(t, "POST", xPath+"/sync", nil, adminHeaders(), http.StatusOK)
+			y.expectStatus(t, "POST", yPath+"/sync", nil, adminHeaders(), http.StatusOK)
+		}
+	}
+
+	b.expectStatus(t, "PUT", bPath, map[string]any{"share_user_ids": []int{bo}}, adminHeaders(), http.StatusOK)
+	syncPair(a, aPath, b, bPath)
+	a.expectStatus(t, "PUT", aPath, map[string]any{"accept_member_ids": []string{fmt.Sprint(bo)}}, adminHeaders(), http.StatusOK)
+	syncPair(a, aPath, b, bPath)
+
+	// Link a third household C ("The Cas") to A.
+	c := setupTest(t)
+	c.friends.SetClock(func() time.Time { return now })
+	c.createAdmin(t)
+	cal := c.createChild(t, "Cal")
+	c.enablePets(t)
+	c.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Pip", "species": "cat"}, childHeaders(cal), http.StatusCreated)
+	c.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"family_name": "The Cas", "leaderboard_enabled": true}, adminHeaders(), http.StatusOK)
+	if _, err := c.db.Exec(`UPDATE users SET created_at = '2020-01-01 00:00:00'`); err != nil {
+		t.Fatal(err)
+	}
+	var inv struct {
+		ID     int64  `json:"id"`
+		Invite string `json:"invite"`
+	}
+	decodeBody(t, a.expectStatus(t, "POST", "/api/admin/friends/invites", nil, adminHeaders(), http.StatusCreated), &inv)
+	acPath := fmt.Sprintf("/api/admin/friends/%d", inv.ID)
+	var joined struct {
+		ID int64 `json:"id"`
+	}
+	decodeBody(t, c.expectStatus(t, "POST", "/api/admin/friends/join", map[string]any{"invite": inv.Invite}, adminHeaders(), http.StatusCreated), &joined)
+	caPath := fmt.Sprintf("/api/admin/friends/%d", joined.ID)
+
+	a.expectStatus(t, "PUT", acPath, map[string]any{"share_user_ids": []int{ava}}, adminHeaders(), http.StatusOK)
+	c.expectStatus(t, "PUT", caPath, map[string]any{"share_user_ids": []int{cal}}, adminHeaders(), http.StatusOK)
+	syncPair(a, acPath, c, caPath)
+	a.expectStatus(t, "PUT", acPath, map[string]any{"accept_member_ids": []string{fmt.Sprint(cal)}}, adminHeaders(), http.StatusOK)
+	c.expectStatus(t, "PUT", caPath, map[string]any{"accept_member_ids": []string{fmt.Sprint(ava)}}, adminHeaders(), http.StatusOK)
+	syncPair(a, acPath, c, caPath)
+
+	// Seed scores: Ava 90%, Bo 90%, Cal 50%.
+	for _, s := range []struct {
+		env  *testEnv
+		uid  int
+		done int
+	}{{a, ava, 90}, {b, bo, 90}, {c, cal, 50}} {
+		if _, err := s.env.db.Exec(`INSERT OR REPLACE INTO score_days (user_id, date, assigned, done) VALUES (?, ?, 100, ?)`,
+			s.uid, tueW, s.done); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Agree goal 85 on A<->B (reached: 90 >= 85) and goal 85 on A<->C (not reached: (90+50)/2 = 70 < 85).
+	a.expectStatus(t, "PUT", aPath, map[string]any{"goal_target": 85}, adminHeaders(), http.StatusOK)
+	b.expectStatus(t, "PUT", bPath, map[string]any{"goal_target": 85}, adminHeaders(), http.StatusOK)
+	a.expectStatus(t, "PUT", acPath, map[string]any{"goal_target": 85}, adminHeaders(), http.StatusOK)
+	c.expectStatus(t, "PUT", caPath, map[string]any{"goal_target": 85}, adminHeaders(), http.StatusOK)
+	syncPair(a, aPath, b, bPath)
+	syncPair(a, acPath, c, caPath)
+
+	// A's own farm celebrates only B; A's visited farms decorate B only, never C.
+	aOwn := a.getJSON(t, "/api/friends/visitors", childHeaders(ava))["goal_celebrations"].([]any)
+	if len(aOwn) != 1 || aOwn[0].(map[string]any)["family"] != "The Bos" {
+		t.Fatalf("expected only The Bos in A own celebrations, got %v", aOwn)
+	}
+	farmsByFamily := func(e *testEnv, hdr map[string]string) map[string]map[string]any {
+		t.Helper()
+		out := map[string]map[string]any{}
+		for _, f := range e.getJSON(t, "/api/friends/farms", hdr)["farms"].([]any) {
+			fm := f.(map[string]any)
+			out[fm["family"].(string)] = fm
+		}
+		return out
+	}
+	af := farmsByFamily(a, childHeaders(ava))
+	if af["The Bos"]["goal_celebration"] == nil || af["The Cas"]["goal_celebration"] != nil {
+		t.Fatalf("expected goal_celebration on The Bos only: %v", af)
+	}
+
+	// Now Cal finishes more chores so A<->C reaches (90+90)/2 = 90 >= 85 too.
+	if _, err := c.db.Exec(`INSERT OR REPLACE INTO score_days (user_id, date, assigned, done) VALUES (?, ?, 100, 90)`, cal, tueW); err != nil {
+		t.Fatal(err)
+	}
+	syncPair(a, acPath, c, caPath)
+	aOwn = a.getJSON(t, "/api/friends/visitors", childHeaders(ava))["goal_celebrations"].([]any)
+	if len(aOwn) != 2 {
+		t.Fatalf("expected 2 own celebrations on A (The Bos & The Cas), got %v", aOwn)
+	}
+	af = farmsByFamily(a, childHeaders(ava))
+	if af["The Bos"]["goal_celebration"] == nil || af["The Cas"]["goal_celebration"] == nil {
+		t.Fatalf("expected goal_celebration on both visited farms: %v", af)
+	}
+
+	// Monday rollover (week W+1): both celebrations persist with week="last" and week_start=weekW!
+	now = mondayW.AddDate(0, 0, 7)
+	syncPair(a, aPath, b, bPath)
+	syncPair(a, acPath, c, caPath)
+	aOwn = a.getJSON(t, "/api/friends/visitors", childHeaders(ava))["goal_celebrations"].([]any)
+	if len(aOwn) != 2 {
+		t.Fatalf("expected celebrations to persist into week W+1, got %v", aOwn)
+	}
+	for _, raw := range aOwn {
+		m := raw.(map[string]any)
+		if m["week"] != "last" || m["week_start"] != weekW {
+			t.Fatalf("expected week=last week_start=%s after Monday rollover, got %v", weekW, m)
+		}
+	}
+	if gc := farmsByFamily(b, childHeaders(bo))["The Avas"]["goal_celebration"].(map[string]any); gc["week"] != "last" || gc["week_start"] != weekW {
+		t.Fatalf("expected B visited farm to carry last week's celebration, got %v", gc)
+	}
+
+	// A proposes a new unagreed goal for week W+1 on A<->C -> clears A<->C celebration while A<->B stays.
+	a.expectStatus(t, "PUT", acPath, map[string]any{"goal_target": 80}, adminHeaders(), http.StatusOK)
+	syncPair(a, acPath, c, caPath)
+	aOwn = a.getJSON(t, "/api/friends/visitors", childHeaders(ava))["goal_celebrations"].([]any)
+	if len(aOwn) != 1 || aOwn[0].(map[string]any)["family"] != "The Bos" {
+		t.Fatalf("new unagreed proposal on C should clear C celebration only, got %v", aOwn)
+	}
+
+	// Unlinking B removes B's celebration immediately on A and on B after sync (status=ended).
+	a.expectStatus(t, "DELETE", aPath, nil, adminHeaders(), http.StatusNoContent)
+	if got := a.getJSON(t, "/api/friends/visitors", childHeaders(ava))["goal_celebrations"].([]any); len(got) != 0 {
+		t.Fatalf("unlink should clear celebration immediately on A: %v", got)
+	}
+	b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	if got := b.getJSON(t, "/api/friends/visitors", childHeaders(bo))["goal_celebrations"].([]any); len(got) != 0 {
+		t.Fatalf("ended link should clear celebration on B after sync: %v", got)
+	}
+
+	// Two-week rollover: agree and reach A<->C in week W+1, then advance to week W+3 -> cleared.
+	c.expectStatus(t, "PUT", caPath, map[string]any{"goal_target": 80}, adminHeaders(), http.StatusOK)
+	if _, err := a.db.Exec(`INSERT OR REPLACE INTO score_days (user_id, date, assigned, done) VALUES (?, ?, 100, 90)`, ava, tueW1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.db.Exec(`INSERT OR REPLACE INTO score_days (user_id, date, assigned, done) VALUES (?, ?, 100, 90)`, cal, tueW1); err != nil {
+		t.Fatal(err)
+	}
+	now = mondayW.AddDate(0, 0, 9) // Wednesday week W+1
+	syncPair(a, acPath, c, caPath)
+	if got := a.getJSON(t, "/api/friends/visitors", childHeaders(ava))["goal_celebrations"].([]any); len(got) != 1 {
+		t.Fatalf("expected active celebration in week W+1, got %v", got)
+	}
+	now = mondayW.AddDate(0, 0, 21) // Monday week W+3 (2 weeks later)
+	if got := a.getJSON(t, "/api/friends/visitors", childHeaders(ava))["goal_celebrations"].([]any); len(got) != 0 {
+		t.Fatalf("expected celebration to expire after 2 weeks, got %v", got)
+	}
+	if af := farmsByFamily(a, childHeaders(ava)); af["The Cas"]["goal_celebration"] != nil {
+		t.Fatalf("expected visited farm celebration to expire after 2 weeks, got %v", af["The Cas"])
+	}
+}
+
