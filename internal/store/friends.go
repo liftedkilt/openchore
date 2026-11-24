@@ -284,10 +284,14 @@ func (s *Store) CountFriendSends(ctx context.Context, fromUser int64, kind, day 
 	return n, err
 }
 
-// FriendSendsSince returns what was sent to one linked family on or after day.
+// FriendSendsSince returns what was sent to one linked family on or after
+// day. Only paid-for sends count: one that's reserved while its redemption
+// is being paid (redemption_id still 0) mustn't go out in a snapshot, since
+// paying can still fail.
 func (s *Store) FriendSendsSince(ctx context.Context, linkID int64, day string) ([]model.FriendSend, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, kind, from_user, to_member, day FROM friend_sends WHERE link_id = ? AND day >= ? ORDER BY created_at, id`, linkID, day)
+		`SELECT id, kind, from_user, to_member, day FROM friend_sends
+		 WHERE link_id = ? AND day >= ? AND redemption_id != 0 ORDER BY created_at, id`, linkID, day)
 	if err != nil {
 		return nil, err
 	}

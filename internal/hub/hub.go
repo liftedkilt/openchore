@@ -305,7 +305,10 @@ func (h *Hub) create(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusInternalServerError, "hub storage error")
 		return
 	}
-	if n, err := res.RowsAffected(); err != nil || n == 0 {
+	if n, err := res.RowsAffected(); err != nil {
+		fail(w, http.StatusInternalServerError, "hub storage error")
+		return
+	} else if n == 0 {
 		fail(w, http.StatusTooManyRequests, "too many invites waiting to be joined; use or let one expire first")
 		return
 	}

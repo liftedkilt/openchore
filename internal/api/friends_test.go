@@ -79,6 +79,19 @@ func TestFriendUndoneGiftDoesNotArrive(t *testing.T) {
 	avaKey := fmt.Sprintf("f%s:%d", bPath[strings.LastIndex(bPath, "/")+1:], ava)
 	gift := b.petRewardID(t, bo, "gift")
 
+	// A reserved gift that isn't paid for yet never goes out.
+	if _, err := b.db.Exec(`INSERT INTO friend_sends (id, link_id, kind, from_user, to_member, day) VALUES ('unpaid', 1, 'gift', ?, ?, ?)`,
+		bo, fmt.Sprint(ava), time.Now().Format("2006-01-02")); err != nil {
+		t.Fatal(err)
+	}
+	b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	var got int
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM friend_received`).Scan(&got); err != nil || got != 0 {
+		t.Fatalf("a gift nobody paid for arrived: %d %v", got, err)
+	}
+	b.db.Exec(`DELETE FROM friend_sends WHERE id = 'unpaid'`)
+
 	for _, undo := range []string{"points history", "redemption"} {
 		base := exchanges.Load()
 		resp := b.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", gift), map[string]any{"pet": map[string]any{"friend": avaKey}}, childHeaders(bo), http.StatusCreated)
@@ -97,10 +110,18 @@ func TestFriendUndoneGiftDoesNotArrive(t *testing.T) {
 		}
 		waitFor(t, exchanges, base+2, "the sync after undoing it ("+undo+")")
 		a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
-		var got int
 		if err := a.db.QueryRow(`SELECT COUNT(*) FROM friend_received`).Scan(&got); err != nil || got != 0 {
 			t.Fatalf("a gift undone from the %s still arrived: %d %v", undo, got, err)
 		}
+	}
+
+	// The control: the same gift, not undone, does arrive.
+	base := exchanges.Load()
+	b.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", gift), map[string]any{"pet": map[string]any{"friend": avaKey}}, childHeaders(bo), http.StatusCreated)
+	waitFor(t, exchanges, base+1, "the sync after buying the gift")
+	a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM friend_received`).Scan(&got); err != nil || got != 1 {
+		t.Fatalf("a gift that wasn't undone didn't arrive: %d %v", got, err)
 	}
 }
 
@@ -1080,8 +1101,8 @@ func TestFriendGiftsAndPlaydates(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < 6; i++ {
-		if _, err := b.db.Exec(`INSERT INTO friend_sends (id, link_id, kind, from_user, to_member, day) VALUES (?, 1, 'gift', ?, ?, ?)`,
-			fmt.Sprintf("flood%d", i), bo, fmt.Sprint(ava), time.Now().Format("2006-01-02")); err != nil {
+		if _, err := b.db.Exec(`INSERT INTO friend_sends (id, link_id, kind, from_user, to_member, day, redemption_id) VALUES (?, 1, 'gift', ?, ?, ?, ?)`,
+			fmt.Sprintf("flood%d", i), bo, fmt.Sprint(ava), time.Now().Format("2006-01-02"), 9000+i); err != nil {
 			t.Fatal(err)
 		}
 	}
