@@ -203,8 +203,13 @@ test.describe('Friend invite confirmation', () => {
     await expect(section).toBeVisible({ timeout: 5_000 });
 
     // Configure family name (distinct from earlier test's 'The Testers' so Save is enabled) and local real hub.
+    // Wait for the reload GET to apply so setHubUrl(c.hub_url) cannot race with filling the hub URL below.
     await section.getByPlaceholder('e.g. The Smiths').fill('The Home Team');
-    await section.getByRole('button', { name: 'Save' }).first().click();
+    await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith('/api/admin/friends') && r.request().method() === 'GET' && r.ok()),
+      section.getByRole('button', { name: 'Save' }).first().click(),
+    ]);
+    await expect(section.getByRole('button', { name: 'Save' }).first()).toBeDisabled();
     await section.getByLabel('Coordination server').fill(hubUrl);
     await section.getByLabel('Key').fill('e2ekey');
     await section.getByRole('button', { name: 'Save' }).nth(1).click();
