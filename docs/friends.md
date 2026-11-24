@@ -142,12 +142,16 @@ other family's.
 2. They send the invite to the other parent (text, email, anything).
 3. The other parent gives their family a name and pastes the invite under
    **Join with an invite**. They don't need a hub key.
-4. Each parent then ticks who to send and who to show (below). Nothing is
+4. Once the other family joins, the inviting parent sees their family's name in
+   Settings and must **Confirm** (or **Decline**) before the link becomes active
+   and before anything is shared.
+5. Each parent then ticks who to send and who to show (below). Nothing is
    shared just by linking.
 
-The invite works once and runs out after 7 days. It carries the hub address,
-the link, a one-time join code, and the key the two families use to encrypt
-their snapshots. That key never goes to the hub.
+The invite works once and runs out after 24 hours (configurable on the hub via
+`HUB_INVITE_TTL`). It carries the hub address, the link, a one-time join code,
+and the key the two families use to encrypt their snapshots. That key never goes
+to the hub.
 
 Either parent can unlink. The hub deletes the link; the other family finds
 out at its next sync, and both sides delete the other family's data. Only the
@@ -304,7 +308,8 @@ OpenChore servers call it, not people, and they can't log in. Then:
 | `HUB_KEYS` | Comma-separated keys allowed to create links. If set, no key file is made |
 | `HUB_KEY_FILE` | Where the made-on-first-start key lives (default `hub.key` next to `HUB_DB`) |
 | `HUB_OPEN` | `true` lets anyone create links without a key. Each address (each /64 for IPv6) can then have at most 20 invites waiting to be joined |
-| `HUB_TRUST_PROXY` | `true` behind one reverse proxy, so rate limits use the caller's real address. Without it every caller counts as the proxy and shares one limit, which on an open hub lets 20 requests block all new invites for a week; the hub logs a warning when it sees `X-Forwarded-For` without this set |
+| `HUB_TRUST_PROXY` | `true` behind one reverse proxy, so rate limits use the caller's real address. Without it every caller counts as the proxy and shares one limit, which on an open hub lets 20 requests block all new invites until they expire; the hub logs a warning when it sees `X-Forwarded-For` without this set |
+| `HUB_INVITE_TTL` | How long an unjoined invite stays valid, as a Go duration (default `24h`, e.g. `12h`, `48h`) |
 
 An OpenChore server takes its hub from Settings, or from `OPENCHORE_HUB_URL` /
 `OPENCHORE_HUB_KEY` (which win).
@@ -338,8 +343,8 @@ joining).
   15 minutes.
 - **Size limits.** A snapshot can be at most 256 KB, and the hub holds at most
   10,000 links.
-- **Clean-up.** Invites nobody joins are deleted after 7 days, and links
-  nobody syncs after 90.
+- **Clean-up.** Invites nobody joins are deleted after 24 hours (or
+  `HUB_INVITE_TTL`), and links nobody syncs after 90 days.
 - **Logging.** One line per request: address, method, path and status. Never
   bodies, keys or tokens.
 
@@ -363,7 +368,8 @@ linked families see the link as ended and need a new invite.
   replaces its list) – who to send to and show from one family. Also
   `show_pictures`, `allow_visits` and `goal_target` (1 to 100; 0 drops it).
 - `POST /api/admin/friends/invites`, `POST /api/admin/friends/join` (`invite`),
-  `POST /api/admin/friends/{id}/sync`, `DELETE /api/admin/friends/{id}`.
+  `POST /api/admin/friends/{id}/confirm`, `POST /api/admin/friends/{id}/sync`,
+  `DELETE /api/admin/friends/{id}`.
 
 Hub: `POST /v1/links`, `POST /v1/links/{id}/join`, `POST /v1/links/{id}/exchange`,
 `DELETE /v1/links/{id}`.

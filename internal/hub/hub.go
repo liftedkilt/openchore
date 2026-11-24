@@ -32,8 +32,8 @@ import (
 const (
 	// MaxBlob caps one family's encrypted snapshot.
 	MaxBlob = 256 << 10
-	// InviteTTL is how long an invite can be joined.
-	InviteTTL = 7 * 24 * time.Hour
+	// InviteTTL is how long an invite can be joined by default.
+	InviteTTL = 24 * time.Hour
 	// IdleTTL is how long a link nobody syncs is kept.
 	IdleTTL = 90 * 24 * time.Hour
 	// MaxLinks caps how many links the hub holds, as a backstop.
@@ -86,6 +86,9 @@ type Hub struct {
 	// X-Forwarded-For entry (set it when exactly one reverse proxy sits in
 	// front). Otherwise the connection's own address is used.
 	TrustProxy bool
+	// InviteTTL is how long a new invite can be joined. Non-positive values
+	// fall back to the package default (InviteTTL, 24 hours).
+	InviteTTL time.Duration
 	// Log, when set, gets one line per request (never bodies or tokens).
 	Log *log.Logger
 
@@ -266,6 +269,13 @@ func fail(w http.ResponseWriter, status int, msg string) {
 	reply(w, status, map[string]string{"error": msg})
 }
 
+func (h *Hub) inviteTTL() time.Duration {
+	if h.InviteTTL > 0 {
+		return h.InviteTTL
+	}
+	return InviteTTL
+}
+
 // create makes a link and its one-time join code. The caller becomes the
 // link's first member.
 func (h *Hub) create(w http.ResponseWriter, r *http.Request) {
@@ -293,7 +303,7 @@ func (h *Hub) create(w http.ResponseWriter, r *http.Request) {
 	by := h.callerID(r)
 	id, token, code := random(12), random(32), random(18)
 	now := h.now()
-	expires := now.Add(InviteTTL)
+	expires := now.Add(h.inviteTTL())
 	// One statement, so two requests at once can't both slip under the cap
 	// on waiting invites (only checked on a hub without keys).
 	res, err := h.db.ExecContext(ctx,

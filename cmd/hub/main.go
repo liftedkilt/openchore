@@ -11,6 +11,8 @@
 //	HUB_OPEN         "true" to let anyone create links (no key needed)
 //	HUB_TRUST_PROXY  "true" behind one reverse proxy: rate limits then go by
 //	                 the last X-Forwarded-For address
+//	HUB_INVITE_TTL   how long an unjoined invite stays valid, as a Go duration
+//	                 (default 24h, e.g. 12h, 48h)
 package main
 
 import (
@@ -19,6 +21,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
@@ -36,6 +39,18 @@ func env(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func parseInviteTTL(raw string) (time.Duration, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, nil
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		return 0, fmt.Errorf("must be a positive duration (e.g. 24h), got %q", raw)
+	}
+	return d, nil
 }
 
 // keyFromFile reads the hub's key file, creating it with a fresh random key
@@ -88,6 +103,11 @@ func main() {
 		log.Fatalf("preparing database: %v", err)
 	}
 	h.TrustProxy = os.Getenv("HUB_TRUST_PROXY") == "true"
+	if ttl, err := parseInviteTTL(os.Getenv("HUB_INVITE_TTL")); err != nil {
+		log.Fatalf("HUB_INVITE_TTL: %v", err)
+	} else if ttl > 0 {
+		h.InviteTTL = ttl
+	}
 	h.Log = log.Default()
 	go func() {
 		for range time.Tick(time.Hour) {

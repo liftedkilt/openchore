@@ -319,7 +319,7 @@ func (h *FriendsHandler) standings(ctx context.Context, from string, withFriends
 	}
 	var links []model.FriendLink
 	if withFriends {
-		if links, err = h.store.ListFriendLinks(ctx); err != nil {
+		if links, err = h.store.ListActiveFriendLinks(ctx); err != nil {
 			return nil, err
 		}
 	}
@@ -419,7 +419,7 @@ func familyLabel(name string) string {
 // Farms returns each friend family's farm as their last snapshot showed it,
 // in the same shape as GET /api/pets so the same farm view can draw it.
 func (h *FriendsHandler) Farms(w http.ResponseWriter, r *http.Request) {
-	links, err := h.store.ListFriendLinks(r.Context())
+	links, err := h.store.ListActiveFriendLinks(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list friend families")
 		return
@@ -555,7 +555,10 @@ func (h *FriendsHandler) linkView(ctx context.Context, l *model.FriendLink, user
 	if err != nil {
 		return nil, err
 	}
-	snap := friends.PeerSnapshot(l)
+	var snap *model.FriendSnapshot
+	if l.Status == model.FriendStatusActive {
+		snap = friends.PeerSnapshot(l)
+	}
 	theirs := map[string]bool{}
 	inbound := []map[string]any{}
 	if snap != nil {
@@ -573,8 +576,10 @@ func (h *FriendsHandler) linkView(ctx context.Context, l *model.FriendLink, user
 			"shared": shares[u.ID], "accepted": shares[u.ID] && theirs[fmt.Sprint(u.ID)],
 		})
 	}
+	peerPending := l.Status == model.FriendStatusActive && l.Side == "b" && (snap == nil || snap.Pending)
 	return map[string]any{
-		"id": l.ID, "status": l.Status, "peer_name": l.PeerName, "hub_url": l.HubURL, "show_pictures": l.ShowPictures, "allow_visits": l.AllowVisits,
+		"id": l.ID, "status": l.Status, "side": l.Side, "peer_pending": peerPending,
+		"peer_name": l.PeerName, "hub_url": l.HubURL, "show_pictures": l.ShowPictures, "allow_visits": l.AllowVisits,
 		"goal":   goalFor(l, snap, score.WeekStart(h.svc.Now()), teamSide{}),
 		"invite": l.Invite, "invite_expires": l.InviteExpires, "outbound": outbound, "inbound": inbound,
 		"snapshot_at": l.SnapshotAt, "last_sync_at": l.LastSyncAt, "last_error": l.LastError, "created_at": l.CreatedAt,
@@ -671,6 +676,19 @@ func (h *FriendsHandler) UpdateLink(w http.ResponseWriter, r *http.Request) {
 	l, _ := h.store.GetFriendLink(ctx, id)
 	if l == nil {
 		writeError(w, http.StatusNotFound, "friend family not found")
+		return
+	}
+	if l.Status != model.FriendStatusActive {
+		msg := "this link is not active"
+		switch l.Status {
+		case model.FriendStatusPendingConfirm:
+			msg = "confirm this friend family before changing its settings"
+		case model.FriendStatusWaiting:
+			msg = "wait for the other family to join first"
+		case model.FriendStatusEnded:
+			msg = "this link has ended"
+		}
+		writeError(w, http.StatusBadRequest, msg)
 		return
 	}
 	var req struct {
@@ -813,6 +831,28 @@ func (h *FriendsHandler) Join(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = h.store.SetSetting(r.Context(), friends.SettingLeaderboard, "true")
 	h.writeLink(w, r, http.StatusCreated, l.ID)
+}
+
+// ConfirmLink activates a link after the inviting parent checks the joining
+// family's name and triggers an immediate sync.
+func (h *FriendsHandler) ConfirmLink(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.svc.Confirm(r.Context(), id); err != nil {
+		switch {
+		case errors.Is(err, friends.ErrLinkNotFound):
+			writeError(w, http.StatusNotFound, "friend family not found")
+		case errors.Is(err, friends.ErrNotPendingConfirm):
+			writeError(w, http.StatusBadRequest, "this link is not waiting for confirmation")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to confirm friend family")
+		}
+		return
+	}
+	h.writeLink(w, r, http.StatusOK, id)
 }
 
 // SyncNow syncs one link straight away.

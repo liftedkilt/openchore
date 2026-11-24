@@ -386,13 +386,20 @@ func TestFriendFamiliesLinkThroughHub(t *testing.T) {
 		return out
 	}
 
-	// Linked, but nothing is shared in either direction until parents choose.
+	// After B joins, A sees pending_confirm with B's family name and spent invite cleared,
+	// cannot configure sharing yet, and nothing is shared until A's parent confirms.
 	link = sync(a, aPath)
-	if link["status"] != "active" || link["peer_name"] != "The Bos" || len(link["inbound"].([]any)) != 0 || link["invite"] != "" {
-		t.Fatalf("A's link after the first sync: %v", link)
+	if link["status"] != "pending_confirm" || link["peer_name"] != "The Bos" || len(link["inbound"].([]any)) != 0 || link["invite"] != "" {
+		t.Fatalf("A's link after B joins (before confirm): %v", link)
 	}
+	a.expectStatus(t, "PUT", aPath, map[string]any{"share_user_ids": []int{ava}}, adminHeaders(), http.StatusBadRequest)
 	if lb := b.leaderboard(t); len(lb) != 1 || lb[0]["name"] != "Bo" {
-		t.Fatalf("B's leaderboard before anything is shared: %v", lb)
+		t.Fatalf("B's leaderboard before A confirms: %v", lb)
+	}
+	// A's parent confirms The Bos; the link becomes active.
+	decodeBody(t, a.expectStatus(t, "POST", aPath+"/confirm", nil, adminHeaders(), http.StatusOK), &link)
+	if link["status"] != "active" || link["peer_name"] != "The Bos" || len(link["inbound"].([]any)) != 0 || link["invite"] != "" {
+		t.Fatalf("A's link after confirm: %v", link)
 	}
 
 	// A's parent shares Ava (not Secret) with the Bos. B is offered Ava, but
@@ -547,6 +554,8 @@ func linkedPair(t *testing.T, hubSrv *httptest.Server) (a, b *testEnv, aPath, bP
 	invite := link["invite"].(string)
 	decodeBody(t, b.expectStatus(t, "POST", "/api/admin/friends/join", map[string]any{"invite": invite}, adminHeaders(), http.StatusCreated), &link)
 	bPath = fmt.Sprintf("/api/admin/friends/%d", int(link["id"].(float64)))
+	a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	a.expectStatus(t, "POST", aPath+"/confirm", nil, adminHeaders(), http.StatusOK)
 	a.expectStatus(t, "PUT", aPath, map[string]any{"share_user_ids": []int{ava}}, adminHeaders(), http.StatusOK)
 	b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
 	b.expectStatus(t, "PUT", bPath, map[string]any{"accept_member_ids": []string{fmt.Sprint(ava)}}, adminHeaders(), http.StatusOK)
@@ -634,6 +643,14 @@ func TestFriendInviteCannotPointInward(t *testing.T) {
 	if code, _ := join("http://example.com"); code != http.StatusBadRequest {
 		t.Fatalf("plain http to a public host: %d", code)
 	}
+	// Path-traversal link IDs are rejected before any request leaves the server.
+	traversal := "ocf1." + base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf(`{"h":%q,"l":"..","c":"C","k":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}`, inner.URL)))
+	resp := env.request(t, "POST", "/api/admin/friends/join", map[string]any{"invite": traversal}, adminHeaders())
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest || hits != 0 {
+		t.Fatalf("path-traversal invite: status=%d hits=%d", resp.StatusCode, hits)
+	}
+
 	// Where it is allowed, a dead hub is reported without addresses or ports.
 	t.Setenv("OPENCHORE_HUB_ALLOW_PRIVATE", "true")
 	if code, msg := join("http://127.0.0.1:1"); code != http.StatusBadGateway || strings.Contains(msg, "127.0.0.1") || strings.Contains(msg, "refused") {
@@ -1424,6 +1441,8 @@ func TestTeamGoalFarmCelebrationRolloverAndMultipleLinks(t *testing.T) {
 	decodeBody(t, c.expectStatus(t, "POST", "/api/admin/friends/join", map[string]any{"invite": inv.Invite}, adminHeaders(), http.StatusCreated), &joined)
 	caPath := fmt.Sprintf("/api/admin/friends/%d", joined.ID)
 
+	a.expectStatus(t, "POST", acPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	a.expectStatus(t, "POST", acPath+"/confirm", nil, adminHeaders(), http.StatusOK)
 	a.expectStatus(t, "PUT", acPath, map[string]any{"share_user_ids": []int{ava}}, adminHeaders(), http.StatusOK)
 	c.expectStatus(t, "PUT", caPath, map[string]any{"share_user_ids": []int{cal}}, adminHeaders(), http.StatusOK)
 	syncPair(a, acPath, c, caPath)
@@ -1539,6 +1558,197 @@ func TestTeamGoalFarmCelebrationRolloverAndMultipleLinks(t *testing.T) {
 	}
 	if af := farmsByFamily(a, childHeaders(ava)); af["The Cas"]["goal_celebration"] != nil {
 		t.Fatalf("expected visited farm celebration to expire after 2 weeks, got %v", af["The Cas"])
+	}
+}
+
+// TestFriendInviteConfirmAndDecline covers the full invite-join parent
+// confirmation lifecycle, auth & precondition errors, outgoing/incoming privacy
+// invariants, side-b waiting UX, online & offline Confirm/Decline, corrupt
+// ciphertext handling, and FriendMember.Streak preservation.
+func TestFriendInviteConfirmAndDecline(t *testing.T) {
+	t.Setenv("OPENCHORE_HUB_ALLOW_PRIVATE", "true")
+	hubSrv, down := startFlakyHub(t)
+
+	setupHousehold := func(family, kidName, petName string) (*testEnv, int) {
+		e := setupTest(t)
+		e.createAdmin(t)
+		kid := e.createChild(t, kidName)
+		e.enablePets(t)
+		e.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": petName, "species": "dog"}, childHeaders(kid), http.StatusCreated)
+		e.yesterdayChores(t, kid, 1, 1, "core", 10)
+		// Give the kid a streak so we can verify FriendMember.Streak is preserved.
+		if _, err := e.db.Exec(`INSERT INTO user_streaks (user_id, current_streak, longest_streak, last_completed_date) VALUES (?, 4, 4, date('now'))`, kid); err != nil {
+			t.Fatal(err)
+		}
+		e.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"family_name": family, "hub_url": hubSrv.URL, "hub_key": "hubkey"}, adminHeaders(), http.StatusOK)
+		return e, kid
+	}
+
+	a, ava := setupHousehold("The Avas", "Ava", "Biscuit")
+	b, bo := setupHousehold("The Bos", "Bo", "Clover")
+
+	// Auth & missing ID checks on confirm endpoint.
+	a.expectStatus(t, "POST", "/api/admin/friends/1/confirm", nil, nil, http.StatusUnauthorized)
+	a.expectStatus(t, "POST", "/api/admin/friends/1/confirm", nil, childHeaders(ava), http.StatusForbidden)
+	a.expectStatus(t, "POST", "/api/admin/friends/nope/confirm", nil, adminHeaders(), http.StatusBadRequest)
+	a.expectStatus(t, "POST", "/api/admin/friends/999/confirm", nil, adminHeaders(), http.StatusNotFound)
+
+	// Make invite on A: starts in waiting with initial minimal handshake uploaded.
+	var aLink map[string]any
+	decodeBody(t, a.expectStatus(t, "POST", "/api/admin/friends/invites", nil, adminHeaders(), http.StatusCreated), &aLink)
+	aID := int64(aLink["id"].(float64))
+	aPath := fmt.Sprintf("/api/admin/friends/%d", aID)
+	invite1 := aLink["invite"].(string)
+	if aLink["status"] != "waiting" || aLink["side"] != "a" || aLink["peer_pending"] != false {
+		t.Fatalf("new invite link: %v", aLink)
+	}
+	// Preconditions on waiting link: confirm -> 400, update -> 400.
+	a.expectStatus(t, "POST", aPath+"/confirm", nil, adminHeaders(), http.StatusBadRequest)
+	a.expectStatus(t, "PUT", aPath, map[string]any{"share_user_ids": []int{ava}}, adminHeaders(), http.StatusBadRequest)
+
+	// Even if a share row existed in SQLite before confirmation, Snapshot MUST
+	// publish ONLY the minimal pending handshake (zero members/scores/streaks/pets).
+	if err := a.store.SetFriendLinkShares(t.Context(), aID, []int64{int64(ava)}); err != nil {
+		t.Fatal(err)
+	}
+	snapWaiting, err := friends.New(a.store).Snapshot(t.Context(), aID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !snapWaiting.Pending || !snapWaiting.NoVisits || snapWaiting.Family != "The Avas" ||
+		snapWaiting.Today != "" || len(snapWaiting.Members) != 0 || len(snapWaiting.Accepted) != 0 ||
+		len(snapWaiting.Team) != 0 || snapWaiting.Goal != nil || len(snapWaiting.Sends) != 0 {
+		t.Fatalf("waiting snapshot leaked data: %+v", snapWaiting)
+	}
+
+	// B joins: immediately sees A's family name, peer_pending=true, last_error="" (no error banner!).
+	var bLink map[string]any
+	decodeBody(t, b.expectStatus(t, "POST", "/api/admin/friends/join", map[string]any{"invite": invite1}, adminHeaders(), http.StatusCreated), &bLink)
+	bPath := fmt.Sprintf("/api/admin/friends/%d", int(bLink["id"].(float64)))
+	if bLink["status"] != "active" || bLink["side"] != "b" || bLink["peer_name"] != "The Avas" ||
+		bLink["peer_pending"] != true || bLink["last_error"] != "" {
+		t.Fatalf("B after join while A unconfirmed: %v", bLink)
+	}
+	// B offers Bo (with pet Clover) before A confirms.
+	b.expectStatus(t, "PUT", bPath, map[string]any{"share_user_ids": []int{bo}}, adminHeaders(), http.StatusOK)
+
+	// A syncs: moves waiting -> pending_confirm, clears invite, stores peer_name ONLY (snapshot == "").
+	decodeBody(t, a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK), &aLink)
+	if aLink["status"] != "pending_confirm" || aLink["peer_name"] != "The Bos" || aLink["invite"] != "" || len(aLink["inbound"].([]any)) != 0 {
+		t.Fatalf("A in pending_confirm: %v", aLink)
+	}
+	var rawSnap string
+	if err := a.db.QueryRow(`SELECT snapshot FROM friend_links WHERE id = ?`, aID).Scan(&rawSnap); err != nil || rawSnap != "" {
+		t.Fatalf("A persisted peer snapshot before confirmation: err=%v snap=%q", err, rawSnap)
+	}
+	// Second sync while still pending_confirm MUST NOT auto-activate.
+	decodeBody(t, a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK), &aLink)
+	if aLink["status"] != "pending_confirm" {
+		t.Fatalf("second sync auto-activated link: %v", aLink)
+	}
+	// Outgoing privacy while pending_confirm (even with share row in DB).
+	snapPending, err := friends.New(a.store).Snapshot(t.Context(), aID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !snapPending.Pending || !snapPending.NoVisits || len(snapPending.Members) != 0 || len(snapPending.Team) != 0 {
+		t.Fatalf("pending_confirm snapshot leaked data: %+v", snapPending)
+	}
+	// Incoming privacy while pending_confirm across all kid & wall-display endpoints.
+	if lb := a.leaderboard(t); len(lb) != 1 || lb[0]["name"] != "Ava" {
+		t.Fatalf("A leaderboard leaked unconfirmed peer: %v", lb)
+	}
+	if wall := a.getJSON(t, "/api/leaderboard/household", nil)["entries"].([]any); len(wall) != 1 {
+		t.Fatalf("A wall leaderboard leaked unconfirmed peer: %v", wall)
+	}
+	if farms := a.getJSON(t, "/api/friends/farms", childHeaders(ava))["farms"].([]any); len(farms) != 0 {
+		t.Fatalf("A farms leaked unconfirmed peer: %v", farms)
+	}
+	if vis := a.getJSON(t, "/api/friends/visitors", childHeaders(ava))["visitors"].([]any); len(vis) != 0 {
+		t.Fatalf("A visitors leaked unconfirmed peer: %v", vis)
+	}
+	// UpdateLink rejected with 400 while pending_confirm.
+	a.expectStatus(t, "PUT", aPath, map[string]any{"share_user_ids": []int{ava}}, adminHeaders(), http.StatusBadRequest)
+	// Clean up injected pre-share before testing normal flow.
+	if err := a.store.SetFriendLinkShares(t.Context(), aID, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Online Decline on pending_confirm deletes link on A and ends it on B.
+	a.expectStatus(t, "DELETE", aPath, nil, adminHeaders(), http.StatusNoContent)
+	decodeBody(t, b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK), &bLink)
+	if bLink["status"] != "ended" {
+		t.Fatalf("B link after A declined online: %v", bLink)
+	}
+	b.expectStatus(t, "DELETE", bPath, nil, adminHeaders(), http.StatusNoContent)
+
+	// Offline Decline while hub is down: deletes locally, queues friend_unlinks, RetryUnlinks tells hub once back.
+	decodeBody(t, a.expectStatus(t, "POST", "/api/admin/friends/invites", nil, adminHeaders(), http.StatusCreated), &aLink)
+	aPath = fmt.Sprintf("/api/admin/friends/%d", int(aLink["id"].(float64)))
+	decodeBody(t, b.expectStatus(t, "POST", "/api/admin/friends/join", map[string]any{"invite": aLink["invite"].(string)}, adminHeaders(), http.StatusCreated), &bLink)
+	bPath = fmt.Sprintf("/api/admin/friends/%d", int(bLink["id"].(float64)))
+	decodeBody(t, a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK), &aLink)
+	if aLink["status"] != "pending_confirm" {
+		t.Fatalf("offline-decline setup: %v", aLink)
+	}
+	down.Store(true)
+	a.expectStatus(t, "DELETE", aPath, nil, adminHeaders(), http.StatusNoContent)
+	var queued int
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM friend_unlinks`).Scan(&queued); err != nil || queued != 1 {
+		t.Fatalf("offline decline queued unlinks = %d, err=%v", queued, err)
+	}
+	down.Store(false)
+	friends.New(a.store).RetryUnlinks(t.Context())
+	decodeBody(t, b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK), &bLink)
+	if bLink["status"] != "ended" {
+		t.Fatalf("B link after A offline decline retried: %v", bLink)
+	}
+	b.expectStatus(t, "DELETE", bPath, nil, adminHeaders(), http.StatusNoContent)
+
+	// Confirm while hub is temporarily offline: flips to active with last_error set, then recovers when hub is back.
+	decodeBody(t, a.expectStatus(t, "POST", "/api/admin/friends/invites", nil, adminHeaders(), http.StatusCreated), &aLink)
+	aPath = fmt.Sprintf("/api/admin/friends/%d", int(aLink["id"].(float64)))
+	decodeBody(t, b.expectStatus(t, "POST", "/api/admin/friends/join", map[string]any{"invite": aLink["invite"].(string)}, adminHeaders(), http.StatusCreated), &bLink)
+	bPath = fmt.Sprintf("/api/admin/friends/%d", int(bLink["id"].(float64)))
+	decodeBody(t, a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK), &aLink)
+	if aLink["status"] != "pending_confirm" {
+		t.Fatalf("offline-confirm setup: %v", aLink)
+	}
+	down.Store(true)
+	decodeBody(t, a.expectStatus(t, "POST", aPath+"/confirm", nil, adminHeaders(), http.StatusOK), &aLink)
+	if aLink["status"] != "active" || aLink["last_error"] == "" {
+		t.Fatalf("confirm while hub down: %v", aLink)
+	}
+	// Double confirm on now-active link returns 400.
+	a.expectStatus(t, "POST", aPath+"/confirm", nil, adminHeaders(), http.StatusBadRequest)
+	down.Store(false)
+	decodeBody(t, a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK), &aLink)
+	if aLink["status"] != "active" || aLink["last_error"] != "" {
+		t.Fatalf("sync after hub recovered: %v", aLink)
+	}
+	// B syncs: peer_pending clears to false once A confirmed and synced.
+	decodeBody(t, b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK), &bLink)
+	if bLink["peer_pending"] != false {
+		t.Fatalf("B peer_pending should clear after A confirms: %v", bLink)
+	}
+
+	// Verify FriendMember.Streak still round-trips after confirmation.
+	a.expectStatus(t, "PUT", aPath, map[string]any{"share_user_ids": []int{ava}}, adminHeaders(), http.StatusOK)
+	b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	b.expectStatus(t, "PUT", bPath, map[string]any{"accept_member_ids": []string{fmt.Sprint(ava)}}, adminHeaders(), http.StatusOK)
+	a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	var sawStreak bool
+	for _, e := range b.leaderboard(t) {
+		if e["name"] == "Ava" {
+			if e["streak"] != 4.0 {
+				t.Fatalf("Ava's streak on B's leaderboard = %v, want 4", e["streak"])
+			}
+			sawStreak = true
+		}
+	}
+	if !sawStreak {
+		t.Fatal("Ava not found on B's leaderboard for streak check")
 	}
 }
 

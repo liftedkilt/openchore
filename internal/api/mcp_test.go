@@ -794,3 +794,45 @@ func TestAPITokenWritesRecordAParent(t *testing.T) {
 		t.Errorf("excuse via token: %v", r)
 	}
 }
+
+func TestMCPConfirmFriendFamily(t *testing.T) {
+	t.Setenv("OPENCHORE_HUB_ALLOW_PRIVATE", "true")
+	hubSrv := startHub(t)
+
+	a := setupMCP(t)
+	b := setupTest(t)
+	b.createAdmin(t)
+
+	a.mustTool(t, "update_friend_families", map[string]any{
+		"family_name": "The Avas",
+		"hub_url":     hubSrv.URL,
+		"hub_key":     "hubkey",
+	})
+	inv := a.mustTool(t, "create_friend_invite", nil)
+	aID := inv["id"]
+
+	// Cannot confirm a waiting link via MCP.
+	if _, isErr := a.callTool(t, adminHeaders(), "confirm_friend_family", map[string]any{"id": aID}); !isErr {
+		t.Fatal("confirm_friend_family on waiting link should return isError=true")
+	}
+	if _, isErr := a.callTool(t, adminHeaders(), "confirm_friend_family", map[string]any{"id": 9999}); !isErr {
+		t.Fatal("confirm_friend_family on missing link should return isError=true")
+	}
+
+	// B joins, A syncs -> pending_confirm, then A confirms via MCP.
+	b.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"family_name": "The Bos"}, adminHeaders(), http.StatusOK)
+	b.expectStatus(t, "POST", "/api/admin/friends/join", map[string]any{"invite": inv["invite"]}, adminHeaders(), http.StatusCreated)
+	synced := a.mustTool(t, "sync_friend_family", map[string]any{"id": aID})
+	if synced["status"] != "pending_confirm" || synced["peer_name"] != "The Bos" {
+		t.Fatalf("synced before confirm: %v", synced)
+	}
+	confirmed := a.mustTool(t, "confirm_friend_family", map[string]any{"id": aID})
+	if confirmed["status"] != "active" {
+		t.Fatalf("after MCP confirm_friend_family: %v", confirmed)
+	}
+	// Second confirm returns error.
+	if _, isErr := a.callTool(t, adminHeaders(), "confirm_friend_family", map[string]any{"id": aID}); !isErr {
+		t.Fatal("confirm_friend_family on active link should return isError=true")
+	}
+}
+

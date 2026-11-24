@@ -8,8 +8,11 @@
 .link { padding: var(--space-3); }
 .linkHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .status { padding: 2px 10px; border-radius: 999px; background: var(--surface-sunk); font-size: 12px; font-weight: 700; }
+.pending_confirm { background: color-mix(in srgb, var(--person-butter) 45%, var(--surface-raised)); }
 .active { background: color-mix(in srgb, var(--person-mint) 45%, var(--surface-raised)); }
 .ended { color: var(--urgent); }
+.confirmBox { margin: var(--space-2) 0; padding: var(--space-3); border-radius: var(--r-row); background: var(--surface-sunk); border: 1px solid var(--line); }
+.confirmText { margin: 0 0 var(--space-2); font-size: 13.5px; line-height: 19px; color: var(--ink); overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
 .sides { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-2) var(--space-5); }
 .hint { margin-left: 8px; color: var(--ink-muted); font-size: 12.5px; font-weight: 400; }

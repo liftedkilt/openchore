@@ -144,8 +144,8 @@ func scanFriendLink(row interface{ Scan(...any) error }) (*model.FriendLink, err
 	return l, nil
 }
 
-func (s *Store) ListFriendLinks(ctx context.Context) ([]model.FriendLink, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+friendLinkColumns+` FROM friend_links ORDER BY id`)
+func (s *Store) listFriendLinks(ctx context.Context, query string, args ...any) ([]model.FriendLink, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -159,6 +159,17 @@ func (s *Store) ListFriendLinks(ctx context.Context) ([]model.FriendLink, error)
 		out = append(out, *l)
 	}
 	return out, rows.Err()
+}
+
+func (s *Store) ListFriendLinks(ctx context.Context) ([]model.FriendLink, error) {
+	return s.listFriendLinks(ctx, `SELECT `+friendLinkColumns+` FROM friend_links ORDER BY id`)
+}
+
+// ListActiveFriendLinks returns only confirmed/active links. Leaderboard,
+// friend farms, visitors and gift/playdate checks use this so waiting,
+// pending_confirm and ended links are never surfaced.
+func (s *Store) ListActiveFriendLinks(ctx context.Context) ([]model.FriendLink, error) {
+	return s.listFriendLinks(ctx, `SELECT `+friendLinkColumns+` FROM friend_links WHERE status = ? ORDER BY id`, model.FriendStatusActive)
 }
 
 func (s *Store) GetFriendLink(ctx context.Context, id int64) (*model.FriendLink, error) {
@@ -182,8 +193,11 @@ func (s *Store) CreateFriendLink(ctx context.Context, l *model.FriendLink) error
 }
 
 // SaveFriendSync records the outcome of one sync with the hub. A non-empty
-// snapshot replaces the stored one; status "ended" also wipes the other
-// family's data.
+// snapshot replaces the stored one; peerName alone updates the joining
+// family's name while a link awaits confirmation (snapshot stays empty).
+// Status "pending_confirm" only advances from "waiting" (clearing the used
+// invite); SaveFriendSync never promotes a link to "active" (ConfirmFriendLink
+// does). Status "ended" also wipes the other family's data.
 func (s *Store) SaveFriendSync(ctx context.Context, id int64, status, peerName, snapshot string, snapshotAt *time.Time, syncErr string, now time.Time) error {
 	if status == model.FriendStatusEnded {
 		_, err := s.db.ExecContext(ctx,
@@ -192,23 +206,68 @@ func (s *Store) SaveFriendSync(ctx context.Context, id int64, status, peerName, 
 		return err
 	}
 	if syncErr != "" {
+		if status == model.FriendStatusPendingConfirm {
+			tx, err := s.db.BeginTx(ctx, nil)
+			if err != nil {
+				return err
+			}
+			defer tx.Rollback()
+			if _, err := tx.ExecContext(ctx,
+				`UPDATE friend_links SET status = ?, invite = '' WHERE id = ? AND status = ?`,
+				status, id, model.FriendStatusWaiting); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `UPDATE friend_links SET last_error = ? WHERE id = ?`, syncErr, id); err != nil {
+				return err
+			}
+			return tx.Commit()
+		}
 		_, err := s.db.ExecContext(ctx, `UPDATE friend_links SET last_error = ? WHERE id = ?`, syncErr, id)
 		return err
 	}
-	if status == model.FriendStatusActive {
-		if _, err := s.db.ExecContext(ctx, `UPDATE friend_links SET status = ?, invite = '' WHERE id = ?`, status, id); err != nil {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if status == model.FriendStatusPendingConfirm {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE friend_links SET status = ?, invite = '' WHERE id = ? AND status = ?`,
+			status, id, model.FriendStatusWaiting); err != nil {
 			return err
 		}
 	}
 	if snapshot != "" {
-		if _, err := s.db.ExecContext(ctx,
+		if _, err := tx.ExecContext(ctx,
 			`UPDATE friend_links SET peer_name = ?, snapshot = ?, snapshot_at = ? WHERE id = ?`,
 			peerName, snapshot, snapshotAt, id); err != nil {
 			return err
 		}
+	} else if peerName != "" {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE friend_links SET peer_name = ? WHERE id = ?`,
+			peerName, id); err != nil {
+			return err
+		}
 	}
-	_, err := s.db.ExecContext(ctx, `UPDATE friend_links SET last_sync_at = ?, last_error = '' WHERE id = ?`, now, id)
-	return err
+	if _, err := tx.ExecContext(ctx, `UPDATE friend_links SET last_sync_at = ?, last_error = '' WHERE id = ?`, now, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// ConfirmFriendLink activates a link that is waiting for the inviting parent
+// to confirm the joining family. It reports whether the link was in
+// pending_confirm and moved to active.
+func (s *Store) ConfirmFriendLink(ctx context.Context, id int64) (bool, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE friend_links SET status = ?, invite = '' WHERE id = ? AND status = ?`,
+		model.FriendStatusActive, id, model.FriendStatusPendingConfirm)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
 }
 
 // SetFriendShowPictures records whether this family's custom animal

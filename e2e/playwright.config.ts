@@ -30,15 +30,23 @@ export default defineConfig({
       // other specs are looking at.
       name: 'shared-state',
       use: { browserName: 'chromium' },
-      testMatch: /leaderboard|custom-animal|team-goal-decoration/,
+      testMatch: /leaderboard|custom-animal/,
       dependencies: ['main'],
+    },
+    {
+      // Runs after leaderboard.spec.ts because both specs mutate hub_url,
+      // leaderboard_enabled, and friend_links on the shared backend.
+      name: 'shared-state-friends',
+      use: { browserName: 'chromium' },
+      testMatch: /team-goal-decoration/,
+      dependencies: ['shared-state'],
     },
     {
       // Specs that change household-wide sign-in state, run last.
       name: 'pin-change',
       use: { browserName: 'chromium' },
       testMatch: /admin-pin-change|sign-in-options/,
-      dependencies: ['main', 'shared-state'],
+      dependencies: ['main', 'shared-state', 'shared-state-friends'],
     },
   ],
   webServer: [

@@ -140,6 +140,11 @@ test.describe('Team goal farm decoration', () => {
     });
     bLinkId = joined.id;
 
+    // Inviting parent syncs and confirms the joining family before configuring shares.
+    await request.post(`/api/admin/friends/${aLinkId}/sync`, { headers: aAdmin });
+    const confirmResp = await request.post(`/api/admin/friends/${aLinkId}/confirm`, { headers: aAdmin });
+    expect(confirmResp.ok()).toBeTruthy();
+
     // Share Emma from both sides, sync, then mutually accept Emma and sync twice.
     await request.put(`/api/admin/friends/${aLinkId}`, { headers: aAdmin, data: { share_user_ids: [EMMA] } });
     await peerFetch(peerBase, `/api/admin/friends/${bLinkId}`, {

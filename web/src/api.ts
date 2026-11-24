@@ -301,6 +301,7 @@ export const api = {
       fetchWithAuth<FriendLink>(`/admin/friends/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     invite: () => fetchWithAuth<FriendLink>('/admin/friends/invites', { method: 'POST' }),
     join: (invite: string) => fetchWithAuth<FriendLink>('/admin/friends/join', { method: 'POST', body: JSON.stringify({ invite }) }),
+    confirm: (id: number) => fetchWithAuth<FriendLink>(`/admin/friends/${id}/confirm`, { method: 'POST' }),
     sync: (id: number) => fetchWithAuth<FriendLink>(`/admin/friends/${id}/sync`, { method: 'POST' }),
     unlink: (id: number) => fetchWithAuth(`/admin/friends/${id}`, { method: 'DELETE' }),
   },

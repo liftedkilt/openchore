@@ -167,9 +167,33 @@ export const FriendFamiliesSection: React.FC = () => {
                   </div>
                 </>
               )}
+              {l.status === 'pending_confirm' && (
+                <div className={ff.confirmBox}>
+                  <p className={ff.confirmText}>{tt('confirmPrompt', { family: l.peer_name || tt('unnamed') })}</p>
+                  <div className={ff.actions}>
+                    <button
+                      type="button"
+                      className={ui.btnPrimary}
+                      disabled={busy}
+                      onClick={() => run(() => api.friends.confirm(l.id), tt('confirmed'))}
+                    >
+                      {tt('confirm')}
+                    </button>
+                    <button
+                      type="button"
+                      className={ui.btnDanger}
+                      disabled={busy}
+                      onClick={() => run(() => api.friends.unlink(l.id), tt('declined'))}
+                    >
+                      {tt('decline')}
+                    </button>
+                  </div>
+                </div>
+              )}
               {l.status === 'active' && (
                 <>
                   {l.last_sync_at && <p className={ff.note}>{tt('lastSync', { when: when(l.last_sync_at) })}</p>}
+                  {(l.peer_pending || (l.side === 'b' && !l.snapshot_at)) && <p className={ff.note}>{tt('waitingForConfirm')}</p>}
                   <p className={ff.note}>{tt('bothPick')}</p>
                   <div className={ff.sides}>
                     <fieldset className={ff.people}>
@@ -223,9 +247,11 @@ export const FriendFamiliesSection: React.FC = () => {
                     {tt('syncNow')}
                   </button>
                 )}
-                <button type="button" className={confirming === l.id ? ui.btnDanger : ui.btnGhost} disabled={busy} onClick={() => unlink(l)}>
-                  {confirming === l.id ? tt('confirmUnlink') : tt(l.status === 'active' ? 'unlink' : 'remove')}
-                </button>
+                {l.status !== 'pending_confirm' && (
+                  <button type="button" className={confirming === l.id ? ui.btnDanger : ui.btnGhost} disabled={busy} onClick={() => unlink(l)}>
+                    {confirming === l.id ? tt('confirmUnlink') : tt(l.status === 'active' ? 'unlink' : 'remove')}
+                  </button>
+                )}
               </div>
             </li>
           ))}
