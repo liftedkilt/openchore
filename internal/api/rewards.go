@@ -315,7 +315,11 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	redemption, err := h.store.RedeemReward(r.Context(), user.ID, rewardID)
+	sendID := "" // a reserved gift or playdate is marked paid in the same transaction
+	if choice != nil && choice.send != nil {
+		sendID = choice.send.Send.ID
+	}
+	redemption, err := h.store.RedeemRewardFor(r.Context(), user.ID, rewardID, sendID)
 	if err != nil {
 		if choice != nil {
 			choice.item = ""
@@ -325,7 +329,7 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if choice != nil && choice.send != nil {
-		h.pets.Friends.ConfirmSend(r.Context(), choice.send, redemption.ID)
+		h.pets.Friends.ConfirmSend(r.Context(), choice.send)
 	}
 	if petReward != nil {
 		if err := h.pets.applyPetReward(r.Context(), user.ID, petReward, choice); err != nil {

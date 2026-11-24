@@ -242,9 +242,13 @@ func (s *Store) AddFriendSend(ctx context.Context, linkID int64, send model.Frie
 	return n > 0, nil
 }
 
-// SetFriendSendRedemption notes which redemption paid for a send.
-func (s *Store) SetFriendSendRedemption(ctx context.Context, sendID string, redemptionID int64) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE friend_sends SET redemption_id = ? WHERE id = ?`, redemptionID, sendID)
+// PruneUnpaidFriendSends removes reservations nobody paid for. A
+// reservation is paid for (or taken back) within the request that made it,
+// so one still unpaid after ten minutes was orphaned (the server stopped
+// mid-purchase) and mustn't go on holding today's limit.
+func (s *Store) PruneUnpaidFriendSends(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM friend_sends WHERE redemption_id = 0 AND created_at < datetime('now', '-10 minutes')`)
 	return err
 }
 

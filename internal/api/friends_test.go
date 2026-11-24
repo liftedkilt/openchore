@@ -65,7 +65,19 @@ func waitFor(t *testing.T, n *atomic.Int64, want int64, what string) {
 // A gift goes to the hub as soon as it's bought. Undoing the purchase leaves
 // a new snapshot without it straight away, so the other family's next sync
 // doesn't pick it up.
-func TestFriendUndoneGiftDoesNotArrive(t *testing.T) {
+// giftSetup links A and B, with B's Bo (100 points, his own animal) shared
+// with A and accepted there, ready to send Ava's animal a treat.
+type giftSetup struct {
+	a, b         *testEnv
+	aPath, bPath string
+	ava, bo      int
+	gift         int    // B's gift reward
+	avaKey       string // the friend key for Ava's animal, as B sees it
+	exchanges    *atomic.Int64
+}
+
+func newGiftSetup(t *testing.T) *giftSetup {
+	t.Helper()
 	hubSrv, _, exchanges := startWatchedHub(t)
 	a, b, aPath, bPath, ava := linkedPair(t, hubSrv)
 	bo := b.createChild(t, "Bo")
@@ -76,8 +88,62 @@ func TestFriendUndoneGiftDoesNotArrive(t *testing.T) {
 	a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
 	a.expectStatus(t, "PUT", aPath, map[string]any{"accept_member_ids": []string{fmt.Sprint(bo)}}, adminHeaders(), http.StatusOK)
 	b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
-	avaKey := fmt.Sprintf("f%s:%d", bPath[strings.LastIndex(bPath, "/")+1:], ava)
-	gift := b.petRewardID(t, bo, "gift")
+	return &giftSetup{a: a, b: b, aPath: aPath, bPath: bPath, ava: ava, bo: bo, gift: b.petRewardID(t, bo, "gift"),
+		avaKey: fmt.Sprintf("f%s:%d", bPath[strings.LastIndex(bPath, "/")+1:], ava), exchanges: exchanges}
+}
+
+// A gift is marked paid in the transaction that charges for it: if its
+// reservation is gone, nothing is charged. An unpaid reservation left behind
+// by a server that stopped mid-purchase stops holding the day's limit.
+func TestFriendSendIsPaidInOneStep(t *testing.T) {
+	g := newGiftSetup(t)
+	b, bo := g.b, g.bo
+	today := time.Now().Format("2006-01-02")
+	reserve := func(id, created string) {
+		t.Helper()
+		if _, err := b.db.Exec(`INSERT INTO friend_sends (id, link_id, kind, from_user, to_member, day, created_at) VALUES (?, 1, 'gift', ?, ?, ?, ?)`,
+			id, bo, fmt.Sprint(g.ava), today, created); err != nil {
+			t.Fatal(err)
+		}
+	}
+	before := b.balance(t, bo)
+
+	reserve("r1", time.Now().UTC().Format("2006-01-02 15:04:05"))
+	red, err := b.store.RedeemRewardFor(t.Context(), int64(bo), int64(g.gift), "r1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paidBy int64
+	if err := b.db.QueryRow(`SELECT redemption_id FROM friend_sends WHERE id = 'r1'`).Scan(&paidBy); err != nil || paidBy != red.ID {
+		t.Fatalf("reservation not marked paid by redemption %d: %d %v", red.ID, paidBy, err)
+	}
+	if err := b.store.UndoRedemption(t.Context(), red.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// The reservation vanished before paying: no charge, no redemption.
+	if _, err := b.store.RedeemRewardFor(t.Context(), int64(bo), int64(g.gift), "gone"); err == nil {
+		t.Fatal("paid for a gift whose reservation is gone")
+	}
+	if got := b.balance(t, bo); got != before {
+		t.Fatalf("balance %d -> %d after a refused payment", before, got)
+	}
+
+	// An unpaid reservation from 20 minutes ago no longer holds today's treat.
+	reserve("orphan", time.Now().UTC().Add(-20*time.Minute).Format("2006-01-02 15:04:05"))
+	b.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", g.gift), map[string]any{"pet": map[string]any{"friend": g.avaKey}}, childHeaders(bo), http.StatusCreated)
+	var left int
+	if err := b.db.QueryRow(`SELECT COUNT(*) FROM friend_sends WHERE id = 'orphan'`).Scan(&left); err != nil || left != 0 {
+		t.Fatalf("orphaned reservation still there: %d %v", left, err)
+	}
+	if err := b.db.QueryRow(`SELECT COUNT(*) FROM friend_sends WHERE redemption_id = 0`).Scan(&left); err != nil || left != 0 {
+		t.Fatalf("a bought gift was left unpaid: %d %v", left, err)
+	}
+}
+
+func TestFriendUndoneGiftDoesNotArrive(t *testing.T) {
+	g := newGiftSetup(t)
+	a, b, aPath, bPath, ava, bo, gift, avaKey, exchanges := g.a, g.b, g.aPath, g.bPath, g.ava, g.bo, g.gift, g.avaKey, g.exchanges
 
 	// A reserved gift that isn't paid for yet never goes out.
 	if _, err := b.db.Exec(`INSERT INTO friend_sends (id, link_id, kind, from_user, to_member, day) VALUES ('unpaid', 1, 'gift', ?, ?, ?)`,

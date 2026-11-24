@@ -1017,6 +1017,9 @@ type SendTarget struct {
 // of link linkID). msg is a refusal to show; "" means go ahead with target.
 // Nothing is recorded and no points move.
 func (f *Service) CheckSend(ctx context.Context, userID int64, kind, friendKey string, linkID int64) (target *SendTarget, msg string, err error) {
+	if err := f.store.PruneUnpaidFriendSends(ctx); err != nil {
+		return nil, "", err
+	}
 	now := f.now()
 	today := now.Format(model.DateFormat)
 	memberID := ""
@@ -1122,17 +1125,20 @@ func (f *Service) ReserveSend(ctx context.Context, userID int64, t *SendTarget) 
 	return "", nil
 }
 
-// CancelSend takes back a reserved send (paying for it failed).
+// CancelSend takes back a reserved send (paying for it failed). It runs
+// even if the request that reserved it has gone (the app was closed), so a
+// reservation nobody paid for doesn't hold today's limit.
 func (f *Service) CancelSend(ctx context.Context, t *SendTarget) {
 	if t != nil && t.Send.ID != "" {
-		_ = f.store.DeleteFriendSend(ctx, t.Send.ID)
+		if err := f.store.DeleteFriendSend(context.WithoutCancel(ctx), t.Send.ID); err != nil {
+			log.Printf("friends: couldn't take back unpaid send %s: %v", t.Send.ID, err)
+		}
 	}
 }
 
-// ConfirmSend notes which redemption paid for a reserved send (so undoing
-// the redemption can take it back) and starts a sync so it arrives soon.
-func (f *Service) ConfirmSend(ctx context.Context, t *SendTarget, redemptionID int64) {
-	_ = f.store.SetFriendSendRedemption(ctx, t.Send.ID, redemptionID)
+// ConfirmSend starts a sync so a paid-for send arrives soon. (It was marked
+// paid by store.RedeemRewardFor, in the transaction that charged for it.)
+func (f *Service) ConfirmSend(ctx context.Context, t *SendTarget) {
 	f.SyncSoon(ctx, t.LinkID)
 }
 
