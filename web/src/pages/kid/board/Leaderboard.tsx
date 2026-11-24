@@ -122,7 +122,12 @@ function FriendFarmView({ farm }: { farm: FriendFarm }) {
   const when = asOf(farm.snapshot_at, i18n.language);
   return (
     <>
-      <FarmScene pets={farm.pets} onSelect={setSelected} />
+      <FarmScene
+        pets={farm.pets}
+        goalCelebrations={farm.goal_celebration ? [farm.goal_celebration] : undefined}
+        friendFarm
+        onSelect={setSelected}
+      />
       {selected && (
         <div className={fs.otherCard} role="status">
           <FarmAnimal species={selected.species} color={selected.color} mood={selected.mood} accessory={selected.accessory} {...petPicture(selected)} className={fs.otherArt} />

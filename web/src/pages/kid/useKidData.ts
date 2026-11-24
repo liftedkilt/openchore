@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, APIError } from '../../api';
 import type {
-  Farm, FriendGift, Leaderboard, Pet, PetPick, PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
+  Farm, FriendGift, GoalCelebration, Leaderboard, Pet, PetPick, PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
 } from '../../types';
 import { localDateStr } from '../../utils';
 
@@ -30,9 +30,10 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   const [people, setPeople] = useState<User[]>([]);
   const [farm, setFarm] = useState<Farm | null>(null);
   const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null);
-  // Friend families' animals here on a playdate, and treats friends sent today.
+  // Friend families' animals here on a playdate, treats sent today, and reached team goals.
   const [visitors, setVisitors] = useState<Pet[]>([]);
   const [gifts, setGifts] = useState<FriendGift[]>([]);
+  const [goalCelebrations, setGoalCelebrations] = useState<GoalCelebration[]>([]);
   const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -85,6 +86,7 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
       ]);
       setVisitors(v?.visitors ?? []);
       setGifts(v?.gifts ?? []);
+      setGoalCelebrations(v?.goal_celebrations ?? []);
       setStreak(s);
       setPoints(p);
       setFarm(f);
@@ -320,7 +322,7 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
   return {
     today, chores, weekChores, streak, points, rewards, redemptions, people,
     farm, myPet: farm?.pets.find(p => p.user_id === userId) ?? null,
-    leaderboard, visitors, gifts, farmPets,
+    leaderboard, visitors, gifts, goalCelebrations, farmPets,
     togglingIds, toast, showToast,
     reloadChores, refreshAll, loadRewards, loadExtras, toggle,
     commitmentFor, redeem, redeemingId, redeemedId, saveToward, savingTowardId,

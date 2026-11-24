@@ -665,10 +665,20 @@ export interface TeamSide { people: number; score: number }
 export interface TeamGoal { target: number; state: 'active' | 'ours' | 'theirs' | 'differs'; their_target?: number; met: boolean }
 export interface LeaderboardTeam { link_id: number; family: string; ours: TeamSide; theirs: TeamSide; together: TeamSide; goal?: TeamGoal }
 
+/** An agreed weekly team goal reached with a friend family, celebrated on both farms. */
+export interface GoalCelebration {
+  link_id: number;
+  family: string;
+  week: 'this' | 'last';
+  week_start: string;
+  target: number;
+  score: number;
+}
+
 /** A treat a friend sent one of this household's animals today. */
 export interface FriendGift { to_user_id: number; from: string; family: string }
 
-export interface FriendFarm { link_id: number; family: string; snapshot_at?: string; pets: Pet[] }
+export interface FriendFarm { link_id: number; family: string; snapshot_at?: string; pets: Pet[]; goal_celebration?: GoalCelebration }
 
 export interface FriendLink {
   id: number;

@@ -36,7 +36,7 @@ export function FarmSheet({ user, data, onClose }: FarmSheetProps) {
 
   return (
     <Sheet title={t('kid.farm.title')} onClose={onClose} className={s.sheet}>
-      <FarmScene pets={pets} meId={user.id} onSelect={setSelected} />
+      <FarmScene pets={pets} meId={user.id} goalCelebrations={data.goalCelebrations} onSelect={setSelected} />
       {other && (
         <div className={s.otherCard} role="status">
           <FarmAnimal species={other.species} color={other.color} mood={other.mood} accessory={other.accessory} {...petPicture(other)} className={s.otherArt} />

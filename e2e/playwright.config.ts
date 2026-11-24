@@ -22,7 +22,7 @@ export default defineConfig({
     {
       name: 'main',
       use: { browserName: 'chromium' },
-      testIgnore: /admin-pin-change|sign-in-options|leaderboard|custom-animal/,
+      testIgnore: /admin-pin-change|sign-in-options|leaderboard|custom-animal|team-goal-decoration/,
     },
     {
       // Specs that turn a household-wide feature on (farm pets, the
@@ -30,7 +30,7 @@ export default defineConfig({
       // other specs are looking at.
       name: 'shared-state',
       use: { browserName: 'chromium' },
-      testMatch: /leaderboard|custom-animal/,
+      testMatch: /leaderboard|custom-animal|team-goal-decoration/,
       dependencies: ['main'],
     },
     {

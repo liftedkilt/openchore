@@ -245,11 +245,11 @@ func allTools() []*Tool {
 			"People need 5 assigned chores in the week to be ranked (rank 0 = not yet). Includes people shared by linked friend families.",
 		method: http.MethodGet, path: "/leaderboard", query: []string{"week"},
 		props: map[string]any{"week": enum("Which week (default this).", "this", "last")}})
-	add(endpoint{name: "list_friend_visitors", title: "Playdates and gifts today", readOnly: true,
-		desc:   "Friend families' animals that are on this farm for a playdate today, and the treats friends sent this household's animals today.",
+	add(endpoint{name: "list_friend_visitors", title: "Playdates, gifts and team goal celebrations", readOnly: true,
+		desc:   "Friend families' animals that are on this farm for a playdate today, the treats friends sent this household's animals today, and any agreed weekly team goals reached with linked families.",
 		method: http.MethodGet, path: "/friends/visitors"})
 	add(endpoint{name: "list_friend_farms", title: "Friend families' farms", readOnly: true,
-		desc:   "The farm animals each linked friend family shares, as of their last sync.",
+		desc:   "The farm animals each linked friend family shares, as of their last sync, along with any reached weekly team goal celebration.",
 		method: http.MethodGet, path: "/friends/farms"})
 	add(endpoint{name: "get_friend_families", title: "Friend families settings", readOnly: true,
 		desc: "Leaderboard on/off, this family's name, the coordination server (hub), and each linked family with its status and last sync, " +
