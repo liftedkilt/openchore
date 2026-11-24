@@ -72,6 +72,31 @@ A picture of another size is scaled to the same square first, so the spots
 stay in proportion. If your animal's head is somewhere else, accessories will
 float; either move the head or go without them.
 
+## Starter pack
+
+OpenChore ships a ready-made pack of eight original pixel-art farm animals in
+`web/public/sprites/pack/` (served at `/sprites/pack/<id>-strip.png`). Each is
+a full 6-frame `384 × 64` strip (`standing`, `walk 1`, `walk 2`, `sick`,
+`lying down`, `happy`), aligned to the accessory spots above and well under the
+48 KB friend-sharing limit:
+
+| Animal | Strip file |
+| --- | --- |
+| Donkey | [`donkey-strip.png`](../web/public/sprites/pack/donkey-strip.png) |
+| Duck | [`duck-strip.png`](../web/public/sprites/pack/duck-strip.png) |
+| Goose | [`goose-strip.png`](../web/public/sprites/pack/goose-strip.png) |
+| Turkey | [`turkey-strip.png`](../web/public/sprites/pack/turkey-strip.png) |
+| Rabbit | [`rabbit-strip.png`](../web/public/sprites/pack/rabbit-strip.png) |
+| Alpaca | [`alpaca-strip.png`](../web/public/sprites/pack/alpaca-strip.png) |
+| Rooster | [`rooster-strip.png`](../web/public/sprites/pack/rooster-strip.png) |
+| Mouse | [`mouse-strip.png`](../web/public/sprites/pack/mouse-strip.png) |
+
+Kids can tap any animal directly inside **Use my own picture** to try it on the
+grass and redeem with no file download or upload required — or download a strip
+to customize it in a pixel-art editor. The strips are generated reproducibly by
+`web/scripts/gen-starter-pack.py` (needs Pillow), and all artwork is original
+to OpenChore (MIT-licensed).
+
 ## Starter kit
 
 The app serves these (and links them from the upload screen); they are in
@@ -109,9 +134,9 @@ export an animation's frames as one row, which is the same thing.
 ## In the app
 
 - **Getting one:** a reward with `pet_action` `picture` ("Use my own
-  picture", added with the starter pet rewards, 60 points). The person picks
-  the file, sees it on the grass, and redeems. A picture that's refused costs
-  nothing.
+  picture", added with the starter pet rewards, 60 points). The person either
+  picks one of the ready-made starter-pack animals or uploads a PNG file, sees
+  it on the grass, and redeems. A picture that's refused costs nothing.
 - **Going back:** "Go back to the drawn animal" on the farm sheet is free and
   deletes the picture.
 - **Grown-ups** can remove a person's picture in Settings → Farm pets

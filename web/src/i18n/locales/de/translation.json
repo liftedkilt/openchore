@@ -1492,7 +1492,21 @@
       },
       "picture": {
         "title": "Mein eigenes Bild verwenden",
-        "lead": "Wähle ein Bild, das du gemalt oder gemacht hast. Dein Tier sieht dann überall auf dem Hof so aus.",
+        "lead": "Wähle unten ein fertiges Tier aus oder nimm ein Bild, das du gemalt oder gemacht hast. Dein Tier sieht dann überall auf dem Hof so aus.",
+        "packTitle": "Fertige Tiere",
+        "packLead": "Tippe eins an, um es auf der Wiese zu sehen, oder lade unten dein eigenes Bild hoch.",
+        "packError": "Das Tierbild konnte nicht geladen werden. Bitte versuche es noch einmal.",
+        "uploadTitle": "Oder lade dein eigenes hoch",
+        "pack": {
+          "donkey": "Esel",
+          "duck": "Ente",
+          "goose": "Gans",
+          "turkey": "Truthahn",
+          "rabbit": "Kaninchen",
+          "alpaca": "Alpaka",
+          "rooster": "Hahn",
+          "mouse": "Maus"
+        },
         "choose": "Bild auswählen",
         "change": "Anderes Bild auswählen",
         "rules": "Ein PNG mit durchsichtigem Hintergrund. Ein Bild ist 64 mal 64 Pixel groß: Das Tier schaut nach rechts und steht mit den Füßen am unteren Rand. Für ein laufendes Tier legst du bis zu sechs Bilder nebeneinander in eine Datei: stehend, zwei Schritte, krank, liegend und fröhlich.",

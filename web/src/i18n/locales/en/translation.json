@@ -1492,7 +1492,21 @@
       },
       "picture": {
         "title": "Use my own picture",
-        "lead": "Pick a picture you drew or made. Your animal will look like it everywhere on the farm.",
+        "lead": "Pick a ready-made animal below, or choose a picture you drew or made. Your animal will look like it everywhere on the farm.",
+        "packTitle": "Ready-made animals",
+        "packLead": "Tap one to try it on the grass, or upload your own picture below.",
+        "packError": "Couldn't load that animal picture. Please try again.",
+        "uploadTitle": "Or upload your own",
+        "pack": {
+          "donkey": "Donkey",
+          "duck": "Duck",
+          "goose": "Goose",
+          "turkey": "Turkey",
+          "rabbit": "Rabbit",
+          "alpaca": "Alpaca",
+          "rooster": "Rooster",
+          "mouse": "Mouse"
+        },
         "choose": "Choose a picture",
         "change": "Choose a different picture",
         "rules": "A PNG with a see-through background. One picture is 64 by 64 pixels: the animal faces right with its feet at the bottom. For a walking animal, put up to six pictures side by side in one file: standing, two walking steps, sick, lying down and happy.",
