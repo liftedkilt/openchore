@@ -22,7 +22,7 @@ func TestSanitizeBoundsWhatAPeerCanSend(t *testing.T) {
 				Name: "Clover", Species: "horse", Color: "<script>", Accessory: "img:head:0123456789abcdef0123",
 				Mood: "furious",
 			}},
-			{ID: "3", Name: "Theo", Pet: &model.FriendPet{Name: "Socks", Species: "cat", Color: "ginger", Accessory: "e:head:🎓", Mood: "sick"}},
+			{ID: "3", Name: "Theo", Color: "x,url(//evil.example/)", Pet: &model.FriendPet{Name: "Socks", Species: "cat", Color: "ginger", Accessory: "e:head:🎓", Mood: "sick"}},
 		},
 	}
 	s.Today = "not a date"
@@ -43,6 +43,12 @@ func TestSanitizeBoundsWhatAPeerCanSend(t *testing.T) {
 	}
 	if ws := s.Members[0].Weeks; len(ws) != 2 || ws[1].Done != 3 || ws[1].Bonus != 0 || ws[1].Share != 10000 {
 		t.Errorf("weeks not bounded: %+v", ws)
+	}
+	if s.Members[2].Color != "" {
+		t.Errorf("a colour that isn't one of ours was kept: %q", s.Members[2].Color)
+	}
+	if s.Members[2].Color = "sky"; !model.ValidPersonColor(s.Members[2].Color) {
+		t.Fatal("sky should be a person colour")
 	}
 	if s.Members[0].Pet != nil {
 		t.Errorf("unknown animal kept: %+v", s.Members[0].Pet)

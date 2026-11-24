@@ -155,6 +155,8 @@ hub saying the link is gone ends it: a hub that is down, or a proxy in front
 of it answering with an error, is just a failed sync, shown on the link and
 tried again.
 
+If the hub can't be reached when you unlink, the link and the other family's data are still removed here straight away. The hub address and this side's token are kept (in `friend_unlinks`) and the delete is tried again at every sync, for up to 90 days, so the hub stops handing your last snapshot to the other family once it's back.
+
 ### What is shared
 
 Sharing is chosen **per linked family and in both directions**, under that
@@ -163,12 +165,7 @@ family in Settings, and both lists start empty:
 - **Sent to them:** which of your people you send to that family.
 - **Offered by them:** which of the people they send you are shown here.
 
-A person appears on the other family's leaderboard and farm only when both
-parents have ticked them. Each side can see whether the other has ticked the
-people it sends. Until you tick someone you're offered, only their name and
-colour are kept on your server; their chore counts and animal are dropped as
-they arrive. Un-ticking someone removes what was stored about them at once,
-whether or not the hub can be reached.
+A person appears on the other family's leaderboard and farm only when both parents have ticked them. Each side can see whether the other has ticked the people it sends. Until the other parent ticks someone you send, only that person's name and colour leave your server: their chore counts, streak and animal are sent only once they're shown there. The receiving side checks too: until you tick someone you're offered, only their name and colour are kept on your server, and anything more is dropped as it arrives. Un-ticking someone removes what was stored about them at once, whether or not the hub can be reached.
 
 A linked family is sent only what its screens show:
 
@@ -300,7 +297,7 @@ OpenChore servers call it, not people, and they can't log in. Then:
 | `HUB_DB` | SQLite file (default `hub.db`) |
 | `HUB_KEYS` | Comma-separated keys allowed to create links. If set, no key file is made |
 | `HUB_KEY_FILE` | Where the made-on-first-start key lives (default `hub.key` next to `HUB_DB`) |
-| `HUB_OPEN` | `true` lets anyone create links without a key |
+| `HUB_OPEN` | `true` lets anyone create links without a key. Each address can then have at most 20 invites waiting to be joined |
 | `HUB_TRUST_PROXY` | `true` behind one reverse proxy, so rate limits use the caller's real address |
 
 An OpenChore server takes its hub from Settings, or from `OPENCHORE_HUB_URL` /

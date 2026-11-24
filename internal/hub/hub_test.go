@@ -165,6 +165,43 @@ func TestSweepAndLimits(t *testing.T) {
 	}
 }
 
+// On an open hub one address can't hold more than MaxWaitingPerCaller
+// unjoined invites, so it can't fill the hub; joining one frees a place.
+// A hub with keys has no such cap (its key holders are trusted).
+func TestOpenHubCapsWaitingInvitesPerAddress(t *testing.T) {
+	h, srv := newHub(t)
+	now := time.Now()
+	h.SetClock(func() time.Time { return now })
+	var first map[string]any
+	for i := 0; i < MaxWaitingPerCaller; i++ {
+		now = now.Add(time.Minute) // stay inside the signup rate
+		code, out := do(t, srv, "POST", "/v1/links", "", nil)
+		if code != http.StatusCreated {
+			t.Fatalf("invite %d = %d", i+1, code)
+		}
+		if first == nil {
+			first = out
+		}
+	}
+	now = now.Add(time.Minute)
+	if code, _ := do(t, srv, "POST", "/v1/links", "", nil); code != http.StatusTooManyRequests {
+		t.Fatalf("invite past the cap = %d, want 429", code)
+	}
+	do(t, srv, "POST", "/v1/links/"+first["link"].(string)+"/join", "", map[string]any{"code": first["join_code"]})
+	if code, _ := do(t, srv, "POST", "/v1/links", "", nil); code != http.StatusCreated {
+		t.Fatalf("invite after one was joined = %d", code)
+	}
+
+	k, ksrv := newHub(t, "key")
+	k.SetClock(func() time.Time { return now })
+	for i := 0; i <= MaxWaitingPerCaller; i++ {
+		now = now.Add(time.Minute)
+		if code, _ := do(t, ksrv, "POST", "/v1/links", "key", nil); code != http.StatusCreated {
+			t.Fatalf("keyed hub invite %d = %d", i+1, code)
+		}
+	}
+}
+
 // The hub doesn't describe itself to someone who just opens its address.
 func TestNoLandingPage(t *testing.T) {
 	_, srv := newHub(t, "key")

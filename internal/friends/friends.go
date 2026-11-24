@@ -388,8 +388,15 @@ func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnap
 	}
 	yesterday := now.AddDate(0, 0, -1).Format(model.DateFormat)
 	pictureBytes := 0
+	accepted := teamOf(shared, link) // shared, and picked by the other family's parent
 	for _, u := range users {
 		if !shared[u.ID] {
+			continue
+		}
+		if !accepted[u.ID] {
+			// Not picked over there yet: only what it takes to offer them,
+			// so nothing more leaves this household until both parents agree.
+			snap.Members = append(snap.Members, model.FriendMember{ID: strconv.FormatInt(u.ID, 10), Name: u.Name, Color: u.Color, Weeks: []model.FriendWeek{}})
 			continue
 		}
 		m := model.FriendMember{ID: strconv.FormatInt(u.ID, 10), Name: u.Name, Color: u.Color, Paused: u.Paused}
@@ -759,13 +766,60 @@ func (f *Service) Join(ctx context.Context, code string) (*model.FriendLink, err
 
 // Sync leaves this family's snapshot at the hub and picks up the other's.
 // Failures are recorded on the link (and returned).
+//
+// A snapshot only carries full details for people the other family has
+// accepted, and which those are comes back in the other family's snapshot.
+// So when it shows someone newly accepted, the exchange is done once more
+// straight away rather than leaving them a blank until the next round.
 func (f *Service) Sync(ctx context.Context, id int64) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	again, err := f.syncOnce(ctx, id)
+	if err == nil && again {
+		_, err = f.syncOnce(ctx, id)
+	}
+	return err
+}
+
+// sentFull is who a link's snapshot currently carries full details for.
+func (f *Service) sentFull(ctx context.Context, id int64) (map[int64]bool, error) {
+	l, err := f.store.GetFriendLink(ctx, id)
+	if err != nil || l == nil {
+		return nil, err
+	}
+	shared, err := f.store.FriendLinkShares(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return teamOf(shared, l), nil
+}
+
+func (f *Service) syncOnce(ctx context.Context, id int64) (again bool, err error) {
 	l, err := f.store.GetFriendLink(ctx, id)
 	if err != nil || l == nil || l.Status == model.FriendStatusEnded {
-		return err
+		return false, err
 	}
+	before, err := f.sentFull(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	if err := f.exchange(ctx, l); err != nil {
+		return false, err
+	}
+	after, err := f.sentFull(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	for uid := range after {
+		if !before[uid] {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (f *Service) exchange(ctx context.Context, l *model.FriendLink) error {
+	id := l.ID
 	now := f.now()
 	fail := func(err error) error {
 		_ = f.store.SaveFriendSync(ctx, id, l.Status, "", "", nil, err.Error(), now)
@@ -873,6 +927,9 @@ func (f *Service) receive(ctx context.Context, l *model.FriendLink, s *model.Fri
 	if err != nil {
 		return err
 	}
+	// With farm pets off here there's no animal to feed, so a gift isn't
+	// taken. It lands if pets are turned back on while it's still being sent.
+	petsOn, _ := f.store.GetSetting(ctx, "pets_enabled")
 	gifts, err := f.store.ListFriendReceived(ctx, model.PetActionGift, "", today)
 	if err != nil {
 		return err
@@ -913,7 +970,7 @@ func (f *Service) receive(ctx context.Context, l *model.FriendLink, s *model.Fri
 		var to int64
 		if sd.Kind == model.PetActionGift {
 			to, _ = strconv.ParseInt(sd.To, 10, 64)
-			if !shares[to] || got[to] >= maxGiftsPerDay {
+			if petsOn != "true" || !shares[to] || got[to] >= maxGiftsPerDay {
 				continue
 			}
 			if p, err := f.store.GetPetForUser(ctx, to); err != nil || p == nil {
@@ -1077,13 +1134,6 @@ func (f *Service) CancelSend(ctx context.Context, t *SendTarget) {
 func (f *Service) ConfirmSend(ctx context.Context, t *SendTarget, redemptionID int64) {
 	_ = f.store.SetFriendSendRedemption(ctx, t.Send.ID, redemptionID)
 	go func(linkID int64) { _ = f.Sync(context.WithoutCancel(ctx), linkID) }(t.LinkID)
-}
-
-// UndoSend takes back the gift or playdate a redemption paid for, if it
-// hasn't gone out for good: within two days it is simply no longer sent.
-// One the other family has already received stays received.
-func (f *Service) UndoSend(ctx context.Context, redemptionID int64) error {
-	return f.store.DeleteFriendSend(ctx, "", redemptionID)
 }
 
 // Visitors returns the friend families' animals that are here on a playdate
@@ -1327,7 +1377,13 @@ func sanitize(s *model.FriendSnapshot) {
 	s.Members = members
 	for i := range s.Members {
 		m := &s.Members[i]
-		m.Name, m.Color = clip(m.Name, maxNameLen), clip(m.Color, 20)
+		m.Name = clip(m.Name, maxNameLen)
+		// The colour ends up in CSS (var(--person-<colour>)), so only one
+		// of our own colour names is kept: anything else could carry a
+		// url() that makes every screen here fetch the other family's server.
+		if !model.ValidPersonColor(m.Color) {
+			m.Color = ""
+		}
 		m.Streak = max(0, min(m.Streak, 9999))
 		weeks := m.Weeks[:0]
 		for _, w := range m.Weeks {
@@ -1382,8 +1438,10 @@ func clip(s string, n int) string {
 	return s
 }
 
-// SyncAll syncs every live link, logging failures.
+// SyncAll syncs every live link, logging failures, and retries any unlink
+// the hub hasn't confirmed.
 func (f *Service) SyncAll(ctx context.Context) {
+	f.RetryUnlinks(ctx)
 	links, err := f.store.ListFriendLinks(ctx)
 	if err != nil {
 		log.Printf("friends: listing links: %v", err)
@@ -1401,16 +1459,45 @@ func (f *Service) SyncAll(ctx context.Context) {
 
 // Unlink ends a link: the hub deletes it (so the other family is told at
 // their next sync) and the other family's data is removed here. If the hub
-// can't be reached the link is still removed locally.
+// can't be reached the link is still removed here at once, and the hub is
+// told later (RetryUnlinks): until then it would go on handing this
+// family's last snapshot to the other family.
 func (f *Service) Unlink(ctx context.Context, id int64) error {
 	l, err := f.store.GetFriendLink(ctx, id)
 	if err != nil || l == nil {
 		return err
 	}
 	if l.Status != model.FriendStatusEnded {
-		if err := f.call(ctx, f.trustsLink(ctx, l), http.MethodDelete, l.HubURL, "/v1/links/"+url.PathEscape(l.HubLink), l.Token, nil, nil); err != nil {
-			log.Printf("friends: couldn't tell the hub about unlinking %q: %v", l.PeerName, err)
+		if err := f.hubDelete(ctx, l); err != nil {
+			log.Printf("friends: couldn't tell the hub about unlinking %q, will retry: %v", l.PeerName, err)
+			return f.store.DeleteFriendLinkLater(ctx, id)
 		}
 	}
 	return f.store.DeleteFriendLink(ctx, id)
+}
+
+func (f *Service) hubDelete(ctx context.Context, l *model.FriendLink) error {
+	return f.call(ctx, f.trustsLink(ctx, l), http.MethodDelete, l.HubURL, "/v1/links/"+url.PathEscape(l.HubLink), l.Token, nil, nil)
+}
+
+// unlinkRetryFor is how long an unconfirmed unlink is retried: the hub drops
+// a link nobody syncs after 90 days anyway.
+const unlinkRetryFor = 90 * 24 * time.Hour
+
+// RetryUnlinks tells the hub about unlinks it missed (see Unlink). The hub
+// answers a delete of a link that's already gone with success too.
+func (f *Service) RetryUnlinks(ctx context.Context) {
+	pending, err := f.store.ListFriendUnlinks(ctx, f.now().Add(-unlinkRetryFor))
+	if err != nil {
+		log.Printf("friends: listing unconfirmed unlinks: %v", err)
+		return
+	}
+	for id, l := range pending {
+		if err := f.hubDelete(ctx, &l); err != nil {
+			continue // still unreachable; next sync tries again
+		}
+		if err := f.store.DeleteFriendUnlink(ctx, id); err != nil {
+			log.Printf("friends: forgetting a confirmed unlink: %v", err)
+		}
+	}
 }

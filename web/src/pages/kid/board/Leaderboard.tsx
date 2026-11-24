@@ -14,6 +14,7 @@ import { FarmScene } from '../farm/FarmScene';
 import { Rosette } from '../farm/Rosette';
 import fs from '../farm/petSheet.module.css';
 import s from './board.module.css';
+import { isPersonColor } from '../../../design/types';
 
 const isMe = (e: LeaderboardEntry, user: User) => e.user_id === user.id;
 
@@ -24,7 +25,7 @@ function Row({ e, user, compact }: { e: LeaderboardEntry; user: User; compact?: 
   return (
     <li
       className={clsx(s.row, me && s.me, e.rank === 0 && s.unranked)}
-      style={{ ['--who' as string]: e.color ? `var(--person-${e.color})` : undefined }}
+      style={{ ['--who' as string]: isPersonColor(e.color) ? `var(--person-${e.color})` : undefined }}
     >
       <span className={s.rank} aria-label={e.rank ? t('kid.board.place', { rank: e.rank }) : t('kid.board.notRanked')}>
         {e.rank || '–'}

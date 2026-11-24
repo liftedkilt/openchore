@@ -358,13 +358,7 @@ func (h *RewardHandler) UndoRedemption(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to undo redemption")
 		return
 	}
-	// A gift or playdate it paid for is taken back too (one that has
-	// already arrived at the other family stays arrived).
-	if h.pets != nil && h.pets.Friends != nil {
-		if err := h.pets.Friends.UndoSend(r.Context(), id); err != nil {
-			log.Printf("rewards: redemption %d undone but its gift or playdate wasn't taken back: %v", id, err)
-		}
-	}
+	// store.UndoRedemption also takes back a gift or playdate it paid for.
 	w.WriteHeader(http.StatusNoContent)
 }
 

@@ -10,6 +10,7 @@ import { FarmAnimal, petPicture, FarmBackdrop, Shelter } from './FarmAnimal';
 import { Rosette } from './Rosette';
 import s from './farm.module.css';
 import { useFarmSeason } from './season';
+import { isPersonColor } from '../../../design/types';
 
 interface Spot { x: number; y: number; face: 1 | -1; ms: number; walking: boolean }
 
@@ -108,7 +109,7 @@ export function FarmScene({ pets, meId, compact, owners = !compact, onSelect, cl
   const label = (p: Pet) => t(`kid.farm.mood.${p.mood}`, { name: p.name });
 
   const tag = (p: Pet) => (
-    <span className={s.tag} style={{ ['--tag' as string]: p.owner_color ? `var(--person-${p.owner_color})` : undefined }}>
+    <span className={s.tag} style={{ ['--tag' as string]: isPersonColor(p.owner_color) ? `var(--person-${p.owner_color})` : undefined }}>
       <span className={s.tagName}>
         {p.ribbon && <Rosette className={s.rosette} title={t('kid.board.ribbon')} />}
         {p.name}

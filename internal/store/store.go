@@ -3077,6 +3077,14 @@ func (s *Store) UndoRedemption(ctx context.Context, redemptionID int64) error {
 		return err
 	}
 
+	// A gift or playdate this paid for is taken back too, whichever way the
+	// purchase is undone (one that already reached the other family stays
+	// arrived: it was in a snapshot they've picked up).
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM friend_sends WHERE redemption_id = ? AND redemption_id != 0`, redemptionID); err != nil {
+		return err
+	}
+
 	// If this redemption settled a commitment, undo that side too: drop the
 	// goal_break we emitted at redeem time and reactivate the commitment so
 	// the saved points sit in the goal again. We identify the commitment by

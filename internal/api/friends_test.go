@@ -8,27 +8,51 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/liftedkilt/openchore/internal/friends"
 	"github.com/liftedkilt/openchore/internal/hub"
 )
 
 // startHub runs a coordination server that needs key "hubkey" to create links.
 func startHub(t *testing.T) *httptest.Server {
 	t.Helper()
+	srv := httptest.NewServer(newTestHub(t))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// startFlakyHub is startHub with a switch: while down is set, every request
+// gets a 503 as if the hub were unreachable.
+func startFlakyHub(t *testing.T) (*httptest.Server, *atomic.Bool) {
+	t.Helper()
+	h, down := newTestHub(t), &atomic.Bool{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if down.Load() {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		h.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	return srv, down
+}
+
+func newTestHub(t *testing.T) *hub.Hub {
+	t.Helper()
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { db.Close() })
 	h, err := hub.New(db, []string{"hubkey"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(h)
-	t.Cleanup(func() { srv.Close(); db.Close() })
-	return srv
+	return h
 }
 
 func (e *testEnv) getJSON(t *testing.T, path string, headers map[string]string) map[string]any {
@@ -241,6 +265,12 @@ func TestFriendFamiliesLinkThroughHub(t *testing.T) {
 	if err := b.db.QueryRow(`SELECT snapshot FROM friend_links`).Scan(&stored); err != nil || strings.Contains(stored, "Biscuit") {
 		t.Fatalf("B kept data for a person its parent hasn't accepted: %v %s", err, stored)
 	}
+	// Nor does A send it: until B's parent picks Ava, she leaves A as a name
+	// and a colour only.
+	sent, err := friends.New(a.store).Snapshot(t.Context(), int64(aLink))
+	if err != nil || len(sent.Members) != 1 || sent.Members[0].Name != "Ava" || sent.Members[0].Pet != nil || len(sent.Members[0].Weeks) != 0 {
+		t.Fatalf("A sent more than a name for someone B hasn't accepted: %v %+v", err, sent)
+	}
 
 	// B's parent accepts Ava (and can't accept someone who wasn't offered).
 	b.expectStatus(t, "PUT", bPath, map[string]any{"accept_member_ids": []string{"12345"}}, adminHeaders(), http.StatusBadRequest)
@@ -258,6 +288,8 @@ func TestFriendFamiliesLinkThroughHub(t *testing.T) {
 		t.Fatalf("A's inbound: %s", got)
 	}
 
+	// A now sends Ava in full, and B has her at its next sync.
+	sync(b, bPath)
 	// B's leaderboard has Ava with her real count; Secret never left A.
 	var sawAva bool
 	for _, e := range b.leaderboard(t) {
@@ -367,7 +399,47 @@ func linkedPair(t *testing.T, hubSrv *httptest.Server) (a, b *testEnv, aPath, bP
 	a.expectStatus(t, "PUT", aPath, map[string]any{"share_user_ids": []int{ava}}, adminHeaders(), http.StatusOK)
 	b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
 	b.expectStatus(t, "PUT", bPath, map[string]any{"accept_member_ids": []string{fmt.Sprint(ava)}}, adminHeaders(), http.StatusOK)
+	// A learns that Ava was accepted and sends her in full; B picks that up.
+	a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
+	b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK)
 	return a, b, aPath, bPath, ava
+}
+
+// Unlinking while the hub is down still removes the link here at once, and
+// the hub is told once it's back, so the other family stops getting this
+// family's data instead of keeping the last snapshot for good.
+func TestFriendUnlinkRetriesWhenHubIsDown(t *testing.T) {
+	hubSrv, down := startFlakyHub(t)
+	a, b, aPath, bPath, _ := linkedPair(t, hubSrv)
+	a.expectStatus(t, "POST", aPath+"/sync", nil, adminHeaders(), http.StatusOK)
+
+	down.Store(true)
+	a.expectStatus(t, "DELETE", aPath, nil, adminHeaders(), http.StatusNoContent)
+	if links := a.getJSON(t, "/api/admin/friends", adminHeaders())["links"].([]any); len(links) != 0 {
+		t.Fatalf("A still has links: %v", links)
+	}
+	var pending int
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM friend_unlinks`).Scan(&pending); err != nil || pending != 1 {
+		t.Fatalf("unconfirmed unlinks: %d %v", pending, err)
+	}
+
+	// Back up: the hub still holds A's snapshot until it's told.
+	down.Store(false)
+	var link map[string]any
+	decodeBody(t, b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK), &link)
+	if link["status"] != "active" {
+		t.Fatalf("B's link before the retry: %v", link)
+	}
+
+	// The next round of syncing at A tells the hub, and B finds out.
+	friends.New(a.store).SyncAll(t.Context())
+	if err := a.db.QueryRow(`SELECT COUNT(*) FROM friend_unlinks`).Scan(&pending); err != nil || pending != 0 {
+		t.Fatalf("unlink still pending after the hub came back: %d %v", pending, err)
+	}
+	decodeBody(t, b.expectStatus(t, "POST", bPath+"/sync", nil, adminHeaders(), http.StatusOK), &link)
+	if link["status"] != "ended" {
+		t.Fatalf("B's link after the retry: %v", link)
+	}
 }
 
 func (e *testEnv) storedSnapshot(t *testing.T) string {
@@ -826,6 +898,14 @@ func TestFriendGiftsAndPlaydates(t *testing.T) {
 	if msg := redeem(gift, map[string]any{"friend": avaKey}, http.StatusUnprocessableEntity); !strings.Contains(msg, "already sent Biscuit") {
 		t.Fatalf("second gift the same day: %q", msg)
 	}
+	// With farm pets off at A, the treat doesn't touch Biscuit.
+	a.expectStatus(t, "PUT", "/api/admin/pets", map[string]any{"enabled": false}, adminHeaders(), http.StatusOK)
+	bothSync()
+	var petJoy int
+	if err := a.db.QueryRow(`SELECT joy FROM pets WHERE user_id = ?`, ava).Scan(&petJoy); err != nil || petJoy != 40 {
+		t.Fatalf("a gift changed an animal with farm pets off: joy %d %v", petJoy, err)
+	}
+	a.enablePets(t)
 	bothSync()
 	bothSync() // arriving again changes nothing
 	if joy() != 60 {
@@ -870,6 +950,17 @@ func TestFriendGiftsAndPlaydates(t *testing.T) {
 	var left int
 	if err := b.db.QueryRow(`SELECT COUNT(*) FROM friend_sends WHERE from_user = ?`, theo).Scan(&left); err != nil || left != 0 {
 		t.Fatalf("an undone gift is still queued to send: %d %v", left, err)
+	}
+	// The same goes for Undo in the points history.
+	resp = b.expectStatus(t, "POST", fmt.Sprintf("/api/rewards/%d/redeem", gift), map[string]any{"pet": map[string]any{"friend": avaKey}}, childHeaders(theo), http.StatusCreated)
+	decodeBody(t, resp, &redemption)
+	var txnID int64
+	if err := b.db.QueryRow(`SELECT id FROM point_transactions WHERE reason = 'reward_redeem' AND reference_id = ?`, int64(redemption["id"].(float64))).Scan(&txnID); err != nil {
+		t.Fatalf("gift's points entry: %v", err)
+	}
+	b.expectStatus(t, "POST", fmt.Sprintf("/api/points/transactions/%d/undo", txnID), nil, adminHeaders(), http.StatusNoContent)
+	if err := b.db.QueryRow(`SELECT COUNT(*) FROM friend_sends WHERE from_user = ?`, theo).Scan(&left); err != nil || left != 0 {
+		t.Fatalf("a gift undone from the points history is still queued to send: %d %v", left, err)
 	}
 
 	// Two taps at once: the limit holds and only one is paid for.

@@ -396,3 +396,54 @@ func (s *Store) DeleteFriendLink(ctx context.Context, id int64) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM friend_links WHERE id = ?`, id)
 	return err
 }
+
+// DeleteFriendLinkLater removes a link like DeleteFriendLink, but keeps its
+// hub address and token in friend_unlinks so the hub can still be told (see
+// RetryFriendUnlinks in the friends service).
+func (s *Store) DeleteFriendLinkLater(ctx context.Context, id int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO friend_unlinks (side, hub_url, hub_link, token)
+		 SELECT side, hub_url, hub_link, token FROM friend_links WHERE id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM friend_links WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// ListFriendUnlinks returns the unlinks the hub hasn't confirmed, dropping
+// any older than before first. Only side, hub address, hub link and token
+// are filled in.
+func (s *Store) ListFriendUnlinks(ctx context.Context, before time.Time) (map[int64]model.FriendLink, error) {
+	// created_at is CURRENT_TIMESTAMP text, so compare in the same form.
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM friend_unlinks WHERE created_at < ?`, before.UTC().Format("2006-01-02 15:04:05")); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT id, side, hub_url, hub_link, token FROM friend_unlinks ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]model.FriendLink{}
+	for rows.Next() {
+		var id int64
+		var l model.FriendLink
+		if err := rows.Scan(&id, &l.Side, &l.HubURL, &l.HubLink, &l.Token); err != nil {
+			return nil, err
+		}
+		out[id] = l
+	}
+	return out, rows.Err()
+}
+
+// DeleteFriendUnlink forgets an unlink once the hub has confirmed it.
+func (s *Store) DeleteFriendUnlink(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM friend_unlinks WHERE id = ?`, id)
+	return err
+}

@@ -36,6 +36,11 @@ const (
 	IdleTTL = 90 * 24 * time.Hour
 	// MaxLinks caps how many links the hub holds, as a backstop.
 	MaxLinks = 10000
+	// MaxWaitingPerCaller caps, on a hub anyone may use (no keys), how many
+	// invites one address can have waiting to be joined. Without it one
+	// address could fill MaxLinks in a day at the signup rate and lock
+	// everyone else out. A family makes one invite at a time.
+	MaxWaitingPerCaller = 20
 
 	// Per-address request budgets, refilled every minute. An instance
 	// syncs each link every 15 minutes, so these are far above honest use
@@ -58,6 +63,13 @@ CREATE TABLE IF NOT EXISTS links (
     b_data       BLOB,
     b_at         DATETIME
 );`
+
+// migrations are added to a hub database made by an older version; an
+// error that the column already exists is expected and ignored.
+var migrations = []string{
+	// sha256 of the address that made the link (for MaxWaitingPerCaller).
+	`ALTER TABLE links ADD COLUMN created_by TEXT NOT NULL DEFAULT ''`,
+}
 
 // Hub serves the hub API.
 type Hub struct {
@@ -84,6 +96,11 @@ type Hub struct {
 func New(db *sql.DB, keys []string) (*Hub, error) {
 	if _, err := db.Exec(schema); err != nil {
 		return nil, err
+	}
+	for _, m := range migrations {
+		if _, err := db.Exec(m); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return nil, err
+		}
 	}
 	h := &Hub{db: db, now: time.Now, mux: http.NewServeMux()}
 	for _, k := range keys {
@@ -232,12 +249,24 @@ func (h *Hub) create(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusServiceUnavailable, "this hub is full")
 		return
 	}
+	by := hash(h.caller(r)) // not the address itself: the hub doesn't keep those
+	if len(h.keys) == 0 {
+		var waiting int
+		if err := h.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM links WHERE created_by = ? AND b_token = ''`, by).Scan(&waiting); err != nil {
+			fail(w, http.StatusInternalServerError, "hub storage error")
+			return
+		}
+		if waiting >= MaxWaitingPerCaller {
+			fail(w, http.StatusTooManyRequests, "too many invites waiting to be joined; use or let one expire first")
+			return
+		}
+	}
 	id, token, code := random(12), random(32), random(18)
 	now := h.now()
 	expires := now.Add(InviteTTL)
 	if _, err := h.db.ExecContext(ctx,
-		`INSERT INTO links (id, created_at, touched_at, join_hash, join_expires, a_token) VALUES (?, ?, ?, ?, ?, ?)`,
-		id, now, now, hash(code), expires, hash(token)); err != nil {
+		`INSERT INTO links (id, created_at, touched_at, join_hash, join_expires, a_token, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		id, now, now, hash(code), expires, hash(token), by); err != nil {
 		fail(w, http.StatusInternalServerError, "hub storage error")
 		return
 	}

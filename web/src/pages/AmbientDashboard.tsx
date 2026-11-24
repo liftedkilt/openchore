@@ -13,6 +13,7 @@ import {
 } from '../design';
 import { LineChart, type LineSeries, type Tick } from '../components/charts/LineChart';
 import { personColorVar } from '../components/charts/personColor';
+import { isPersonColor } from '../design/types';
 import { CAT_ORDER, nextRows, type NextRow } from './AmbientDashboard.data';
 import { isChoreDone } from '../choreRules';
 import styles from './AmbientDashboard.module.css';
@@ -258,7 +259,7 @@ export const AmbientDashboard: React.FC = () => {
                   <p className={styles.week} aria-label={t('wall.week')}>
                     <span className={styles.label}>{t('wall.week')}</span>
                     {board.entries.filter((e) => e.rank > 0).slice(0, 5).map((e) => (
-                      <span key={e.key} className={styles.weekEntry} style={{ ['--who' as string]: e.color ? `var(--person-${e.color})` : undefined }}>
+                      <span key={e.key} className={styles.weekEntry} style={{ ['--who' as string]: isPersonColor(e.color) ? `var(--person-${e.color})` : undefined }}>
                         <span className={styles.weekRank}>{e.rank}</span>
                         {e.name} <strong>{e.percent}</strong>
                       </span>
