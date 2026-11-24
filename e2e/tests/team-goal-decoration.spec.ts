@@ -225,15 +225,18 @@ test.describe('Team goal farm decoration', () => {
     });
 
     // Complete "Make Bed" (no available_at restriction) for Emma on both families -> combined score >= 15.
+    // Earlier specs in the shared-state run may already have completed Make Bed for Emma today.
     const aChores = await (await request.get(`/api/users/${EMMA}/chores?view=daily&date=${today}`, { headers: aEmma })).json();
-    const aMakeBed = aChores.find((c: { title: string }) => c.title === 'Make Bed');
+    const aMakeBed = aChores.find((c: { title: string; completed?: boolean; schedule_id: number }) => c.title === 'Make Bed');
     expect(aMakeBed).toBeTruthy();
-    aMakeBedScheduleId = aMakeBed.schedule_id;
-    const aComp = await request.post(`/api/schedules/${aMakeBedScheduleId}/complete`, {
-      headers: aEmma,
-      data: { date: today },
-    });
-    expect(aComp.ok()).toBeTruthy();
+    if (!aMakeBed.completed) {
+      aMakeBedScheduleId = aMakeBed.schedule_id;
+      const aComp = await request.post(`/api/schedules/${aMakeBedScheduleId}/complete`, {
+        headers: aEmma,
+        data: { date: today },
+      });
+      expect(aComp.ok()).toBeTruthy();
+    }
 
     const bChores = await peerFetch(peerBase, `/api/users/${EMMA}/chores?view=daily&date=${today}`, { headers: peerEmma });
     const bMakeBed = bChores.find((c: { title: string }) => c.title === 'Make Bed');
