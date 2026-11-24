@@ -212,6 +212,7 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 				r.Put("/admin/friends", friendsH.AdminUpdate)
 				r.Post("/admin/friends/invites", friendsH.CreateInvite)
 				r.Post("/admin/friends/join", friendsH.Join)
+				r.Post("/admin/friends/{id}/confirm", friendsH.ConfirmLink)
 				r.Put("/admin/friends/{id}", friendsH.UpdateLink)
 				r.Post("/admin/friends/{id}/sync", friendsH.SyncNow)
 				r.Delete("/admin/friends/{id}", friendsH.Unlink)

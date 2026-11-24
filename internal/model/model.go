@@ -682,9 +682,10 @@ type ScoreDay struct {
 
 // Friend link statuses.
 const (
-	FriendStatusWaiting = "waiting" // invite made, the other family hasn't joined yet
-	FriendStatusActive  = "active"
-	FriendStatusEnded   = "ended" // the other family unlinked
+	FriendStatusWaiting        = "waiting"         // invite made, the other family hasn't joined yet
+	FriendStatusPendingConfirm = "pending_confirm" // another family joined; waiting for a parent here to confirm
+	FriendStatusActive         = "active"
+	FriendStatusEnded          = "ended" // the other family unlinked
 )
 
 // FriendLink is a link to another family's OpenChore, kept through a hub.
@@ -727,7 +728,8 @@ type FriendSnapshot struct {
 	Version     int            `json:"version"`
 	Family      string         `json:"family"`
 	GeneratedAt time.Time      `json:"generated_at"`
-	Today       string         `json:"today"` // the sender's date, in its own time zone
+	Today       string         `json:"today"`             // the sender's date, in its own time zone
+	Pending     bool           `json:"pending,omitempty"` // true while the sender hasn't confirmed the link yet
 	Members     []FriendMember `json:"members"`
 	// Team is this family's side of family-versus-family and team goals:
 	// how the people it shares with this link are doing together.

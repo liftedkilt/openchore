@@ -128,3 +128,38 @@ func TestCleanHubURL(t *testing.T) {
 		t.Fatalf("parseInvite hub = %v %v", inv, err)
 	}
 }
+
+func TestParseInviteValidatesLink(t *testing.T) {
+	valid := []string{
+		"L",
+		"abcDEF0123_-9876",
+		strings.Repeat("a", 128),
+	}
+	for _, id := range valid {
+		inv, err := parseInvite(invite{Hub: "https://hub.example", Link: id, Code: "C", Key: "K"}.String())
+		if err != nil || inv.Link != id {
+			t.Errorf("parseInvite valid link %q: inv=%v err=%v", id, inv, err)
+		}
+	}
+	invalid := []string{
+		"",
+		".",
+		"..",
+		"../admin",
+		"a/b",
+		`a\b`,
+		"a?b",
+		"a#b",
+		"%2e%2e",
+		"a b",
+		"a\nb",
+		"a\x00b",
+		strings.Repeat("a", 129),
+	}
+	for _, id := range invalid {
+		if inv, err := parseInvite(invite{Hub: "https://hub.example", Link: id, Code: "C", Key: "K"}.String()); err == nil {
+			t.Errorf("parseInvite accepted invalid link %q: %+v", id, inv)
+		}
+	}
+}
+

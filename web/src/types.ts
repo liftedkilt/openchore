@@ -682,7 +682,9 @@ export interface FriendFarm { link_id: number; family: string; snapshot_at?: str
 
 export interface FriendLink {
   id: number;
-  status: 'waiting' | 'active' | 'ended';
+  status: 'waiting' | 'pending_confirm' | 'active' | 'ended';
+  side?: 'a' | 'b';
+  peer_pending?: boolean;
   peer_name: string;
   hub_url: string;
   /** Show this family's custom animal pictures here. */

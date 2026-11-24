@@ -197,6 +197,7 @@ Requires an authenticated caller with the `admin` role.
 | `GET` `PUT` | `/api/admin/friends` | Leaderboard switch, family name, coordination server, and each linked family |
 | `POST` | `/api/admin/friends/invites` | Make an invite for another family |
 | `POST` | `/api/admin/friends/join` | Join with another family's invite |
+| `POST` | `/api/admin/friends/{id}/confirm` | Confirm a family that joined your invite so the link becomes active |
 | `PUT` | `/api/admin/friends/{id}` | For one linked family: who is sent and shown, pictures, gifts and playdates, and the team goal |
 | `POST` | `/api/admin/friends/{id}/sync` | Sync with one linked family now |
 | `DELETE` | `/api/admin/friends/{id}` | Unlink |

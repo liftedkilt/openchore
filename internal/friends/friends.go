@@ -68,6 +68,13 @@ const (
 // ErrNoHub is returned when an invite is asked for and no hub is set.
 var ErrNoHub = errors.New("no coordination server is set")
 
+// ErrLinkNotFound is returned when an operation targets a missing friend link.
+var ErrLinkNotFound = errors.New("friend family not found")
+
+// ErrNotPendingConfirm is returned when confirming a link that is not waiting
+// for parent confirmation.
+var ErrNotPendingConfirm = errors.New("this link is not waiting for confirmation")
+
 // Service does the scoring catch-up and all the talking to hubs.
 type Service struct {
 	store   *store.Store
@@ -329,14 +336,26 @@ func (f *Service) FamilyName(ctx context.Context) string {
 // weekly scores and chore counts, streaks and farm animals.
 func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnapshot, error) {
 	now := f.now()
+	link, err := f.store.GetFriendLink(ctx, linkID)
+	if err != nil {
+		return nil, err
+	}
 	snap := &model.FriendSnapshot{
 		Version:     snapshotVersion,
 		Family:      f.FamilyName(ctx),
 		GeneratedAt: now.UTC(),
-		Today:       now.Format(model.DateFormat),
 		Members:     []model.FriendMember{},
 		Accepted:    []string{},
 	}
+	// Before a link is active (waiting to be joined or awaiting parent
+	// confirmation), publish only the family-name handshake: never member
+	// names, scores, streaks, pets, pictures, team totals, goals, or sends.
+	if link == nil || link.Status != model.FriendStatusActive {
+		snap.Pending = true
+		snap.NoVisits = true
+		return snap, nil
+	}
+	snap.Today = now.Format(model.DateFormat)
 	accepts, err := f.store.FriendLinkAccepts(ctx, linkID)
 	if err != nil {
 		return nil, err
@@ -345,19 +364,13 @@ func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnap
 		snap.Accepted = append(snap.Accepted, id)
 	}
 	sort.Strings(snap.Accepted)
-	link, err := f.store.GetFriendLink(ctx, linkID)
-	if err != nil {
-		return nil, err
-	}
-	if link != nil && link.GoalTarget > 0 && link.GoalWeek != "" {
+	if link.GoalTarget > 0 && link.GoalWeek != "" {
 		snap.Goal = &model.FriendGoal{Start: link.GoalWeek, Target: link.GoalTarget}
 	}
 	if snap.Sends, err = f.store.FriendSendsSince(ctx, linkID, now.AddDate(0, 0, -1).Format(model.DateFormat)); err != nil {
 		return nil, err
 	}
-	if link != nil {
-		snap.NoVisits = !link.AllowVisits
-	}
+	snap.NoVisits = !link.AllowVisits
 	shared, err := f.store.FriendLinkShares(ctx, linkID)
 	if err != nil || len(shared) == 0 {
 		return snap, err
@@ -567,6 +580,22 @@ func (i invite) String() string {
 	return invitePrefix + base64.RawURLEncoding.EncodeToString(b)
 }
 
+// validHubLink reports whether id is a safe hub link identifier: 1..128
+// ASCII letters, digits, '-' or '_' (matching base64url IDs from internal/hub).
+// Rejects '.', '..', '/', '\', whitespace, control chars, and URL metacharacters.
+func validHubLink(id string) bool {
+	if len(id) == 0 || len(id) > 128 {
+		return false
+	}
+	for i := 0; i < len(id); i++ {
+		c := id[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 func parseInvite(s string) (*invite, error) {
 	bad := errInput{errors.New("that doesn't look like an OpenChore invite")}
 	s = strings.Join(strings.Fields(s), "") // pasted codes pick up spaces and line breaks
@@ -579,7 +608,7 @@ func parseInvite(s string) (*invite, error) {
 		return nil, bad
 	}
 	var inv invite
-	if json.Unmarshal(raw, &inv) != nil || inv.Link == "" || inv.Code == "" || inv.Key == "" {
+	if json.Unmarshal(raw, &inv) != nil || !validHubLink(inv.Link) || inv.Code == "" || inv.Key == "" {
 		return nil, bad
 	}
 	// Keep the tidied form, so the same hub always compares equal.
@@ -648,7 +677,14 @@ func Refused(err error) bool {
 }
 
 func (f *Service) call(ctx context.Context, trusted bool, method, hubURL, path, token string, body, out any) error {
-	target := hubURL + path
+	base, err := url.Parse(hubURL)
+	if err != nil || (base.Scheme != "https" && base.Scheme != "http") || base.Host == "" || base.RawQuery != "" || base.Fragment != "" || base.User != nil {
+		return errors.New("invalid coordination server address")
+	}
+	target, err := url.JoinPath(hubURL, path)
+	if err != nil {
+		return err
+	}
 	var rd io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -720,6 +756,9 @@ func (f *Service) CreateInvite(ctx context.Context) (*model.FriendLink, error) {
 	if err := f.call(ctx, true, http.MethodPost, hubURL, "/v1/links", key, nil, &res); err != nil {
 		return nil, err
 	}
+	if !validHubLink(res.Link) {
+		return nil, errors.New("the coordination server returned an invalid link")
+	}
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
 		return nil, err
@@ -730,7 +769,10 @@ func (f *Service) CreateInvite(ctx context.Context) (*model.FriendLink, error) {
 	if err := f.store.CreateFriendLink(ctx, l); err != nil {
 		return nil, err
 	}
-	return l, nil
+	// Upload the minimal family-name handshake right away so the joining family
+	// sees who invited them on Join while waiting for parent confirmation.
+	_ = f.Sync(ctx, l.ID)
+	return f.store.GetFriendLink(ctx, l.ID)
 }
 
 // Join uses another family's invite, then syncs once so their names show up
@@ -774,6 +816,10 @@ func (f *Service) Join(ctx context.Context, code string) (*model.FriendLink, err
 func (f *Service) Sync(ctx context.Context, id int64) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	return f.syncLocked(ctx, id)
+}
+
+func (f *Service) syncLocked(ctx context.Context, id int64) error {
 	again, err := f.syncOnce(ctx, id)
 	if err == nil && again {
 		_, err = f.syncOnce(ctx, id)
@@ -781,11 +827,44 @@ func (f *Service) Sync(ctx context.Context, id int64) error {
 	return err
 }
 
+// Confirm activates a pending_confirm link after the inviting parent checks
+// the joining family's name, then does a best-effort immediate sync so both
+// families start exchanging snapshots right away.
+func (f *Service) Confirm(ctx context.Context, id int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	l, err := f.store.GetFriendLink(ctx, id)
+	if err != nil {
+		return err
+	}
+	if l == nil {
+		return ErrLinkNotFound
+	}
+	if l.Status != model.FriendStatusPendingConfirm {
+		return ErrNotPendingConfirm
+	}
+	ok, err := f.store.ConfirmFriendLink(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrNotPendingConfirm
+	}
+	// Best-effort immediate sync: if the hub is temporarily offline, the link
+	// stays active with last_error recorded; if the other family already
+	// unlinked, 410 Gone cleanly moves the link to ended.
+	_ = f.syncLocked(ctx, id)
+	return nil
+}
+
 // sentFull is who a link's snapshot currently carries full details for.
 func (f *Service) sentFull(ctx context.Context, id int64) (map[int64]bool, error) {
 	l, err := f.store.GetFriendLink(ctx, id)
 	if err != nil || l == nil {
 		return nil, err
+	}
+	if l.Status != model.FriendStatusActive {
+		return map[int64]bool{}, nil
 	}
 	shared, err := f.store.FriendLinkShares(ctx, id)
 	if err != nil {
@@ -821,9 +900,13 @@ func (f *Service) syncOnce(ctx context.Context, id int64) (again bool, err error
 func (f *Service) exchange(ctx context.Context, l *model.FriendLink) error {
 	id := l.ID
 	now := f.now()
+	status := l.Status
 	fail := func(err error) error {
-		_ = f.store.SaveFriendSync(ctx, id, l.Status, "", "", nil, err.Error(), now)
+		_ = f.store.SaveFriendSync(ctx, id, status, "", "", nil, err.Error(), now)
 		return err
+	}
+	if !validHubLink(l.HubLink) {
+		return fail(errors.New("invalid link identifier"))
 	}
 	snap, err := f.Snapshot(ctx, id)
 	if err != nil {
@@ -852,9 +935,8 @@ func (f *Service) exchange(ctx context.Context, l *model.FriendLink) error {
 	if err != nil {
 		return fail(err)
 	}
-	status := l.Status
-	if res.Joined {
-		status = model.FriendStatusActive
+	if res.Joined && status == model.FriendStatusWaiting {
+		status = model.FriendStatusPendingConfirm
 	}
 	peerName, peerJSON := "", ""
 	var peerAt *time.Time
@@ -872,8 +954,13 @@ func (f *Service) exchange(ctx context.Context, l *model.FriendLink) error {
 		if ps.GeneratedAt.After(now.Add(10 * time.Minute)) {
 			ps.GeneratedAt = now.UTC()
 		}
-		// Never go back to an older snapshot than the one already held.
-		if old := PeerSnapshot(l); old == nil || !ps.GeneratedAt.Before(old.GeneratedAt) {
+		if status != model.FriendStatusActive {
+			// Before the inviting parent confirms, keep only the joining
+			// family's name so they can verify who used the invite; never
+			// apply sends or persist peer members/goals/pets.
+			peerName = clip(ps.Family, maxNameLen)
+		} else if old := PeerSnapshot(l); old == nil || !ps.GeneratedAt.Before(old.GeneratedAt) {
+			// Never go back to an older snapshot than the one already held.
 			sanitize(&ps)
 			// Keep nothing but the name of anyone a parent here hasn't
 			// picked: enough to offer them, no more.
@@ -1153,7 +1240,7 @@ func (f *Service) SyncSoon(ctx context.Context, linkID int64) {
 // household's animals.
 func (f *Service) Visitors(ctx context.Context) ([]model.Pet, []model.FriendGift, error) {
 	visitors, gifts := []model.Pet{}, []model.FriendGift{}
-	links, err := f.store.ListFriendLinks(ctx)
+	links, err := f.store.ListActiveFriendLinks(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1231,7 +1318,7 @@ func PictureURL(png []byte) string { return pictureURL(png) }
 // HasFriendAnimals reports whether there is any linked family animal a kid
 // could send a gift to (gift and playdate rewards are hidden otherwise).
 func (f *Service) HasFriendAnimals(ctx context.Context) bool {
-	links, err := f.store.ListFriendLinks(ctx)
+	links, err := f.store.ListActiveFriendLinks(ctx)
 	if err != nil {
 		return false
 	}
@@ -1489,6 +1576,9 @@ func (f *Service) Unlink(ctx context.Context, id int64) error {
 }
 
 func (f *Service) hubDelete(ctx context.Context, l *model.FriendLink) error {
+	if !validHubLink(l.HubLink) {
+		return errors.New("invalid link identifier")
+	}
 	return f.call(ctx, f.trustsLink(ctx, l), http.MethodDelete, l.HubURL, "/v1/links/"+url.PathEscape(l.HubLink), l.Token, nil, nil)
 }
 

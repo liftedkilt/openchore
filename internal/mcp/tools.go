@@ -254,7 +254,8 @@ func allTools() []*Tool {
 	add(endpoint{name: "get_friend_families", title: "Friend families settings", readOnly: true,
 		desc: "Leaderboard on/off, this family's name, the coordination server (hub), and each linked family with its status and last sync, " +
 			"who this household shares with them (outbound: shared, and accepted once they chose to show that person) and who they offer " +
-			"(inbound: accepted when shown here). A waiting link carries the invite to send.",
+			"(inbound: accepted when shown here). A waiting link carries the invite to send; a pending_confirm link means another family " +
+			"joined your invite and needs a parent to confirm (confirm_friend_family) or decline (unlink_friend_family) before anything is shared.",
 		method: http.MethodGet, path: "/admin/friends"})
 	add(endpoint{name: "update_friend_families", title: "Change leaderboard and friend families settings",
 		desc: "Turn the leaderboard on or off, set the family name other families see, or set the coordination server " +
@@ -283,12 +284,16 @@ func allTools() []*Tool {
 			"goal_target":       integer("Put forward, or agree to, a team goal for this week: the score from 1 to 100 the two families aim to average together. It counts once both families have set the same number. 0 drops it."),
 		}})
 	add(endpoint{name: "create_friend_invite", title: "Invite a friend family",
-		desc:   "Make a one-time invite (valid 7 days) for another family's OpenChore to link with this one. Give the invite text to the other parent.",
+		desc:   "Make a one-time invite (valid 24 hours by default) for another family's OpenChore to link with this one. Give the invite text to the other parent; once they join, a parent here confirms their family name before the link activates.",
 		method: http.MethodPost, path: "/admin/friends/invites"})
 	add(endpoint{name: "join_friend_family", title: "Join a friend family",
 		desc:   "Link to another family using the invite their parent sent.",
 		method: http.MethodPost, path: "/admin/friends/join", required: []string{"invite"},
 		props: map[string]any{"invite": str("The invite text, starting ocf1.")}})
+	add(endpoint{name: "confirm_friend_family", title: "Confirm a friend family",
+		desc: "Confirm a family that joined your invite (status pending_confirm) so the link becomes active and starts syncing. Ask the parent to check the joining family's name first. To decline instead, use unlink_friend_family.",
+		method: http.MethodPost, path: "/admin/friends/{id}/confirm",
+		props: map[string]any{"id": integer("Link id from get_friend_families.")}})
 	add(endpoint{name: "sync_friend_family", title: "Sync with a friend family now",
 		desc:   "Exchange the latest data with one linked family now, without waiting for the 15-minute sync.",
 		method: http.MethodPost, path: "/admin/friends/{id}/sync", props: map[string]any{"id": integer("Link id from get_friend_families.")}})

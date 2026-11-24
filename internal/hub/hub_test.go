@@ -133,7 +133,7 @@ func TestSweepAndLimits(t *testing.T) {
 	jp := "/v1/links/" + joined["link"].(string)
 	do(t, srv, "POST", jp+"/join", "", map[string]any{"code": joined["join_code"]})
 
-	// An invite nobody used is gone after a week; a joined link stays.
+	// An invite nobody used is gone after InviteTTL (24h); a joined link stays.
 	now = now.Add(InviteTTL + time.Hour)
 	if err := h.Sweep(t.Context()); err != nil {
 		t.Fatal(err)
@@ -338,3 +338,82 @@ func TestHubWarnsAboutAnUntrustedProxy(t *testing.T) {
 		t.Fatalf("proxy warnings = %d:\n%s", n, buf.String())
 	}
 }
+
+func TestInviteTTLDefaultAndOverride(t *testing.T) {
+	if InviteTTL != 24*time.Hour {
+		t.Fatalf("InviteTTL = %v, want 24h", InviteTTL)
+	}
+
+	h, srv := newHub(t, "key")
+	base := time.Date(2026, 11, 24, 12, 0, 0, 0, time.UTC)
+	now := base
+	h.SetClock(func() time.Time { return now })
+
+	// Default TTL is 24h.
+	code, defLink := do(t, srv, "POST", "/v1/links", "key", nil)
+	if code != http.StatusCreated {
+		t.Fatalf("create default = %d", code)
+	}
+	exp, err := time.Parse(time.RFC3339Nano, defLink["expires_at"].(string))
+	if err != nil {
+		t.Fatalf("parse expires_at: %v", err)
+	}
+	if got := exp.Sub(base); got != 24*time.Hour {
+		t.Fatalf("default invite TTL = %v, want 24h", got)
+	}
+
+	// Custom Hub.InviteTTL overrides the default for new invites.
+	h.InviteTTL = 2 * time.Hour
+	code, shortLink := do(t, srv, "POST", "/v1/links", "key", nil)
+	if code != http.StatusCreated {
+		t.Fatalf("create short = %d", code)
+	}
+	exp, err = time.Parse(time.RFC3339Nano, shortLink["expires_at"].(string))
+	if err != nil {
+		t.Fatalf("parse short expires_at: %v", err)
+	}
+	if got := exp.Sub(base); got != 2*time.Hour {
+		t.Fatalf("custom invite TTL = %v, want 2h", got)
+	}
+
+	// Joined link survives past InviteTTL while waiting for parent confirmation.
+	code, joinedLink := do(t, srv, "POST", "/v1/links", "key", nil)
+	if code != http.StatusCreated {
+		t.Fatalf("create joined = %d", code)
+	}
+	jp := "/v1/links/" + joinedLink["link"].(string)
+	if code, _ := do(t, srv, "POST", jp+"/join", "", map[string]any{"code": joinedLink["join_code"]}); code != http.StatusOK {
+		t.Fatalf("join before expiry = %d", code)
+	}
+
+	// Non-positive Hub.InviteTTL falls back to the 24h package default.
+	h.InviteTTL = -time.Hour
+	code, fallbackLink := do(t, srv, "POST", "/v1/links", "key", nil)
+	if code != http.StatusCreated {
+		t.Fatalf("create fallback = %d", code)
+	}
+	exp, _ = time.Parse(time.RFC3339Nano, fallbackLink["expires_at"].(string))
+	if got := exp.Sub(base); got != 24*time.Hour {
+		t.Fatalf("non-positive fallback TTL = %v, want 24h", got)
+	}
+
+	// Advance past 2h: shortLink can no longer be joined and is swept, while
+	// joinedLink and defLink remain live.
+	now = base.Add(2*time.Hour + time.Minute)
+	if code, _ := do(t, srv, "POST", "/v1/links/"+shortLink["link"].(string)+"/join", "", map[string]any{"code": shortLink["join_code"]}); code != http.StatusForbidden {
+		t.Fatalf("join expired short invite = %d, want 403", code)
+	}
+	if err := h.Sweep(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if code, _ := do(t, srv, "POST", "/v1/links/"+shortLink["link"].(string)+"/exchange", shortLink["token"].(string), map[string]any{}); code != http.StatusGone {
+		t.Fatalf("expired short link survived sweep = %d", code)
+	}
+	if code, _ := do(t, srv, "POST", jp+"/exchange", joinedLink["token"].(string), map[string]any{}); code != http.StatusOK {
+		t.Fatalf("joined link did not survive past InviteTTL = %d", code)
+	}
+	if code, _ := do(t, srv, "POST", "/v1/links/"+defLink["link"].(string)+"/join", "", map[string]any{"code": defLink["join_code"]}); code != http.StatusOK {
+		t.Fatalf("default 24h link should still be joinable at 2h = %d", code)
+	}
+}
+

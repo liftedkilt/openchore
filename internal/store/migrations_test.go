@@ -258,3 +258,104 @@ func TestMigration022OptionalCategoryKeepsHistory(t *testing.T) {
 		t.Fatalf("down lost completions: %d", n)
 	}
 }
+
+// 030 widens the friend_links status CHECK in place to allow pending_confirm.
+// Rebuilding friend_links with DROP TABLE would cascade-delete all 4 child
+// tables (friend_link_shares, friend_sends, friend_received,
+// friend_link_accepts), so every child row and existing link must survive both
+// up and down.
+func TestMigration030FriendConfirmKeepsChildRows(t *testing.T) {
+	m, db := migrator(t)
+	if err := m.Migrate(29); err != nil {
+		t.Fatalf("migrate to 29: %v", err)
+	}
+	mustExec(t, db, `INSERT INTO users (id, name, role, theme, color) VALUES (1, 'Ava', 'child', 'sunroom', 'mint')`)
+	mustExec(t, db, `INSERT INTO friend_links (id, status, side, hub_url, hub_link, token, secret, peer_name, snapshot)
+		VALUES (1, 'active', 'a', 'https://hub.example', 'L1', 't1', 's1', 'Smiths', '{"version":1}')`)
+	mustExec(t, db, `INSERT INTO friend_links (id, status, side, hub_url, hub_link, token, secret, invite)
+		VALUES (2, 'waiting', 'a', 'https://hub.example', 'L2', 't2', 's2', 'code123')`)
+	mustExec(t, db, `INSERT INTO friend_links (id, status, side, hub_url, hub_link, token, secret)
+		VALUES (3, 'ended', 'b', 'https://hub.example', 'L3', 't3', 's3')`)
+	mustExec(t, db, `INSERT INTO friend_link_shares (link_id, user_id) VALUES (1, 1)`)
+	mustExec(t, db, `INSERT INTO friend_sends (id, link_id, kind, from_user, to_member, day, redemption_id)
+		VALUES ('s1', 1, 'gift', 1, 'm1', '2026-11-24', 1)`)
+	mustExec(t, db, `INSERT INTO friend_received (link_id, send_id, kind, from_member, to_user, day, received_on)
+		VALUES (1, 'r1', 'playdate', 'm1', 0, '2026-11-24', '2026-11-24')`)
+	mustExec(t, db, `INSERT INTO friend_link_accepts (link_id, member_id) VALUES (1, 'm1')`)
+
+	if _, err := db.Exec(`INSERT INTO friend_links (id, status, side, hub_url, hub_link, token, secret)
+		VALUES (4, 'pending_confirm', 'a', 'https://hub.example', 'L4', 't4', 's4')`); err == nil {
+		t.Fatal("pending_confirm accepted before 030")
+	}
+
+	assertChildren := func(stage string) {
+		t.Helper()
+		for _, tbl := range []string{"friend_link_shares", "friend_sends", "friend_received", "friend_link_accepts"} {
+			var n int
+			if err := db.QueryRow(`SELECT count(*) FROM ` + tbl).Scan(&n); err != nil || n != 1 {
+				t.Fatalf("%s: %s count = %d (err=%v), want 1", stage, tbl, n, err)
+			}
+		}
+		var ok string
+		if err := db.QueryRow(`PRAGMA integrity_check`).Scan(&ok); err != nil || ok != "ok" {
+			t.Fatalf("%s: integrity_check = %q (err=%v)", stage, ok, err)
+		}
+		rows, err := db.Query(`PRAGMA foreign_key_check`)
+		if err != nil {
+			t.Fatalf("%s: foreign_key_check: %v", stage, err)
+		}
+		defer rows.Close()
+		if rows.Next() {
+			t.Fatalf("%s: foreign_key_check returned violations", stage)
+		}
+	}
+
+	if err := m.Migrate(30); err != nil {
+		t.Fatalf("migrate to 30: %v", err)
+	}
+	var st1, peer1, snap1, st2, st3 string
+	if err := db.QueryRow(`SELECT status, peer_name, snapshot FROM friend_links WHERE id = 1`).Scan(&st1, &peer1, &snap1); err != nil {
+		t.Fatal(err)
+	}
+	if st1 != "active" || peer1 != "Smiths" || snap1 != `{"version":1}` {
+		t.Fatalf("existing active link altered: %q %q %q", st1, peer1, snap1)
+	}
+	db.QueryRow(`SELECT status FROM friend_links WHERE id = 2`).Scan(&st2)
+	db.QueryRow(`SELECT status FROM friend_links WHERE id = 3`).Scan(&st3)
+	if st2 != "waiting" || st3 != "ended" {
+		t.Fatalf("existing waiting/ended links altered: %q %q", st2, st3)
+	}
+	mustExec(t, db, `INSERT INTO friend_links (id, status, side, hub_url, hub_link, token, secret, peer_name, snapshot)
+		VALUES (4, 'pending_confirm', 'a', 'https://hub.example', 'L4', 't4', 's4', 'Garcias', '{"version":1}')`)
+	if _, err := db.Exec(`INSERT INTO friend_links (status, side, hub_url, hub_link, token, secret)
+		VALUES ('bogus', 'a', 'https://hub.example', 'L5', 't5', 's5')`); err == nil {
+		t.Fatal("CHECK no longer enforced after 030")
+	}
+	assertChildren("up 030")
+
+	if err := m.Migrate(29); err != nil {
+		t.Fatalf("down to 29: %v", err)
+	}
+	var st4, snap4 string
+	if err := db.QueryRow(`SELECT status, snapshot FROM friend_links WHERE id = 4`).Scan(&st4, &snap4); err != nil {
+		t.Fatal(err)
+	}
+	if st4 != "waiting" || snap4 != "" {
+		t.Fatalf("down: want status=waiting snapshot='', got %q %q", st4, snap4)
+	}
+	db.QueryRow(`SELECT status FROM friend_links WHERE id = 1`).Scan(&st1)
+	if st1 != "active" {
+		t.Fatalf("down altered active link: %q", st1)
+	}
+	if _, err := db.Exec(`INSERT INTO friend_links (status, side, hub_url, hub_link, token, secret)
+		VALUES ('pending_confirm', 'a', 'https://hub.example', 'L6', 't6', 's6')`); err == nil {
+		t.Fatal("pending_confirm still accepted after down")
+	}
+	assertChildren("down 029")
+
+	if err := m.Up(); err != nil {
+		t.Fatalf("re-upgrade to latest: %v", err)
+	}
+	assertChildren("re-up")
+}
+
