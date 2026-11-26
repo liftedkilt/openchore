@@ -598,16 +598,20 @@ func TestReportPoints_UseLocalDay(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 	today := now.Format("2006-01-02")
-	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+	// Built from the calendar, not by adding hours to midnight: a
+	// daylight-saving day is 23 or 25 hours long.
+	at := func(day, hour, min int) time.Time {
+		return time.Date(now.Year(), now.Month(), now.Day()+day, hour, min, 0, 0, time.Local)
+	}
 
 	kid := createTestUser(t, s, "Gabe", "child")
 	for _, tx := range []struct {
 		at     time.Time
 		amount int
 	}{
-		{midnight.Add(time.Minute), 5},                // 00:01 today
-		{midnight.Add(24*time.Hour - time.Minute), 5}, // 23:59 today
-		{midnight.Add(-time.Minute), 100},             // 23:59 yesterday: not today
+		{at(0, 0, 1), 5},      // 00:01 today
+		{at(0, 23, 59), 5},    // 23:59 today
+		{at(-1, 23, 59), 100}, // 23:59 yesterday: not today
 	} {
 		if _, err := db.Exec(
 			`INSERT INTO point_transactions (user_id, amount, reason, created_at) VALUES (?, ?, 'chore_complete', ?)`,
@@ -625,14 +629,18 @@ func TestReportPoints_UseLocalDay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, r := range points {
-		if r.UserID == kid.ID && r.PointsEarned != 10 {
-			t.Errorf("ReportPointsSummary earned = %d, want 10", r.PointsEarned)
+	earned := func(report string, n int, row func(i int) (int64, int)) {
+		t.Helper()
+		for i := 0; i < n; i++ {
+			if id, pts := row(i); id == kid.ID {
+				if pts != 10 {
+					t.Errorf("%s earned = %d, want 10", report, pts)
+				}
+				return
+			}
 		}
+		t.Errorf("%s has no row for the kid", report)
 	}
-	for _, r := range kids {
-		if r.UserID == kid.ID && r.PointsEarned != 10 {
-			t.Errorf("ReportKidSummaries earned = %d, want 10", r.PointsEarned)
-		}
-	}
+	earned("ReportPointsSummary", len(points), func(i int) (int64, int) { return points[i].UserID, points[i].PointsEarned })
+	earned("ReportKidSummaries", len(kids), func(i int) (int64, int) { return kids[i].UserID, kids[i].PointsEarned })
 }
