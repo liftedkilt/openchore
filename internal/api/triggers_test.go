@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
+
+	"github.com/liftedkilt/openchore/internal/model"
 )
 
 // helper to create a chore via admin API and return its ID
@@ -312,7 +315,6 @@ func TestFireTrigger_NoAssignee(t *testing.T) {
 	}
 }
 
-
 // ===== allow_repeat: post a chore more than once a day =====
 
 func fireTriggerStatus(t *testing.T, env *testEnv, uuid string) int {
@@ -399,4 +401,356 @@ func TestFireTrigger_AllowRepeat(t *testing.T) {
 	if got := fireTriggerStatus(t, env, fcfs["uuid"].(string)); got != http.StatusConflict {
 		t.Fatalf("after turning allow_repeat off: expected 409, got %d", got)
 	}
+}
+
+// A first-come chore pays only the person who finishes it. The others get a
+// shadow completion (approved, 0 points); opening their own core or bonus
+// gate later must not pay them for it.
+func TestFCFS_OnlyFinisherIsPaid(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	alice := env.createChild(t, "Alice")
+	bob := env.createChild(t, "Bob")
+	today := time.Now().Format(model.DateFormat)
+
+	mkChore := func(title, category string, points int) int {
+		resp := env.expectStatus(t, "POST", "/api/chores", map[string]any{
+			"title": title, "category": category, "points_value": points,
+		}, adminHeaders(), http.StatusCreated)
+		var c map[string]any
+		decodeBody(t, resp, &c)
+		return int(c["id"].(float64))
+	}
+
+	// Bob has a Must-do chore today, so his core and bonus gates start closed.
+	brush := mkChore("Brush teeth", "required", 0)
+	resp := env.expectStatus(t, "POST", fmt.Sprintf("/api/chores/%d/schedules", brush), map[string]any{
+		"assigned_to": bob, "specific_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	var brushSched map[string]any
+	decodeBody(t, resp, &brushSched)
+
+	// Two first-come chores, offered to both kids.
+	dryer := mkChore("Empty dryer", "core", 10)
+	bins := mkChore("Bring in bins", "bonus", 7)
+	for _, c := range []int{dryer, bins} {
+		trig := env.createTrigger(t, c, map[string]any{"assignment_type": "fcfs"})
+		if got := fireTriggerStatus(t, env, trig["uuid"].(string)); got != http.StatusCreated {
+			t.Fatalf("fire trigger for chore %d: got %d", c, got)
+		}
+	}
+
+	// Alice finishes both first.
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/chores?view=daily&date=%s", alice, today), nil, adminHeaders(), http.StatusOK)
+	var aliceChores []model.ScheduledChore
+	decodeBody(t, resp, &aliceChores)
+	for _, title := range []string{"Empty dryer", "Bring in bins"} {
+		var id int64
+		for _, c := range aliceChores {
+			if c.Title == title {
+				id = c.ScheduleID
+			}
+		}
+		if id == 0 {
+			t.Fatalf("Alice has no %q today", title)
+		}
+		env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", id), map[string]any{
+			"completion_date": today,
+		}, adminHeaders(), http.StatusCreated)
+	}
+
+	// Bob then does his Must-do chore, which opens his gates.
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%v/complete", brushSched["id"]), map[string]any{
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+
+	if got := env.balance(t, alice); got != 17 {
+		t.Errorf("Alice (finisher) balance = %d, want 17", got)
+	}
+	if got := env.balance(t, bob); got != 0 {
+		t.Errorf("Bob (didn't finish) balance = %d, want 0", got)
+	}
+}
+
+// fcfsSetup makes Alice and Bob, a first-come chore offered to both (fired
+// for today), and returns each kid's copy of it.
+func fcfsSetup(t *testing.T, env *testEnv, chore map[string]any) (alice, bob int, aliceSched, bobSched int64, today string) {
+	t.Helper()
+	env.createAdmin(t)
+	alice = env.createChild(t, "Alice")
+	bob = env.createChild(t, "Bob")
+	today = time.Now().Format(model.DateFormat)
+	resp := env.expectStatus(t, "POST", "/api/chores", chore, adminHeaders(), http.StatusCreated)
+	var c map[string]any
+	decodeBody(t, resp, &c)
+	trig := env.createTrigger(t, int(c["id"].(float64)), map[string]any{"assignment_type": "fcfs"})
+	if got := fireTriggerStatus(t, env, trig["uuid"].(string)); got != http.StatusCreated {
+		t.Fatalf("fire trigger: got %d", got)
+	}
+	aliceSched = fcfsCopy(t, env, alice, today).ScheduleID
+	bobSched = fcfsCopy(t, env, bob, today).ScheduleID
+	return
+}
+
+// fcfsCopy returns the person's only chore today (their copy of the first-come chore).
+func fcfsCopy(t *testing.T, env *testEnv, user int, today string) model.ScheduledChore {
+	t.Helper()
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/chores?view=daily&date=%s", user, today), nil, adminHeaders(), http.StatusOK)
+	var chores []model.ScheduledChore
+	decodeBody(t, resp, &chores)
+	if len(chores) != 1 {
+		t.Fatalf("user %d: expected 1 chore today, got %d", user, len(chores))
+	}
+	return chores[0]
+}
+
+// Unchecking a first-come chore from a kid who didn't finish it undoes the
+// whole group, including the points the finisher got.
+func TestFCFS_UncheckOtherCopyTakesBackFinishersPoints(t *testing.T) {
+	env := setupTest(t)
+	alice, bob, aliceSched, bobSched, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10,
+	})
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", aliceSched), map[string]any{
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	if got := env.balance(t, alice); got != 10 {
+		t.Fatalf("Alice balance after finishing = %d, want 10", got)
+	}
+
+	resp := env.request(t, "DELETE", fmt.Sprintf("/api/schedules/%d/complete?date=%s", bobSched, today), nil, adminHeaders())
+	resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		t.Fatalf("uncheck Bob's copy: got %d", resp.StatusCode)
+	}
+	if got := env.balance(t, alice); got != 0 {
+		t.Errorf("Alice balance after unchecking = %d, want 0", got)
+	}
+	if got := env.balance(t, bob); got != 0 {
+		t.Errorf("Bob balance = %d, want 0", got)
+	}
+	for _, u := range []int{alice, bob} {
+		if c := fcfsCopy(t, env, u, today); c.Completed {
+			t.Errorf("user %d's copy is still done after unchecking", u)
+		}
+	}
+}
+
+// A first-come chore that needs approval: once a parent approves the
+// finisher's completion, the other kids' copies are done too (by the
+// finisher, for 0 points).
+func TestFCFS_ApprovalMarksOtherCopiesDone(t *testing.T) {
+	env := setupTest(t)
+	alice, bob, aliceSched, _, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10, "requires_approval": true,
+	})
+	resp := env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", aliceSched), map[string]any{
+		"completion_date": today,
+	}, childHeaders(alice), http.StatusCreated)
+	var comp map[string]any
+	decodeBody(t, resp, &comp)
+	if comp["status"] != model.StatusPending {
+		t.Fatalf("expected a pending completion, got %v", comp["status"])
+	}
+	if c := fcfsCopy(t, env, bob, today); c.Completed {
+		t.Fatalf("Bob's copy is done before approval")
+	}
+
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%v/approve", comp["id"]), nil, adminHeaders(), http.StatusNoContent)
+
+	c := fcfsCopy(t, env, bob, today)
+	if !c.Completed || c.CompletedByName != "Alice" {
+		t.Errorf("Bob's copy after approval: completed=%v by %q, want done by Alice", c.Completed, c.CompletedByName)
+	}
+	if got := env.balance(t, alice); got != 10 {
+		t.Errorf("Alice balance = %d, want 10", got)
+	}
+	if got := env.balance(t, bob); got != 0 {
+		t.Errorf("Bob balance = %d, want 0", got)
+	}
+}
+
+// A rejected first-come completion frees the chore: the other kids see it
+// as open again and can do it themselves.
+func TestFCFS_RejectionFreesChore(t *testing.T) {
+	env := setupTest(t)
+	alice, bob, aliceSched, bobSched, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10, "requires_approval": true,
+	})
+	resp := env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", aliceSched), map[string]any{
+		"completion_date": today,
+	}, childHeaders(alice), http.StatusCreated)
+	var comp map[string]any
+	decodeBody(t, resp, &comp)
+
+	// While Alice's completion waits for approval, the chore is taken.
+	if c := fcfsCopy(t, env, bob, today); !c.CompletedBySibling {
+		t.Errorf("Bob's copy while Alice's waits: want it shown as taken by a sibling")
+	}
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", bobSched), map[string]any{
+		"completion_date": today,
+	}, adminHeaders(), http.StatusConflict)
+
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%v/reject", comp["id"]), nil, adminHeaders(), http.StatusNoContent)
+
+	if c := fcfsCopy(t, env, bob, today); c.Completed || c.CompletedBySibling {
+		t.Fatalf("Bob's copy after rejection: completed=%v bySibling=%v, want open", c.Completed, c.CompletedBySibling)
+	}
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", bobSched), map[string]any{
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+
+	if got := env.balance(t, bob); got != 10 {
+		t.Errorf("Bob balance = %d, want 10", got)
+	}
+	if got := env.balance(t, alice); got != 0 {
+		t.Errorf("Alice balance = %d, want 0", got)
+	}
+	if c := fcfsCopy(t, env, alice, today); !c.Completed || c.CompletedByName != "Bob" {
+		t.Errorf("Alice's copy: completed=%v by %q, want done by Bob", c.Completed, c.CompletedByName)
+	}
+	// Bob's own copy is his, not a sibling's (Alice's copy now holds a
+	// 0-point completion by Bob next to her rejected try).
+	if c := fcfsCopy(t, env, bob, today); !c.Completed || c.CompletedBySibling {
+		t.Errorf("Bob's own copy: completed=%v bySibling=%v, want done by him", c.Completed, c.CompletedBySibling)
+	}
+}
+
+// Excusing one kid's copy of a first-come chore doesn't take it from the others.
+func TestFCFS_ExcusedCopyDoesNotTakeChore(t *testing.T) {
+	env := setupTest(t)
+	_, bob, aliceSched, bobSched, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10,
+	})
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/excuse", aliceSched), map[string]any{
+		"date": today, "reason": "sick",
+	}, adminHeaders(), http.StatusCreated)
+
+	if c := fcfsCopy(t, env, bob, today); c.CompletedBySibling {
+		t.Errorf("Bob's copy shows as taken after Alice was excused")
+	}
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", bobSched), map[string]any{
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	if got := env.balance(t, bob); got != 10 {
+		t.Errorf("Bob balance = %d, want 10", got)
+	}
+}
+
+// A kid can't undo a first-come chore a sibling did by unchecking their own
+// copy (it would take the sibling's points); a parent still can.
+func TestFCFS_KidCannotUndoSiblingsChore(t *testing.T) {
+	env := setupTest(t)
+	alice, bob, aliceSched, bobSched, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10,
+	})
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", aliceSched), map[string]any{
+		"completion_date": today,
+	}, childHeaders(alice), http.StatusCreated)
+
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/%d/complete?date=%s", bobSched, today), nil, childHeaders(bob), http.StatusForbidden)
+	if got := env.balance(t, alice); got != 10 {
+		t.Errorf("Alice balance after Bob's tap = %d, want 10", got)
+	}
+	if c := fcfsCopy(t, env, bob, today); !c.Completed {
+		t.Errorf("Bob's copy was undone by his own tap")
+	}
+
+	// Alice's own copy isn't shown as done by a sibling (the kid app would
+	// then refuse to let her undo it).
+	if c := fcfsCopy(t, env, alice, today); !c.Completed || c.CompletedBySibling {
+		t.Errorf("Alice's own copy: completed=%v bySibling=%v, want done by her, not a sibling", c.Completed, c.CompletedBySibling)
+	}
+
+	// Alice can undo her own.
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/%d/complete?date=%s", aliceSched, today), nil, childHeaders(alice), http.StatusNoContent)
+	if got := env.balance(t, alice); got != 0 {
+		t.Errorf("Alice balance after undoing her own = %d, want 0", got)
+	}
+}
+
+// After a rejection, "try again" only clears the kid's own attempt: if a
+// sibling has since done the chore, it's theirs and stays done.
+func TestFCFS_RetryAfterRejection(t *testing.T) {
+	env := setupTest(t)
+	alice, bob, aliceSched, bobSched, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10, "requires_approval": true,
+	})
+	try := func() any {
+		resp := env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", aliceSched), map[string]any{
+			"completion_date": today,
+		}, childHeaders(alice), http.StatusCreated)
+		var comp map[string]any
+		decodeBody(t, resp, &comp)
+		return comp["id"]
+	}
+
+	// Nobody else has it: Alice can clear her rejected try and go again.
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%v/reject", try()), nil, adminHeaders(), http.StatusNoContent)
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/%d/complete?date=%s", aliceSched, today), nil, childHeaders(alice), http.StatusNoContent)
+	second := try()
+
+	// Rejected again, and this time Bob does it.
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%v/reject", second), nil, adminHeaders(), http.StatusNoContent)
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", bobSched), map[string]any{
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+
+	// Alice's "try again" can't undo Bob's.
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/%d/complete?date=%s", aliceSched, today), nil, childHeaders(alice), http.StatusForbidden)
+	if got := env.balance(t, bob); got != 10 {
+		t.Errorf("Bob balance = %d, want 10", got)
+	}
+	if c := fcfsCopy(t, env, bob, today); !c.Completed {
+		t.Errorf("Bob's copy was undone")
+	}
+}
+
+// Points an older first-come bug paid another kid for the finisher's 0-point
+// copy can be undone from the points history on their own: the finisher
+// keeps their chore and points.
+func TestFCFS_UndoStrayCreditLeavesFinisherAlone(t *testing.T) {
+	env := setupTest(t)
+	alice, bob, aliceSched, bobSched, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10,
+	})
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", aliceSched), map[string]any{
+		"completion_date": today,
+	}, childHeaders(alice), http.StatusCreated)
+
+	// What the old bug wrote: a credit for Bob on Alice's copy of his chore.
+	var shadowID int64
+	if err := env.db.QueryRow(`SELECT id FROM chore_completions WHERE chore_schedule_id = ?`, bobSched).Scan(&shadowID); err != nil {
+		t.Fatal(err)
+	}
+	res, err := env.db.Exec(`INSERT INTO point_transactions (user_id, amount, reason, reference_id) VALUES (?, 10, 'chore_complete', ?)`, bob, shadowID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stray, _ := res.LastInsertId()
+	if got := env.balance(t, bob); got != 10 {
+		t.Fatalf("Bob balance with the stray credit = %d, want 10", got)
+	}
+
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/points/transactions/%d/undo", stray), nil, adminHeaders(), http.StatusNoContent)
+	if got := env.balance(t, bob); got != 0 {
+		t.Errorf("Bob balance after undo = %d, want 0", got)
+	}
+	if got := env.balance(t, alice); got != 10 {
+		t.Errorf("Alice balance after undoing Bob's stray credit = %d, want 10", got)
+	}
+	for _, u := range []int{alice, bob} {
+		if c := fcfsCopy(t, env, u, today); !c.Completed {
+			t.Errorf("user %d's copy was unchecked by undoing Bob's stray credit", u)
+		}
+	}
+
+	// Gone from Bob's history (the pair is hidden), and can't be undone twice.
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", bob), nil, adminHeaders(), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if txs, _ := pts["transactions"].([]any); len(txs) != 0 {
+		t.Errorf("Bob's history still shows %d entries: %v", len(txs), txs)
+	}
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/points/transactions/%d/undo", stray), nil, adminHeaders(), http.StatusConflict)
 }

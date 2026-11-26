@@ -43,10 +43,10 @@ const ChoreSourceSelf = "self"
 
 // Completion statuses
 const (
-	StatusPending    = "pending"
-	StatusApproved   = "approved"
-	StatusRejected   = "rejected"
-	StatusExcused    = "excused"
+	StatusPending  = "pending"
+	StatusApproved = "approved"
+	StatusRejected = "rejected"
+	StatusExcused  = "excused"
 )
 
 // Point transaction reasons
@@ -190,46 +190,46 @@ type OIDCProvider struct {
 }
 
 type Chore struct {
-	ID                 int64     `json:"id"`
-	Title              string    `json:"title"`
-	Description        string    `json:"description"`
-	Category           string    `json:"category"`
-	Icon               string    `json:"icon,omitempty"`
-	PointsValue        int       `json:"points_value"`
-	MissedPenaltyValue int       `json:"missed_penalty_value"`
-	EstimatedMinutes   *int      `json:"estimated_minutes,omitempty"`
-	RequiresApproval   bool      `json:"requires_approval"`
-	RequiresPhoto      bool      `json:"requires_photo"`
-	PhotoSource        string    `json:"photo_source"`
-	Source             string    `json:"source"`
-	ExternalID         string    `json:"external_id,omitempty"`
+	ID                 int64  `json:"id"`
+	Title              string `json:"title"`
+	Description        string `json:"description"`
+	Category           string `json:"category"`
+	Icon               string `json:"icon,omitempty"`
+	PointsValue        int    `json:"points_value"`
+	MissedPenaltyValue int    `json:"missed_penalty_value"`
+	EstimatedMinutes   *int   `json:"estimated_minutes,omitempty"`
+	RequiresApproval   bool   `json:"requires_approval"`
+	RequiresPhoto      bool   `json:"requires_photo"`
+	PhotoSource        string `json:"photo_source"`
+	Source             string `json:"source"`
+	ExternalID         string `json:"external_id,omitempty"`
 	// AutoComplete marks a chore another app finishes through the API when
 	// the work is really done. Only a parent (or an API token) may complete
 	// or uncomplete it; the assignee cannot tick it themselves.
-	AutoComplete       bool      `json:"auto_complete"`
-	TTSAudioURL        string    `json:"tts_audio_url,omitempty"`
-	CreatedBy          int64     `json:"created_by"`
-	CreatedAt          time.Time `json:"created_at"`
+	AutoComplete bool      `json:"auto_complete"`
+	TTSAudioURL  string    `json:"tts_audio_url,omitempty"`
+	CreatedBy    int64     `json:"created_by"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type ChoreSchedule struct {
-	ID               int64    `json:"id"`
-	ChoreID          int64    `json:"chore_id"`
-	AssignedTo       int64    `json:"assigned_to"`
-	AssignmentType   string   `json:"assignment_type"`
-	FcfsGroupID      *string  `json:"fcfs_group_id,omitempty"`
-	DayOfWeek        *int     `json:"day_of_week,omitempty"`
-	SpecificDate     *string  `json:"specific_date,omitempty"`
-	AvailableAt      *string  `json:"available_at,omitempty"`
-	PointsMultiplier    float64  `json:"points_multiplier"`
-	StartDate           *string  `json:"start_date,omitempty"`
-	EndDate             *string  `json:"end_date,omitempty"`
-	RecurrenceInterval  *int     `json:"recurrence_interval,omitempty"`
-	RecurrenceStart     *string  `json:"recurrence_start,omitempty"`
-	DueBy               *string  `json:"due_by,omitempty"`
-	ExpiryPenalty       string   `json:"expiry_penalty"`
-	ExpiryPenaltyValue  int      `json:"expiry_penalty_value"`
-	CreatedAt           string   `json:"created_at"`
+	ID                 int64   `json:"id"`
+	ChoreID            int64   `json:"chore_id"`
+	AssignedTo         int64   `json:"assigned_to"`
+	AssignmentType     string  `json:"assignment_type"`
+	FcfsGroupID        *string `json:"fcfs_group_id,omitempty"`
+	DayOfWeek          *int    `json:"day_of_week,omitempty"`
+	SpecificDate       *string `json:"specific_date,omitempty"`
+	AvailableAt        *string `json:"available_at,omitempty"`
+	PointsMultiplier   float64 `json:"points_multiplier"`
+	StartDate          *string `json:"start_date,omitempty"`
+	EndDate            *string `json:"end_date,omitempty"`
+	RecurrenceInterval *int    `json:"recurrence_interval,omitempty"`
+	RecurrenceStart    *string `json:"recurrence_start,omitempty"`
+	DueBy              *string `json:"due_by,omitempty"`
+	ExpiryPenalty      string  `json:"expiry_penalty"`
+	ExpiryPenaltyValue int     `json:"expiry_penalty_value"`
+	CreatedAt          string  `json:"created_at"`
 }
 
 // OwnChore is a chore a person added for themselves (Source "self"), with
@@ -244,7 +244,7 @@ type OwnChore struct {
 
 type ChoreCompletion struct {
 	ID              int64      `json:"id"`
-	ChoreScheduleID int64     `json:"chore_schedule_id"`
+	ChoreScheduleID int64      `json:"chore_schedule_id"`
 	CompletedBy     int64      `json:"completed_by"`
 	Status          string     `json:"status"` // approved, pending, rejected, excused
 	PhotoURL        string     `json:"photo_url,omitempty"`
@@ -254,9 +254,9 @@ type ChoreCompletion struct {
 	CompletionDate  string     `json:"completion_date"`
 	// AIFeedback is the AI photo reviewer's note for the approving parent
 	// (or, on an excused completion, the excuse reason).
-	AIFeedback      string     `json:"ai_feedback,omitempty"`
-	AIConfidence    float64    `json:"ai_confidence,omitempty"`
-	AIComplete      *bool      `json:"ai_complete,omitempty"`
+	AIFeedback   string  `json:"ai_feedback,omitempty"`
+	AIConfidence float64 `json:"ai_confidence,omitempty"`
+	AIComplete   *bool   `json:"ai_complete,omitempty"`
 	// UncompletedAt, when non-nil, marks a soft-deleted completion. The row
 	// is preserved (photo + AI metadata + approval) so a kid can un-check and
 	// re-check a chore without losing the approved state. Reader queries
@@ -267,13 +267,13 @@ type ChoreCompletion struct {
 // --- Points & Rewards ---
 
 type PointTransaction struct {
-	ID             int64     `json:"id"`
-	UserID         int64     `json:"user_id"`
-	Amount         int       `json:"amount"`
-	Reason         string    `json:"reason"`
-	ReferenceID    *int64    `json:"reference_id,omitempty"`
-	Note           string    `json:"note,omitempty"`
-	IdempotencyKey *string   `json:"idempotency_key,omitempty"`
+	ID             int64   `json:"id"`
+	UserID         int64   `json:"user_id"`
+	Amount         int     `json:"amount"`
+	Reason         string  `json:"reason"`
+	ReferenceID    *int64  `json:"reference_id,omitempty"`
+	Note           string  `json:"note,omitempty"`
+	IdempotencyKey *string `json:"idempotency_key,omitempty"`
 	// ReversesID is set on a row written by Undo: the row it cancels.
 	ReversesID *int64    `json:"reverses_id,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
@@ -499,15 +499,15 @@ func ValidPetSpecies(sp string) bool {
 // Pet is a person's optional companion. Chores keep it healthy; points buy
 // food and play (pet-care rewards). Health can't be bought.
 type Pet struct {
-	ID             int64     `json:"id"`
-	UserID         int64     `json:"user_id"`
-	Name           string    `json:"name"`
-	Species        string    `json:"species"`
-	Health         int       `json:"health"`
-	Fullness       int       `json:"fullness"`
-	Joy            int       `json:"joy"`
-	Color          string    `json:"color,omitempty"`     // coat colour (PetColors); "" = default
-	Accessory      string    `json:"accessory,omitempty"` // worn item, from Items
+	ID        int64  `json:"id"`
+	UserID    int64  `json:"user_id"`
+	Name      string `json:"name"`
+	Species   string `json:"species"`
+	Health    int    `json:"health"`
+	Fullness  int    `json:"fullness"`
+	Joy       int    `json:"joy"`
+	Color     string `json:"color,omitempty"`     // coat colour (PetColors); "" = default
+	Accessory string `json:"accessory,omitempty"` // worn item, from Items
 	// Sprite, when set, is the id of the person's own picture, shown in
 	// place of the drawn animal (uploads/pets/<id>.png). Species and Color
 	// are kept underneath: they are what friend families see.
@@ -523,28 +523,28 @@ type Pet struct {
 	Character string `json:"character,omitempty"`
 	// SpriteData is set instead of Sprite for a friend family's animal:
 	// its picture as a data: URL (it isn't a file on this server).
-	SpriteData string `json:"sprite_data,omitempty"`
-	Items          []string  `json:"items"`               // owned accessories
-	LastMissedDate *string   `json:"last_missed_date,omitempty"`
-	LastDayChecked string    `json:"last_day_checked"`
+	SpriteData     string   `json:"sprite_data,omitempty"`
+	Items          []string `json:"items"` // owned accessories
+	LastMissedDate *string  `json:"last_missed_date,omitempty"`
+	LastDayChecked string   `json:"last_day_checked"`
 	// SickDays counts the nights in a row it ended sick after missed chores
 	// (pet deaths, docs/pets.md). A day with every chore done, or ending
 	// well, clears it; paused and chore-free days leave it as it is.
-	SickDays int `json:"sick_days"`
-	CreatedAt      time.Time `json:"created_at"`
+	SickDays  int       `json:"sick_days"`
+	CreatedAt time.Time `json:"created_at"`
 
 	// Computed on read.
-	Mood    string `json:"mood"`   // hiding, very_sick, sick, hungry, bored, happy, content
+	Mood string `json:"mood"` // hiding, very_sick, sick, hungry, bored, happy, content
 	// HealedToday: all of today's chores are done, so Health already shows
 	// the gain tonight's check will make real (pet.ShowToday).
 	HealedToday bool `json:"healed_today,omitempty"`
 	// DaysLeft: pet deaths are on, it's sick and today's chores aren't all
 	// done; this many more nights ending sick after missed chores and it
 	// dies (1 = tonight). 0 = not in danger.
-	DaysLeft int `json:"days_left,omitempty"`
-	Hiding  bool   `json:"hiding"` // missed chores yesterday and today's aren't done yet
-	Sick    bool   `json:"sick"`
-	CanPlay bool   `json:"can_play"`
+	DaysLeft int  `json:"days_left,omitempty"`
+	Hiding   bool `json:"hiding"` // missed chores yesterday and today's aren't done yet
+	Sick     bool `json:"sick"`
+	CanPlay  bool `json:"can_play"`
 
 	// Visiting: a friend family's animal here on a playdate; Family says whose.
 	Visiting bool   `json:"visiting,omitempty"`
@@ -667,26 +667,26 @@ type WebhookDelivery struct {
 
 // ScheduledChore is a denormalized view returned by the chores-for-user endpoint.
 type ScheduledChore struct {
-	ScheduleID       int64   `json:"schedule_id"`
-	ChoreID          int64   `json:"chore_id"`
-	Title            string  `json:"title"`
-	Description      string  `json:"description"`
-	Category         string  `json:"category"`
-	Icon             string  `json:"icon,omitempty"`
-	PointsValue      int     `json:"points_value"`
-	MissedPenaltyValue int    `json:"missed_penalty_value"`
-	EstimatedMinutes *int    `json:"estimated_minutes,omitempty"`
-	RequiresApproval bool    `json:"requires_approval"`
-	RequiresPhoto    bool    `json:"requires_photo"`
-	PhotoSource      string  `json:"photo_source"`
-	AutoComplete     bool    `json:"auto_complete"`
-	AssignmentType   string  `json:"assignment_type"`
-	AvailableAt      *string `json:"available_at,omitempty"`
-	DueBy              *string `json:"due_by,omitempty"`
-	ExpiryPenalty      string  `json:"expiry_penalty"`
-	ExpiryPenaltyValue int     `json:"expiry_penalty_value"`
-	Available          bool    `json:"available"`
-	Expired            bool    `json:"expired"`
+	ScheduleID         int64      `json:"schedule_id"`
+	ChoreID            int64      `json:"chore_id"`
+	Title              string     `json:"title"`
+	Description        string     `json:"description"`
+	Category           string     `json:"category"`
+	Icon               string     `json:"icon,omitempty"`
+	PointsValue        int        `json:"points_value"`
+	MissedPenaltyValue int        `json:"missed_penalty_value"`
+	EstimatedMinutes   *int       `json:"estimated_minutes,omitempty"`
+	RequiresApproval   bool       `json:"requires_approval"`
+	RequiresPhoto      bool       `json:"requires_photo"`
+	PhotoSource        string     `json:"photo_source"`
+	AutoComplete       bool       `json:"auto_complete"`
+	AssignmentType     string     `json:"assignment_type"`
+	AvailableAt        *string    `json:"available_at,omitempty"`
+	DueBy              *string    `json:"due_by,omitempty"`
+	ExpiryPenalty      string     `json:"expiry_penalty"`
+	ExpiryPenaltyValue int        `json:"expiry_penalty_value"`
+	Available          bool       `json:"available"`
+	Expired            bool       `json:"expired"`
 	Completed          bool       `json:"completed"`
 	CompletionID       *int64     `json:"completion_id,omitempty"`
 	CompletedAt        *time.Time `json:"completed_at,omitempty"`
@@ -697,6 +697,14 @@ type ScheduledChore struct {
 	CompletedBySibling bool       `json:"completed_by_sibling,omitempty"`
 	TTSAudioURL        string     `json:"tts_audio_url,omitempty"`
 	Date               string     `json:"date"`
+}
+
+// PossiblePoints is the most a person can earn from their scheduled chores
+// on a day and across its Monday-to-Sunday week (admin Chores tab).
+type PossiblePoints struct {
+	UserID int64 `json:"user_id"`
+	Today  int   `json:"today"`
+	Week   int   `json:"week"`
 }
 
 // AIReviewResult is an AI photo review: advice for a parent, never a verdict.
@@ -733,9 +741,9 @@ const (
 
 // FriendLink is a link to another family's OpenChore, kept through a hub.
 type FriendLink struct {
-	ID            int64      `json:"id"`
-	Status        string     `json:"status"`
-	Side          string     `json:"-"` // "a" made the invite, "b" joined with it
+	ID     int64  `json:"id"`
+	Status string `json:"status"`
+	Side   string `json:"-"` // "a" made the invite, "b" joined with it
 	// ShowPictures: a parent here has chosen to show this family's custom
 	// animal pictures. Off by default; without it they are not even kept.
 	ShowPictures bool `json:"show_pictures"`
@@ -747,7 +755,7 @@ type FriendLink struct {
 	GoalTarget int    `json:"-"`
 	// AllowVisits: take gifts and playdates from this family (on unless a
 	// parent turns it off).
-	AllowVisits bool `json:"allow_visits"`
+	AllowVisits   bool       `json:"allow_visits"`
 	HubURL        string     `json:"hub_url"`
 	HubLink       string     `json:"-"`
 	Token         string     `json:"-"`
@@ -792,11 +800,11 @@ type FriendSnapshot struct {
 }
 
 type FriendMember struct {
-	ID     string     `json:"id"` // stable within the sending family
-	Name   string     `json:"name"`
-	Color  string     `json:"color,omitempty"`
-	Streak int        `json:"streak"`
-	Paused bool       `json:"paused,omitempty"`
+	ID     string `json:"id"` // stable within the sending family
+	Name   string `json:"name"`
+	Color  string `json:"color,omitempty"`
+	Streak int    `json:"streak"`
+	Paused bool   `json:"paused,omitempty"`
 	// Weeks holds this week and last week (the sender's own weeks).
 	Weeks []FriendWeek `json:"weeks"`
 	Pet   *FriendPet   `json:"pet,omitempty"`

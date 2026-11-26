@@ -1,8 +1,8 @@
 package api
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"sync"
@@ -21,8 +21,8 @@ type ChoreHandler struct {
 	store      *store.Store
 	dispatcher *webhook.Dispatcher
 	discord    *discord.Notifier
-	aiSvc      *AIServices    // optional AI and read-aloud audio
-	reviews    sync.WaitGroup // in-flight background photo reviews
+	aiSvc      *AIServices      // optional AI and read-aloud audio
+	reviews    sync.WaitGroup   // in-flight background photo reviews
 	friends    *friends.Service // optional; undoing a gift's purchase resyncs its link
 }
 
@@ -351,6 +351,19 @@ func (h *ChoreHandler) ListSchedules(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, schedules)
 }
 
+// ListAllSchedules returns every schedule across all chores (admin overview).
+func (h *ChoreHandler) ListAllSchedules(w http.ResponseWriter, r *http.Request) {
+	schedules, err := h.store.ListAllSchedules(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list schedules")
+		return
+	}
+	if schedules == nil {
+		schedules = []model.ChoreSchedule{}
+	}
+	writeJSON(w, http.StatusOK, schedules)
+}
+
 func (h *ChoreHandler) DeleteSchedule(w http.ResponseWriter, r *http.Request) {
 	scheduleID, err := urlParamInt64(r, "scheduleID")
 	if err != nil {
@@ -451,8 +464,8 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 
 	// FCFS race condition check: if a sibling already completed this FCFS group, reject
 	if schedule.AssignmentType == model.AssignmentFCFS && schedule.FcfsGroupID != nil {
-		done, err := h.store.FcfsGroupCompletedForDate(r.Context(), *schedule.FcfsGroupID, req.CompletionDate)
-		if err == nil && done {
+		takenBy, err := h.store.FcfsGroupTakenBy(r.Context(), *schedule.FcfsGroupID, req.CompletionDate)
+		if err == nil && takenBy != 0 {
 			writeError(w, http.StatusConflict, "a sibling already completed this chore")
 			return
 		}
@@ -682,32 +695,8 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// FCFS: complete sibling schedules with shadow completions
-	if schedule.AssignmentType == model.AssignmentFCFS && schedule.FcfsGroupID != nil && status == model.StatusApproved {
-		if err := h.store.CompleteFCFSSiblings(r.Context(), *schedule.FcfsGroupID, completedBy, scheduleID, req.CompletionDate); err != nil {
-			log.Printf("error completing FCFS siblings: %v", err)
-		}
-
-		// Fire FCFS-specific webhook
-		completedByUser, _ := h.store.GetUser(r.Context(), completedBy)
-		fcfsName := ""
-		if completedByUser != nil {
-			fcfsName = completedByUser.Name
-		}
-		fcfsTitle := ""
-		if chore != nil {
-			fcfsTitle = chore.Title
-		}
-		h.dispatcher.Fire(webhook.EventChoreFCFSCompleted, map[string]any{
-			"completion_id":   completion.ID,
-			"schedule_id":     scheduleID,
-			"fcfs_group_id":   *schedule.FcfsGroupID,
-			"chore_title":     fcfsTitle,
-			"user_id":         completedBy,
-			"user_name":       fcfsName,
-			"completion_date": req.CompletionDate,
-			"points_earned":   pts,
-		})
+	if status == model.StatusApproved {
+		h.finishFCFS(r.Context(), schedule, chore, completion, pts)
 	}
 
 	// Fire webhook
@@ -831,21 +820,48 @@ func (h *ChoreHandler) uncomplete(r *http.Request, scheduleID int64, dateStr str
 		}
 	}
 
-	// FCFS: uncomplete all siblings in the group
+	// FCFS: once someone has taken the chore, unchecking any copy undoes the
+	// whole group and takes back the taker's points, so only the taker or a
+	// parent may do it. A copy nobody has taken (only a rejected try or an
+	// excuse on it) is unchecked on its own, leaving the rest of the group.
+	streakUsers := []int64{completedBy}
+	fcfsTakenBy := int64(0)
 	if schedule != nil && schedule.AssignmentType == model.AssignmentFCFS && schedule.FcfsGroupID != nil {
-		if err := h.store.UncompleteFCFSGroupAndDebitPoints(r.Context(), *schedule.FcfsGroupID, dateStr, completedBy, existing, netPoints); err != nil {
+		takenBy, err := h.store.FcfsGroupTakenBy(r.Context(), *schedule.FcfsGroupID, dateStr)
+		if err != nil {
 			return http.StatusInternalServerError, "failed to uncomplete FCFS group"
 		}
+		caller := UserFromContext(r.Context())
+		if takenBy != 0 && caller.Role != model.RoleAdmin && takenBy != caller.ID {
+			name := "someone else"
+			if u, _ := h.store.GetUser(r.Context(), takenBy); u != nil {
+				name = u.Name
+			}
+			return http.StatusForbidden, name + " did this chore, so only they or a parent can undo it"
+		}
+		fcfsTakenBy = takenBy
+	}
+	if fcfsTakenBy != 0 {
+		assignees, err := h.store.UncompleteFCFSGroupAndDebitPoints(r.Context(), *schedule.FcfsGroupID, dateStr)
+		if err != nil {
+			return http.StatusInternalServerError, "failed to uncomplete FCFS group"
+		}
+		streakUsers = append(streakUsers, assignees...)
 	} else {
 		if err := h.store.UncompleteChoreAndDebitPoints(r.Context(), scheduleID, dateStr, completedBy, completionID, netPoints); err != nil {
 			return http.StatusInternalServerError, "failed to uncomplete chore"
 		}
 	}
 
-	// Recalculate streak
-	if completedBy > 0 {
-		if err := h.store.RecalculateStreak(r.Context(), completedBy, dateStr); err != nil {
-			log.Printf("error recalculating streak for user %d: %v", completedBy, err)
+	// Recalculate streaks
+	recalculated := map[int64]bool{}
+	for _, uid := range streakUsers {
+		if uid <= 0 || recalculated[uid] {
+			continue
+		}
+		recalculated[uid] = true
+		if err := h.store.RecalculateStreak(r.Context(), uid, dateStr); err != nil {
+			log.Printf("error recalculating streak for user %d: %v", uid, err)
 		}
 	}
 
@@ -960,6 +976,9 @@ func (h *ChoreHandler) approveCompletion(ctx context.Context, completion *model.
 	if err := h.store.RecalculateStreak(ctx, completion.CompletedBy, completion.CompletionDate); err != nil {
 		log.Printf("error recalculating streak for user %d: %v", completion.CompletedBy, err)
 	}
+
+	// A first-come chore that waited for approval is taken now.
+	h.finishFCFS(ctx, schedule, chore, completion, pts)
 
 	userName := ""
 	if u, _ := h.store.GetUser(ctx, completion.CompletedBy); u != nil {
@@ -1115,6 +1134,9 @@ func (h *ChoreHandler) creditPendingBonusPoints(ctx context.Context, userID int6
 		if sc.CompletionStatus == nil || *sc.CompletionStatus != model.StatusApproved {
 			continue
 		}
+		if !h.completedBy(ctx, *sc.CompletionID, userID) {
+			continue
+		}
 		fullPts, err := h.store.GetChorePointsForSchedule(ctx, sc.ScheduleID)
 		if err != nil {
 			log.Printf("error fetching points for schedule %d: %v", sc.ScheduleID, err)
@@ -1132,6 +1154,49 @@ func (h *ChoreHandler) creditPendingBonusPoints(ctx context.Context, userID int6
 			}
 		}
 	}
+}
+
+// finishFCFS runs once a first-come completion is approved (straight away or
+// by a parent later): everyone else's copy is marked done by the finisher, at
+// 0 points, and the chore.fcfs_completed webhook fires. No-op for other chores.
+func (h *ChoreHandler) finishFCFS(ctx context.Context, schedule *model.ChoreSchedule, chore *model.Chore, completion *model.ChoreCompletion, pts int) {
+	if schedule == nil || schedule.AssignmentType != model.AssignmentFCFS || schedule.FcfsGroupID == nil {
+		return
+	}
+	if err := h.store.CompleteFCFSSiblings(ctx, *schedule.FcfsGroupID, completion.CompletedBy, schedule.ID, completion.CompletionDate); err != nil {
+		log.Printf("error completing FCFS siblings: %v", err)
+	}
+
+	userName := ""
+	if u, _ := h.store.GetUser(ctx, completion.CompletedBy); u != nil {
+		userName = u.Name
+	}
+	title := ""
+	if chore != nil {
+		title = chore.Title
+	}
+	h.dispatcher.Fire(webhook.EventChoreFCFSCompleted, map[string]any{
+		"completion_id":   completion.ID,
+		"schedule_id":     schedule.ID,
+		"fcfs_group_id":   *schedule.FcfsGroupID,
+		"chore_title":     title,
+		"user_id":         completion.CompletedBy,
+		"user_name":       userName,
+		"completion_date": completion.CompletionDate,
+		"points_earned":   pts,
+	})
+}
+
+// completedBy reports whether userID did the completion themselves. On a
+// first-come chore the others get a shadow completion done by the finisher;
+// only the finisher is paid, so the retroactive credits skip those.
+func (h *ChoreHandler) completedBy(ctx context.Context, completionID, userID int64) bool {
+	c, err := h.store.GetCompletion(ctx, completionID)
+	if err != nil || c == nil {
+		log.Printf("error fetching completion %d: %v", completionID, err)
+		return false
+	}
+	return c.CompletedBy == userID
 }
 
 // creditPendingCorePoints retroactively credits approved core completions
@@ -1156,6 +1221,9 @@ func (h *ChoreHandler) creditPendingCorePoints(ctx context.Context, userID int64
 		// Only approved completions get points; pending completions
 		// are credited when the admin approves them.
 		if sc.CompletionStatus == nil || *sc.CompletionStatus != model.StatusApproved {
+			continue
+		}
+		if !h.completedBy(ctx, *sc.CompletionID, userID) {
 			continue
 		}
 		fullPts, err := h.store.GetChorePointsForSchedule(ctx, sc.ScheduleID)
@@ -1236,8 +1304,6 @@ func (h *ChoreHandler) Excuse(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusCreated, completion)
 }
-
-
 
 // completerFor decides whose completion this is (and so who is credited).
 // It defaults to the schedule's assignee, so a parent ticking a kid's chore

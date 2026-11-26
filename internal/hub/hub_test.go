@@ -416,4 +416,3 @@ func TestInviteTTLDefaultAndOverride(t *testing.T) {
 		t.Fatalf("default 24h link should still be joinable at 2h = %d", code)
 	}
 }
-

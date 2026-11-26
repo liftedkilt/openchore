@@ -587,3 +587,131 @@ func TestReportPointsSummary_NetBreakdown(t *testing.T) {
 		t.Errorf("got %+v, want %+v", *got, want)
 	}
 }
+
+// Reports bucket points by the server's local day, like completion dates.
+// created_at is stored in UTC, so points earned just after local midnight
+// or just before the next one can sit on a different UTC date; both must
+// still count toward today. (Before the fix this failed whenever the local
+// timezone wasn't UTC: in the evening west of UTC, in the morning east of it.)
+func TestReportPoints_UseLocalDay(t *testing.T) {
+	s, db := setupStoreWithDB(t)
+	ctx := context.Background()
+	now := time.Now()
+	today := now.Format("2006-01-02")
+	// Built from the calendar, not by adding hours to midnight: a
+	// daylight-saving day is 23 or 25 hours long.
+	at := func(day, hour, min int) time.Time {
+		return time.Date(now.Year(), now.Month(), now.Day()+day, hour, min, 0, 0, time.Local)
+	}
+
+	kid := createTestUser(t, s, "Gabe", "child")
+	for _, tx := range []struct {
+		at     time.Time
+		amount int
+	}{
+		{at(0, 0, 1), 5},      // 00:01 today
+		{at(0, 23, 59), 5},    // 23:59 today
+		{at(-1, 23, 59), 100}, // 23:59 yesterday: not today
+	} {
+		if _, err := db.Exec(
+			`INSERT INTO point_transactions (user_id, amount, reason, created_at) VALUES (?, ?, 'chore_complete', ?)`,
+			kid.ID, tx.amount, tx.at.UTC().Format("2006-01-02 15:04:05"),
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	points, err := s.ReportPointsSummary(ctx, today, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kids, err := s.ReportKidSummaries(ctx, today, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	earned := func(report string, n int, row func(i int) (int64, int)) {
+		t.Helper()
+		for i := 0; i < n; i++ {
+			if id, pts := row(i); id == kid.ID {
+				if pts != 10 {
+					t.Errorf("%s earned = %d, want 10", report, pts)
+				}
+				return
+			}
+		}
+		t.Errorf("%s has no row for the kid", report)
+	}
+	earned("ReportPointsSummary", len(points), func(i int) (int64, int) { return points[i].UserID, points[i].PointsEarned })
+	earned("ReportKidSummaries", len(kids), func(i int) (int64, int) { return kids[i].UserID, kids[i].PointsEarned })
+}
+
+// A first-come chore done once counts once in the reports, for whoever did
+// it: not again for the 0-point copies it makes on everyone else's schedule.
+func TestReports_FCFSCopiesCountOnce(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+	today := time.Now().Format("2006-01-02")
+
+	admin := createTestUser(t, s, "Admin", "admin")
+	alice := createTestUser(t, s, "Alice", "child")
+	bob := createTestUser(t, s, "Bob", "child")
+	cara := createTestUser(t, s, "Cara", "child")
+	chore := createTestChore(t, s, "Empty dryer", 10, admin.ID)
+	group := "g1"
+	var aliceSched int64
+	for _, kid := range []*model.User{alice, bob, cara} {
+		cs := &model.ChoreSchedule{ChoreID: chore.ID, AssignedTo: kid.ID, AssignmentType: model.AssignmentFCFS,
+			FcfsGroupID: &group, SpecificDate: &today, PointsMultiplier: 1, ExpiryPenalty: "none"}
+		if err := s.CreateSchedule(ctx, cs); err != nil {
+			t.Fatal(err)
+		}
+		if kid == alice {
+			aliceSched = cs.ID
+		}
+	}
+	if err := s.CompleteChore(ctx, &model.ChoreCompletion{ChoreScheduleID: aliceSched, CompletedBy: alice.ID, Status: "approved", CompletionDate: today}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CompleteFCFSSiblings(ctx, group, alice.ID, aliceSched, today); err != nil {
+		t.Fatal(err)
+	}
+
+	kids, err := s.ReportKidSummaries(ctx, today, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, r := range kids {
+		want := 0
+		if r.UserID == alice.ID {
+			want, found = 1, true
+		}
+		if r.TotalCompleted != want {
+			t.Errorf("%s TotalCompleted = %d, want %d", r.Name, r.TotalCompleted, want)
+		}
+	}
+	if !found {
+		t.Error("the kid summary has no row for Alice")
+	}
+	trend, err := s.ReportCompletionTrend(ctx, today, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(trend) != 1 || trend[0].Completed != 1 || trend[0].Assigned != 1 {
+		t.Errorf("trend = %+v, want one day with 1 completed of 1", trend)
+	}
+	cats, err := s.ReportCategoryBreakdown(ctx, today, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cats) != 1 || cats[0].TotalCompleted != 1 {
+		t.Errorf("categories = %+v, want 1 completed", cats)
+	}
+	dows, err := s.ReportDayOfWeek(ctx, today, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dows) != 1 || dows[0].TotalCompleted != 1 {
+		t.Errorf("day of week = %+v, want 1 completed", dows)
+	}
+}

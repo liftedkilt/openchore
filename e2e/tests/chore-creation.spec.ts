@@ -16,7 +16,7 @@ test.describe('Chore Creation', () => {
       await page.getByRole('button', { name: /Next/i }).click();
 
       // Step 2: Schedule - assign to first child, pick Every Day
-      await page.getByRole('button', { name: 'Emma' }).click();
+      await page.getByRole('button', { name: 'Emma', exact: true }).click();
       await page.getByRole('button', { name: 'Every day' }).click();
       await page.getByRole('button', { name: /Next/i }).click();
 

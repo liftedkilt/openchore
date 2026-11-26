@@ -222,6 +222,13 @@ export interface ChoreSchedule {
   created_at: string;
 }
 
+/** The most a person can earn on a day and across its Mon–Sun week. */
+export interface PossiblePoints {
+  user_id: number;
+  today: number;
+  week: number;
+}
+
 export const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 // --- Points & Rewards ---

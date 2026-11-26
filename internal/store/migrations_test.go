@@ -359,7 +359,6 @@ func TestMigration030FriendConfirmKeepsChildRows(t *testing.T) {
 	assertChildren("re-up")
 }
 
-
 // Migration 031 gives a household that already has pet-care rewards one
 // reward per character, and leaves one without pets alone.
 func TestMigration031AddsCharacterRewards(t *testing.T) {

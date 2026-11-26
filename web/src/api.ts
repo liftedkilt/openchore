@@ -1,4 +1,4 @@
-import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, OwnChore, OwnChoreInput, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput, SignInOptions, Farm, Pet, PetItem, PetPick, PetSpecies, Leaderboard, FriendFarm, FriendGift, FriendLink, FriendsSettings, GoalCelebration } from './types';
+import type { User, PersonColor, AuthSession, AuthProvider, LinkedIdentity, ScheduledChore, Chore, ChoreSchedule, PossiblePoints, OwnChore, OwnChoreInput, PointsData, PointBalance, PendingCompletion, Reward, RewardRedemption, RewardCommitment, SharedCommitmentPool, RedemptionHistory, UserStreakData, StreakRewardItem, ChoreTrigger, Webhook, WebhookDelivery, UserDecayConfig, APIToken, AIStatus, AIReviewResult, AIConfig, AIConnectionUpdate, AdminAuthConfig, AuthProviderInput, SignInOptions, Farm, Pet, PetItem, PetPick, PetSpecies, Leaderboard, FriendFarm, FriendGift, FriendLink, FriendsSettings, GoalCelebration } from './types';
 
 const API_BASE = '/api';
 
@@ -238,6 +238,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ date, reason: reason ?? '' }),
       }),
+    /** Every schedule across all chores (admin). */
+    listAllSchedules: () => fetchWithAuth<ChoreSchedule[]>('/schedules'),
+    /** Per person: the most they can earn on `date` and across its week. */
+    possiblePoints: (date: string) =>
+      fetchWithAuth<PossiblePoints[]>(`/chores/possible-points?date=${date}`),
     listSchedules: (choreId: number) =>
       fetchWithAuth<ChoreSchedule[]>(`/chores/${choreId}/schedules`),
     createSchedule: (choreId: number, data: Partial<ChoreSchedule>) =>

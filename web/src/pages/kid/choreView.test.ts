@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import i18n from '../../i18n';
 import type { ScheduledChore, RewardCommitment, PointTransaction } from '../../types';
-import { choreView, type ChoreViewContext } from './choreView';
+import { choreView, siblingTook, type ChoreViewContext } from './choreView';
 import { daysToGoal, goalProgress } from './goals';
 import { weekDates } from './WeekScreen';
 
@@ -65,6 +65,37 @@ describe('choreView', () => {
     expect(choreView(chore({ completed: true, completion_status: 'excused' }), ctx)).toMatchObject({ state: 'done', meta: 'Excused today' });
     const sibling = choreView(chore({ completed: true, completion_status: 'approved', completed_by_sibling: true, completed_by_name: 'Lily' }), ctx);
     expect(sibling).toMatchObject({ state: 'done', meta: 'Done by Lily' });
+  });
+
+  describe('a first-come chore someone else took', () => {
+    const sib = { completed_by_sibling: true, completed_by_name: 'Lily' };
+
+    it('is read-only and says who, done or waiting', () => {
+      // Lily's was approved: this copy has its own approved 0-point completion.
+      expect(choreView(chore({ ...sib, completed: true, completion_status: 'approved' }), ctx))
+        .toMatchObject({ state: 'done', meta: 'Done by Lily', canToggle: false });
+      // Lily's waits for a grown-up: it's hers unless it's turned down.
+      expect(choreView(chore({ ...sib, completed: false }), ctx))
+        .toMatchObject({ state: 'waiting', meta: 'Lily got to it first', canToggle: false });
+    });
+
+    it("isn't shown as done by Lily over this kid's own rejected try while hers waits", () => {
+      const v = choreView(chore({ ...sib, completed: true, completion_status: 'rejected' }), ctx);
+      expect(v).toMatchObject({ state: 'waiting', meta: 'Lily got to it first', canToggle: false, retry: false });
+    });
+
+    it('still shows an excuse on this copy, without a toggle', () => {
+      expect(choreView(chore({ ...sib, completed: true, completion_status: 'excused' }), ctx))
+        .toMatchObject({ state: 'done', meta: 'Excused today', canToggle: false });
+    });
+  });
+
+  it('siblingTook names who took a first-come chore and whether theirs is approved', () => {
+    expect(siblingTook({ completed_by_sibling: true, completed_by_name: 'Lily', completion_status: 'approved' }))
+      .toEqual({ name: 'Lily', waiting: false });
+    expect(siblingTook({ completed_by_sibling: true, completed_by_name: 'Lily' })).toEqual({ name: 'Lily', waiting: true });
+    expect(siblingTook({ completed_by_sibling: true, completion_status: 'rejected' })).toEqual({ name: '?', waiting: true });
+    expect(siblingTook({ completed_by_sibling: false, completed_by_name: 'Lily' })).toBeNull();
   });
 
   it('holds Every day points until Must do is done', () => {

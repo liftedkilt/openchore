@@ -34,12 +34,12 @@ func (h *ReportsHandler) SetAI(ai *llm.Client) {
 // ReportsResponse is the full payload returned by GET /api/admin/reports.
 type ReportsResponse struct {
 	Period     string          `json:"period"`
-	StartDate  string         `json:"start_date"`
-	EndDate    string         `json:"end_date"`
-	Kids       []KidSummary   `json:"kids"`
-	MostMissed []MissedChore  `json:"most_missed"`
-	Trend      []TrendDay     `json:"trend"`
-	Categories []CategoryStat `json:"categories"`
+	StartDate  string          `json:"start_date"`
+	EndDate    string          `json:"end_date"`
+	Kids       []KidSummary    `json:"kids"`
+	MostMissed []MissedChore   `json:"most_missed"`
+	Trend      []TrendDay      `json:"trend"`
+	Categories []CategoryStat  `json:"categories"`
 	Points     []PointsSummary `json:"points"`
 	DayOfWeek  []DayOfWeekStat `json:"day_of_week"`
 }

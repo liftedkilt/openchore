@@ -4,6 +4,7 @@
 import type { TFunction } from 'i18next';
 import { catFromCategory, type Cat, type ChoreState } from '../../design';
 import type { ScheduledChore } from '../../types';
+import { siblingTook } from '../../choreRules';
 
 /** Minutes before `due_by` at which a countdown turns urgent. */
 export const URGENT_MINUTES = 60;
@@ -63,7 +64,7 @@ export function formatDuration(minutes: number, t: TFunction): string {
 }
 
 // The Bonus / Every day gates are shared with the wall display.
-export { isChoreDone as isDone, dayGates as gates } from '../../choreRules';
+export { isChoreDone as isDone, dayGates as gates, siblingTook } from '../../choreRules';
 
 export function choreView(c: ScheduledChore, ctx: ChoreViewContext): ChoreView {
   const { t, now, lang } = ctx;
@@ -81,12 +82,25 @@ export function choreView(c: ScheduledChore, ctx: ChoreViewContext): ChoreView {
     ? t('kid.chore.doneAt', { time: formatClock(doneAt, lang) })
     : t('kid.chore.done');
 
+  // --- A first-come chore someone else took: not this person's to tick or
+  // untick, so the row is read-only and says why. While the sibling's
+  // completion waits for a grown-up it's theirs unless it's turned down (this
+  // copy may hold a rejected try of this person's own). An excuse on this
+  // copy still shows as the excuse. ---
+  const sibling = siblingTook(c);
+  if (sibling) {
+    base.canToggle = false;
+    if (sibling.waiting && c.completion_status !== 'excused') {
+      return { ...base, state: 'waiting', meta: t('kid.chore.takenBy', { name: sibling.name }) };
+    }
+  }
+
   // --- Finished in some way ---
   if (c.completed) {
     base.needsPhotoProof = isToday && !!c.requires_photo &&
       (c.photo_source === 'both' || c.photo_source === 'external') && !c.photo_url;
-    if (c.completed_by_sibling) {
-      return { ...base, state: 'done', meta: c.completed_by_name ? t('kid.chore.doneBy', { name: c.completed_by_name }) : doneAtLine };
+    if (sibling && !sibling.waiting) {
+      return { ...base, needsPhotoProof: false, state: 'done', meta: t('kid.chore.doneBy', { name: sibling.name }) };
     }
     switch (c.completion_status) {
       case 'pending':

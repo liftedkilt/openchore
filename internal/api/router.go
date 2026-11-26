@@ -169,6 +169,8 @@ func NewRouter(s *store.Store, dispatcher *webhook.Dispatcher, auth Auth) (*chi.
 				r.Get("/chores/{id}/schedules", chores.ListSchedules)
 				r.Post("/chores/{id}/schedules", chores.CreateSchedule)
 				r.Delete("/chores/{id}/schedules/{scheduleID}", chores.DeleteSchedule)
+				r.Get("/schedules", chores.ListAllSchedules)
+				r.Get("/chores/possible-points", chores.PossiblePoints)
 				r.Put("/schedules/{scheduleID}", chores.UpdateSchedule)
 				r.Post("/schedules/{scheduleID}/excuse", chores.Excuse)
 

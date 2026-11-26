@@ -3,7 +3,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Avatar, CategoryHeader, Icon, PointsChip, catFromCategory, isPersonColor, type Cat, type IconName } from '../../design';
 import type { ScheduledChore, User } from '../../types';
-import type { ChoreView } from './choreView';
+import { isDone, type ChoreView } from './choreView';
 import { ChoreItem } from './ChoreItem';
 import s from './kid.module.css';
 
@@ -58,7 +58,8 @@ export function ChoreGroups({ chores, viewOf, togglingIds, tts, onToggle, onPhot
         const list = chores.filter(c => catFromCategory(c.category) === cat);
         if (!list.length) return null;
         const views = list.map(viewOf);
-        const done = views.filter(v => v.state === 'done' || v.state === 'waiting').length;
+        // Same rule as the day progress (a sibling's waiting take isn't done).
+        const done = list.filter(isDone).length;
         const bonusPts = list.reduce((sum, c) => sum + (c.points_value || 0), 0);
         const count = cat === 'bonus'
           ? t('kid.today.bonusCount', { count: bonusPts })

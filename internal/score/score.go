@@ -47,8 +47,10 @@ func SummarizeDay(date string, chores []model.ScheduledChore, finished bool) mod
 				d.Assigned++
 				d.AssignedPoints += pts
 			}
-		case done && (c.Category == model.CategoryBonus || model.CountsTowardDay(c.Category)):
-			// Bonus chores, and family / first-come chores this person did.
+		case done && !c.CompletedBySibling && (c.Category == model.CategoryBonus || model.CountsTowardDay(c.Category)):
+			// Bonus chores, and family / first-come chores this person did
+			// (not a first-come chore a sibling did, which only marks their
+			// copy done).
 			d.Bonus++
 		}
 	}

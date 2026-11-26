@@ -3,7 +3,7 @@
 // can be unit-tested without the page.
 import type { ScheduledChore } from '../types';
 import { catFromCategory, type Cat, type ChoreState } from '../design';
-import { dayGates, isChoreDone } from '../choreRules';
+import { dayGates, isChoreDone, siblingTook } from '../choreRules';
 
 export const CAT_ORDER: Record<Cat, number> = { essential: 0, daily: 1, bonus: 2, optional: 3 };
 
@@ -51,6 +51,7 @@ export function nextRows(chores: ScheduledChore[], now: Date): NextRow[] {
   const rows: (NextRow & { group: number; sortAt: number })[] = [];
   for (const c of chores) {
     if (isChoreDone(c)) continue;
+    if (siblingTook(c)) continue; // someone else took this first-come chore
     if (c.expired && c.expiry_penalty === 'block') continue;
     const cat = catFromCategory(c.category);
     const locked = cat === 'bonus' && !open;

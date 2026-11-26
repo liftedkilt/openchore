@@ -105,8 +105,8 @@ type UserConfig struct {
 	Role string `yaml:"role"`
 	// Pin is a 4-8 digit profile PIN, hashed on seed. Admin profiles need
 	// a PIN (or a linked account) to sign in.
-	Pin    string `yaml:"pin,omitempty"`
-	Age    int    `yaml:"age,omitempty"`
+	Pin string `yaml:"pin,omitempty"`
+	Age int    `yaml:"age,omitempty"`
 	// Theme is the person's skin: sunroom, blocks or tint. The legacy
 	// names default, quest, galaxy and forest are accepted and mapped.
 	Theme string `yaml:"theme,omitempty"`

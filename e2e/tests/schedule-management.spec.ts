@@ -12,7 +12,7 @@ test.describe('Schedule Management', () => {
     await page.getByRole('button', { name: /Next/i }).click();
 
     // Assign to Emma, pick Weekdays (Mon-Fri = 5 days)
-    await page.getByRole('button', { name: 'Emma' }).click();
+    await page.getByRole('button', { name: 'Emma', exact: true }).click();
     await page.getByRole('button', { name: 'Weekdays' }).click();
     await page.getByRole('button', { name: /Next/i }).click();
 
