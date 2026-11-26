@@ -67,12 +67,21 @@ func ApplyDay(p *model.Pet, date string, d DayResult) {
 // It only changes what is shown. The stored health is untouched, tonight's
 // ApplyDay is still what makes it real, and un-ticking a chore (or a
 // rejection) takes the preview away again. Call it before Describe.
+//
+// The preview is what tonight's ApplyDay will really give: if the food will
+// run out tonight, the StarveHealth it costs is taken off too, so the
+// animal doesn't look better now than it will tomorrow morning. Feeding it
+// before bedtime brings the full gain back into the preview.
 func ShowToday(p *model.Pet, today []model.ScheduledChore) {
 	d := Summarize(today)
 	if d.Counted == 0 || d.Missed > 0 {
 		return
 	}
-	p.Health = clamp(p.Health + GoodDayHealth)
+	gain := GoodDayHealth
+	if clamp(p.Fullness-DailyHunger) == 0 {
+		gain -= StarveHealth
+	}
+	p.Health = clamp(p.Health + gain)
 	p.HealedToday = true
 }
 

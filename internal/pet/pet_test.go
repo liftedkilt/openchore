@@ -130,8 +130,25 @@ func TestShowToday(t *testing.T) {
 	if p.Health != 34 || p.HealedToday {
 		t.Fatalf("nothing counted: %+v", p)
 	}
+	// Food runs out tonight: the preview matches tonight's check (+15, -10 for
+	// starving), not a gain the animal will lose again by morning.
+	for _, full := range []int{0, DailyHunger} {
+		p = &model.Pet{Health: 20, Fullness: full}
+		ShowToday(p, []model.ScheduledChore{chore(model.CategoryCore, true)})
+		night := &model.Pet{Health: 20, Fullness: full}
+		ApplyDay(night, "2026-11-16", DayResult{Counted: 1})
+		if p.Health != night.Health || p.Health != 20+GoodDayHealth-StarveHealth || !p.HealedToday {
+			t.Fatalf("starving fullness %d: preview %d, tonight %d", full, p.Health, night.Health)
+		}
+	}
+	// Fed enough to last the night: the full gain.
+	p = &model.Pet{Health: 20, Fullness: DailyHunger + 1}
+	ShowToday(p, []model.ScheduledChore{chore(model.CategoryCore, true)})
+	if p.Health != 20+GoodDayHealth {
+		t.Fatalf("fed: %+v", p)
+	}
 	// Never past full.
-	p = &model.Pet{Health: 95}
+	p = &model.Pet{Health: 95, Fullness: 80}
 	ShowToday(p, []model.ScheduledChore{chore(model.CategoryCore, true)})
 	if p.Health != 100 {
 		t.Fatalf("clamp: %+v", p)
