@@ -30,6 +30,10 @@ func validatePetReward(rw *model.Reward) string {
 		if !model.ValidPetItem(rw.PetItem) {
 			return "unknown pet_item"
 		}
+	} else if rw.PetAction == model.PetActionCharacter {
+		if model.PetCharacterName(rw.PetItem) == "" {
+			return "unknown character"
+		}
 	} else {
 		rw.PetItem = ""
 	}
@@ -274,7 +278,16 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 			choice = body.Pet
 		}
 	}
+	// A character needs no pick: the reward names it, and the server has the picture.
+	if petReward != nil && petReward.PetAction == model.PetActionCharacter {
+		choice = &PetChoice{}
+	}
 	if petReward != nil {
+		// One pet-care redemption at a time, from the check until it has
+		// taken effect: two quick taps on "Dragon" or the same hat would
+		// otherwise both pass the "already has it" check and both be charged.
+		h.pets.redeemMu.Lock()
+		defer h.pets.redeemMu.Unlock()
 		msg, err := h.pets.checkPetReward(r.Context(), user, petReward, choice)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to check pet")
@@ -293,7 +306,7 @@ func (h *RewardHandler) Redeem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		choice.item = "img:" + choice.Slot + ":" + id
-		if petReward.PetAction == model.PetActionPicture {
+		if petReward.PetAction == model.PetActionPicture || petReward.PetAction == model.PetActionCharacter {
 			choice.item = id
 		}
 		defer func() {
@@ -524,7 +537,8 @@ func (h *RewardHandler) GetSharedPool(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, pool)
 }
 
-// undoRedemption refunds a redemption (store.UndoRedemption). A gift or
+// undoRedemption refunds a redemption (store.UndoRedemption). A character
+// it bought is taken back too, if the animal is still that character. A gift or
 // playdate it paid for is taken back with it, and if one was queued the link
 // is synced straight away: the hub already holds the snapshot it went out
 // in, and until this family leaves a new one the other family could still
@@ -534,8 +548,22 @@ func undoRedemption(ctx context.Context, s *store.Store, f *friends.Service, id 
 	if err != nil {
 		return err
 	}
+	// Read before the refund, which deletes the redemption.
+	charUser, character, err := s.RedemptionCharacter(ctx, id)
+	if err != nil {
+		return err
+	}
 	if err := s.UndoRedemption(ctx, id); err != nil {
 		return err
+	}
+	// After the refund, so a refund that fails leaves the animal as it is.
+	// Without this the kid would keep the character and get the points back.
+	if character != "" {
+		if old, err := s.UndoPetCharacter(ctx, charUser, character, id); err != nil {
+			log.Printf("undo redemption %d: put back the drawn animal: %v", id, err)
+		} else if old != "" {
+			removePetImage(old)
+		}
 	}
 	if linkID != 0 && f != nil {
 		f.SyncSoon(ctx, linkID)

@@ -371,7 +371,39 @@ const (
 	PetActionPicture   = "picture"    // use your own picture as the animal (docs/custom-animals.md)
 	PetActionGift      = "gift"       // send a treat to a friend family's animal (docs/friends.md)
 	PetActionPlaydate  = "playdate"   // send your animal to play on a friend family's farm for the day
+	PetActionCharacter = "character"  // become one ready-made character (PetItem names it, PetCharacters)
 )
+
+// PetCharacter is a ready-made character picture a "character" reward
+// turns the animal into. The pictures ship with the server
+// (internal/sprite/characters) and each is its own reward, so it costs
+// what the parents set rather than the cheaper "picture" upload.
+type PetCharacter struct {
+	ID   string
+	Name string
+}
+
+// PetCharacters are the characters a "character" reward can give, in the
+// order they are offered.
+var PetCharacters = []PetCharacter{
+	{ID: "dragon", Name: "Dragon"},
+	{ID: "gnome", Name: "Christmas gnome"},
+	{ID: "hippogriff", Name: "Hippogriff"},
+	{ID: "unicorn", Name: "Unicorn"},
+	{ID: "yeti", Name: "Yeti"},
+	{ID: "phoenix", Name: "Phoenix"},
+	{ID: "griffin", Name: "Griffin"},
+}
+
+// PetCharacterName is the character's display name, or "" if id isn't one.
+func PetCharacterName(id string) string {
+	for _, c := range PetCharacters {
+		if c.ID == id {
+			return c.Name
+		}
+	}
+	return ""
+}
 
 // PetSpriteFrames is the order of the frames in a custom animal's picture
 // strip. A strip may stop early: a missing frame falls back to the first.
@@ -380,7 +412,7 @@ var PetSpriteFrames = []string{"stand", "walk1", "walk2", "sick", "lying", "happ
 // ValidPetAction reports whether a is a pet action or empty (ordinary reward).
 func ValidPetAction(a string) bool {
 	switch a {
-	case "", PetActionFeed, PetActionTreat, PetActionPlay, PetActionAccessory, PetActionNewAnimal, PetActionRestyle, PetActionDesign, PetActionPicture, PetActionGift, PetActionPlaydate:
+	case "", PetActionFeed, PetActionTreat, PetActionPlay, PetActionAccessory, PetActionNewAnimal, PetActionRestyle, PetActionDesign, PetActionPicture, PetActionGift, PetActionPlaydate, PetActionCharacter:
 		return true
 	}
 	return false
@@ -486,6 +518,9 @@ type Pet struct {
 	// SpriteApproved: a parent has said the picture may be sent to friend
 	// families. Cleared whenever the picture changes.
 	SpriteApproved bool `json:"sprite_approved,omitempty"`
+	// Character is set when the picture is a ready-made character from a
+	// "character" reward (PetCharacters), so that reward can show as owned.
+	Character string `json:"character,omitempty"`
 	// SpriteData is set instead of Sprite for a friend family's animal:
 	// its picture as a data: URL (it isn't a file on this server).
 	SpriteData string `json:"sprite_data,omitempty"`

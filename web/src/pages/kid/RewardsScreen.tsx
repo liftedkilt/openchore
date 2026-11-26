@@ -12,7 +12,7 @@ import { PictureSheet } from './farm/PictureSheet';
 import { FriendPickSheet } from './farm/FriendPickSheet';
 import { ReactingAnimal, reactionLine, type ReactionEvent } from './farm/PetReaction';
 import { Sheet } from './Sheet';
-import { needsPick } from './farm/petLook';
+import { needsPick, petRewardOwned } from './farm/petLook';
 import { PetRewardThumb } from './farm/PetRewardThumb';
 import fs from './farm/petSheet.module.css';
 import s from './kid.module.css';
@@ -193,7 +193,7 @@ export function RewardsScreen({ user, data, topBar, onRedeemed, onFarm }: Reward
             {pet && (
               <ul className={s.rewardList}>
                 {petRewards
-                  .filter(r => !(r.pet_action === 'accessory' && r.pet_item && pet.items.includes(r.pet_item)))
+                  .filter(r => !petRewardOwned(pet, r))
                   .map(reward => renderReward(reward, reward.pet_action === 'play' && !pet.can_play))}
               </ul>
             )}
