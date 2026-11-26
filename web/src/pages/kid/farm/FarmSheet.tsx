@@ -236,8 +236,8 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
           <p className={s.moodLine} aria-live="polite">
             {reaction ? reactionLine(t, pet, reaction.kind) : t(`kid.farm.mood.${pet.mood}`, { name: pet.name })}
           </p>
-          {!pet.days_left && <p className={s.hint}>{hint}</p>}
-          {!!pet.days_left && (
+          {(!pet.days_left || pet.healed_today) && <p className={s.hint}>{hint}</p>}
+          {!!pet.days_left && !pet.healed_today && (
             <p className={s.danger} role="status">
               {t('kid.farm.daysLeft', { count: pet.days_left, name: pet.name })}
             </p>

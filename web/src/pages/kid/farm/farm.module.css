@@ -535,17 +535,7 @@
   z-index: 4;
 }
 .graveItem { display: block; }
-.graveBtn {
-  display: block;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-}
-.graveBtn:disabled { cursor: default; }
-.graveBtn:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; border-radius: var(--r-well); }
+.grave { display: block; }
 .tombstone { position: relative; display: block; width: 54px; height: 63px; }
 .compact .tombstone { width: 40px; height: 47px; }
 .tombstoneArt { display: block; width: 100%; height: 100%; filter: var(--farm-art-filter); }

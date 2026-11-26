@@ -25,3 +25,8 @@ export function Tombstone({ name, className }: { name: string; className?: strin
     </span>
   );
 }
+
+/** A grave's YYYY-MM-DD date written out for the reader's language. */
+export function graveDate(day: string, lang: string): string {
+  return new Date(`${day}T12:00:00`).toLocaleDateString(lang, { day: 'numeric', month: 'long', year: 'numeric' });
+}

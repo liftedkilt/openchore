@@ -726,10 +726,10 @@
         "pictureChanged": "Das Bild wurde inzwischen geändert. Sieh es dir noch einmal an und kreuze es dann an.",
         "deathsToggle": "Tiere können sterben, wenn sie krank bleiben",
         "deathDaysLabel": "Stirbt nach",
-        "deathDaysUnit": "Tagen in Folge krank",
-        "deathsHelp": "Standardmäßig aus. Ein Tier, das so viele Tage in Folge krank beendet (Gesundheit unter 40), stirbt und hinterlässt einen Grabstein mit seinem Namen auf dem Hof; sein Besitzer kann ein neues adoptieren. Kinder sehen, wie viele Tage ihr krankes Tier noch hat. Beim Einschalten beginnt die Zählung für jedes Tier bei null, und pausierte Tage zählen nicht.",
-        "deathsOn_one": "Tiere sterben jetzt nach {{count}} Tag in Folge krank.",
-        "deathsOn_other": "Tiere sterben jetzt nach {{count}} Tagen in Folge krank.",
+        "deathDaysUnit": "Nächten in Folge krank mit verpassten Aufgaben",
+        "deathsHelp": "Standardmäßig aus. Ein Tier, das so viele Nächte in Folge nach verpassten Aufgaben krank beendet (Gesundheit unter 40), stirbt und hinterlässt einen Grabstein mit seinem Namen auf dem Hof; sein Besitzer kann ein neues adoptieren. Ein Tag, an dem alle Aufgaben erledigt sind, setzt die Zählung zurück, auch wenn das Tier noch krank ist. Wer seine Aufgaben macht, rettet sein Tier also immer. Tage ohne Aufgaben und pausierte Tage zählen in keine Richtung. Kinder sehen, wie viele Nächte ihr krankes Tier noch hat. Beim Einschalten beginnt die Zählung für jedes Tier bei null.",
+        "deathsOn_one": "Tiere sterben jetzt nach {{count}} Nacht in Folge krank mit verpassten Aufgaben.",
+        "deathsOn_other": "Tiere sterben jetzt nach {{count}} Nächten in Folge krank mit verpassten Aufgaben.",
         "deathsOff": "Tiere sterben nicht mehr.",
         "gravesTitle": "Gräber",
         "diedOn": "gestorben am {{date}}",
@@ -1574,7 +1574,7 @@
       "gravesTitle": "Hier in Erinnerung",
       "grave": "In Erinnerung an {{name}}, {{owner}}s Tier ({{species}}), gestorben am {{date}}.",
       "daysLeft_one": "{{name}} ist schwer krank. Wenn heute nicht alle Aufgaben erledigt werden, stirbt {{name}} heute Nacht.",
-      "daysLeft_other": "{{name}} ist schwer krank. Wenn {{name}} nach {{count}} weiteren Nächten noch krank ist, stirbt {{name}}. Erledige jeden Tag alle Aufgaben, dann wird {{name}} wieder gesund."
+      "daysLeft_other": "{{name}} ist schwer krank. Wenn in {{count}} weiteren Nächten Aufgaben verpasst werden, während {{name}} krank ist, stirbt {{name}}. Ein Tag mit allen erledigten Aufgaben nimmt die Gefahr weg."
     },
     "board": {
       "title": "Diese Woche",

@@ -9,7 +9,7 @@ import type { GoalCelebration, Pet, PetGrave } from '../../../types';
 import { FarmAnimal, petPicture, FarmBackdrop, Shelter } from './FarmAnimal';
 import { GoalDecoration } from './GoalDecoration';
 import { Rosette } from './Rosette';
-import { Tombstone } from './Tombstone';
+import { Tombstone, graveDate } from './Tombstone';
 import s from './farm.module.css';
 import { useFarmSeason } from './season';
 import { isPersonColor } from '../../../design/types';
@@ -166,11 +166,11 @@ export function FarmScene({ pets, graves, meId, compact, owners = !compact, goal
               name: g.name,
               owner: g.owner_name ?? '',
               species: t(`kid.farm.species.${g.species}`).toLowerCase(),
-              date: new Date(`${g.died_on}T12:00:00`).toLocaleDateString(i18n.language, { day: 'numeric', month: 'long', year: 'numeric' }),
+              date: graveDate(g.died_on, i18n.language),
             });
             return (
               <li key={g.id} className={clsx(s.graveItem, g.user_id === meId && s.mine)}>
-                <span className={s.graveBtn} role="img" aria-label={words} title={words}>
+                <span className={s.grave} role="img" aria-label={words} title={words}>
                   <Tombstone name={g.name} />
                 </span>
               </li>

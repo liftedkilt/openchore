@@ -232,12 +232,12 @@ func allTools() []*Tool {
 	add(endpoint{name: "set_farm_pets", title: "Farm pets settings",
 		desc: "Turn the optional farm pets on or off for the household, and set pet deaths. The first time they're turned on, " +
 			"a starter set of pet-care rewards (feed, treat, play, accessories) is added to the store. " +
-			"With death_days set, an animal that ends that many days in a row sick dies and leaves a tombstone with its name on the farm; " +
+			"With death_days set, an animal that ends that many nights in a row sick after missed chores dies (a day with every chore done resets the count) and leaves a tombstone with its name on the farm; " +
 			"turning deaths on starts every animal's count afresh. Confirm with the user before turning deaths on.",
 		method: http.MethodPut, path: "/admin/pets",
 		props: map[string]any{
 			"enabled":    boolean("On or off (omit to leave as is)."),
-			"death_days": integer("Days in a row sick before an animal dies: 0 = never (the default), or 2-60. Omit to leave as is."),
+			"death_days": integer("Nights in a row sick after missed chores before an animal dies: 0 = never (the default), or 2-60. Omit to leave as is."),
 		}})
 	add(endpoint{name: "remove_farm_grave", title: "Remove a tombstone from the farm",
 		desc:   "Take the tombstone of an animal that died off the farm (ids from list_farm_pets' graves). Confirm first.",

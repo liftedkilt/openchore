@@ -321,7 +321,7 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ enabled }),
     }),
-    /** Pet deaths: 0 = animals never die, or 2-60 days in a row sick. */
+    /** Pet deaths: 0 = animals never die, or 2-60 nights in a row sick after missed chores. */
     setDeathDays: (deathDays: number) => fetchWithAuth<{ enabled: boolean; rewards_added: number; death_days: number }>('/admin/pets', {
       method: 'PUT',
       body: JSON.stringify({ death_days: deathDays }),

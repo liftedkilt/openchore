@@ -211,4 +211,32 @@ func TestSickDaysAndDeath(t *testing.T) {
 	if DaysLeft(&model.Pet{Health: 10, SickDays: 5}, 0) != 0 {
 		t.Fatal("deaths off should never warn")
 	}
+
+	// Recovering but still below SickBelow: every chore done, so the nights
+	// don't count, even starving (food is bought with points).
+	for _, full := range []int{100, 0} {
+		p = &model.Pet{Health: 5, Fullness: full, SickDays: 1}
+		for _, day := range []string{"2026-11-25", "2026-11-26"} {
+			ApplyDay(p, day, DayResult{Counted: 3})
+			if p.SickDays != 0 || Dies(p, 2) {
+				t.Fatalf("recovering (food %d) on %s: %+v", full, day, p)
+			}
+		}
+		if p.Health >= SickBelow {
+			t.Fatalf("test wants a pet still sick, got %+v", p)
+		}
+	}
+	// A day with no chores neither counts nor clears it.
+	p = &model.Pet{Health: 10, Fullness: 0, SickDays: 1}
+	ApplyDay(p, "2026-11-25", DayResult{})
+	if p.SickDays != 1 {
+		t.Fatalf("free day: %+v", p)
+	}
+	// Today's chores all done: no "dies tonight" warning, since tonight
+	// clears the count.
+	p = &model.Pet{Health: 10, Fullness: 80, SickDays: 2, LastDayChecked: "2026-11-24"}
+	ShowToday(p, []model.ScheduledChore{{Category: model.CategoryCore, Completed: true, Available: true}}, "2026-11-24", false)
+	if p.Health >= SickBelow || DaysLeft(p, 3) != 0 {
+		t.Fatalf("healed today still warns: %+v days left %d", p, DaysLeft(p, 3))
+	}
 }

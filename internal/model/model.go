@@ -492,8 +492,9 @@ type Pet struct {
 	Items          []string  `json:"items"`               // owned accessories
 	LastMissedDate *string   `json:"last_missed_date,omitempty"`
 	LastDayChecked string    `json:"last_day_checked"`
-	// SickDays counts the finished, unpaused days in a row it ended sick
-	// (pet deaths, docs/pets.md).
+	// SickDays counts the nights in a row it ended sick after missed chores
+	// (pet deaths, docs/pets.md). A day with every chore done, or ending
+	// well, clears it; paused and chore-free days leave it as it is.
 	SickDays int `json:"sick_days"`
 	CreatedAt      time.Time `json:"created_at"`
 
@@ -502,8 +503,9 @@ type Pet struct {
 	// HealedToday: all of today's chores are done, so Health already shows
 	// the gain tonight's check will make real (pet.ShowToday).
 	HealedToday bool `json:"healed_today,omitempty"`
-	// DaysLeft: pet deaths are on and it's sick; this many more nights
-	// ending sick and it dies (1 = tonight). 0 = not in danger.
+	// DaysLeft: pet deaths are on, it's sick and today's chores aren't all
+	// done; this many more nights ending sick after missed chores and it
+	// dies (1 = tonight). 0 = not in danger.
 	DaysLeft int `json:"days_left,omitempty"`
 	Hiding  bool   `json:"hiding"` // missed chores yesterday and today's aren't done yet
 	Sick    bool   `json:"sick"`

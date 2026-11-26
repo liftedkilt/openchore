@@ -63,19 +63,30 @@ A parent can turn on **Animals can die if they stay sick** under Manage →
 Settings → Farm pets (or `PUT /api/admin/pets` with `death_days`, or the
 `set_farm_pets` MCP tool) and pick how many days, 2 to 60.
 
-- The nightly check counts the days in a row an animal *ends* sick (health
-  below 40). A day that ends at 40 or more resets the count; paused days
-  don't count and don't reset it.
+- The nightly check counts the nights in a row an animal *ends* sick (health
+  below 40) **after missed chores**. It counts neglect, not slow recovery:
+  - a night that ends at 40 or more resets the count;
+  - a day with every chore done resets it too, even if the animal is still
+    sick (and even if its food ran out, since food is bought with points), so
+    doing the chores always takes the danger away;
+  - a day with no chores, and a paused day, neither counts nor resets it.
 - When the count reaches the setting, the animal dies that night. It is
   removed (with its accessories and pictures) and a **tombstone with its
   name** is left in the corner of the farm, on the Today screen, the farm
   sheet and the wall display. Its owner can adopt a new animal.
-- A sick animal's sheet tells its owner how many more nights it can end sick
-  (`days_left`). Doing all of today's chores lifts the warning straight away
-  when it would bring the animal back above 40 (the same preview as above).
-- Turning deaths on, or turning farm pets back on, starts every animal's
-  count from zero, and shortening the time always leaves at least one night,
-  so no animal dies without warning.
+- A sick animal's sheet tells its owner how many more nights with missed
+  chores it can take (`days_left`). Once all of today's chores are done the
+  warning goes away straight away, since tonight resets the count.
+- No animal dies without warning:
+  - turning deaths on, or turning farm pets back on, starts every count from
+    zero, and shortening the time always leaves at least one night. These
+    caps are saved together with the settings in one transaction;
+  - a catch-up over several days (after the server was down) never kills an
+    animal; it leaves the count one short, so the owner sees "dies tonight"
+    for a day first;
+  - the nightly check only writes the count, or buries the animal, if
+    nothing changed since it read the pet, and it re-reads the death setting
+    at that moment.
 - A parent can remove a tombstone in Settings (`DELETE
   /api/admin/pets/graves/{id}`, `remove_farm_grave`). Graves are never sent
   to friend families.

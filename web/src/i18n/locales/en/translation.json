@@ -726,10 +726,10 @@
         "pictureChanged": "The picture changed while you were looking. Have another look, then tick it.",
         "deathsToggle": "Animals can die if they stay sick",
         "deathDaysLabel": "Dies after",
-        "deathDaysUnit": "days in a row sick",
-        "deathsHelp": "Off by default. An animal that ends this many days in a row sick (health below 40) dies and leaves a tombstone with its name on the farm, and its owner can adopt a new one. Kids see how many days their sick animal has left. Turning this on starts every animal's count from zero, and paused days don't count.",
-        "deathsOn_one": "Animals now die after {{count}} day in a row sick.",
-        "deathsOn_other": "Animals now die after {{count}} days in a row sick.",
+        "deathDaysUnit": "nights in a row sick with chores missed",
+        "deathsHelp": "Off by default. An animal that ends this many nights in a row sick (health below 40) after missed chores dies and leaves a tombstone with its name on the farm, and its owner can adopt a new one. A day with every chore done clears the count, even if the animal is still sick, so doing the chores always saves it. Days with no chores and paused days don't count either way. Kids see how many nights their sick animal has left. Turning this on starts every animal's count from zero.",
+        "deathsOn_one": "Animals now die after {{count}} night in a row sick with chores missed.",
+        "deathsOn_other": "Animals now die after {{count}} nights in a row sick with chores missed.",
         "deathsOff": "Animals will no longer die.",
         "gravesTitle": "Graves",
         "diedOn": "died {{date}}",
@@ -1574,7 +1574,7 @@
       "gravesTitle": "Remembered here",
       "grave": "In memory of {{name}}, {{owner}}'s {{species}}, who died on {{date}}.",
       "daysLeft_one": "{{name}} is seriously ill. If today's chores aren't all done, {{name}} will die tonight.",
-      "daysLeft_other": "{{name}} is seriously ill. If {{name}} is still sick after {{count}} more nights, {{name}} will die. Doing all your chores each day makes {{name}} better."
+      "daysLeft_other": "{{name}} is seriously ill. If chores are missed on {{count}} more nights while {{name}} is sick, {{name}} will die. A day with all your chores done takes the danger away."
     },
     "board": {
       "title": "This week",

@@ -65,9 +65,17 @@ func ApplyDay(p *model.Pet, date string, d DayResult) {
 		p.Health -= StarveHealth
 	}
 	p.Health = clamp(p.Health)
-	if p.Health < SickBelow {
+	// Pet deaths count neglect, not slow recovery: only a night that ends
+	// sick after missed chores counts. A day with every chore done clears the
+	// count even if the animal is still sick, so doing the chores always
+	// takes the danger away (and food, which points buy, never decides it).
+	// A day with no chores leaves the count as it is.
+	switch {
+	case p.Health >= SickBelow:
+		p.SickDays = 0
+	case d.Missed > 0:
 		p.SickDays++
-	} else {
+	case d.Counted > 0:
 		p.SickDays = 0
 	}
 }
@@ -78,12 +86,13 @@ func Dies(p *model.Pet, deathDays int) bool {
 	return deathDays > 0 && p.SickDays >= deathDays
 }
 
-// DaysLeft is how many more nights the pet can end sick before it dies
-// (1 = it dies tonight unless today's chores make it better), or 0 when it
-// isn't in danger: deaths are off or it isn't sick. Call after ShowToday, so
-// a kid who has done today's chores sees the danger lift straight away.
+// DaysLeft is how many more nights with missed chores the pet can end sick
+// before it dies (1 = it dies tonight if today's chores aren't all done), or
+// 0 when it isn't in danger: deaths are off, it isn't sick, or today's chores
+// are all done (that clears the count tonight). Call after ShowToday, so a
+// kid who has done today's chores sees the danger lift straight away.
 func DaysLeft(p *model.Pet, deathDays int) int {
-	if deathDays <= 0 || p.Health >= SickBelow {
+	if deathDays <= 0 || p.Health >= SickBelow || p.HealedToday {
 		return 0
 	}
 	return max(1, deathDays-p.SickDays)

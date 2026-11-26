@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 
 	"github.com/liftedkilt/openchore/internal/model"
 )
@@ -199,11 +200,15 @@ func (s *Store) SetPetSpriteApproved(ctx context.Context, userID int64, sprite s
 
 // SavePetDay stores the outcome of one or more daily checks. The
 // last_day_checked guard makes a concurrent or repeated run a no-op.
-func (s *Store) SavePetDay(ctx context.Context, p *model.Pet, prevDayChecked string) (bool, error) {
+//
+// prevSickDays guards the sick-day count the same way: a parent turning pet
+// deaths on, or shortening them, caps every count (SetPetSettings), and a
+// check that loaded the old count before that must not write it back.
+func (s *Store) SavePetDay(ctx context.Context, p *model.Pet, prevDayChecked string, prevSickDays int) (bool, error) {
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE pets SET health = ?, fullness = ?, joy = ?, last_missed_date = ?, last_day_checked = ?, sick_days = ?
-		 WHERE id = ? AND last_day_checked = ?`,
-		p.Health, p.Fullness, p.Joy, p.LastMissedDate, p.LastDayChecked, p.SickDays, p.ID, prevDayChecked)
+		 WHERE id = ? AND last_day_checked = ? AND sick_days = ?`,
+		p.Health, p.Fullness, p.Joy, p.LastMissedDate, p.LastDayChecked, p.SickDays, p.ID, prevDayChecked, prevSickDays)
 	if err != nil {
 		return false, err
 	}
@@ -239,13 +244,23 @@ func (s *Store) CountPetRewards(ctx context.Context) (int, error) {
 // accessories), leaving a grave on the farm. Like SavePetDay, the
 // last_day_checked guard makes a concurrent or repeated run a no-op; it
 // reports whether this call did it.
-func (s *Store) BuryPet(ctx context.Context, p *model.Pet, prevDayChecked, diedOn string) (bool, error) {
+//
+// It only goes ahead if nothing changed since the check loaded the pet (the
+// same last_day_checked and sick_days) and the settings stored right now
+// still say it dies: farm pets on, and pet deaths on with at most
+// p.SickDays days. Otherwise it reports false and changes nothing.
+func (s *Store) BuryPet(ctx context.Context, p *model.Pet, prevDayChecked string, prevSickDays int, diedOn string) (bool, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return false, err
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `DELETE FROM pets WHERE id = ? AND last_day_checked = ?`, p.ID, prevDayChecked)
+	res, err := tx.ExecContext(ctx,
+		`DELETE FROM pets WHERE id = ? AND last_day_checked = ? AND sick_days = ?
+		   AND EXISTS (SELECT 1 FROM app_settings WHERE key = ? AND value = 'true')
+		   AND EXISTS (SELECT 1 FROM app_settings WHERE key = ?
+		               AND CAST(value AS INTEGER) BETWEEN 1 AND ?)`,
+		p.ID, prevDayChecked, prevSickDays, SettingPetsEnabled, SettingPetDeathDays, p.SickDays)
 	if err != nil {
 		return false, err
 	}
@@ -290,10 +305,89 @@ func (s *Store) DeletePetGrave(ctx context.Context, id int64) (bool, error) {
 	return n > 0, nil
 }
 
-// CapPetSickDays lowers every pet's sick-day count to at most n, so turning
-// pet deaths on (n = 0) or shortening the time never kills an animal
-// without a night's warning.
-func (s *Store) CapPetSickDays(ctx context.Context, n int) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE pets SET sick_days = MIN(sick_days, ?)`, max(n, 0))
-	return err
+// Farm pet settings, shared by the API and the nightly check.
+const (
+	SettingPetsEnabled  = "pets_enabled"
+	SettingPetDeathDays = "pets_death_days" // nights in a row sick after missed chores; "" or "0" = never
+)
+
+// ParsePetDeathDays reads a stored pets_death_days value (0 = off).
+func ParsePetDeathDays(v string) int {
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
+}
+
+// SetPetSettings saves farm pets on/off and, when deathDays isn't nil, the
+// pet deaths setting, in one transaction with the sick-day caps they need,
+// so an animal never dies without a night's warning:
+//   - turning farm pets on (no deaths happen while they're off, but the
+//     nightly check still counts) starts every count afresh;
+//   - turning deaths on starts every count afresh, and a shorter time leaves
+//     every animal at least one night.
+//
+// Callers validate first. It returns the death setting now in force.
+func (s *Store) SetPetSettings(ctx context.Context, enabled bool, deathDays *int) (int, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	get := func(key string) (string, error) {
+		var v string
+		err := tx.QueryRowContext(ctx, `SELECT value FROM app_settings WHERE key = ?`, key).Scan(&v)
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return v, err
+	}
+	set := func(key, v string) error {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, v)
+		return err
+	}
+	capTo := func(n int) error {
+		_, err := tx.ExecContext(ctx, `UPDATE pets SET sick_days = MIN(sick_days, ?)`, max(n, 0))
+		return err
+	}
+	on, err := get(SettingPetsEnabled)
+	if err != nil {
+		return 0, err
+	}
+	v, err := get(SettingPetDeathDays)
+	if err != nil {
+		return 0, err
+	}
+	cur := ParsePetDeathDays(v)
+	if enabled && on != "true" {
+		if err := capTo(0); err != nil {
+			return 0, err
+		}
+	}
+	if deathDays != nil {
+		n := *deathDays
+		switch {
+		case n > 0 && cur == 0:
+			err = capTo(0)
+		case n > 0 && n < cur:
+			err = capTo(n - 1)
+		}
+		if err != nil {
+			return 0, err
+		}
+		if err := set(SettingPetDeathDays, strconv.Itoa(n)); err != nil {
+			return 0, err
+		}
+		cur = n
+	}
+	val := "false"
+	if enabled {
+		val = "true"
+	}
+	if err := set(SettingPetsEnabled, val); err != nil {
+		return 0, err
+	}
+	return cur, tx.Commit()
 }

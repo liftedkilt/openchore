@@ -361,7 +361,7 @@ export interface Pet {
   healed_today?: boolean;
   /** Pet deaths are on and it's sick: this many more nights ending sick and it dies (1 = tonight). */
   days_left?: number;
-  /** Finished days in a row it ended sick. */
+  /** Nights in a row it ended sick after missed chores (a day with every chore done resets it). */
   sick_days?: number;
   hiding: boolean;
   sick: boolean;

@@ -6,13 +6,13 @@ import clsx from 'clsx';
 import { api, APIError } from '../../api';
 import type { Pet, PetGrave } from '../../types';
 import { FarmAnimal, petPicture } from '../../pages/kid/farm/FarmAnimal';
-import { Tombstone } from '../../pages/kid/farm/Tombstone';
+import { Tombstone, graveDate } from '../../pages/kid/farm/Tombstone';
 import { FormMessage } from './FormMessage';
 import ui from './ui.module.css';
 import fp from './FarmPetsSection.module.css';
 
 export const FarmPetsSection: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [pets, setPets] = useState<Pet[]>([]);
   const [graves, setGraves] = useState<PetGrave[]>([]);
@@ -204,7 +204,7 @@ export const FarmPetsSection: React.FC = () => {
               <li key={g.id} className={fp.row}>
                 <Tombstone name={g.name} className={fp.graveThumb} />
                 <span className={fp.text}>
-                  <strong>{g.name}</strong> · {g.owner_name} · {t('admin.settingsTab.pets.diedOn', { date: g.died_on })}
+                  <strong>{g.name}</strong> · {g.owner_name} · {t('admin.settingsTab.pets.diedOn', { date: graveDate(g.died_on, i18n.language) })}
                 </span>
                 <button type="button" className={confirmingGrave === g.id ? ui.btnDanger : ui.btnGhost} onClick={() => removeGrave(g)}>
                   {confirmingGrave === g.id ? t('admin.settingsTab.pets.confirmRemove') : t('admin.settingsTab.pets.removeGrave')}

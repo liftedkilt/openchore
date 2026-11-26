@@ -3,7 +3,6 @@ package webhook
 import (
 	"context"
 	"log"
-	"strconv"
 	"time"
 
 	"github.com/liftedkilt/openchore/internal/model"
@@ -17,8 +16,8 @@ import (
 // the gap (pets are only stored when the feature was on).
 //
 // With pet deaths on (the pets_death_days setting), an animal that ends that
-// many days in a row sick dies: it's removed and a grave with its name is
-// left on the farm.
+// many nights in a row sick after missed chores dies: it's removed and a
+// grave with its name is left on the farm.
 type PetChecker struct {
 	store    *store.Store
 	interval time.Duration
@@ -29,17 +28,13 @@ type PetChecker struct {
 }
 
 // SettingPetDeathDays is how many days in a row an animal can end sick
-// before it dies; "" or "0" means animals never die.
-const SettingPetDeathDays = "pets_death_days"
+// after missed chores before it dies; "" or "0" means animals never die.
+const SettingPetDeathDays = store.SettingPetDeathDays
 
 // PetDeathDays reads the pet deaths setting (0 = off).
 func PetDeathDays(ctx context.Context, s *store.Store) int {
 	v, _ := s.GetSetting(ctx, SettingPetDeathDays)
-	n, err := strconv.Atoi(v)
-	if err != nil || n < 0 {
-		return 0
-	}
-	return n
+	return store.ParsePetDeathDays(v)
 }
 
 func NewPetChecker(s *store.Store) *PetChecker {
@@ -73,7 +68,7 @@ func (pc *PetChecker) check(ctx context.Context, now time.Time) {
 	}
 	yesterday := now.AddDate(0, 0, -1).Format(model.DateFormat)
 	deathDays := 0
-	if on, _ := pc.store.GetSetting(ctx, "pets_enabled"); on == "true" {
+	if on, _ := pc.store.GetSetting(ctx, store.SettingPetsEnabled); on == "true" {
 		deathDays = PetDeathDays(ctx, pc.store)
 	}
 	for i := range pets {
@@ -101,7 +96,11 @@ func (pc *PetChecker) catchUp(ctx context.Context, p *model.Pet, yesterday strin
 	if err != nil || user == nil {
 		return err
 	}
-	prev := p.LastDayChecked
+	prev, prevSick := p.LastDayChecked, p.SickDays
+	// One night's check can be fatal; a catch-up over several days (after
+	// downtime) can't, so the owner always sees the "dies tonight" warning
+	// for at least one real day first.
+	single := start.Equal(end)
 	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
 		date := d.Format(model.DateFormat)
 		var res pet.DayResult
@@ -118,20 +117,27 @@ func (pc *PetChecker) catchUp(ctx context.Context, p *model.Pet, yesterday strin
 		}
 		pet.ApplyDay(p, date, res)
 		p.LastDayChecked = date
-		if pet.Dies(p, deathDays) {
-			buried, err := pc.store.BuryPet(ctx, p, prev, date)
-			if err != nil {
-				return err
-			}
-			if buried {
-				log.Printf("pets: %s (user %d) died on %s after %d days sick", p.Name, p.UserID, date, p.SickDays)
-				if pc.OnDeath != nil {
-					pc.OnDeath(p)
-				}
+	}
+	if single && pet.Dies(p, deathDays) {
+		// BuryPet re-checks the setting and the stored count, so a parent
+		// turning deaths off or lengthening them meanwhile wins.
+		buried, err := pc.store.BuryPet(ctx, p, prev, prevSick, p.LastDayChecked)
+		if err != nil {
+			return err
+		}
+		if buried {
+			log.Printf("pets: %s (user %d) died on %s after %d days sick", p.Name, p.UserID, p.LastDayChecked, p.SickDays)
+			if pc.OnDeath != nil {
+				pc.OnDeath(p)
 			}
 			return nil
 		}
 	}
-	_, err = pc.store.SavePetDay(ctx, p, prev)
+	if !single && deathDays > 0 {
+		p.SickDays = min(p.SickDays, deathDays-1)
+	}
+	// Guarded on the count this run started from: if a parent capped it
+	// meanwhile, nothing is written and the next tick starts afresh.
+	_, err = pc.store.SavePetDay(ctx, p, prev, prevSick)
 	return err
 }

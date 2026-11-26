@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -24,7 +23,7 @@ import (
 // ordinary rewards that carry a pet_action.
 
 const (
-	settingPetsEnabled = "pets_enabled"
+	settingPetsEnabled = store.SettingPetsEnabled
 	maxPetNameLen      = 24
 	// maxPetDeathDays is the longest "dies after this many days sick" a
 	// parent can pick.
@@ -50,8 +49,9 @@ func petsEnabled(ctx context.Context, s *store.Store) bool {
 	return v == "true"
 }
 
-// describe fills in mood and owner details for one pet.
-func (h *PetHandler) describe(ctx context.Context, p *model.Pet, owner *model.User) error {
+// describe fills in mood and owner details for one pet. deathDays is the
+// pet deaths setting, read once per request by the caller.
+func (h *PetHandler) describe(ctx context.Context, p *model.Pet, owner *model.User, deathDays int) error {
 	now := h.now()
 	today := now.Format(model.DateFormat)
 	yesterday := now.AddDate(0, 0, -1).Format(model.DateFormat)
@@ -66,7 +66,7 @@ func (h *PetHandler) describe(ctx context.Context, p *model.Pet, owner *model.Us
 	}
 	pet.ShowToday(p, chores, yesterday, owner != nil && owner.Paused)
 	pet.Describe(p, yesterday, pet.CaughtUp(chores))
-	p.DaysLeft = pet.DaysLeft(p, webhook.PetDeathDays(ctx, h.store))
+	p.DaysLeft = pet.DaysLeft(p, deathDays)
 	if owner != nil {
 		p.OwnerName = owner.Name
 		p.OwnerColor = owner.Color
@@ -78,6 +78,7 @@ func (h *PetHandler) describe(ctx context.Context, p *model.Pet, owner *model.Us
 func (h *PetHandler) Farm(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	enabled := petsEnabled(ctx, h.store)
+	deathDays := webhook.PetDeathDays(ctx, h.store)
 	out := map[string]any{
 		"enabled": enabled,
 		"species": model.PetSpecies,
@@ -85,9 +86,9 @@ func (h *PetHandler) Farm(w http.ResponseWriter, r *http.Request) {
 		"colors":  model.PetColors,
 		"pets":    []model.Pet{},
 		"graves":  []model.PetGrave{},
-		// death_days: animals that end this many days in a row sick die
-		// (0 = never).
-		"death_days": webhook.PetDeathDays(ctx, h.store),
+		// death_days: animals that end this many nights in a row sick
+		// after missed chores die (0 = never).
+		"death_days": deathDays,
 	}
 	if !enabled {
 		writeJSON(w, http.StatusOK, out)
@@ -112,7 +113,7 @@ func (h *PetHandler) Farm(w http.ResponseWriter, r *http.Request) {
 		ribbons = h.Ribbons(ctx)
 	}
 	for i := range pets {
-		if err := h.describe(ctx, &pets[i], byID[pets[i].UserID]); err != nil {
+		if err := h.describe(ctx, &pets[i], byID[pets[i].UserID], deathDays); err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to describe pet")
 			return
 		}
@@ -156,7 +157,7 @@ func (h *PetHandler) Mine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if p != nil {
-		if err := h.describe(ctx, p, u); err != nil {
+		if err := h.describe(ctx, p, u, webhook.PetDeathDays(ctx, h.store)); err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to describe pet")
 			return
 		}
@@ -222,7 +223,7 @@ func (h *PetHandler) Adopt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, _ = h.store.GetPetForUser(ctx, u.ID)
-	if err := h.describe(ctx, p, u); err != nil {
+	if err := h.describe(ctx, p, u, webhook.PetDeathDays(ctx, h.store)); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to describe pet")
 		return
 	}
@@ -297,7 +298,7 @@ func (h *PetHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	p, _ = h.store.GetPetForUser(ctx, u.ID)
-	if err := h.describe(ctx, p, u); err != nil {
+	if err := h.describe(ctx, p, u, webhook.PetDeathDays(ctx, h.store)); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to describe pet")
 		return
 	}
@@ -339,49 +340,21 @@ func (h *PetHandler) SetEnabled(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	wasEnabled := petsEnabled(ctx, h.store)
-	enabled := wasEnabled
-	if req.Enabled != nil {
-		enabled = *req.Enabled
-	}
-	deathDays := webhook.PetDeathDays(ctx, h.store)
-	if enabled && !wasEnabled {
-		// No deaths happen while pets are off, but the nightly check still
-		// counts sick days; start them afresh so nobody dies the first night.
-		if err := h.store.CapPetSickDays(ctx, 0); err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to save setting")
-			return
-		}
-	}
+	// Check everything before anything is written.
 	if req.DeathDays != nil {
-		n := *req.DeathDays
-		if n != 0 && (n < 2 || n > maxPetDeathDays) {
+		if n := *req.DeathDays; n != 0 && (n < 2 || n > maxPetDeathDays) {
 			writeError(w, http.StatusBadRequest, "death_days must be 0 (off) or 2-60")
 			return
 		}
-		// Never a death without a night's warning: turning deaths on starts
-		// every count afresh, and a shorter time leaves at least one night.
-		if n > 0 && (deathDays == 0 || n < deathDays) {
-			keep := n - 1
-			if deathDays == 0 {
-				keep = 0
-			}
-			if err := h.store.CapPetSickDays(ctx, keep); err != nil {
-				writeError(w, http.StatusInternalServerError, "failed to save setting")
-				return
-			}
-		}
-		if err := h.store.SetSetting(ctx, webhook.SettingPetDeathDays, strconv.Itoa(n)); err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to save setting")
-			return
-		}
-		deathDays = n
 	}
-	val := "false"
-	if enabled {
-		val = "true"
+	enabled := petsEnabled(ctx, h.store)
+	if req.Enabled != nil {
+		enabled = *req.Enabled
 	}
-	if err := h.store.SetSetting(ctx, settingPetsEnabled, val); err != nil {
+	// One transaction: both settings plus the sick-day caps that keep a
+	// death from ever coming without a night's warning (store.SetPetSettings).
+	deathDays, err := h.store.SetPetSettings(ctx, enabled, req.DeathDays)
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to save setting")
 		return
 	}
@@ -564,7 +537,7 @@ func (h *PetHandler) checkPetReward(ctx context.Context, u *model.User, rw *mode
 	}
 	switch rw.PetAction {
 	case model.PetActionPlay:
-		if err := h.describe(ctx, p, u); err != nil {
+		if err := h.describe(ctx, p, u, webhook.PetDeathDays(ctx, h.store)); err != nil {
 			return "", err
 		}
 		if p.Hiding {
@@ -608,7 +581,7 @@ func (h *PetHandler) checkPetReward(ctx context.Context, u *model.User, rw *mode
 			return "choose a friend", nil
 		}
 		if rw.PetAction == model.PetActionPlaydate {
-			if err := h.describe(ctx, p, u); err != nil {
+			if err := h.describe(ctx, p, u, webhook.PetDeathDays(ctx, h.store)); err != nil {
 				return "", err
 			}
 			if p.Hiding {
