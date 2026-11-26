@@ -15,8 +15,8 @@ func TestPeriodRange_Week(t *testing.T) {
 		{
 			name:      "Wednesday mid-week",
 			ref:       time.Date(2026, 3, 25, 0, 0, 0, 0, time.UTC), // Wednesday
-			wantStart: "2026-03-23",                                   // Monday
-			wantEnd:   "2026-03-29",                                   // Sunday
+			wantStart: "2026-03-23",                                 // Monday
+			wantEnd:   "2026-03-29",                                 // Sunday
 		},
 		{
 			name:      "Monday (start of week)",
@@ -39,14 +39,14 @@ func TestPeriodRange_Week(t *testing.T) {
 		{
 			name:      "week spanning month boundary",
 			ref:       time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC), // Wednesday
-			wantStart: "2026-03-30",                                   // Monday
-			wantEnd:   "2026-04-05",                                   // Sunday
+			wantStart: "2026-03-30",                                // Monday
+			wantEnd:   "2026-04-05",                                // Sunday
 		},
 		{
 			name:      "week spanning year boundary",
 			ref:       time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC), // Wednesday
-			wantStart: "2025-12-29",                                    // Monday
-			wantEnd:   "2026-01-04",                                    // Sunday
+			wantStart: "2025-12-29",                                  // Monday
+			wantEnd:   "2026-01-04",                                  // Sunday
 		},
 	}
 

@@ -1348,8 +1348,8 @@ func TestSchedulePointsMultiplier(t *testing.T) {
 	}, adminHeaders())
 
 	resp := env.expectStatus(t, "POST", "/api/chores/1/schedules", map[string]any{
-		"assigned_to":      kidID,
-		"day_of_week":      3,
+		"assigned_to":       kidID,
+		"day_of_week":       3,
 		"points_multiplier": 2.0,
 	}, adminHeaders(), http.StatusCreated)
 	var schedule map[string]any
@@ -2445,7 +2445,6 @@ func TestAutoContributeRoundsAndKeepsRemainder(t *testing.T) {
 		})
 	}
 }
-
 
 // =================== BCRYPT PASSCODE TESTS ===================
 

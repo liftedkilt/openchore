@@ -1,8 +1,8 @@
 package api
 
 import (
-	"errors"
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"sync"
@@ -21,8 +21,8 @@ type ChoreHandler struct {
 	store      *store.Store
 	dispatcher *webhook.Dispatcher
 	discord    *discord.Notifier
-	aiSvc      *AIServices    // optional AI and read-aloud audio
-	reviews    sync.WaitGroup // in-flight background photo reviews
+	aiSvc      *AIServices      // optional AI and read-aloud audio
+	reviews    sync.WaitGroup   // in-flight background photo reviews
 	friends    *friends.Service // optional; undoing a gift's purchase resyncs its link
 }
 
@@ -1236,8 +1236,6 @@ func (h *ChoreHandler) Excuse(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusCreated, completion)
 }
-
-
 
 // completerFor decides whose completion this is (and so who is credited).
 // It defaults to the schedule's assignee, so a parent ticking a kid's chore

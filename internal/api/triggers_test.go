@@ -312,7 +312,6 @@ func TestFireTrigger_NoAssignee(t *testing.T) {
 	}
 }
 
-
 // ===== allow_repeat: post a chore more than once a day =====
 
 func fireTriggerStatus(t *testing.T, env *testEnv, uuid string) int {

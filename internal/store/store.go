@@ -1012,7 +1012,6 @@ func (s *Store) ReverseAutoContributeReversals(ctx context.Context, completionID
 	return err
 }
 
-
 func (s *Store) GetSchedule(ctx context.Context, id int64) (*model.ChoreSchedule, error) {
 	cs := &model.ChoreSchedule{}
 	err := s.db.QueryRowContext(ctx,
@@ -1056,10 +1055,10 @@ func (s *Store) GetCompletion(ctx context.Context, id int64) (*model.ChoreComple
 }
 
 type PendingCompletionRow struct {
-	ID             int64     `json:"id"`
-	ChoreID        int64     `json:"chore_id"`
-	ChoreTitle     string    `json:"chore_title"`
-	ChildName      string    `json:"child_name"`
+	ID         int64  `json:"id"`
+	ChoreID    int64  `json:"chore_id"`
+	ChoreTitle string `json:"chore_title"`
+	ChildName  string `json:"child_name"`
 	// AssignedUserID is the user_id the underlying schedule is assigned to
 	// (i.e. the kid the chore "belongs to"), which may differ from the user
 	// who clicked "complete" (see ChildName) in sibling/FCFS scenarios.
@@ -1747,12 +1746,12 @@ func (s *Store) SetRewardAssignments(ctx context.Context, rewardID int64, assign
 
 // UpdateReward applies admin edits and, when the shareable flag transitions,
 // keeps existing kid commitments coherent:
-//   * shareable false → true: any active personal commits on this reward
+//   - shareable false → true: any active personal commits on this reward
 //     migrate into a new shared pool so siblings end up in the same pool
 //     instead of disconnected personal silos. Each kid's saved amount is
 //     preserved (it's derived from ledger rows referencing the commitment
 //     row, which we don't touch).
-//   * shareable true → false: refuse if there's an active shared pool with
+//   - shareable true → false: refuse if there's an active shared pool with
 //     contributors — the admin must redeem or cancel it first. Otherwise
 //     untying the pool from the reward leaves a half-state nobody can fix.
 func (s *Store) UpdateReward(ctx context.Context, r *model.Reward) error {

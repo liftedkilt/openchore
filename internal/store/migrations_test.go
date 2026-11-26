@@ -358,4 +358,3 @@ func TestMigration030FriendConfirmKeepsChildRows(t *testing.T) {
 	}
 	assertChildren("re-up")
 }
-

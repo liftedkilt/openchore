@@ -162,4 +162,3 @@ func TestParseInviteValidatesLink(t *testing.T) {
 		}
 	}
 }
-

@@ -1751,4 +1751,3 @@ func TestFriendInviteConfirmAndDecline(t *testing.T) {
 		t.Fatal("Ava not found on B's leaderboard for streak check")
 	}
 }
-
