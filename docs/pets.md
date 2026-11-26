@@ -36,7 +36,9 @@ check will give it, so a sick animal perks up when the kid finishes rather
 than the next morning. It is only a preview: un-ticking a chore or a rejection
 takes it away again, and the nightly check is still what records it (nothing
 is counted twice). If the food will run out tonight, the preview also takes
-off the −10 for that, so it shows +5 until the animal is fed. A chore that only unlocks later in the day has to be done
+off the −10 for that, so it shows +5 until the animal has enough food to last
+the night (more than 20). A paused person's animal gets no preview, since
+nothing changes for it overnight. A chore that only unlocks later in the day has to be done
 too.
 
 "Done" means completed (approved or waiting for a grown-up), excused, or a

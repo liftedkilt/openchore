@@ -6,7 +6,11 @@
 // to pay your way out of chores.
 package pet
 
-import "github.com/liftedkilt/openchore/internal/model"
+import (
+	"time"
+
+	"github.com/liftedkilt/openchore/internal/model"
+)
 
 // Tunables. Keep docs/pets.md in step.
 const (
@@ -27,6 +31,10 @@ const (
 	HungryBelow   = 30
 	BoredBelow    = 30
 	HappyAtLeast  = 70
+
+	// CatchUpDays caps how many unchecked days one nightly run applies
+	// (e.g. after the server was down), so a long outage can't flatten a pet.
+	CatchUpDays = 7
 )
 
 // DayResult is what a person's chores looked like on one day.
@@ -68,21 +76,40 @@ func ApplyDay(p *model.Pet, date string, d DayResult) {
 // ApplyDay is still what makes it real, and un-ticking a chore (or a
 // rejection) takes the preview away again. Call it before Describe.
 //
-// The preview is what tonight's ApplyDay will really give: if the food will
-// run out tonight, the StarveHealth it costs is taken off too, so the
-// animal doesn't look better now than it will tomorrow morning. Feeding it
-// before bedtime brings the full gain back into the preview.
-func ShowToday(p *model.Pet, today []model.ScheduledChore) {
+// The gain shown is what tonight's ApplyDay will give for a done day. If the
+// food will run out tonight, the StarveHealth it costs is taken off too, so
+// the animal doesn't look better now than it will tomorrow morning. Days the
+// nightly check hasn't reached yet (just after midnight, or after downtime)
+// will eat DailyHunger each first, so they count toward running out. A
+// paused owner gets no preview: ApplyDay leaves their animal as it is.
+// yesterday is the day before today.
+func ShowToday(p *model.Pet, today []model.ScheduledChore, yesterday string, paused bool) {
+	if paused {
+		return
+	}
 	d := Summarize(today)
 	if d.Counted == 0 || d.Missed > 0 {
 		return
 	}
+	fullness := p.Fullness - DailyHunger*pendingDays(p.LastDayChecked, yesterday)
 	gain := GoodDayHealth
-	if clamp(p.Fullness-DailyHunger) == 0 {
+	if clamp(fullness-DailyHunger) == 0 {
 		gain -= StarveHealth
 	}
 	p.Health = clamp(p.Health + gain)
 	p.HealedToday = true
+}
+
+// pendingDays is how many finished days after lastChecked, up to and
+// including yesterday, the nightly check still has to apply (at most
+// CatchUpDays, as it does).
+func pendingDays(lastChecked, yesterday string) int {
+	last, err1 := time.Parse(model.DateFormat, lastChecked)
+	end, err2 := time.Parse(model.DateFormat, yesterday)
+	if err1 != nil || err2 != nil || !end.After(last) {
+		return 0
+	}
+	return min(CatchUpDays, int(end.Sub(last).Hours()/24+0.5))
 }
 
 // Effect is what a pet-care reward does to fullness and joy.
