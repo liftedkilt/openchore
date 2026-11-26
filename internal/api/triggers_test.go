@@ -651,6 +651,12 @@ func TestFCFS_KidCannotUndoSiblingsChore(t *testing.T) {
 		t.Errorf("Bob's copy was undone by his own tap")
 	}
 
+	// Alice's own copy isn't shown as done by a sibling (the kid app would
+	// then refuse to let her undo it).
+	if c := fcfsCopy(t, env, alice, today); !c.Completed || c.CompletedBySibling {
+		t.Errorf("Alice's own copy: completed=%v bySibling=%v, want done by her, not a sibling", c.Completed, c.CompletedBySibling)
+	}
+
 	// Alice can undo her own.
 	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/%d/complete?date=%s", aliceSched, today), nil, childHeaders(alice), http.StatusNoContent)
 	if got := env.balance(t, alice); got != 0 {

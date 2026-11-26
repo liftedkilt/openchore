@@ -526,6 +526,9 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			   AND cc2.completion_date = ?
 			   AND cc2.uncompleted_at IS NULL
 			   AND cc2.status IN ('approved', 'pending')
+			   -- Not the 0-point copies this person's own completion made
+			   -- on the others' schedules.
+			   AND cc2.completed_by != cs.assigned_to
 			 LIMIT 1) as completed_by_sibling_name
 		FROM chore_schedules cs
 		JOIN chores c ON c.id = cs.chore_id
