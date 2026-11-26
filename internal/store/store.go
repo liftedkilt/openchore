@@ -4122,7 +4122,7 @@ func (s *Store) ReportKidSummaries(ctx context.Context, startDate, endDate strin
 			FROM point_transactions pt
 			WHERE pt.amount > 0
 			AND pt.reason IN ('chore_complete', 'streak_bonus')
-			AND DATE(pt.created_at) >= ? AND DATE(pt.created_at) <= ?
+			AND DATE(pt.created_at, 'localtime') >= ? AND DATE(pt.created_at, 'localtime') <= ?
 			GROUP BY pt.user_id
 		) earned ON earned.user_id = u.id
 		LEFT JOIN user_streaks us ON us.user_id = u.id
@@ -4296,7 +4296,7 @@ func (s *Store) ReportPointsSummary(ctx context.Context, startDate, endDate stri
 		FROM users u
 		LEFT JOIN point_transactions pt
 			ON pt.user_id = u.id
-			AND DATE(pt.created_at) >= ? AND DATE(pt.created_at) <= ?
+			AND DATE(pt.created_at, 'localtime') >= ? AND DATE(pt.created_at, 'localtime') <= ?
 		WHERE ` + participantFilter + `
 		GROUP BY u.id, u.name
 		ORDER BY u.name`

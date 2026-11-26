@@ -14,6 +14,7 @@ import (
 
 	"github.com/liftedkilt/openchore/internal/friends"
 	"github.com/liftedkilt/openchore/internal/hub"
+	"github.com/liftedkilt/openchore/internal/model"
 )
 
 // startHub runs a coordination server that needs key "hubkey" to create links.
@@ -1156,8 +1157,11 @@ func TestFriendGiftsAndPlaydates(t *testing.T) {
 	// been forgotten here, and not from a snapshot that has gone stale.
 	bothSync()
 	a.db.Exec(`UPDATE pets SET joy = 10`)
-	a.db.Exec(`UPDATE friend_received SET received_on = date('now', '-8 days')`)
-	b.db.Exec(`UPDATE friend_sends SET day = date('now', '-8 days')`)
+	// These columns hold the server's local date, so age them in local time
+	// (SQLite's date('now') is UTC and can be a day ahead in the evening).
+	eightDaysAgo := time.Now().AddDate(0, 0, -8).Format(model.DateFormat)
+	a.db.Exec(`UPDATE friend_received SET received_on = ?`, eightDaysAgo)
+	b.db.Exec(`UPDATE friend_sends SET day = ?`, eightDaysAgo)
 	bothSync()
 	if joy() != 10 {
 		t.Fatalf("an old gift was applied again: joy %v", joy())
@@ -1577,7 +1581,7 @@ func TestFriendInviteConfirmAndDecline(t *testing.T) {
 		e.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": petName, "species": "dog"}, childHeaders(kid), http.StatusCreated)
 		e.yesterdayChores(t, kid, 1, 1, "core", 10)
 		// Give the kid a streak so we can verify FriendMember.Streak is preserved.
-		if _, err := e.db.Exec(`INSERT INTO user_streaks (user_id, current_streak, longest_streak, last_completed_date) VALUES (?, 4, 4, date('now'))`, kid); err != nil {
+		if _, err := e.db.Exec(`INSERT INTO user_streaks (user_id, current_streak, longest_streak, last_completed_date) VALUES (?, 4, 4, ?)`, kid, time.Now().Format(model.DateFormat)); err != nil {
 			t.Fatal(err)
 		}
 		e.expectStatus(t, "PUT", "/api/admin/friends", map[string]any{"family_name": family, "hub_url": hubSrv.URL, "hub_key": "hubkey"}, adminHeaders(), http.StatusOK)

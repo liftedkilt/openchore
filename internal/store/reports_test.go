@@ -587,3 +587,52 @@ func TestReportPointsSummary_NetBreakdown(t *testing.T) {
 		t.Errorf("got %+v, want %+v", *got, want)
 	}
 }
+
+// Reports bucket points by the server's local day, like completion dates.
+// created_at is stored in UTC, so points earned just after local midnight
+// or just before the next one can sit on a different UTC date; both must
+// still count toward today. (Before the fix this failed whenever the local
+// timezone wasn't UTC: in the evening west of UTC, in the morning east of it.)
+func TestReportPoints_UseLocalDay(t *testing.T) {
+	s, db := setupStoreWithDB(t)
+	ctx := context.Background()
+	now := time.Now()
+	today := now.Format("2006-01-02")
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+
+	kid := createTestUser(t, s, "Gabe", "child")
+	for _, tx := range []struct {
+		at     time.Time
+		amount int
+	}{
+		{midnight.Add(time.Minute), 5},                // 00:01 today
+		{midnight.Add(24*time.Hour - time.Minute), 5}, // 23:59 today
+		{midnight.Add(-time.Minute), 100},             // 23:59 yesterday: not today
+	} {
+		if _, err := db.Exec(
+			`INSERT INTO point_transactions (user_id, amount, reason, created_at) VALUES (?, ?, 'chore_complete', ?)`,
+			kid.ID, tx.amount, tx.at.UTC().Format("2006-01-02 15:04:05"),
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	points, err := s.ReportPointsSummary(ctx, today, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kids, err := s.ReportKidSummaries(ctx, today, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range points {
+		if r.UserID == kid.ID && r.PointsEarned != 10 {
+			t.Errorf("ReportPointsSummary earned = %d, want 10", r.PointsEarned)
+		}
+	}
+	for _, r := range kids {
+		if r.UserID == kid.ID && r.PointsEarned != 10 {
+			t.Errorf("ReportKidSummaries earned = %d, want 10", r.PointsEarned)
+		}
+	}
+}
