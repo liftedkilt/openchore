@@ -225,13 +225,24 @@ func allTools() []*Tool {
 	const petItemDesc = "For pet_action accessory: a built-in accessory (straw_hat, cowboy_hat, flower_crown, crown, party_hat, top_hat, beanie, wizard_hat, pirate_hat, flower, bow, sunglasses, round_glasses, heart_glasses, bandana, scarf, bell, bowtie, medal) or a custom emoji accessory written e:<slot>:<emoji> with slot head, face or neck, e.g. e:head:🎓. For pet_action character: the character, one of dragon, gnome (Christmas gnome), hippogriff, unicorn, yeti, phoenix or griffin."
 	add(endpoint{name: "list_farm_pets", title: "The family farm", readOnly: true,
 		desc: "Whether farm pets are on, and every person's animal with its health, fullness, joy and mood " +
-			"(hiding = missed chores yesterday and today's aren't done; sick/very_sick = health low from missed chores).",
+			"(hiding = missed chores yesterday and today's aren't done; sick/very_sick = health low from missed chores). " +
+			"death_days is the pet deaths setting (0 = animals never die); with it on, a sick animal's days_left says how many more nights ending sick before it dies. " +
+			"graves lists the tombstones of animals that died.",
 		method: http.MethodGet, path: "/pets"})
-	add(endpoint{name: "set_farm_pets", title: "Turn farm pets on or off",
-		desc: "Turn the optional farm pets on or off for the household. The first time they're turned on, " +
-			"a starter set of pet-care rewards (feed, treat, play, accessories) is added to the store.",
-		method: http.MethodPut, path: "/admin/pets", required: []string{"enabled"},
-		props: map[string]any{"enabled": boolean("On or off.")}})
+	add(endpoint{name: "set_farm_pets", title: "Farm pets settings",
+		desc: "Turn the optional farm pets on or off for the household, and set pet deaths. The first time they're turned on, " +
+			"a starter set of pet-care rewards (feed, treat, play, accessories) is added to the store. " +
+			"With death_days set, an animal that ends that many nights in a row sick after missed chores dies (a day with every chore done resets the count) and leaves a tombstone with its name on the farm; " +
+			"turning deaths on starts every animal's count afresh. Confirm with the user before turning deaths on.",
+		method: http.MethodPut, path: "/admin/pets",
+		props: map[string]any{
+			"enabled":    boolean("On or off (omit to leave as is)."),
+			"death_days": integer("Nights in a row sick after missed chores before an animal dies: 0 = never (the default), or 2-60. Omit to leave as is."),
+		}})
+	add(endpoint{name: "remove_farm_grave", title: "Remove a tombstone from the farm",
+		desc:   "Take the tombstone of an animal that died off the farm (ids from list_farm_pets' graves). Confirm first.",
+		method: http.MethodDelete, path: "/admin/pets/graves/{id}",
+		props: map[string]any{"id": integer("Grave id.")}})
 	add(endpoint{name: "remove_farm_pet", title: "Remove a person's farm animal",
 		desc:   "Delete a person's farm animal and its accessories so they can adopt again. Confirm first.",
 		method: http.MethodDelete, path: "/admin/users/{id}/pet",

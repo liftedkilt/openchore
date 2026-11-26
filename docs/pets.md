@@ -35,7 +35,10 @@ chore for today is done, the animal is shown with the +15 health that tonight's
 check will give it, so a sick animal perks up when the kid finishes rather
 than the next morning. It is only a preview: un-ticking a chore or a rejection
 takes it away again, and the nightly check is still what records it (nothing
-is counted twice). A chore that only unlocks later in the day has to be done
+is counted twice). If the food will run out tonight, the preview also takes
+off the −10 for that, so it shows +5 until the animal has enough food to last
+the night (more than 20). A paused person's animal gets no preview, since
+nothing changes for it overnight. A chore that only unlocks later in the day has to be done
 too.
 
 "Done" means completed (approved or waiting for a grown-up), excused, or a
@@ -51,7 +54,42 @@ Mood, shown on the farm:
   play) – recovers only through chores.
 - **Hungry** (food below 30), **bored** (joy below 30), **happy**, **content**.
 
-There's no death: at 0 health it's very sick until chores bring it back.
+By default there's no death: at 0 health it's very sick until chores bring it
+back.
+
+## Pet deaths (optional)
+
+A parent can turn on **Animals can die if they stay sick** under Manage →
+Settings → Farm pets (or `PUT /api/admin/pets` with `death_days`, or the
+`set_farm_pets` MCP tool) and pick how many days, 2 to 60.
+
+- The nightly check counts the nights in a row an animal *ends* sick (health
+  below 40) **after missed chores**. It counts neglect, not slow recovery:
+  - a night that ends at 40 or more resets the count;
+  - a day with every chore done resets it too, even if the animal is still
+    sick (and even if its food ran out, since food is bought with points), so
+    doing the chores always takes the danger away;
+  - a day with no chores, and a paused day, neither counts nor resets it.
+- When the count reaches the setting, the animal dies that night. It is
+  removed (with its accessories and pictures) and a **tombstone with its
+  name** is left in the corner of the farm, on the Today screen, the farm
+  sheet and the wall display. Its owner can adopt a new animal.
+- A sick animal's sheet tells its owner how many more nights with missed
+  chores it can take (`days_left`). Once all of today's chores are done the
+  warning goes away straight away, since tonight resets the count.
+- No animal dies without warning:
+  - turning deaths on, or turning farm pets back on, starts every count from
+    zero, and shortening the time always leaves at least one night. These
+    caps are saved together with the settings in one transaction;
+  - a catch-up over several days (after the server was down) never kills an
+    animal; it leaves the count one short, so the owner sees "dies tonight"
+    for a day first;
+  - the nightly check only writes the count, or buries the animal, if
+    nothing changed since it read the pet, and it re-reads the death setting
+    at that moment.
+- A parent can remove a tombstone in Settings (`DELETE
+  /api/admin/pets/graves/{id}`, `remove_farm_grave`). Graves are never sent
+  to friend families.
 
 ## Pet-care rewards
 
@@ -91,7 +129,9 @@ From five weeks before Christmas (November 20) through one week after (January 1
 - `GET /api/pets` – the farm: `enabled` and every animal with mood and owner.
 - `GET /api/me/pet`, `POST /api/me/pet` (adopt: `name`, `species`),
   `PATCH /api/me/pet` (`name`, `accessory`).
-- `PUT /api/admin/pets` (`enabled`), `DELETE /api/admin/users/{id}/pet`
+- `GET /api/pets` also returns `death_days` (0 = off) and `graves`.
+- `PUT /api/admin/pets` (`enabled`, `death_days`; either may be left out),
+  `DELETE /api/admin/users/{id}/pet`, `DELETE /api/admin/pets/graves/{id}`
   (also in Settings → Farm pets).
 - `POST /api/rewards/{id}/redeem` takes an optional `{"pet": {"species", "color"}}`
   for `new_animal` / `restyle` rewards.

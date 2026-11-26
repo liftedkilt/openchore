@@ -6,7 +6,11 @@
 // to pay your way out of chores.
 package pet
 
-import "github.com/liftedkilt/openchore/internal/model"
+import (
+	"time"
+
+	"github.com/liftedkilt/openchore/internal/model"
+)
 
 // Tunables. Keep docs/pets.md in step.
 const (
@@ -22,11 +26,15 @@ const (
 	MaxMissHealth = 30 // ...up to this much in one day
 	StarveHealth  = 10 // fullness ran out
 
-	SickBelow     = 40
+	SickBelow     = 40 // also what counts as a sick day for pet deaths
 	VerySickBelow = 15
 	HungryBelow   = 30
 	BoredBelow    = 30
 	HappyAtLeast  = 70
+
+	// CatchUpDays caps how many unchecked days one nightly run applies
+	// (e.g. after the server was down), so a long outage can't flatten a pet.
+	CatchUpDays = 7
 )
 
 // DayResult is what a person's chores looked like on one day.
@@ -57,6 +65,37 @@ func ApplyDay(p *model.Pet, date string, d DayResult) {
 		p.Health -= StarveHealth
 	}
 	p.Health = clamp(p.Health)
+	// Pet deaths count neglect, not slow recovery: only a night that ends
+	// sick after missed chores counts. A day with every chore done clears the
+	// count even if the animal is still sick, so doing the chores always
+	// takes the danger away (and food, which points buy, never decides it).
+	// A day with no chores leaves the count as it is.
+	switch {
+	case p.Health >= SickBelow:
+		p.SickDays = 0
+	case d.Missed > 0:
+		p.SickDays++
+	case d.Counted > 0:
+		p.SickDays = 0
+	}
+}
+
+// Dies reports whether a pet has stayed sick long enough to die, given the
+// household's setting (deathDays; 0 = animals never die). Call after ApplyDay.
+func Dies(p *model.Pet, deathDays int) bool {
+	return deathDays > 0 && p.SickDays >= deathDays
+}
+
+// DaysLeft is how many more nights with missed chores the pet can end sick
+// before it dies (1 = it dies tonight if today's chores aren't all done), or
+// 0 when it isn't in danger: deaths are off, it isn't sick, or today's chores
+// are all done (that clears the count tonight). Call after ShowToday, so a
+// kid who has done today's chores sees the danger lift straight away.
+func DaysLeft(p *model.Pet, deathDays int) int {
+	if deathDays <= 0 || p.Health >= SickBelow || p.HealedToday {
+		return 0
+	}
+	return max(1, deathDays-p.SickDays)
 }
 
 // ShowToday previews today's health gain as soon as it is earned: once every
@@ -67,13 +106,41 @@ func ApplyDay(p *model.Pet, date string, d DayResult) {
 // It only changes what is shown. The stored health is untouched, tonight's
 // ApplyDay is still what makes it real, and un-ticking a chore (or a
 // rejection) takes the preview away again. Call it before Describe.
-func ShowToday(p *model.Pet, today []model.ScheduledChore) {
+//
+// The gain shown is what tonight's ApplyDay will give for a done day. If the
+// food will run out tonight, the StarveHealth it costs is taken off too, so
+// the animal doesn't look better now than it will tomorrow morning. Days the
+// nightly check hasn't reached yet (just after midnight, or after downtime)
+// will eat DailyHunger each first, so they count toward running out. A
+// paused owner gets no preview: ApplyDay leaves their animal as it is.
+// yesterday is the day before today.
+func ShowToday(p *model.Pet, today []model.ScheduledChore, yesterday string, paused bool) {
+	if paused {
+		return
+	}
 	d := Summarize(today)
 	if d.Counted == 0 || d.Missed > 0 {
 		return
 	}
-	p.Health = clamp(p.Health + GoodDayHealth)
+	fullness := p.Fullness - DailyHunger*pendingDays(p.LastDayChecked, yesterday)
+	gain := GoodDayHealth
+	if clamp(fullness-DailyHunger) == 0 {
+		gain -= StarveHealth
+	}
+	p.Health = clamp(p.Health + gain)
 	p.HealedToday = true
+}
+
+// pendingDays is how many finished days after lastChecked, up to and
+// including yesterday, the nightly check still has to apply (at most
+// CatchUpDays, as it does).
+func pendingDays(lastChecked, yesterday string) int {
+	last, err1 := time.Parse(model.DateFormat, lastChecked)
+	end, err2 := time.Parse(model.DateFormat, yesterday)
+	if err1 != nil || err2 != nil || !end.After(last) {
+		return 0
+	}
+	return min(CatchUpDays, int(end.Sub(last).Hours()/24+0.5))
 }
 
 // Effect is what a pet-care reward does to fullness and joy.

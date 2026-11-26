@@ -106,11 +106,12 @@ func TestShowToday(t *testing.T) {
 		return c
 	}
 	_ = done
-	sick := func() *model.Pet { return &model.Pet{Health: 34, Fullness: 80, Joy: 80} }
+	const yest = "2026-11-16"
+	sick := func() *model.Pet { return &model.Pet{Health: 34, Fullness: 80, Joy: 80, LastDayChecked: yest} }
 
 	// Everything that counts is done: the gain shows now, and the pet is no longer sick.
 	p := sick()
-	ShowToday(p, []model.ScheduledChore{chore(model.CategoryRequired, true), chore(model.CategoryCore, true), chore(model.CategoryBonus, false)})
+	ShowToday(p, []model.ScheduledChore{chore(model.CategoryRequired, true), chore(model.CategoryCore, true), chore(model.CategoryBonus, false)}, yest, false)
 	Describe(p, "2026-11-16", true)
 	if p.Health != 34+GoodDayHealth || !p.HealedToday || p.Sick {
 		t.Fatalf("all done: %+v", p)
@@ -119,21 +120,123 @@ func TestShowToday(t *testing.T) {
 	p = sick()
 	late := chore(model.CategoryCore, false)
 	late.Available = false
-	ShowToday(p, []model.ScheduledChore{chore(model.CategoryRequired, true), late})
+	ShowToday(p, []model.ScheduledChore{chore(model.CategoryRequired, true), late}, yest, false)
 	Describe(p, "2026-11-16", true)
 	if p.Health != 34 || p.HealedToday || !p.Sick {
 		t.Fatalf("one open: %+v", p)
 	}
 	// A day with nothing that counts gives no preview (tonight's small gain isn't shown early).
 	p = sick()
-	ShowToday(p, []model.ScheduledChore{chore(model.CategoryBonus, true)})
+	ShowToday(p, []model.ScheduledChore{chore(model.CategoryBonus, true)}, yest, false)
 	if p.Health != 34 || p.HealedToday {
 		t.Fatalf("nothing counted: %+v", p)
 	}
+	// Food runs out tonight: the preview matches tonight's check (+15, -10 for
+	// starving), not a gain the animal will lose again by morning.
+	for _, full := range []int{0, DailyHunger} {
+		p = &model.Pet{Health: 20, Fullness: full, LastDayChecked: yest}
+		ShowToday(p, []model.ScheduledChore{chore(model.CategoryCore, true)}, yest, false)
+		night := &model.Pet{Health: 20, Fullness: full}
+		ApplyDay(night, "2026-11-16", DayResult{Counted: 1})
+		if p.Health != night.Health || p.Health != 20+GoodDayHealth-StarveHealth || !p.HealedToday {
+			t.Fatalf("starving fullness %d: preview %d, tonight %d", full, p.Health, night.Health)
+		}
+	}
+	// Fed enough to last the night: the full gain.
+	p = &model.Pet{Health: 20, Fullness: DailyHunger + 1, LastDayChecked: yest}
+	ShowToday(p, []model.ScheduledChore{chore(model.CategoryCore, true)}, yest, false)
+	if p.Health != 20+GoodDayHealth {
+		t.Fatalf("fed: %+v", p)
+	}
+	// Yesterday isn't checked yet (just after midnight): its hunger comes
+	// first, so 30 food runs out tonight and the preview is the real +5.
+	p = &model.Pet{Health: 20, Fullness: 30, LastDayChecked: "2026-11-15"}
+	ShowToday(p, []model.ScheduledChore{chore(model.CategoryCore, true)}, yest, false)
+	night := &model.Pet{Health: 20, Fullness: 30}
+	ApplyDay(night, "2026-11-16", DayResult{Counted: 1})
+	ApplyDay(night, "2026-11-17", DayResult{Counted: 1})
+	if p.Health != 20+GoodDayHealth-StarveHealth || night.Health != 20+2*GoodDayHealth-StarveHealth {
+		t.Fatalf("stale fullness: preview %d, nights %d", p.Health, night.Health)
+	}
+	// Long downtime: only CatchUpDays of hunger, as the checker applies.
+	if n := pendingDays("2026-10-01", yest); n != CatchUpDays {
+		t.Fatalf("pendingDays capped: %d", n)
+	}
+	if n := pendingDays(yest, yest); n != 0 {
+		t.Fatalf("pendingDays none: %d", n)
+	}
+	// Paused: ApplyDay changes nothing tonight, so nothing is previewed.
+	p = sick()
+	ShowToday(p, []model.ScheduledChore{chore(model.CategoryCore, true)}, yest, true)
+	if p.Health != 34 || p.HealedToday {
+		t.Fatalf("paused: %+v", p)
+	}
 	// Never past full.
-	p = &model.Pet{Health: 95}
-	ShowToday(p, []model.ScheduledChore{chore(model.CategoryCore, true)})
+	p = &model.Pet{Health: 95, Fullness: 80, LastDayChecked: yest}
+	ShowToday(p, []model.ScheduledChore{chore(model.CategoryCore, true)}, yest, false)
 	if p.Health != 100 {
 		t.Fatalf("clamp: %+v", p)
+	}
+}
+
+func TestSickDaysAndDeath(t *testing.T) {
+	p := newPet()
+	p.Health = 45
+	ApplyDay(p, "2026-11-20", DayResult{Counted: 2, Missed: 1}) // 35: sick
+	if p.SickDays != 1 || Dies(p, 3) || Dies(p, 0) {
+		t.Fatalf("first sick day: %+v", p)
+	}
+	if got := DaysLeft(p, 3); got != 2 {
+		t.Fatalf("days left = %d, want 2", got)
+	}
+	ApplyDay(p, "2026-11-21", DayResult{Counted: 2, Paused: true}) // paused: count waits
+	if p.SickDays != 1 {
+		t.Fatalf("paused day counted: %+v", p)
+	}
+	ApplyDay(p, "2026-11-22", DayResult{Counted: 2, Missed: 1})
+	if p.SickDays != 2 || DaysLeft(p, 3) != 1 || Dies(p, 3) {
+		t.Fatalf("second sick day: %+v", p)
+	}
+	ApplyDay(p, "2026-11-23", DayResult{Counted: 2, Missed: 1})
+	if !Dies(p, 3) {
+		t.Fatalf("third sick day should be fatal at 3: %+v", p)
+	}
+	// Getting better resets the count.
+	p = newPet()
+	p.Health, p.SickDays = 30, 2
+	ApplyDay(p, "2026-11-24", DayResult{Counted: 1}) // 45
+	if p.SickDays != 0 || DaysLeft(p, 3) != 0 {
+		t.Fatalf("recovered: %+v", p)
+	}
+	if DaysLeft(&model.Pet{Health: 10, SickDays: 5}, 0) != 0 {
+		t.Fatal("deaths off should never warn")
+	}
+
+	// Recovering but still below SickBelow: every chore done, so the nights
+	// don't count, even starving (food is bought with points).
+	for _, full := range []int{100, 0} {
+		p = &model.Pet{Health: 5, Fullness: full, SickDays: 1}
+		for _, day := range []string{"2026-11-25", "2026-11-26"} {
+			ApplyDay(p, day, DayResult{Counted: 3})
+			if p.SickDays != 0 || Dies(p, 2) {
+				t.Fatalf("recovering (food %d) on %s: %+v", full, day, p)
+			}
+		}
+		if p.Health >= SickBelow {
+			t.Fatalf("test wants a pet still sick, got %+v", p)
+		}
+	}
+	// A day with no chores neither counts nor clears it.
+	p = &model.Pet{Health: 10, Fullness: 0, SickDays: 1}
+	ApplyDay(p, "2026-11-25", DayResult{})
+	if p.SickDays != 1 {
+		t.Fatalf("free day: %+v", p)
+	}
+	// Today's chores all done: no "dies tonight" warning, since tonight
+	// clears the count.
+	p = &model.Pet{Health: 10, Fullness: 80, SickDays: 2, LastDayChecked: "2026-11-24"}
+	ShowToday(p, []model.ScheduledChore{{Category: model.CategoryCore, Completed: true, Available: true}}, "2026-11-24", false)
+	if p.Health >= SickBelow || DaysLeft(p, 3) != 0 {
+		t.Fatalf("healed today still warns: %+v days left %d", p, DaysLeft(p, 3))
 	}
 }

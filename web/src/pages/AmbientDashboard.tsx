@@ -210,7 +210,7 @@ export const AmbientDashboard: React.FC = () => {
   );
   const start = () => navigate('/login');
   // Past a handful of lines the chart stops being readable; the strip stays.
-  const showFarm = !!farm?.enabled && farm.pets.length > 0;
+  const showFarm = !!farm?.enabled && (farm.pets.length > 0 || (farm.graves?.length ?? 0) > 0);
   const showChart = !showFarm && people.filter((p) => p.total > 0).length <= MAX_CHART_LINES;
 
   return (
@@ -271,7 +271,7 @@ export const AmbientDashboard: React.FC = () => {
               {showFarm && farm && (
                 <div className={styles.farmPanel}>
                   <div className={styles.label}>{t('wall.farm')}</div>
-                  <FarmScene pets={farm.pets} compact owners className={styles.farm} />
+                  <FarmScene pets={farm.pets} graves={farm.graves} compact owners className={styles.farm} />
                 </div>
               )}
             </section>

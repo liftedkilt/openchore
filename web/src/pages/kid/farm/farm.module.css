@@ -516,3 +516,55 @@
 
 /* The winner's ribbon on a name tag. */
 .rosette { width: 12px; height: 14px; margin-right: 3px; vertical-align: -2px; }
+
+/* Graves of animals that died (pet deaths): a little row at the right of
+   the field, behind the animals, each stone carved with the animal's name. */
+.graves {
+  position: absolute;
+  right: 2%;
+  bottom: 5%;
+  display: flex;
+  flex-direction: row-reverse;
+  flex-wrap: wrap-reverse;
+  justify-content: flex-start;
+  gap: 2px;
+  max-width: 40%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  z-index: 4;
+}
+.graveItem { display: block; }
+.grave { display: block; }
+.tombstone { position: relative; display: block; width: 54px; height: 63px; }
+.compact .tombstone { width: 40px; height: 47px; }
+.tombstoneArt { display: block; width: 100%; height: 100%; filter: var(--farm-art-filter); }
+.tombstoneText {
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  top: 22%;
+  bottom: 18%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1px;
+  overflow: hidden;
+  color: #4a4e54;
+  text-align: center;
+  line-height: 1.05;
+  pointer-events: none;
+}
+.tombstoneRip { font-size: 7px; font-weight: 800; letter-spacing: 0.08em; opacity: 0.75; }
+.tombstoneName {
+  font-size: 8px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.compact .tombstoneRip { font-size: 6px; }
+.compact .tombstoneName { font-size: 6.5px; -webkit-line-clamp: 2; }

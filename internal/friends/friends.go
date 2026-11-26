@@ -427,7 +427,7 @@ func (f *Service) Snapshot(ctx context.Context, linkID int64) (*model.FriendSnap
 			if err != nil {
 				return nil, err
 			}
-			pet.ShowToday(p, chores)
+			pet.ShowToday(p, chores, yesterday, u.Paused)
 			pet.Describe(p, yesterday, pet.CaughtUp(chores))
 			acc := p.Accessory
 			if strings.HasPrefix(acc, "img:") {

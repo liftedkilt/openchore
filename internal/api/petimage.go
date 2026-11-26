@@ -134,6 +134,10 @@ func savePetImage(pngData []byte) (string, error) {
 
 // removePetFiles deletes every picture that belongs to a pet: its own
 // animal picture and any accessories it drew or uploaded.
+// RemovePetFiles deletes a removed pet's own picture and drawn accessories,
+// e.g. after it died (webhook.PetChecker.OnDeath).
+func RemovePetFiles(p *model.Pet) { removePetFiles(p) }
+
 func removePetFiles(p *model.Pet) {
 	if p == nil {
 		return
