@@ -9,7 +9,7 @@ import type {
   Farm, FriendGift, GoalCelebration, Leaderboard, Pet, PetPick, PointsData, RedemptionHistory, Reward, ScheduledChore, User, UserStreakData,
 } from '../../types';
 import { localDateStr } from '../../utils';
-import { siblingTook } from './choreView';
+import { siblingTook } from '../../choreRules';
 
 export interface ToggleResult {
   /** The chore was finished (show the celebration). */
@@ -141,9 +141,10 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
     // A first-come chore a sibling took is theirs: unchecking it here would
     // undo their work and points, so only they or a parent can, and while
     // theirs waits for a grown-up nobody else can do it.
-    const takenBy = siblingTook(chore);
-    if (takenBy && !opts2.retry) {
-      showToast(t(chore.completed ? 'kid.chore.siblingDid' : 'kid.chore.siblingTaking', { name: takenBy }));
+    // (The row is read-only then; this is the backstop, retry included.)
+    const sibling = siblingTook(chore);
+    if (sibling) {
+      showToast(t(sibling.waiting ? 'kid.chore.siblingTaking' : 'kid.chore.siblingDid', { name: sibling.name }));
       return {};
     }
     // Double-tap guard: drop taps while a request for this chore is in flight.

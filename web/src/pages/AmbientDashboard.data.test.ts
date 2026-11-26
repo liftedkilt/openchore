@@ -32,6 +32,15 @@ describe('nextRows', () => {
     expect(titles(rows)).toEqual(['Open']);
   });
 
+  it("leaves out a first-come chore someone else took, even while theirs waits for approval", () => {
+    const rows = nextRows([
+      chore('Taken, waiting', 'core', { completed_by_sibling: true, completed_by_name: 'Bob' }),
+      chore('Taken over a rejected try', 'core', { completed: true, completion_status: 'rejected', completed_by_sibling: true, completed_by_name: 'Bob' }),
+      chore('Open', 'core'),
+    ], at(16));
+    expect(titles(rows)).toEqual(['Open']);
+  });
+
   it('puts what can be done now first, by category then deadline', () => {
     const rows = nextRows([
       chore('Every day', 'core'),

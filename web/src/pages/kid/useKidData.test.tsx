@@ -42,9 +42,9 @@ function chore(over: Partial<ScheduledChore>): ScheduledChore {
   } as ScheduledChore;
 }
 
-async function tap(c: ScheduledChore) {
+async function tap(c: ScheduledChore, opts: { retry?: boolean } = {}) {
   const { result } = renderHook(() => useKidData(bob, { week: false, rewards: false }));
-  await act(async () => { await result.current.toggle(c); });
+  await act(async () => { await result.current.toggle(c, opts); });
   return result;
 }
 
@@ -61,6 +61,18 @@ describe('useKidData toggle on a first-come chore', () => {
 
   it("doesn't try to complete a chore a sibling's waiting completion has taken", async () => {
     const result = await tap(chore({ completed: false, completed_by_sibling: true, completed_by_name: 'Alice' }));
+    expect(api.chores.complete).not.toHaveBeenCalled();
+    expect(api.chores.uncomplete).not.toHaveBeenCalled();
+    expect(result.current.toast).toMatch(/^Alice got to this one first/);
+  });
+
+  it("a stale 'try again' doesn't clear or redo a chore a sibling has since taken", async () => {
+    // Bob's try was rejected, then Alice's went in; the screen hadn't refreshed.
+    const result = await tap(
+      chore({ completed: true, completion_status: 'rejected', completed_by_sibling: true, completed_by_name: 'Alice' }),
+      { retry: true },
+    );
+    expect(api.chores.uncomplete).not.toHaveBeenCalled();
     expect(api.chores.complete).not.toHaveBeenCalled();
     expect(result.current.toast).toMatch(/^Alice got to this one first/);
   });

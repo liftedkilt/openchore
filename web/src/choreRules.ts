@@ -4,6 +4,20 @@ import type { ScheduledChore } from './types';
 
 type Chore = Pick<ScheduledChore, 'category' | 'available' | 'completed' | 'completion_status'>;
 
+/**
+ * Someone else took this first-come chore. `waiting` is true while their
+ * completion still waits for a grown-up: this copy only gets an approved
+ * (0-point) completion of its own once theirs is approved. Null when it's
+ * still this person's to do, or they took it themselves. Either way it isn't
+ * this person's to tick or untick.
+ */
+export function siblingTook(
+  c: Pick<ScheduledChore, 'completed_by_sibling' | 'completed_by_name' | 'completion_status'>,
+): { name: string; waiting: boolean } | null {
+  if (!c.completed_by_sibling) return null;
+  return { name: c.completed_by_name || '?', waiting: c.completion_status !== 'approved' };
+}
+
 /** Done for the day: completed in any way except a grown-up's rejection. */
 export function isChoreDone(c: Chore): boolean {
   return c.completed && c.completion_status !== 'rejected';
