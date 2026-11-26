@@ -613,8 +613,10 @@ func TestMCPCoversAPI(t *testing.T) {
 		"GET /me/pet":  "kid action", "POST /me/pet": "kid action", "PATCH /me/pet": "kid action",
 		// Self-service copies of fields update_person sets.
 		"PUT /users/{}/theme": "update_person", "PUT /users/{}/avatar": "update_person", "PUT /users/{}/color": "update_person",
-		"PUT /users/{}/line-color":   "only settable by that person",
-		"GET /leaderboard/household": "the wall display's copy; get_leaderboard has everyone",
+		"PUT /users/{}/line-color":    "only settable by that person",
+		"GET /leaderboard/household":  "the wall display's copy; get_leaderboard has everyone",
+		"GET /schedules":              "the Chores tab's bulk copy; household_overview and list_schedules cover it",
+		"GET /chores/possible-points": "the Chores tab's summary; get_person_chores has each person's week",
 		// The MCP endpoint itself.
 		"POST /mcp": "self", "GET /mcp": "self", "PUT /mcp": "self", "DELETE /mcp": "self", "PATCH /mcp": "self",
 		"HEAD /mcp": "self", "OPTIONS /mcp": "self", "CONNECT /mcp": "self", "TRACE /mcp": "self", "QUERY /mcp": "self",

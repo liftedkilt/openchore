@@ -689,16 +689,7 @@ func (h *UserHandler) GetChores(w http.ResponseWriter, r *http.Request) {
 	var dates []string
 	switch view {
 	case "weekly":
-		// Find Monday of the week
-		weekday := date.Weekday()
-		offset := int(weekday - time.Monday)
-		if offset < 0 {
-			offset += 7
-		}
-		monday := date.AddDate(0, 0, -offset)
-		for i := 0; i < 7; i++ {
-			dates = append(dates, monday.AddDate(0, 0, i).Format(model.DateFormat))
-		}
+		dates = weekDates(date)
 	default: // daily
 		dates = []string{dateStr}
 	}
@@ -726,4 +717,18 @@ func (h *UserHandler) isLastAdmin(r *http.Request, userID int64) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+// weekDates returns the Monday-to-Sunday dates of the week containing date.
+func weekDates(date time.Time) []string {
+	offset := int(date.Weekday() - time.Monday)
+	if offset < 0 {
+		offset += 7
+	}
+	monday := date.AddDate(0, 0, -offset)
+	dates := make([]string, 7)
+	for i := range dates {
+		dates[i] = monday.AddDate(0, 0, i).Format(model.DateFormat)
+	}
+	return dates
 }

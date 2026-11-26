@@ -656,6 +656,14 @@ type ScheduledChore struct {
 	Date               string     `json:"date"`
 }
 
+// PossiblePoints is the most a person can earn from their scheduled chores
+// on a day and across its Monday-to-Sunday week (admin Chores tab).
+type PossiblePoints struct {
+	UserID int64 `json:"user_id"`
+	Today  int   `json:"today"`
+	Week   int   `json:"week"`
+}
+
 // AIReviewResult is an AI photo review: advice for a parent, never a verdict.
 type AIReviewResult struct {
 	Complete   bool    `json:"complete"`

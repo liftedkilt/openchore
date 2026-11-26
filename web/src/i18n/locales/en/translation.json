@@ -98,7 +98,14 @@
       "subtitle_one": "{{count}} chore",
       "subtitle_other": "{{count}} chores",
       "addedBy": "Added by {{name}}",
-      "addedByTitle": "Added by this person for themselves. Give it points and it becomes yours to manage."
+      "addedByTitle": "Added by this person for themselves. Give it points and it becomes yours to manage.",
+      "possibleHeading": "Points possible",
+      "possibleDesc": "The most each person can earn from their scheduled chores. A first-come-first-serve chore counts for everyone it's offered to, so the rows don't add up to a household total.",
+      "possibleToday": "Today",
+      "possibleWeek": "This week",
+      "assignedTo": "Assigned to {{names}}",
+      "unassigned": "Not assigned",
+      "possibleError": "Couldn't load the points possible. Try reloading the page."
     },
     "colors": {
       "butter": "Butter",

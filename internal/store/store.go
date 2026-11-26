@@ -475,10 +475,20 @@ func (s *Store) ScheduleExistsForDate(ctx context.Context, choreID, userID int64
 	return exists, err
 }
 
+const scheduleColumns = `id, chore_id, assigned_to, assignment_type, fcfs_group_id, day_of_week, specific_date, available_at, points_multiplier, start_date, end_date, recurrence_interval, recurrence_start, due_by, expiry_penalty, expiry_penalty_value, created_at`
+
 func (s *Store) ListSchedulesForChore(ctx context.Context, choreID int64) ([]model.ChoreSchedule, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, chore_id, assigned_to, assignment_type, fcfs_group_id, day_of_week, specific_date, available_at, points_multiplier, start_date, end_date, recurrence_interval, recurrence_start, due_by, expiry_penalty, expiry_penalty_value, created_at
-		 FROM chore_schedules WHERE chore_id = ? ORDER BY id`, choreID)
+	return s.querySchedules(ctx, `SELECT `+scheduleColumns+` FROM chore_schedules WHERE chore_id = ? ORDER BY id`, choreID)
+}
+
+// ListAllSchedules returns every chore schedule, for overviews such as who
+// each chore is assigned to.
+func (s *Store) ListAllSchedules(ctx context.Context) ([]model.ChoreSchedule, error) {
+	return s.querySchedules(ctx, `SELECT `+scheduleColumns+` FROM chore_schedules ORDER BY chore_id, id`)
+}
+
+func (s *Store) querySchedules(ctx context.Context, query string, args ...any) ([]model.ChoreSchedule, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -339,6 +340,72 @@ func TestChoreUpdatePointsAndPenaltyZeroing(t *testing.T) {
 	if chore["missed_penalty_value"].(float64) != 0 {
 		t.Errorf("explicit zero was ignored for missed_penalty_value: got %v, want 0", chore["missed_penalty_value"])
 	}
+}
+
+func TestListAllSchedules(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+
+	env.request(t, "POST", "/api/users", map[string]any{"name": "Kid", "role": "child"}, adminHeaders())
+	env.request(t, "POST", "/api/chores", map[string]any{"title": "Dishes", "category": "core"}, adminHeaders())
+	env.request(t, "POST", "/api/chores", map[string]any{"title": "Trash", "category": "core"}, adminHeaders())
+	env.request(t, "POST", "/api/chores/1/schedules", map[string]any{"assigned_to": 2, "day_of_week": 1}, adminHeaders())
+	env.request(t, "POST", "/api/chores/2/schedules", map[string]any{"assigned_to": 1, "day_of_week": 2}, adminHeaders())
+
+	resp := env.request(t, "GET", "/api/schedules", nil, adminHeaders())
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	var schedules []map[string]any
+	decodeBody(t, resp, &schedules)
+	if len(schedules) != 2 {
+		t.Fatalf("expected 2 schedules, got %d", len(schedules))
+	}
+	if schedules[0]["chore_id"].(float64) != 1 || schedules[0]["assigned_to"].(float64) != 2 {
+		t.Errorf("unexpected first schedule: %v", schedules[0])
+	}
+
+	// Kids can't list everyone's schedules.
+	resp = env.request(t, "GET", "/api/schedules", nil, sessionHeaders(2))
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("expected 403 for a child, got %d", resp.StatusCode)
+	}
+}
+
+func TestPossiblePoints(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t) // user 1, no chores
+
+	env.request(t, "POST", "/api/users", map[string]any{"name": "Kid", "role": "child"}, adminHeaders())    // 2
+	env.request(t, "POST", "/api/users", map[string]any{"name": "Paused", "role": "child"}, adminHeaders()) // 3
+	env.request(t, "POST", "/api/chores", map[string]any{"title": "Dishes", "category": "core", "points_value": 10}, adminHeaders())
+	env.request(t, "POST", "/api/chores", map[string]any{"title": "Trash", "category": "core", "points_value": 5}, adminHeaders())
+
+	// 2026-03-11 is a Wednesday; its week runs Mon 03-09 to Sun 03-15.
+	for _, s := range []map[string]any{
+		{"chore": 1, "assigned_to": 2, "day_of_week": 3, "points_multiplier": 2},   // 1: Wed, 20
+		{"chore": 2, "assigned_to": 2, "day_of_week": 1},                           // 2: Mon, 5
+		{"chore": 2, "assigned_to": 2, "day_of_week": 3},                           // 3: Wed, 5 (excused below, still counts)
+		{"chore": 1, "assigned_to": 2, "day_of_week": 6, "points_multiplier": 0.5}, // 4: Sat, 5
+		{"chore": 1, "assigned_to": 3, "day_of_week": 3},                           // 5: paused person
+	} {
+		chore := s["chore"]
+		delete(s, "chore")
+		env.expectStatus(t, "POST", fmt.Sprintf("/api/chores/%v/schedules", chore), s, adminHeaders(), http.StatusCreated)
+	}
+	env.expectStatus(t, "POST", "/api/schedules/3/excuse", map[string]any{"date": "2026-03-11"}, adminHeaders(), http.StatusCreated)
+	env.expectStatus(t, "PUT", "/api/users/3/pause", nil, adminHeaders(), http.StatusOK)
+
+	resp := env.expectStatus(t, "GET", "/api/chores/possible-points?date=2026-03-11", nil, adminHeaders(), http.StatusOK)
+	var got []model.PossiblePoints
+	decodeBody(t, resp, &got)
+	want := []model.PossiblePoints{{UserID: 1}, {UserID: 2, Today: 25, Week: 35}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("possible points = %+v, want %+v", got, want)
+	}
+
+	env.expectStatus(t, "GET", "/api/chores/possible-points?date=nope", nil, adminHeaders(), http.StatusBadRequest)
+	env.expectStatus(t, "GET", "/api/chores/possible-points", nil, sessionHeaders(2), http.StatusForbidden)
 }
 
 func TestScheduleAndComplete(t *testing.T) {

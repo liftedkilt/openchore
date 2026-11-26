@@ -351,6 +351,19 @@ func (h *ChoreHandler) ListSchedules(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, schedules)
 }
 
+// ListAllSchedules returns every schedule across all chores (admin overview).
+func (h *ChoreHandler) ListAllSchedules(w http.ResponseWriter, r *http.Request) {
+	schedules, err := h.store.ListAllSchedules(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list schedules")
+		return
+	}
+	if schedules == nil {
+		schedules = []model.ChoreSchedule{}
+	}
+	writeJSON(w, http.StatusOK, schedules)
+}
+
 func (h *ChoreHandler) DeleteSchedule(w http.ResponseWriter, r *http.Request) {
 	scheduleID, err := urlParamInt64(r, "scheduleID")
 	if err != nil {

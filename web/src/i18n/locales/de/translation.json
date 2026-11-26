@@ -98,7 +98,14 @@
       "subtitle_one": "{{count}} Aufgabe",
       "subtitle_other": "{{count}} Aufgaben",
       "addedBy": "Von {{name}} hinzugefügt",
-      "addedByTitle": "Selbst hinzugefügt. Wenn du Punkte vergibst, verwaltest du die Aufgabe."
+      "addedByTitle": "Selbst hinzugefügt. Wenn du Punkte vergibst, verwaltest du die Aufgabe.",
+      "possibleHeading": "Mögliche Punkte",
+      "possibleDesc": "Das Maximum, das jede Person mit ihren geplanten Aufgaben verdienen kann. Eine „Wer zuerst kommt“-Aufgabe zählt für alle, denen sie angeboten wird, deshalb ergeben die Zeilen zusammen keine Haushaltssumme.",
+      "possibleToday": "Heute",
+      "possibleWeek": "Diese Woche",
+      "assignedTo": "Zugewiesen an {{names}}",
+      "unassigned": "Nicht zugewiesen",
+      "possibleError": "Die möglichen Punkte konnten nicht geladen werden. Lade die Seite neu."
     },
     "colors": {
       "butter": "Butter",
