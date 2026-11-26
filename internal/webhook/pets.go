@@ -11,10 +11,6 @@ import (
 	"github.com/liftedkilt/openchore/internal/store"
 )
 
-// petCatchUpDays caps how many missed days one run applies (e.g. after the
-// server was down for a while), so a long outage can't flatten a pet.
-const petCatchUpDays = 7
-
 // PetChecker applies each finished day's chores to every pet: done days heal
 // it, missed chores make it sick and send it into hiding. It runs whether or
 // not pets are switched on, so turning them off and on again doesn't replay
@@ -97,7 +93,7 @@ func (pc *PetChecker) catchUp(ctx context.Context, p *model.Pet, yesterday strin
 	}
 	end, _ := time.ParseInLocation(model.DateFormat, yesterday, now.Location())
 	start := last.AddDate(0, 0, 1)
-	if skip := end.AddDate(0, 0, -(petCatchUpDays - 1)); start.Before(skip) {
+	if skip := end.AddDate(0, 0, -(pet.CatchUpDays - 1)); start.Before(skip) {
 		start = skip
 	}
 
