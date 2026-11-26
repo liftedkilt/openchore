@@ -222,7 +222,7 @@ func allTools() []*Tool {
 		method: http.MethodDelete, path: "/admin/streak-rewards/{id}", props: map[string]any{"id": integer("Milestone id.")}})
 
 	// ---- Farm pets ----
-	const petItemDesc = "For pet_action accessory: a built-in accessory (straw_hat, cowboy_hat, flower_crown, crown, party_hat, top_hat, beanie, wizard_hat, pirate_hat, flower, bow, sunglasses, round_glasses, heart_glasses, bandana, scarf, bell, bowtie, medal) or a custom emoji accessory written e:<slot>:<emoji> with slot head, face or neck, e.g. e:head:🎓."
+	const petItemDesc = "For pet_action accessory: a built-in accessory (straw_hat, cowboy_hat, flower_crown, crown, party_hat, top_hat, beanie, wizard_hat, pirate_hat, flower, bow, sunglasses, round_glasses, heart_glasses, bandana, scarf, bell, bowtie, medal) or a custom emoji accessory written e:<slot>:<emoji> with slot head, face or neck, e.g. e:head:🎓. For pet_action character: the character, one of dragon, gnome (Christmas gnome), hippogriff, unicorn, yeti, phoenix or griffin."
 	add(endpoint{name: "list_farm_pets", title: "The family farm", readOnly: true,
 		desc: "Whether farm pets are on, and every person's animal with its health, fullness, joy and mood " +
 			"(hiding = missed chores yesterday and today's aren't done; sick/very_sick = health low from missed chores).",
@@ -326,7 +326,7 @@ func allTools() []*Tool {
 			"cost":        integer("Price in points (positive)."),
 			"stock":       integer("How many are available (omit for unlimited)."),
 			"shareable":   boolean("Kids can pool points toward it together."),
-			"pet_action":  enum("Make it a farm-pet care reward (omit for an ordinary reward): feed, treat, play, accessory, new_animal (trade for another animal; stats carry over), restyle (new coat colour), design (the kid draws or uploads their own accessory), picture (the kid uploads their own picture to use as the animal), gift (send a treat to a linked friend family's animal) or playdate (send the kid's animal to a friend family's farm for the day).", "feed", "treat", "play", "accessory", "new_animal", "restyle", "design", "picture", "gift", "playdate"),
+			"pet_action":  enum("Make it a farm-pet care reward (omit for an ordinary reward): feed, treat, play, accessory, new_animal (trade for another animal; stats carry over), restyle (new coat colour), design (the kid draws or uploads their own accessory), picture (the kid uploads their own picture to use as the animal), character (the animal becomes the ready-made character named in pet_item, e.g. a dragon), gift (send a treat to a linked friend family's animal) or playdate (send the kid's animal to a friend family's farm for the day).", "feed", "treat", "play", "accessory", "new_animal", "restyle", "design", "picture", "character", "gift", "playdate"),
 			"pet_item":    str(petItemDesc),
 		}})
 	add(endpoint{name: "update_reward", title: "Edit a reward",
@@ -341,7 +341,7 @@ func allTools() []*Tool {
 			"stock":       integer("How many are available."),
 			"active":      boolean("Shown to kids."),
 			"shareable":   boolean("Kids can pool points toward it."),
-			"pet_action":  enum("Farm-pet care action, or \"\" for an ordinary reward.", "", "feed", "treat", "play", "accessory", "new_animal", "restyle", "design"),
+			"pet_action":  enum("Farm-pet care action, or \"\" for an ordinary reward.", "", "feed", "treat", "play", "accessory", "new_animal", "restyle", "design", "picture", "character", "gift", "playdate"),
 			"pet_item":    str(petItemDesc),
 		}})
 	add(endpoint{name: "delete_reward", title: "Delete a reward",
