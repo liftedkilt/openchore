@@ -471,3 +471,101 @@ func TestFCFS_OnlyFinisherIsPaid(t *testing.T) {
 		t.Errorf("Bob (didn't finish) balance = %d, want 0", got)
 	}
 }
+
+// fcfsSetup makes Alice and Bob, a first-come chore offered to both (fired
+// for today), and returns each kid's copy of it.
+func fcfsSetup(t *testing.T, env *testEnv, chore map[string]any) (alice, bob int, aliceSched, bobSched int64, today string) {
+	t.Helper()
+	env.createAdmin(t)
+	alice = env.createChild(t, "Alice")
+	bob = env.createChild(t, "Bob")
+	today = time.Now().Format(model.DateFormat)
+	resp := env.expectStatus(t, "POST", "/api/chores", chore, adminHeaders(), http.StatusCreated)
+	var c map[string]any
+	decodeBody(t, resp, &c)
+	trig := env.createTrigger(t, int(c["id"].(float64)), map[string]any{"assignment_type": "fcfs"})
+	if got := fireTriggerStatus(t, env, trig["uuid"].(string)); got != http.StatusCreated {
+		t.Fatalf("fire trigger: got %d", got)
+	}
+	aliceSched = fcfsCopy(t, env, alice, today).ScheduleID
+	bobSched = fcfsCopy(t, env, bob, today).ScheduleID
+	return
+}
+
+// fcfsCopy returns the person's only chore today (their copy of the first-come chore).
+func fcfsCopy(t *testing.T, env *testEnv, user int, today string) model.ScheduledChore {
+	t.Helper()
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/chores?view=daily&date=%s", user, today), nil, adminHeaders(), http.StatusOK)
+	var chores []model.ScheduledChore
+	decodeBody(t, resp, &chores)
+	if len(chores) != 1 {
+		t.Fatalf("user %d: expected 1 chore today, got %d", user, len(chores))
+	}
+	return chores[0]
+}
+
+// Unchecking a first-come chore from a kid who didn't finish it undoes the
+// whole group, including the points the finisher got.
+func TestFCFS_UncheckOtherCopyTakesBackFinishersPoints(t *testing.T) {
+	env := setupTest(t)
+	alice, bob, aliceSched, bobSched, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10,
+	})
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", aliceSched), map[string]any{
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	if got := env.balance(t, alice); got != 10 {
+		t.Fatalf("Alice balance after finishing = %d, want 10", got)
+	}
+
+	resp := env.request(t, "DELETE", fmt.Sprintf("/api/schedules/%d/complete?date=%s", bobSched, today), nil, adminHeaders())
+	resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		t.Fatalf("uncheck Bob's copy: got %d", resp.StatusCode)
+	}
+	if got := env.balance(t, alice); got != 0 {
+		t.Errorf("Alice balance after unchecking = %d, want 0", got)
+	}
+	if got := env.balance(t, bob); got != 0 {
+		t.Errorf("Bob balance = %d, want 0", got)
+	}
+	for _, u := range []int{alice, bob} {
+		if c := fcfsCopy(t, env, u, today); c.Completed {
+			t.Errorf("user %d's copy is still done after unchecking", u)
+		}
+	}
+}
+
+// A first-come chore that needs approval: once a parent approves the
+// finisher's completion, the other kids' copies are done too (by the
+// finisher, for 0 points).
+func TestFCFS_ApprovalMarksOtherCopiesDone(t *testing.T) {
+	env := setupTest(t)
+	alice, bob, aliceSched, _, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10, "requires_approval": true,
+	})
+	resp := env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", aliceSched), map[string]any{
+		"completion_date": today,
+	}, childHeaders(alice), http.StatusCreated)
+	var comp map[string]any
+	decodeBody(t, resp, &comp)
+	if comp["status"] != model.StatusPending {
+		t.Fatalf("expected a pending completion, got %v", comp["status"])
+	}
+	if c := fcfsCopy(t, env, bob, today); c.Completed {
+		t.Fatalf("Bob's copy is done before approval")
+	}
+
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%v/approve", comp["id"]), nil, adminHeaders(), http.StatusNoContent)
+
+	c := fcfsCopy(t, env, bob, today)
+	if !c.Completed || c.CompletedByName != "Alice" {
+		t.Errorf("Bob's copy after approval: completed=%v by %q, want done by Alice", c.Completed, c.CompletedByName)
+	}
+	if got := env.balance(t, alice); got != 10 {
+		t.Errorf("Alice balance = %d, want 10", got)
+	}
+	if got := env.balance(t, bob); got != 0 {
+		t.Errorf("Bob balance = %d, want 0", got)
+	}
+}

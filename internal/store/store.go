@@ -3616,36 +3616,91 @@ func (s *Store) UncompleteByFCFSGroup(ctx context.Context, groupID, date string)
 	return err
 }
 
-// UncompleteFCFSGroupAndDebitPoints atomically deletes all completions for an FCFS group on a given date
-// and debits any net points that were credited for the completion.
-func (s *Store) UncompleteFCFSGroupAndDebitPoints(ctx context.Context, groupID, date string, userID int64, existing *model.ChoreCompletion, netPoints int) error {
+// UncompleteFCFSGroupAndDebitPoints atomically unchecks a first-come group on
+// a date: it takes back whatever points each completion in the group earned,
+// from whoever received them, then deletes the completions. Unchecking any
+// copy (the finisher's or another kid's shadow) undoes the finisher's points.
+// It returns everyone the group was offered to, whose day may have changed.
+func (s *Store) UncompleteFCFSGroupAndDebitPoints(ctx context.Context, groupID, date string) ([]int64, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer tx.Rollback()
+
+	var assignees []int64
+	rows, err := tx.QueryContext(ctx,
+		`SELECT DISTINCT assigned_to FROM chore_schedules WHERE fcfs_group_id = ? ORDER BY assigned_to`, groupID)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		assignees = append(assignees, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	type credit struct {
+		userID, completionID int64
+		net                  int
+	}
+	var credits []credit
+	rows, err = tx.QueryContext(ctx,
+		`SELECT pt.user_id, pt.reference_id, SUM(pt.amount)
+		 FROM point_transactions pt
+		 WHERE pt.reason IN (?, ?)
+		   AND pt.reference_id IN (
+		     SELECT cc.id FROM chore_completions cc
+		     JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
+		     WHERE cs.fcfs_group_id = ? AND cc.completion_date = ? AND cc.uncompleted_at IS NULL)
+		 GROUP BY pt.user_id, pt.reference_id
+		 HAVING SUM(pt.amount) != 0
+		 ORDER BY pt.reference_id, pt.user_id`,
+		model.ReasonChoreComplete, model.ReasonExpiryPenalty, groupID, date)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var c credit
+		if err := rows.Scan(&c.userID, &c.completionID, &c.net); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		credits = append(credits, c)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for _, c := range credits {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
+			 VALUES (?, ?, ?, ?, '')`,
+			c.userID, -c.net, model.ReasonChoreUncomplete, c.completionID); err != nil {
+			return nil, err
+		}
+		if err := s.reverseAutoContributeTx(ctx, tx, c.userID, c.completionID); err != nil {
+			return nil, err
+		}
+	}
 
 	if _, err := tx.ExecContext(ctx,
 		`DELETE FROM chore_completions WHERE chore_schedule_id IN (
 		   SELECT id FROM chore_schedules WHERE fcfs_group_id = ?
 		 ) AND completion_date = ?`,
 		groupID, date); err != nil {
-		return err
+		return nil, err
 	}
 
-	if existing != nil && netPoints != 0 && userID > 0 {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note)
-			 VALUES (?, ?, ?, ?, '')`,
-			userID, -netPoints, model.ReasonChoreUncomplete, existing.ID); err != nil {
-			return err
-		}
-		if err := s.reverseAutoContributeTx(ctx, tx, userID, existing.ID); err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit()
+	return assignees, tx.Commit()
 }
 
 // --- Chore Triggers ---
