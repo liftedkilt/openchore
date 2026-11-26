@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
+
+	"github.com/liftedkilt/openchore/internal/model"
 )
 
 // helper to create a chore via admin API and return its ID
@@ -397,5 +400,74 @@ func TestFireTrigger_AllowRepeat(t *testing.T) {
 	resp.Body.Close()
 	if got := fireTriggerStatus(t, env, fcfs["uuid"].(string)); got != http.StatusConflict {
 		t.Fatalf("after turning allow_repeat off: expected 409, got %d", got)
+	}
+}
+
+// A first-come chore pays only the person who finishes it. The others get a
+// shadow completion (approved, 0 points); opening their own core or bonus
+// gate later must not pay them for it.
+func TestFCFS_OnlyFinisherIsPaid(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	alice := env.createChild(t, "Alice")
+	bob := env.createChild(t, "Bob")
+	today := time.Now().Format(model.DateFormat)
+
+	mkChore := func(title, category string, points int) int {
+		resp := env.expectStatus(t, "POST", "/api/chores", map[string]any{
+			"title": title, "category": category, "points_value": points,
+		}, adminHeaders(), http.StatusCreated)
+		var c map[string]any
+		decodeBody(t, resp, &c)
+		return int(c["id"].(float64))
+	}
+
+	// Bob has a Must-do chore today, so his core and bonus gates start closed.
+	brush := mkChore("Brush teeth", "required", 0)
+	resp := env.expectStatus(t, "POST", fmt.Sprintf("/api/chores/%d/schedules", brush), map[string]any{
+		"assigned_to": bob, "specific_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	var brushSched map[string]any
+	decodeBody(t, resp, &brushSched)
+
+	// Two first-come chores, offered to both kids.
+	dryer := mkChore("Empty dryer", "core", 10)
+	bins := mkChore("Bring in bins", "bonus", 7)
+	for _, c := range []int{dryer, bins} {
+		trig := env.createTrigger(t, c, map[string]any{"assignment_type": "fcfs"})
+		if got := fireTriggerStatus(t, env, trig["uuid"].(string)); got != http.StatusCreated {
+			t.Fatalf("fire trigger for chore %d: got %d", c, got)
+		}
+	}
+
+	// Alice finishes both first.
+	resp = env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/chores?view=daily&date=%s", alice, today), nil, adminHeaders(), http.StatusOK)
+	var aliceChores []model.ScheduledChore
+	decodeBody(t, resp, &aliceChores)
+	for _, title := range []string{"Empty dryer", "Bring in bins"} {
+		var id int64
+		for _, c := range aliceChores {
+			if c.Title == title {
+				id = c.ScheduleID
+			}
+		}
+		if id == 0 {
+			t.Fatalf("Alice has no %q today", title)
+		}
+		env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", id), map[string]any{
+			"completion_date": today,
+		}, adminHeaders(), http.StatusCreated)
+	}
+
+	// Bob then does his Must-do chore, which opens his gates.
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%v/complete", brushSched["id"]), map[string]any{
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+
+	if got := env.balance(t, alice); got != 17 {
+		t.Errorf("Alice (finisher) balance = %d, want 17", got)
+	}
+	if got := env.balance(t, bob); got != 0 {
+		t.Errorf("Bob (didn't finish) balance = %d, want 0", got)
 	}
 }

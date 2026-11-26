@@ -1115,6 +1115,9 @@ func (h *ChoreHandler) creditPendingBonusPoints(ctx context.Context, userID int6
 		if sc.CompletionStatus == nil || *sc.CompletionStatus != model.StatusApproved {
 			continue
 		}
+		if !h.completedBy(ctx, *sc.CompletionID, userID) {
+			continue
+		}
 		fullPts, err := h.store.GetChorePointsForSchedule(ctx, sc.ScheduleID)
 		if err != nil {
 			log.Printf("error fetching points for schedule %d: %v", sc.ScheduleID, err)
@@ -1132,6 +1135,18 @@ func (h *ChoreHandler) creditPendingBonusPoints(ctx context.Context, userID int6
 			}
 		}
 	}
+}
+
+// completedBy reports whether userID did the completion themselves. On a
+// first-come chore the others get a shadow completion done by the finisher;
+// only the finisher is paid, so the retroactive credits skip those.
+func (h *ChoreHandler) completedBy(ctx context.Context, completionID, userID int64) bool {
+	c, err := h.store.GetCompletion(ctx, completionID)
+	if err != nil || c == nil {
+		log.Printf("error fetching completion %d: %v", completionID, err)
+		return false
+	}
+	return c.CompletedBy == userID
 }
 
 // creditPendingCorePoints retroactively credits approved core completions
@@ -1156,6 +1171,9 @@ func (h *ChoreHandler) creditPendingCorePoints(ctx context.Context, userID int64
 		// Only approved completions get points; pending completions
 		// are credited when the admin approves them.
 		if sc.CompletionStatus == nil || *sc.CompletionStatus != model.StatusApproved {
+			continue
+		}
+		if !h.completedBy(ctx, *sc.CompletionID, userID) {
 			continue
 		}
 		fullPts, err := h.store.GetChorePointsForSchedule(ctx, sc.ScheduleID)
