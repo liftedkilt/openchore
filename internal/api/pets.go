@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -13,6 +14,7 @@ import (
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/pet"
 	"github.com/liftedkilt/openchore/internal/store"
+	"github.com/liftedkilt/openchore/internal/webhook"
 )
 
 // Farm pets: an optional feature a grown-up turns on in Settings. Each
@@ -24,6 +26,9 @@ import (
 const (
 	settingPetsEnabled = "pets_enabled"
 	maxPetNameLen      = 24
+	// maxPetDeathDays is the longest "dies after this many days sick" a
+	// parent can pick.
+	maxPetDeathDays = 60
 )
 
 type PetHandler struct {
@@ -56,6 +61,7 @@ func (h *PetHandler) describe(ctx context.Context, p *model.Pet, owner *model.Us
 	}
 	pet.ShowToday(p, chores)
 	pet.Describe(p, yesterday, pet.CaughtUp(chores))
+	p.DaysLeft = pet.DaysLeft(p, webhook.PetDeathDays(ctx, h.store))
 	if owner != nil {
 		p.OwnerName = owner.Name
 		p.OwnerColor = owner.Color
@@ -73,6 +79,10 @@ func (h *PetHandler) Farm(w http.ResponseWriter, r *http.Request) {
 		"items":   model.PetItems,
 		"colors":  model.PetColors,
 		"pets":    []model.Pet{},
+		"graves":  []model.PetGrave{},
+		// death_days: animals that end this many days in a row sick die
+		// (0 = never).
+		"death_days": webhook.PetDeathDays(ctx, h.store),
 	}
 	if !enabled {
 		writeJSON(w, http.StatusOK, out)
@@ -104,6 +114,17 @@ func (h *PetHandler) Farm(w http.ResponseWriter, r *http.Request) {
 		pets[i].Ribbon = ribbons[pets[i].UserID]
 	}
 	out["pets"] = pets
+	graves, err := h.store.ListPetGraves(ctx)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list graves")
+		return
+	}
+	for i := range graves {
+		if o := byID[graves[i].UserID]; o != nil {
+			graves[i].OwnerName, graves[i].OwnerColor = o.Name, o.Color
+		}
+	}
+	out["graves"] = graves
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -300,18 +321,59 @@ var defaultPetRewards = []model.Reward{
 }
 
 // SetEnabled turns farm pets on or off (grown-ups). Turning them on the
-// first time adds a starter set of pet-care rewards to the store.
+// first time adds a starter set of pet-care rewards to the store. An
+// optional death_days sets pet deaths: an animal that ends that many days in
+// a row sick dies and leaves a grave (0 = never, the default).
 func (h *PetHandler) SetEnabled(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var req struct {
-		Enabled bool `json:"enabled"`
+		Enabled   *bool `json:"enabled"` // omitted: left as it is
+		DeathDays *int  `json:"death_days"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	wasEnabled := petsEnabled(ctx, h.store)
+	enabled := wasEnabled
+	if req.Enabled != nil {
+		enabled = *req.Enabled
+	}
+	deathDays := webhook.PetDeathDays(ctx, h.store)
+	if enabled && !wasEnabled {
+		// No deaths happen while pets are off, but the nightly check still
+		// counts sick days; start them afresh so nobody dies the first night.
+		if err := h.store.CapPetSickDays(ctx, 0); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to save setting")
+			return
+		}
+	}
+	if req.DeathDays != nil {
+		n := *req.DeathDays
+		if n != 0 && (n < 2 || n > maxPetDeathDays) {
+			writeError(w, http.StatusBadRequest, "death_days must be 0 (off) or 2-60")
+			return
+		}
+		// Never a death without a night's warning: turning deaths on starts
+		// every count afresh, and a shorter time leaves at least one night.
+		if n > 0 && (deathDays == 0 || n < deathDays) {
+			keep := n - 1
+			if deathDays == 0 {
+				keep = 0
+			}
+			if err := h.store.CapPetSickDays(ctx, keep); err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to save setting")
+				return
+			}
+		}
+		if err := h.store.SetSetting(ctx, webhook.SettingPetDeathDays, strconv.Itoa(n)); err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to save setting")
+			return
+		}
+		deathDays = n
+	}
 	val := "false"
-	if req.Enabled {
+	if enabled {
 		val = "true"
 	}
 	if err := h.store.SetSetting(ctx, settingPetsEnabled, val); err != nil {
@@ -319,7 +381,7 @@ func (h *PetHandler) SetEnabled(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	seeded := 0
-	if req.Enabled {
+	if enabled {
 		n, err := h.store.CountPetRewards(ctx)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "failed to check rewards")
@@ -341,7 +403,26 @@ func (h *PetHandler) SetEnabled(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"enabled": req.Enabled, "rewards_added": seeded})
+	writeJSON(w, http.StatusOK, map[string]any{"enabled": enabled, "rewards_added": seeded, "death_days": deathDays})
+}
+
+// RemoveGrave takes a grave off the farm (grown-ups).
+func (h *PetHandler) RemoveGrave(w http.ResponseWriter, r *http.Request) {
+	id, err := urlParamInt64(r, "id")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid grave id")
+		return
+	}
+	ok, err := h.store.DeletePetGrave(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to remove grave")
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "no such grave")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // Remove takes a person's pet away (grown-ups), e.g. to start over.

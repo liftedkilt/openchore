@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/webhook"
 )
 
@@ -437,5 +438,92 @@ func TestPetOwnPicture(t *testing.T) {
 	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/admin/users/%d/pet", kid), nil, adminHeaders(), http.StatusNoContent)
 	if _, err := os.Stat(file(last)); !os.IsNotExist(err) {
 		t.Fatal("a removed animal's picture was left on disk")
+	}
+}
+
+func TestPetDiesAfterStayingSickAndLeavesAGrave(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kid := env.createChild(t, "Kid")
+	env.enablePets(t)
+	env.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Clover", "species": "cow"}, childHeaders(kid), http.StatusCreated)
+
+	// Off by default.
+	var farm map[string]any
+	decodeBody(t, env.expectStatus(t, "GET", "/api/pets", nil, childHeaders(kid), http.StatusOK), &farm)
+	if farm["death_days"].(float64) != 0 || len(farm["graves"].([]any)) != 0 {
+		t.Fatalf("deaths should be off with no graves: %v", farm)
+	}
+	env.expectStatus(t, "PUT", "/api/admin/pets", map[string]any{"death_days": 1}, adminHeaders(), http.StatusBadRequest)
+	env.expectStatus(t, "PUT", "/api/admin/pets", map[string]any{"death_days": 2}, childHeaders(kid), http.StatusForbidden)
+
+	// Sick for a while already: turning deaths on starts the count afresh.
+	if _, err := env.db.Exec(`UPDATE pets SET health = 20, sick_days = 9`); err != nil {
+		t.Fatal(err)
+	}
+	resp := env.expectStatus(t, "PUT", "/api/admin/pets", map[string]any{"death_days": 2}, adminHeaders(), http.StatusOK)
+	var set map[string]any
+	decodeBody(t, resp, &set)
+	if set["enabled"] != true || set["death_days"].(float64) != 2 {
+		t.Fatalf("death_days alone must leave pets on: %v", set)
+	}
+	p := env.myPet(t, kid)
+	if p["sick_days"].(float64) != 0 || p["days_left"].(float64) != 2 {
+		t.Fatalf("fresh count: %v", p)
+	}
+
+	// Two missed days in a row: it dies on the second night.
+	now := time.Now()
+	resp = env.expectStatus(t, "POST", "/api/chores", map[string]any{"title": "Milk", "category": "required"}, adminHeaders(), http.StatusCreated)
+	var chore map[string]any
+	decodeBody(t, resp, &chore)
+	for _, d := range []int{-2, -1} {
+		env.expectStatus(t, "POST", fmt.Sprintf("/api/chores/%d/schedules", int(chore["id"].(float64))),
+			map[string]any{"assigned_to": kid, "specific_date": now.AddDate(0, 0, d).Format("2006-01-02")}, adminHeaders(), http.StatusCreated)
+	}
+	env.db.Exec(`UPDATE pets SET last_day_checked = ?`, now.AddDate(0, 0, -3).Format("2006-01-02"))
+	checker := webhook.NewPetChecker(env.store)
+	var died []string
+	checker.OnDeath = func(p *model.Pet) { died = append(died, p.Name) }
+	checker.CheckAt(context.Background(), now.AddDate(0, 0, -1)) // judges two days ago: one sick day
+	if p := env.myPet(t, kid); p == nil || p["days_left"].(float64) != 1 {
+		t.Fatalf("after one sick day: %v", p)
+	}
+	checker.CheckAt(context.Background(), now)
+	checker.CheckAt(context.Background(), now) // idempotent
+	if p := env.myPet(t, kid); p != nil {
+		t.Fatalf("pet should have died: %v", p)
+	}
+	if len(died) != 1 || died[0] != "Clover" {
+		t.Fatalf("OnDeath calls: %v", died)
+	}
+	decodeBody(t, env.expectStatus(t, "GET", "/api/pets", nil, childHeaders(kid), http.StatusOK), &farm)
+	graves := farm["graves"].([]any)
+	if len(graves) != 1 {
+		t.Fatalf("graves: %v", graves)
+	}
+	g := graves[0].(map[string]any)
+	if g["name"] != "Clover" || g["species"] != "cow" || g["died_on"] != now.AddDate(0, 0, -1).Format("2006-01-02") || g["owner_name"] != "Kid" {
+		t.Fatalf("grave: %v", g)
+	}
+
+	// The kid can adopt again; a grown-up can take the grave away.
+	env.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Daisy", "species": "cow"}, childHeaders(kid), http.StatusCreated)
+	gid := int(g["id"].(float64))
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/admin/pets/graves/%d", gid), nil, childHeaders(kid), http.StatusForbidden)
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/admin/pets/graves/%d", gid), nil, adminHeaders(), http.StatusNoContent)
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/admin/pets/graves/%d", gid), nil, adminHeaders(), http.StatusNotFound)
+}
+
+func TestPetNeverDiesWithDeathsOff(t *testing.T) {
+	env := setupTest(t)
+	env.createAdmin(t)
+	kid := env.createChild(t, "Kid")
+	env.enablePets(t)
+	env.expectStatus(t, "POST", "/api/me/pet", map[string]any{"name": "Rex", "species": "dog"}, childHeaders(kid), http.StatusCreated)
+	env.db.Exec(`UPDATE pets SET health = 0, sick_days = 50, last_day_checked = ?`, time.Now().AddDate(0, 0, -3).Format("2006-01-02"))
+	webhook.NewPetChecker(env.store).CheckAt(context.Background(), time.Now())
+	if p := env.myPet(t, kid); p == nil || p["days_left"] != nil {
+		t.Fatalf("pet should be alive with no warning: %v", p)
 	}
 }

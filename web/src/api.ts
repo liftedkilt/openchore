@@ -307,7 +307,7 @@ export const api = {
   },
   pets: {
     // Servers before the empty-farm fix sent `pets: null` for a farm with no animals.
-    farm: () => fetchWithAuth<Farm>('/pets').then(f => ({ ...f, pets: f.pets ?? [] })),
+    farm: () => fetchWithAuth<Farm>('/pets').then(f => ({ ...f, pets: f.pets ?? [], graves: f.graves ?? [] })),
     mine: () => fetchWithAuth<{ enabled: boolean; pet: Pet | null }>('/me/pet'),
     adopt: (name: string, species: PetSpecies, color?: string) => fetchWithAuth<Pet>('/me/pet', {
       method: 'POST',
@@ -317,10 +317,16 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
-    setEnabled: (enabled: boolean) => fetchWithAuth<{ enabled: boolean; rewards_added: number }>('/admin/pets', {
+    setEnabled: (enabled: boolean) => fetchWithAuth<{ enabled: boolean; rewards_added: number; death_days: number }>('/admin/pets', {
       method: 'PUT',
       body: JSON.stringify({ enabled }),
     }),
+    /** Pet deaths: 0 = animals never die, or 2-60 days in a row sick. */
+    setDeathDays: (deathDays: number) => fetchWithAuth<{ enabled: boolean; rewards_added: number; death_days: number }>('/admin/pets', {
+      method: 'PUT',
+      body: JSON.stringify({ death_days: deathDays }),
+    }),
+    removeGrave: (id: number) => fetchWithAuth(`/admin/pets/graves/${id}`, { method: 'DELETE' }),
     remove: (userId: number) => fetchWithAuth(`/admin/users/${userId}/pet`, { method: 'DELETE' }),
     removePicture: (userId: number) => fetchWithAuth(`/admin/users/${userId}/pet/picture`, { method: 'DELETE' }),
     // sprite: the id of the picture the parent is looking at, so one swapped since isn't approved unseen.

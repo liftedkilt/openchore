@@ -3,6 +3,7 @@ package webhook
 import (
 	"context"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/liftedkilt/openchore/internal/model"
@@ -18,10 +19,31 @@ const petCatchUpDays = 7
 // it, missed chores make it sick and send it into hiding. It runs whether or
 // not pets are switched on, so turning them off and on again doesn't replay
 // the gap (pets are only stored when the feature was on).
+//
+// With pet deaths on (the pets_death_days setting), an animal that ends that
+// many days in a row sick dies: it's removed and a grave with its name is
+// left on the farm.
 type PetChecker struct {
 	store    *store.Store
 	interval time.Duration
 	now      func() time.Time
+	// OnDeath, when set, runs after an animal has died and been buried,
+	// e.g. to delete its picture files.
+	OnDeath func(p *model.Pet)
+}
+
+// SettingPetDeathDays is how many days in a row an animal can end sick
+// before it dies; "" or "0" means animals never die.
+const SettingPetDeathDays = "pets_death_days"
+
+// PetDeathDays reads the pet deaths setting (0 = off).
+func PetDeathDays(ctx context.Context, s *store.Store) int {
+	v, _ := s.GetSetting(ctx, SettingPetDeathDays)
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }
 
 func NewPetChecker(s *store.Store) *PetChecker {
@@ -54,14 +76,18 @@ func (pc *PetChecker) check(ctx context.Context, now time.Time) {
 		return
 	}
 	yesterday := now.AddDate(0, 0, -1).Format(model.DateFormat)
+	deathDays := 0
+	if on, _ := pc.store.GetSetting(ctx, "pets_enabled"); on == "true" {
+		deathDays = PetDeathDays(ctx, pc.store)
+	}
 	for i := range pets {
-		if err := pc.catchUp(ctx, &pets[i], yesterday, now); err != nil {
+		if err := pc.catchUp(ctx, &pets[i], yesterday, now, deathDays); err != nil {
 			log.Printf("pets: user %d: %v", pets[i].UserID, err)
 		}
 	}
 }
 
-func (pc *PetChecker) catchUp(ctx context.Context, p *model.Pet, yesterday string, now time.Time) error {
+func (pc *PetChecker) catchUp(ctx context.Context, p *model.Pet, yesterday string, now time.Time, deathDays int) error {
 	if p.LastDayChecked >= yesterday {
 		return nil
 	}
@@ -96,6 +122,19 @@ func (pc *PetChecker) catchUp(ctx context.Context, p *model.Pet, yesterday strin
 		}
 		pet.ApplyDay(p, date, res)
 		p.LastDayChecked = date
+		if pet.Dies(p, deathDays) {
+			buried, err := pc.store.BuryPet(ctx, p, prev, date)
+			if err != nil {
+				return err
+			}
+			if buried {
+				log.Printf("pets: %s (user %d) died on %s after %d days sick", p.Name, p.UserID, date, p.SickDays)
+				if pc.OnDeath != nil {
+					pc.OnDeath(p)
+				}
+			}
+			return nil
+		}
 	}
 	_, err = pc.store.SavePetDay(ctx, p, prev)
 	return err

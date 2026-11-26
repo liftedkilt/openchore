@@ -492,6 +492,9 @@ type Pet struct {
 	Items          []string  `json:"items"`               // owned accessories
 	LastMissedDate *string   `json:"last_missed_date,omitempty"`
 	LastDayChecked string    `json:"last_day_checked"`
+	// SickDays counts the finished, unpaused days in a row it ended sick
+	// (pet deaths, docs/pets.md).
+	SickDays int `json:"sick_days"`
 	CreatedAt      time.Time `json:"created_at"`
 
 	// Computed on read.
@@ -499,6 +502,9 @@ type Pet struct {
 	// HealedToday: all of today's chores are done, so Health already shows
 	// the gain tonight's check will make real (pet.ShowToday).
 	HealedToday bool `json:"healed_today,omitempty"`
+	// DaysLeft: pet deaths are on and it's sick; this many more nights
+	// ending sick and it dies (1 = tonight). 0 = not in danger.
+	DaysLeft int `json:"days_left,omitempty"`
 	Hiding  bool   `json:"hiding"` // missed chores yesterday and today's aren't done yet
 	Sick    bool   `json:"sick"`
 	CanPlay bool   `json:"can_play"`
@@ -801,6 +807,21 @@ type FriendWeek struct {
 	Done     int    `json:"done"`
 	Bonus    int    `json:"bonus"`
 	Share    int    `json:"share"`
+}
+
+// PetGrave is where a farm animal that died is remembered: a tombstone with
+// its name on the farm (pet deaths, docs/pets.md).
+type PetGrave struct {
+	ID         int64     `json:"id"`
+	UserID     int64     `json:"user_id"`
+	Name       string    `json:"name"`
+	Species    string    `json:"species"`
+	Color      string    `json:"color,omitempty"`
+	AdoptedOn  string    `json:"adopted_on"`
+	DiedOn     string    `json:"died_on"`
+	CreatedAt  time.Time `json:"created_at"`
+	OwnerName  string    `json:"owner_name,omitempty"`
+	OwnerColor string    `json:"owner_color,omitempty"`
 }
 
 // FriendPet is a farm animal as shown to a friend family, in its real state:

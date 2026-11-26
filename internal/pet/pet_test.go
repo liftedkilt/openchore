@@ -137,3 +137,37 @@ func TestShowToday(t *testing.T) {
 		t.Fatalf("clamp: %+v", p)
 	}
 }
+
+func TestSickDaysAndDeath(t *testing.T) {
+	p := newPet()
+	p.Health = 45
+	ApplyDay(p, "2026-11-20", DayResult{Counted: 2, Missed: 1}) // 35: sick
+	if p.SickDays != 1 || Dies(p, 3) || Dies(p, 0) {
+		t.Fatalf("first sick day: %+v", p)
+	}
+	if got := DaysLeft(p, 3); got != 2 {
+		t.Fatalf("days left = %d, want 2", got)
+	}
+	ApplyDay(p, "2026-11-21", DayResult{Counted: 2, Paused: true}) // paused: count waits
+	if p.SickDays != 1 {
+		t.Fatalf("paused day counted: %+v", p)
+	}
+	ApplyDay(p, "2026-11-22", DayResult{Counted: 2, Missed: 1})
+	if p.SickDays != 2 || DaysLeft(p, 3) != 1 || Dies(p, 3) {
+		t.Fatalf("second sick day: %+v", p)
+	}
+	ApplyDay(p, "2026-11-23", DayResult{Counted: 2, Missed: 1})
+	if !Dies(p, 3) {
+		t.Fatalf("third sick day should be fatal at 3: %+v", p)
+	}
+	// Getting better resets the count.
+	p = newPet()
+	p.Health, p.SickDays = 30, 2
+	ApplyDay(p, "2026-11-24", DayResult{Counted: 1}) // 45
+	if p.SickDays != 0 || DaysLeft(p, 3) != 0 {
+		t.Fatalf("recovered: %+v", p)
+	}
+	if DaysLeft(&model.Pet{Health: 10, SickDays: 5}, 0) != 0 {
+		t.Fatal("deaths off should never warn")
+	}
+}

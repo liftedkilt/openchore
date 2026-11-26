@@ -359,6 +359,10 @@ export interface Pet {
   mood: PetMood;
   /** All of today's chores are done, so health already shows tonight's gain. */
   healed_today?: boolean;
+  /** Pet deaths are on and it's sick: this many more nights ending sick and it dies (1 = tonight). */
+  days_left?: number;
+  /** Finished days in a row it ended sick. */
+  sick_days?: number;
   hiding: boolean;
   sick: boolean;
   can_play: boolean;
@@ -366,9 +370,26 @@ export interface Pet {
   owner_color?: string;
 }
 
+/** The tombstone of a farm animal that died (pet deaths, docs/pets.md). */
+export interface PetGrave {
+  id: number;
+  user_id: number;
+  name: string;
+  species: PetSpecies;
+  color?: string;
+  adopted_on: string;
+  died_on: string;
+  owner_name?: string;
+  owner_color?: string;
+}
+
 export interface Farm {
   enabled: boolean;
   pets: Pet[];
+  /** Animals that died; absent from older servers. */
+  graves?: PetGrave[];
+  /** Pet deaths: animals ending this many days in a row sick die (0 = never). */
+  death_days?: number;
 }
 
 export interface PoolContributor {

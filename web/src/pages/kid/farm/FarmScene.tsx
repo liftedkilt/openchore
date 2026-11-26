@@ -5,10 +5,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
-import type { GoalCelebration, Pet } from '../../../types';
+import type { GoalCelebration, Pet, PetGrave } from '../../../types';
 import { FarmAnimal, petPicture, FarmBackdrop, Shelter } from './FarmAnimal';
 import { GoalDecoration } from './GoalDecoration';
 import { Rosette } from './Rosette';
+import { Tombstone } from './Tombstone';
 import s from './farm.module.css';
 import { useFarmSeason } from './season';
 import { isPersonColor } from '../../../design/types';
@@ -44,6 +45,8 @@ function startSpot(id: number, i: number, n: number): Spot {
 
 export interface FarmSceneProps {
   pets: Pet[];
+  /** Tombstones of animals that died (pet deaths). */
+  graves?: readonly PetGrave[];
   /** Highlight this person's animal. */
   meId?: number;
   compact?: boolean;
@@ -57,8 +60,8 @@ export interface FarmSceneProps {
   className?: string;
 }
 
-export function FarmScene({ pets, meId, compact, owners = !compact, goalCelebrations, friendFarm, onSelect, className }: FarmSceneProps) {
-  const { t } = useTranslation();
+export function FarmScene({ pets, graves, meId, compact, owners = !compact, goalCelebrations, friendFarm, onSelect, className }: FarmSceneProps) {
+  const { t, i18n } = useTranslation();
   const season = useFarmSeason();
   const out = pets.filter(p => !p.hiding);
   const hiding = pets.filter(p => p.hiding);
@@ -153,6 +156,26 @@ export function FarmScene({ pets, meId, compact, owners = !compact, goalCelebrat
               </button>
             </li>
           ))}
+        </ul>
+      )}
+
+      {graves && graves.length > 0 && (
+        <ul className={s.graves} aria-label={t('kid.farm.gravesTitle')}>
+          {graves.map(g => {
+            const words = t('kid.farm.grave', {
+              name: g.name,
+              owner: g.owner_name ?? '',
+              species: t(`kid.farm.species.${g.species}`).toLowerCase(),
+              date: new Date(`${g.died_on}T12:00:00`).toLocaleDateString(i18n.language, { day: 'numeric', month: 'long', year: 'numeric' }),
+            });
+            return (
+              <li key={g.id} className={clsx(s.graveItem, g.user_id === meId && s.mine)}>
+                <span className={s.graveBtn} role="img" aria-label={words} title={words}>
+                  <Tombstone name={g.name} />
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
 

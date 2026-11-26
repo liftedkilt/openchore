@@ -22,7 +22,7 @@ const (
 	MaxMissHealth = 30 // ...up to this much in one day
 	StarveHealth  = 10 // fullness ran out
 
-	SickBelow     = 40
+	SickBelow     = 40 // also what counts as a sick day for pet deaths
 	VerySickBelow = 15
 	HungryBelow   = 30
 	BoredBelow    = 30
@@ -57,6 +57,28 @@ func ApplyDay(p *model.Pet, date string, d DayResult) {
 		p.Health -= StarveHealth
 	}
 	p.Health = clamp(p.Health)
+	if p.Health < SickBelow {
+		p.SickDays++
+	} else {
+		p.SickDays = 0
+	}
+}
+
+// Dies reports whether a pet has stayed sick long enough to die, given the
+// household's setting (deathDays; 0 = animals never die). Call after ApplyDay.
+func Dies(p *model.Pet, deathDays int) bool {
+	return deathDays > 0 && p.SickDays >= deathDays
+}
+
+// DaysLeft is how many more nights the pet can end sick before it dies
+// (1 = it dies tonight unless today's chores make it better), or 0 when it
+// isn't in danger: deaths are off or it isn't sick. Call after ShowToday, so
+// a kid who has done today's chores sees the danger lift straight away.
+func DaysLeft(p *model.Pet, deathDays int) int {
+	if deathDays <= 0 || p.Health >= SickBelow {
+		return 0
+	}
+	return max(1, deathDays-p.SickDays)
 }
 
 // ShowToday previews today's health gain as soon as it is earned: once every

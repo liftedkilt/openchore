@@ -51,7 +51,31 @@ Mood, shown on the farm:
   play) – recovers only through chores.
 - **Hungry** (food below 30), **bored** (joy below 30), **happy**, **content**.
 
-There's no death: at 0 health it's very sick until chores bring it back.
+By default there's no death: at 0 health it's very sick until chores bring it
+back.
+
+## Pet deaths (optional)
+
+A parent can turn on **Animals can die if they stay sick** under Manage →
+Settings → Farm pets (or `PUT /api/admin/pets` with `death_days`, or the
+`set_farm_pets` MCP tool) and pick how many days, 2 to 60.
+
+- The nightly check counts the days in a row an animal *ends* sick (health
+  below 40). A day that ends at 40 or more resets the count; paused days
+  don't count and don't reset it.
+- When the count reaches the setting, the animal dies that night. It is
+  removed (with its accessories and pictures) and a **tombstone with its
+  name** is left in the corner of the farm, on the Today screen, the farm
+  sheet and the wall display. Its owner can adopt a new animal.
+- A sick animal's sheet tells its owner how many more nights it can end sick
+  (`days_left`). Doing all of today's chores lifts the warning straight away
+  when it would bring the animal back above 40 (the same preview as above).
+- Turning deaths on, or turning farm pets back on, starts every animal's
+  count from zero, and shortening the time always leaves at least one night,
+  so no animal dies without warning.
+- A parent can remove a tombstone in Settings (`DELETE
+  /api/admin/pets/graves/{id}`, `remove_farm_grave`). Graves are never sent
+  to friend families.
 
 ## Pet-care rewards
 
@@ -90,7 +114,9 @@ From five weeks before Christmas (November 20) through one week after (January 1
 - `GET /api/pets` – the farm: `enabled` and every animal with mood and owner.
 - `GET /api/me/pet`, `POST /api/me/pet` (adopt: `name`, `species`),
   `PATCH /api/me/pet` (`name`, `accessory`).
-- `PUT /api/admin/pets` (`enabled`), `DELETE /api/admin/users/{id}/pet`
+- `GET /api/pets` also returns `death_days` (0 = off) and `graves`.
+- `PUT /api/admin/pets` (`enabled`, `death_days`; either may be left out),
+  `DELETE /api/admin/users/{id}/pet`, `DELETE /api/admin/pets/graves/{id}`
   (also in Settings → Farm pets).
 - `POST /api/rewards/{id}/redeem` takes an optional `{"pet": {"species", "color"}}`
   for `new_animal` / `restyle` rewards.

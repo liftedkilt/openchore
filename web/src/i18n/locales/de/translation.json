@@ -723,7 +723,18 @@
         "approveTitle": "Kreuze das an, wenn du dir das Bild angesehen hast. Auf eurem eigenen Hof wird es immer gezeigt; hier entscheidest du nur, ob es an verbundene Familien gesendet werden darf.",
         "approved": "Das Bild von {{name}} darf jetzt an befreundete Familien gesendet werden.",
         "unapproved": "Das Bild von {{name}} wird nicht mehr an befreundete Familien gesendet.",
-        "pictureChanged": "Das Bild wurde inzwischen geändert. Sieh es dir noch einmal an und kreuze es dann an."
+        "pictureChanged": "Das Bild wurde inzwischen geändert. Sieh es dir noch einmal an und kreuze es dann an.",
+        "deathsToggle": "Tiere können sterben, wenn sie krank bleiben",
+        "deathDaysLabel": "Stirbt nach",
+        "deathDaysUnit": "Tagen in Folge krank",
+        "deathsHelp": "Standardmäßig aus. Ein Tier, das so viele Tage in Folge krank beendet (Gesundheit unter 40), stirbt und hinterlässt einen Grabstein mit seinem Namen auf dem Hof; sein Besitzer kann ein neues adoptieren. Kinder sehen, wie viele Tage ihr krankes Tier noch hat. Beim Einschalten beginnt die Zählung für jedes Tier bei null, und pausierte Tage zählen nicht.",
+        "deathsOn_one": "Tiere sterben jetzt nach {{count}} Tag in Folge krank.",
+        "deathsOn_other": "Tiere sterben jetzt nach {{count}} Tagen in Folge krank.",
+        "deathsOff": "Tiere sterben nicht mehr.",
+        "gravesTitle": "Gräber",
+        "diedOn": "gestorben am {{date}}",
+        "removeGrave": "Grab entfernen",
+        "graveRemoved": "Das Grab von {{name}} wurde entfernt."
       },
       "friends": {
         "title": "Rangliste & befreundete Familien",
@@ -1559,7 +1570,11 @@
         "ariaFriend": "Festwimpel: gemeinsames Teamziel von {{target}} mit {{family}} erreicht.",
         "ariaMany": "Festwimpel: {{count}} Teamziele erreicht ({{list}}).",
         "item": "{{family}} ({{target}})"
-      }
+      },
+      "gravesTitle": "Hier in Erinnerung",
+      "grave": "In Erinnerung an {{name}}, {{owner}}s Tier ({{species}}), gestorben am {{date}}.",
+      "daysLeft_one": "{{name}} ist schwer krank. Wenn heute nicht alle Aufgaben erledigt werden, stirbt {{name}} heute Nacht.",
+      "daysLeft_other": "{{name}} ist schwer krank. Wenn {{name}} nach {{count}} weiteren Nächten noch krank ist, stirbt {{name}}. Erledige jeden Tag alle Aufgaben, dann wird {{name}} wieder gesund."
     },
     "board": {
       "title": "Diese Woche",
