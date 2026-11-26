@@ -453,6 +453,7 @@
       "fieldPetAction": "Farm pet care",
       "fieldPetActionTitle": "Make this a pet-care reward: redeeming it feeds, plays with or dresses up the person's farm animal.",
       "fieldPetItem": "Accessory",
+      "fieldCharacter": "Character",
       "petAction": {
         "none": "Not a pet reward",
         "feed": "Feed (lots of food)",
@@ -463,6 +464,7 @@
         "new_animal": "New animal (stats carry over)",
         "design": "Design (kid draws their own)",
         "picture": "Own picture (kid uploads their animal)",
+        "character": "Character (becomes a ready-made dragon, unicorn…)",
         "gift": "Gift (a treat for a friend family's animal)",
         "playdate": "Playdate (visit a friend family's farm)"
       },
@@ -730,7 +732,18 @@
         "approveTitle": "Tick this once you've looked at the picture. It always shows on your own farm; this only decides whether linked families can be sent it.",
         "approved": "{{name}}'s picture can now be sent to friend families.",
         "unapproved": "{{name}}'s picture will no longer be sent to friend families.",
-        "pictureChanged": "The picture changed while you were looking. Have another look, then tick it."
+        "pictureChanged": "The picture changed while you were looking. Have another look, then tick it.",
+        "deathsToggle": "Animals can die if they stay sick",
+        "deathDaysLabel": "Dies after",
+        "deathDaysUnit": "nights in a row sick with chores missed",
+        "deathsHelp": "Off by default. An animal that ends this many nights in a row sick (health below 40) after missed chores dies and leaves a tombstone with its name on the farm, and its owner can adopt a new one. A day with every chore done clears the count, even if the animal is still sick, so doing the chores always saves it. Days with no chores and paused days don't count either way. Kids see how many nights their sick animal has left. Turning this on starts every animal's count from zero.",
+        "deathsOn_one": "Animals now die after {{count}} night in a row sick with chores missed.",
+        "deathsOn_other": "Animals now die after {{count}} nights in a row sick with chores missed.",
+        "deathsOff": "Animals will no longer die.",
+        "gravesTitle": "Graves",
+        "diedOn": "died {{date}}",
+        "removeGrave": "Remove grave",
+        "graveRemoved": "{{name}}'s grave was removed."
       },
       "friends": {
         "title": "Leaderboard & friend families",
@@ -1482,6 +1495,7 @@
           "restyle": "{{name}} loves the new coat!",
           "new_animal": "Ta-da! Meet the new {{name}}!",
           "picture": "{{name}} has a whole new look!",
+          "character": "Ta-da! {{name}} has transformed!",
           "gift": "Sent! Your friend's animal will love it.",
           "playdate": "{{name}} is off to play at your friend's farm!"
         }
@@ -1566,7 +1580,20 @@
         "ariaFriend": "Celebration bunting: team goal of {{target}} reached together with {{family}}.",
         "ariaMany": "Celebration bunting: {{count}} team goals reached ({{list}}).",
         "item": "{{family}} ({{target}})"
-      }
+      },
+      "character": {
+        "dragon": "Dragon",
+        "gnome": "Christmas gnome",
+        "hippogriff": "Hippogriff",
+        "unicorn": "Unicorn",
+        "yeti": "Yeti",
+        "phoenix": "Phoenix",
+        "griffin": "Griffin"
+      },
+      "gravesTitle": "Remembered here",
+      "grave": "In memory of {{name}}, {{owner}}'s {{species}}, who died on {{date}}.",
+      "daysLeft_one": "{{name}} is seriously ill. If today's chores aren't all done, {{name}} will die tonight.",
+      "daysLeft_other": "{{name}} is seriously ill. If chores are missed on {{count}} more nights while {{name}} is sick, {{name}} will die. A day with all your chores done takes the danger away."
     },
     "board": {
       "title": "This week",

@@ -617,6 +617,7 @@ func TestMCPCoversAPI(t *testing.T) {
 		"GET /leaderboard/household":  "the wall display's copy; get_leaderboard has everyone",
 		"GET /schedules":              "the Chores tab's bulk copy; household_overview and list_schedules cover it",
 		"GET /chores/possible-points": "the Chores tab's summary; get_person_chores has each person's week",
+		"GET /pets/characters/{}.png": "a picture file for the web app",
 		// The MCP endpoint itself.
 		"POST /mcp": "self", "GET /mcp": "self", "PUT /mcp": "self", "DELETE /mcp": "self", "PATCH /mcp": "self",
 		"HEAD /mcp": "self", "OPTIONS /mcp": "self", "CONNECT /mcp": "self", "TRACE /mcp": "self", "QUERY /mcp": "self",

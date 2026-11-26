@@ -358,3 +358,48 @@ func TestMigration030FriendConfirmKeepsChildRows(t *testing.T) {
 	}
 	assertChildren("re-up")
 }
+
+// Migration 031 gives a household that already has pet-care rewards one
+// reward per character, and leaves one without pets alone.
+func TestMigration031AddsCharacterRewards(t *testing.T) {
+	count := func(db *sql.DB) int {
+		var n int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM rewards WHERE pet_action = 'character' AND created_by = 1 AND cost = 100`).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	for _, withPets := range []bool{true, false} {
+		m, db := migrator(t)
+		if err := m.Migrate(30); err != nil {
+			t.Fatalf("migrate to 30: %v", err)
+		}
+		mustExec(t, db, `INSERT INTO users (id, name, role) VALUES (1, 'Parent', 'admin')`)
+		mustExec(t, db, `INSERT INTO rewards (name, cost, created_by) VALUES ('Ice cream', 20, 1)`)
+		if withPets {
+			mustExec(t, db, `INSERT INTO rewards (name, cost, created_by, pet_action) VALUES ('Feed my animal', 5, 1, 'feed')`)
+		}
+		if err := m.Up(); err != nil {
+			t.Fatalf("up: %v", err)
+		}
+		want := 0
+		if withPets {
+			want = 7
+		}
+		if got := count(db); got != want {
+			t.Fatalf("pets=%v: %d character rewards, want %d", withPets, got, want)
+		}
+		if withPets {
+			// Rolling back keeps a redeemed one as an inactive ordinary reward.
+			mustExec(t, db, `INSERT INTO reward_redemptions (reward_id, user_id, points_spent) SELECT id, 1, 100 FROM rewards WHERE pet_item = 'dragon'`)
+			if err := m.Migrate(30); err != nil {
+				t.Fatalf("down to 30: %v", err)
+			}
+			var left int
+			db.QueryRow(`SELECT COUNT(*) FROM rewards WHERE name IN ('Dragon', 'Unicorn') AND pet_action = '' AND active = 0`).Scan(&left)
+			if left != 1 {
+				t.Fatalf("after rollback: %d kept", left)
+			}
+		}
+	}
+}

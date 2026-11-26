@@ -3,3 +3,9 @@
 .text { flex: 1; min-width: 0; }
 /* A custom picture's own controls, on a line of their own under the animal. */
 .picture { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding-left: 76px; }
+/* Pet deaths: the switch and how many days in a row sick. */
+.deaths { margin: 4px 0 8px; }
+.deathDays { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 4px 0 0 28px; }
+.deathDays .daysInput { width: 5.5em; flex: none; margin: 0; }
+.subTitle { margin: 12px 0 4px; font-size: 14px; }
+.row .graveThumb { width: 54px; height: 63px; flex: none; margin: 0 5px; }

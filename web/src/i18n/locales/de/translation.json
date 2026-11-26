@@ -453,6 +453,7 @@
       "fieldPetAction": "Hoftier-Pflege",
       "fieldPetActionTitle": "Mach daraus eine Tierpflege-Belohnung: Einlösen füttert das Hoftier, spielt mit ihm oder schmückt es.",
       "fieldPetItem": "Accessoire",
+      "fieldCharacter": "Figur",
       "petAction": {
         "none": "Keine Tier-Belohnung",
         "feed": "Füttern (viel Futter)",
@@ -463,6 +464,7 @@
         "new_animal": "Neues Tier (Werte bleiben)",
         "design": "Selbst gestalten (Kind malt)",
         "picture": "Eigenes Bild (Kind lädt sein Tier hoch)",
+        "character": "Figur (wird zu Drache, Einhorn…)",
         "gift": "Geschenk (ein Leckerli für das Tier einer befreundeten Familie)",
         "playdate": "Spielbesuch (den Hof einer befreundeten Familie besuchen)"
       },
@@ -730,7 +732,18 @@
         "approveTitle": "Kreuze das an, wenn du dir das Bild angesehen hast. Auf eurem eigenen Hof wird es immer gezeigt; hier entscheidest du nur, ob es an verbundene Familien gesendet werden darf.",
         "approved": "Das Bild von {{name}} darf jetzt an befreundete Familien gesendet werden.",
         "unapproved": "Das Bild von {{name}} wird nicht mehr an befreundete Familien gesendet.",
-        "pictureChanged": "Das Bild wurde inzwischen geändert. Sieh es dir noch einmal an und kreuze es dann an."
+        "pictureChanged": "Das Bild wurde inzwischen geändert. Sieh es dir noch einmal an und kreuze es dann an.",
+        "deathsToggle": "Tiere können sterben, wenn sie krank bleiben",
+        "deathDaysLabel": "Stirbt nach",
+        "deathDaysUnit": "Nächten in Folge krank mit verpassten Aufgaben",
+        "deathsHelp": "Standardmäßig aus. Ein Tier, das so viele Nächte in Folge nach verpassten Aufgaben krank beendet (Gesundheit unter 40), stirbt und hinterlässt einen Grabstein mit seinem Namen auf dem Hof; sein Besitzer kann ein neues adoptieren. Ein Tag, an dem alle Aufgaben erledigt sind, setzt die Zählung zurück, auch wenn das Tier noch krank ist. Wer seine Aufgaben macht, rettet sein Tier also immer. Tage ohne Aufgaben und pausierte Tage zählen in keine Richtung. Kinder sehen, wie viele Nächte ihr krankes Tier noch hat. Beim Einschalten beginnt die Zählung für jedes Tier bei null.",
+        "deathsOn_one": "Tiere sterben jetzt nach {{count}} Nacht in Folge krank mit verpassten Aufgaben.",
+        "deathsOn_other": "Tiere sterben jetzt nach {{count}} Nächten in Folge krank mit verpassten Aufgaben.",
+        "deathsOff": "Tiere sterben nicht mehr.",
+        "gravesTitle": "Gräber",
+        "diedOn": "gestorben am {{date}}",
+        "removeGrave": "Grab entfernen",
+        "graveRemoved": "Das Grab von {{name}} wurde entfernt."
       },
       "friends": {
         "title": "Rangliste & befreundete Familien",
@@ -1482,6 +1495,7 @@
           "restyle": "{{name}} liebt das neue Fell!",
           "new_animal": "Tadaa! Das ist {{name}} in neu!",
           "picture": "{{name}} sieht ganz neu aus!",
+          "character": "Tadaa! {{name}} hat sich verwandelt!",
           "gift": "Verschickt! Das Tier deines Freundes wird sich freuen.",
           "playdate": "{{name}} ist unterwegs zum Spielen auf dem Hof deiner Freunde!"
         }
@@ -1566,7 +1580,20 @@
         "ariaFriend": "Festwimpel: gemeinsames Teamziel von {{target}} mit {{family}} erreicht.",
         "ariaMany": "Festwimpel: {{count}} Teamziele erreicht ({{list}}).",
         "item": "{{family}} ({{target}})"
-      }
+      },
+      "character": {
+        "dragon": "Drache",
+        "gnome": "Weihnachtswichtel",
+        "hippogriff": "Hippogreif",
+        "unicorn": "Einhorn",
+        "yeti": "Yeti",
+        "phoenix": "Phönix",
+        "griffin": "Greif"
+      },
+      "gravesTitle": "Hier in Erinnerung",
+      "grave": "In Erinnerung an {{name}}, {{owner}}s Tier ({{species}}), gestorben am {{date}}.",
+      "daysLeft_one": "{{name}} ist schwer krank. Wenn heute nicht alle Aufgaben erledigt werden, stirbt {{name}} heute Nacht.",
+      "daysLeft_other": "{{name}} ist schwer krank. Wenn in {{count}} weiteren Nächten Aufgaben verpasst werden, während {{name}} krank ist, stirbt {{name}}. Ein Tag mit allen erledigten Aufgaben nimmt die Gefahr weg."
     },
     "board": {
       "title": "Diese Woche",

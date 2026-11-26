@@ -327,3 +327,14 @@ a.chip { text-decoration: none; color: inherit; }
 .friendOwner { color: var(--ink-muted); font-size: 12px; }
 /* Treats friends sent today. */
 .giftLine { margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-3); border-radius: var(--r-row); background: var(--surface-sunk); font-size: 14px; }
+
+/* Pet deaths are on and the animal is sick: how long it has left. */
+.danger {
+  margin: 4px 0 0;
+  padding: 4px 8px;
+  border-radius: var(--r-chip);
+  background: color-mix(in srgb, var(--danger, #c0392b) 14%, transparent);
+  color: var(--danger-ink, var(--ink));
+  font-size: 13px;
+  font-weight: 700;
+}

@@ -31,6 +31,7 @@ const BURST: Record<ReactionEvent['kind'], string[]> = {
   accessory: ['✨', '⭐', '✨', '💫'],
   design: ['🎨', '✨', '⭐', '✨'],
   picture: ['🖼️', '✨', '⭐', '✨'],
+  character: ['✨', '🌟', '💫', '✨'],
   gift: ['🎁', '💛', '✨'],
   playdate: ['🎉', '💨', '⭐', '✨'],
   wear: ['✨', '✨'],
@@ -38,10 +39,10 @@ const BURST: Record<ReactionEvent['kind'], string[]> = {
   new_animal: ['💨', '✨', '💨', '⭐'],
 };
 const MOTION: Record<ReactionEvent['kind'], string> = {
-  feed: s.munch, treat: s.munch, play: s.hop, accessory: s.pose, design: s.pose, picture: s.poof, gift: s.pose, playdate: s.hop, wear: s.pose, restyle: s.pose, new_animal: s.poof,
+  feed: s.munch, treat: s.munch, play: s.hop, accessory: s.pose, design: s.pose, picture: s.poof, character: s.poof, gift: s.pose, playdate: s.hop, wear: s.pose, restyle: s.pose, new_animal: s.poof,
 };
 const FACE: Record<ReactionEvent['kind'], FaceReaction> = {
-  feed: 'eat', treat: 'eat', play: 'play', accessory: 'love', design: 'love', picture: 'love', gift: 'love', playdate: 'play', wear: 'love', restyle: 'love', new_animal: 'love',
+  feed: 'eat', treat: 'eat', play: 'play', accessory: 'love', design: 'love', picture: 'love', character: 'love', gift: 'love', playdate: 'play', wear: 'love', restyle: 'love', new_animal: 'love',
 };
 
 interface ReactingAnimalProps {

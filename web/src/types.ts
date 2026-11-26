@@ -292,7 +292,7 @@ export interface Reward {
   shareable: boolean;
   /** '' for an ordinary reward; otherwise it cares for the person's farm animal. */
   pet_action?: PetAction | '';
-  /** The accessory an "accessory" reward gives. */
+  /** The accessory an "accessory" reward gives, or the character a "character" reward gives. */
   pet_item?: PetItem;
   created_by: number;
   created_at: string;
@@ -301,7 +301,7 @@ export interface Reward {
 
 // --- Farm pets ---
 
-export type PetAction = 'feed' | 'treat' | 'play' | 'accessory' | 'new_animal' | 'restyle' | 'design' | 'picture' | 'gift' | 'playdate';
+export type PetAction = 'feed' | 'treat' | 'play' | 'accessory' | 'new_animal' | 'restyle' | 'design' | 'picture' | 'character' | 'gift' | 'playdate';
 /** What a person picks when redeeming new_animal / restyle / design rewards. */
 export interface PetPick {
   species?: PetSpecies; color?: string; slot?: PetItemSlot; image?: string;
@@ -323,6 +323,11 @@ export const PET_ITEMS: PetItem[] = [
   'bandana', 'scarf', 'bell', 'bowtie', 'medal',
 ];
 export const PET_ITEM_SLOTS: PetItemSlot[] = ['head', 'face', 'neck'];
+/** Ready-made characters a "character" reward turns the animal into (model.PetCharacters). */
+export const PET_CHARACTERS = ['dragon', 'gnome', 'hippogriff', 'unicorn', 'yeti', 'phoenix', 'griffin'] as const;
+export type PetCharacter = (typeof PET_CHARACTERS)[number];
+/** Where the server serves a character's six-frame picture strip. */
+export const characterPictureUrl = (id: string) => `/api/pets/characters/${id}.png`;
 /** Each species' coat colours; the first is the default. */
 export const PET_COLORS: Record<PetSpecies, string[]> = {
   horse: ['chestnut', 'black', 'grey', 'palomino'],
@@ -352,6 +357,8 @@ export interface Pet {
   sprite_frames?: number;
   /** A parent has said the picture may be sent to friend families. */
   sprite_approved?: boolean;
+  /** The picture is this ready-made character, from a "character" reward. */
+  character?: PetCharacter;
   /** A friend family's animal: its picture as a data: URL (set instead of sprite). */
   sprite_data?: string;
   /** The owner came first on last week's leaderboard. */
@@ -366,6 +373,10 @@ export interface Pet {
   mood: PetMood;
   /** All of today's chores are done, so health already shows tonight's gain. */
   healed_today?: boolean;
+  /** Pet deaths are on and it's sick: this many more nights ending sick and it dies (1 = tonight). */
+  days_left?: number;
+  /** Nights in a row it ended sick after missed chores (a day with every chore done resets it). */
+  sick_days?: number;
   hiding: boolean;
   sick: boolean;
   can_play: boolean;
@@ -373,9 +384,26 @@ export interface Pet {
   owner_color?: string;
 }
 
+/** The tombstone of a farm animal that died (pet deaths, docs/pets.md). */
+export interface PetGrave {
+  id: number;
+  user_id: number;
+  name: string;
+  species: PetSpecies;
+  color?: string;
+  adopted_on: string;
+  died_on: string;
+  owner_name?: string;
+  owner_color?: string;
+}
+
 export interface Farm {
   enabled: boolean;
   pets: Pet[];
+  /** Animals that died; absent from older servers. */
+  graves?: PetGrave[];
+  /** Pet deaths: animals ending this many days in a row sick die (0 = never). */
+  death_days?: number;
 }
 
 export interface PoolContributor {

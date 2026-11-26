@@ -106,6 +106,7 @@ Optional features, off until a parent turns them on. Details in
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/pets` | The family farm: every animal with its mood (public, like chores and points) |
+| `GET` | `/api/pets/characters/{id}.png` | A ready-made character's picture strip (public) |
 | `GET` | `/api/leaderboard/household` | This household's own weekly standings (public, for the wall display) |
 | `GET` `POST` `PATCH` | `/api/me/pet` | This person's animal: view, adopt, rename / change accessory / drop a custom picture |
 | `GET` | `/api/leaderboard?week=this\|last` | The weekly standings, with people shared by linked families |

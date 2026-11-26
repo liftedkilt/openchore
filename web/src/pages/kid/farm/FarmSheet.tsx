@@ -15,7 +15,7 @@ import { DesignSheet } from './DesignSheet';
 import { PictureSheet } from './PictureSheet';
 import { FriendPickSheet } from './FriendPickSheet';
 import { ReactingAnimal, reactionLine, type ReactionEvent } from './PetReaction';
-import { itemLabel, needsPick } from './petLook';
+import { itemLabel, needsPick, petRewardOwned } from './petLook';
 import { PetRewardThumb } from './PetRewardThumb';
 import k from '../kid.module.css';
 import s from './petSheet.module.css';
@@ -36,7 +36,7 @@ export function FarmSheet({ user, data, onClose }: FarmSheetProps) {
 
   return (
     <Sheet title={t('kid.farm.title')} onClose={onClose} className={s.sheet}>
-      <FarmScene pets={pets} meId={user.id} goalCelebrations={data.goalCelebrations} onSelect={setSelected} />
+      <FarmScene pets={pets} graves={data.farm?.graves} meId={user.id} goalCelebrations={data.goalCelebrations} onSelect={setSelected} />
       {other && (
         <div className={s.otherCard} role="status">
           <FarmAnimal species={other.species} color={other.color} mood={other.mood} accessory={other.accessory} {...petPicture(other)} className={s.otherArt} />
@@ -146,7 +146,7 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
   }, []);
   useEffect(loadRewards, [loadRewards]);
 
-  const care = (rewards ?? []).filter(r => r.pet_action && r.pet_action !== 'accessory');
+  const care = (rewards ?? []).filter(r => r.pet_action && r.pet_action !== 'accessory' && !petRewardOwned(pet, r));
   const shopItems = (rewards ?? []).filter(r => r.pet_action === 'accessory' && r.pet_item && !pet.items.includes(r.pet_item));
 
   const redeem = async (r: Reward, pick?: PetPick) => {
@@ -236,7 +236,12 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
           <p className={s.moodLine} aria-live="polite">
             {reaction ? reactionLine(t, pet, reaction.kind) : t(`kid.farm.mood.${pet.mood}`, { name: pet.name })}
           </p>
-          <p className={s.hint}>{hint}</p>
+          {(!pet.days_left || pet.healed_today) && <p className={s.hint}>{hint}</p>}
+          {!!pet.days_left && !pet.healed_today && (
+            <p className={s.danger} role="status">
+              {t('kid.farm.daysLeft', { count: pet.days_left, name: pet.name })}
+            </p>
+          )}
           {data.gifts.filter(g => g.to_user_id === pet.user_id).map((g, i) => (
             <p key={i} className={s.giftLine}>{t('kid.farm.giftFrom', { from: g.from, family: g.family, name: pet.name })}</p>
           ))}

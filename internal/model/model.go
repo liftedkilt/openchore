@@ -371,7 +371,39 @@ const (
 	PetActionPicture   = "picture"    // use your own picture as the animal (docs/custom-animals.md)
 	PetActionGift      = "gift"       // send a treat to a friend family's animal (docs/friends.md)
 	PetActionPlaydate  = "playdate"   // send your animal to play on a friend family's farm for the day
+	PetActionCharacter = "character"  // become one ready-made character (PetItem names it, PetCharacters)
 )
+
+// PetCharacter is a ready-made character picture a "character" reward
+// turns the animal into. The pictures ship with the server
+// (internal/sprite/characters) and each is its own reward, so it costs
+// what the parents set rather than the cheaper "picture" upload.
+type PetCharacter struct {
+	ID   string
+	Name string
+}
+
+// PetCharacters are the characters a "character" reward can give, in the
+// order they are offered.
+var PetCharacters = []PetCharacter{
+	{ID: "dragon", Name: "Dragon"},
+	{ID: "gnome", Name: "Christmas gnome"},
+	{ID: "hippogriff", Name: "Hippogriff"},
+	{ID: "unicorn", Name: "Unicorn"},
+	{ID: "yeti", Name: "Yeti"},
+	{ID: "phoenix", Name: "Phoenix"},
+	{ID: "griffin", Name: "Griffin"},
+}
+
+// PetCharacterName is the character's display name, or "" if id isn't one.
+func PetCharacterName(id string) string {
+	for _, c := range PetCharacters {
+		if c.ID == id {
+			return c.Name
+		}
+	}
+	return ""
+}
 
 // PetSpriteFrames is the order of the frames in a custom animal's picture
 // strip. A strip may stop early: a missing frame falls back to the first.
@@ -380,7 +412,7 @@ var PetSpriteFrames = []string{"stand", "walk1", "walk2", "sick", "lying", "happ
 // ValidPetAction reports whether a is a pet action or empty (ordinary reward).
 func ValidPetAction(a string) bool {
 	switch a {
-	case "", PetActionFeed, PetActionTreat, PetActionPlay, PetActionAccessory, PetActionNewAnimal, PetActionRestyle, PetActionDesign, PetActionPicture, PetActionGift, PetActionPlaydate:
+	case "", PetActionFeed, PetActionTreat, PetActionPlay, PetActionAccessory, PetActionNewAnimal, PetActionRestyle, PetActionDesign, PetActionPicture, PetActionGift, PetActionPlaydate, PetActionCharacter:
 		return true
 	}
 	return false
@@ -486,22 +518,33 @@ type Pet struct {
 	// SpriteApproved: a parent has said the picture may be sent to friend
 	// families. Cleared whenever the picture changes.
 	SpriteApproved bool `json:"sprite_approved,omitempty"`
+	// Character is set when the picture is a ready-made character from a
+	// "character" reward (PetCharacters), so that reward can show as owned.
+	Character string `json:"character,omitempty"`
 	// SpriteData is set instead of Sprite for a friend family's animal:
 	// its picture as a data: URL (it isn't a file on this server).
-	SpriteData     string    `json:"sprite_data,omitempty"`
-	Items          []string  `json:"items"` // owned accessories
-	LastMissedDate *string   `json:"last_missed_date,omitempty"`
-	LastDayChecked string    `json:"last_day_checked"`
-	CreatedAt      time.Time `json:"created_at"`
+	SpriteData     string   `json:"sprite_data,omitempty"`
+	Items          []string `json:"items"` // owned accessories
+	LastMissedDate *string  `json:"last_missed_date,omitempty"`
+	LastDayChecked string   `json:"last_day_checked"`
+	// SickDays counts the nights in a row it ended sick after missed chores
+	// (pet deaths, docs/pets.md). A day with every chore done, or ending
+	// well, clears it; paused and chore-free days leave it as it is.
+	SickDays  int       `json:"sick_days"`
+	CreatedAt time.Time `json:"created_at"`
 
 	// Computed on read.
 	Mood string `json:"mood"` // hiding, very_sick, sick, hungry, bored, happy, content
 	// HealedToday: all of today's chores are done, so Health already shows
 	// the gain tonight's check will make real (pet.ShowToday).
 	HealedToday bool `json:"healed_today,omitempty"`
-	Hiding      bool `json:"hiding"` // missed chores yesterday and today's aren't done yet
-	Sick        bool `json:"sick"`
-	CanPlay     bool `json:"can_play"`
+	// DaysLeft: pet deaths are on, it's sick and today's chores aren't all
+	// done; this many more nights ending sick after missed chores and it
+	// dies (1 = tonight). 0 = not in danger.
+	DaysLeft int  `json:"days_left,omitempty"`
+	Hiding   bool `json:"hiding"` // missed chores yesterday and today's aren't done yet
+	Sick     bool `json:"sick"`
+	CanPlay  bool `json:"can_play"`
 
 	// Visiting: a friend family's animal here on a playdate; Family says whose.
 	Visiting bool   `json:"visiting,omitempty"`
@@ -809,6 +852,21 @@ type FriendWeek struct {
 	Done     int    `json:"done"`
 	Bonus    int    `json:"bonus"`
 	Share    int    `json:"share"`
+}
+
+// PetGrave is where a farm animal that died is remembered: a tombstone with
+// its name on the farm (pet deaths, docs/pets.md).
+type PetGrave struct {
+	ID         int64     `json:"id"`
+	UserID     int64     `json:"user_id"`
+	Name       string    `json:"name"`
+	Species    string    `json:"species"`
+	Color      string    `json:"color,omitempty"`
+	AdoptedOn  string    `json:"adopted_on"`
+	DiedOn     string    `json:"died_on"`
+	CreatedAt  time.Time `json:"created_at"`
+	OwnerName  string    `json:"owner_name,omitempty"`
+	OwnerColor string    `json:"owner_color,omitempty"`
 }
 
 // FriendPet is a farm animal as shown to a friend family, in its real state:
