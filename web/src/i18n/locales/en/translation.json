@@ -446,6 +446,7 @@
       "fieldPetAction": "Farm pet care",
       "fieldPetActionTitle": "Make this a pet-care reward: redeeming it feeds, plays with or dresses up the person's farm animal.",
       "fieldPetItem": "Accessory",
+      "fieldCharacter": "Character",
       "petAction": {
         "none": "Not a pet reward",
         "feed": "Feed (lots of food)",
@@ -456,6 +457,7 @@
         "new_animal": "New animal (stats carry over)",
         "design": "Design (kid draws their own)",
         "picture": "Own picture (kid uploads their animal)",
+        "character": "Character (becomes a ready-made dragon, unicorn…)",
         "gift": "Gift (a treat for a friend family's animal)",
         "playdate": "Playdate (visit a friend family's farm)"
       },
@@ -1486,6 +1488,7 @@
           "restyle": "{{name}} loves the new coat!",
           "new_animal": "Ta-da! Meet the new {{name}}!",
           "picture": "{{name}} has a whole new look!",
+          "character": "Ta-da! {{name}} has transformed!",
           "gift": "Sent! Your friend's animal will love it.",
           "playdate": "{{name}} is off to play at your friend's farm!"
         }
@@ -1570,6 +1573,15 @@
         "ariaFriend": "Celebration bunting: team goal of {{target}} reached together with {{family}}.",
         "ariaMany": "Celebration bunting: {{count}} team goals reached ({{list}}).",
         "item": "{{family}} ({{target}})"
+      },
+      "character": {
+        "dragon": "Dragon",
+        "gnome": "Christmas gnome",
+        "hippogriff": "Hippogriff",
+        "unicorn": "Unicorn",
+        "yeti": "Yeti",
+        "phoenix": "Phoenix",
+        "griffin": "Griffin"
       },
       "gravesTitle": "Remembered here",
       "grave": "In memory of {{name}}, {{owner}}'s {{species}}, who died on {{date}}.",

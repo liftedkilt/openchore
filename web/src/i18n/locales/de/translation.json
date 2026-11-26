@@ -446,6 +446,7 @@
       "fieldPetAction": "Hoftier-Pflege",
       "fieldPetActionTitle": "Mach daraus eine Tierpflege-Belohnung: Einlösen füttert das Hoftier, spielt mit ihm oder schmückt es.",
       "fieldPetItem": "Accessoire",
+      "fieldCharacter": "Figur",
       "petAction": {
         "none": "Keine Tier-Belohnung",
         "feed": "Füttern (viel Futter)",
@@ -456,6 +457,7 @@
         "new_animal": "Neues Tier (Werte bleiben)",
         "design": "Selbst gestalten (Kind malt)",
         "picture": "Eigenes Bild (Kind lädt sein Tier hoch)",
+        "character": "Figur (wird zu Drache, Einhorn…)",
         "gift": "Geschenk (ein Leckerli für das Tier einer befreundeten Familie)",
         "playdate": "Spielbesuch (den Hof einer befreundeten Familie besuchen)"
       },
@@ -1486,6 +1488,7 @@
           "restyle": "{{name}} liebt das neue Fell!",
           "new_animal": "Tadaa! Das ist {{name}} in neu!",
           "picture": "{{name}} sieht ganz neu aus!",
+          "character": "Tadaa! {{name}} hat sich verwandelt!",
           "gift": "Verschickt! Das Tier deines Freundes wird sich freuen.",
           "playdate": "{{name}} ist unterwegs zum Spielen auf dem Hof deiner Freunde!"
         }
@@ -1570,6 +1573,15 @@
         "ariaFriend": "Festwimpel: gemeinsames Teamziel von {{target}} mit {{family}} erreicht.",
         "ariaMany": "Festwimpel: {{count}} Teamziele erreicht ({{list}}).",
         "item": "{{family}} ({{target}})"
+      },
+      "character": {
+        "dragon": "Drache",
+        "gnome": "Weihnachtswichtel",
+        "hippogriff": "Hippogreif",
+        "unicorn": "Einhorn",
+        "yeti": "Yeti",
+        "phoenix": "Phönix",
+        "griffin": "Greif"
       },
       "gravesTitle": "Hier in Erinnerung",
       "grave": "In Erinnerung an {{name}}, {{owner}}s Tier ({{species}}), gestorben am {{date}}.",

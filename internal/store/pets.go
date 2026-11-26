@@ -12,17 +12,17 @@ import (
 // ErrPetExists is returned when a person who already has a pet adopts another.
 var ErrPetExists = fmt.Errorf("you already have a pet")
 
-const petColumns = `id, user_id, name, species, color, health, fullness, joy, accessory, sprite, sprite_frames, sprite_approved, last_missed_date, last_day_checked, sick_days, created_at`
+const petColumns = `id, user_id, name, species, color, health, fullness, joy, accessory, sprite, sprite_frames, sprite_approved, sprite_character, last_missed_date, last_day_checked, sick_days, created_at`
 
 func scanPet(row interface{ Scan(...any) error }) (*model.Pet, error) {
 	p := &model.Pet{}
 	var missed sql.NullString
-	if err := row.Scan(&p.ID, &p.UserID, &p.Name, &p.Species, &p.Color, &p.Health, &p.Fullness, &p.Joy, &p.Accessory, &p.Sprite, &p.SpriteFrames, &p.SpriteApproved,
+	if err := row.Scan(&p.ID, &p.UserID, &p.Name, &p.Species, &p.Color, &p.Health, &p.Fullness, &p.Joy, &p.Accessory, &p.Sprite, &p.SpriteFrames, &p.SpriteApproved, &p.Character,
 		&missed, &p.LastDayChecked, &p.SickDays, &p.CreatedAt); err != nil {
 		return nil, err
 	}
 	if p.Sprite == "" {
-		p.SpriteFrames, p.SpriteApproved = 0, false
+		p.SpriteFrames, p.SpriteApproved, p.Character = 0, false, ""
 	}
 	if missed.Valid {
 		m := missed.String
@@ -168,8 +168,11 @@ func (s *Store) SetPetLook(ctx context.Context, userID int64, species, color str
 }
 
 // SetPetSprite sets (or with "" clears) the person's own animal picture and
-// returns the id it replaced, so the caller can delete that file.
-func (s *Store) SetPetSprite(ctx context.Context, userID int64, id string, frames int) (old string, err error) {
+// returns the id it replaced, so the caller can delete that file. character
+// names the ready-made character the picture is (model.PetCharacters), or
+// "" for an upload. A character is the app's own art, so it may go to friend
+// families straight away; an upload waits for a parent's approval.
+func (s *Store) SetPetSprite(ctx context.Context, userID int64, id string, frames int, character string) (old string, err error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return "", err
@@ -178,7 +181,53 @@ func (s *Store) SetPetSprite(ctx context.Context, userID int64, id string, frame
 	if err := tx.QueryRowContext(ctx, `SELECT sprite FROM pets WHERE user_id = ?`, userID).Scan(&old); err != nil {
 		return "", err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE pets SET sprite = ?, sprite_frames = ?, sprite_approved = 0 WHERE user_id = ?`, id, max(frames, 1), userID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE pets SET sprite = ?, sprite_frames = ?, sprite_approved = ?, sprite_character = ? WHERE user_id = ?`, id, max(frames, 1), character != "", character, userID); err != nil {
+		return "", err
+	}
+	return old, tx.Commit()
+}
+
+// RedemptionCharacter says who a redemption was for and which character it
+// bought, or "" if it wasn't a "character" reward.
+func (s *Store) RedemptionCharacter(ctx context.Context, redemptionID int64) (userID int64, character string, err error) {
+	err = s.db.QueryRowContext(ctx, `SELECT rr.user_id, r.pet_item FROM reward_redemptions rr
+		JOIN rewards r ON r.id = rr.reward_id
+		WHERE rr.id = ? AND r.pet_action = ?`, redemptionID, model.PetActionCharacter).Scan(&userID, &character)
+	if err == sql.ErrNoRows {
+		return 0, "", nil
+	}
+	return userID, character, err
+}
+
+// UndoPetCharacter puts the person's animal back to the drawn one if it is
+// still the character an undone redemption bought, and returns the picture
+// id to delete ("" if nothing changed). A later picture or character
+// purchase means the animal isn't that redemption's any more, so it is left
+// alone.
+func (s *Store) UndoPetCharacter(ctx context.Context, userID int64, character string, redemptionID int64) (old string, err error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+	var later int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM reward_redemptions rr
+		JOIN rewards r ON r.id = rr.reward_id
+		WHERE rr.user_id = ? AND rr.id > ? AND r.pet_action IN (?, ?)`,
+		userID, redemptionID, model.PetActionCharacter, model.PetActionPicture).Scan(&later); err != nil {
+		return "", err
+	}
+	if later > 0 {
+		return "", nil
+	}
+	err = tx.QueryRowContext(ctx, `SELECT sprite FROM pets WHERE user_id = ? AND sprite_character = ? AND sprite != ''`, userID, character).Scan(&old)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE pets SET sprite = '', sprite_frames = 1, sprite_approved = 0, sprite_character = '' WHERE user_id = ?`, userID); err != nil {
 		return "", err
 	}
 	return old, tx.Commit()

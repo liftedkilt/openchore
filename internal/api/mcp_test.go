@@ -615,6 +615,7 @@ func TestMCPCoversAPI(t *testing.T) {
 		"PUT /users/{}/theme": "update_person", "PUT /users/{}/avatar": "update_person", "PUT /users/{}/color": "update_person",
 		"PUT /users/{}/line-color": "only settable by that person",
 		"GET /leaderboard/household": "the wall display's copy; get_leaderboard has everyone",
+		"GET /pets/characters/{}.png": "a picture file for the web app",
 		// The MCP endpoint itself.
 		"POST /mcp": "self", "GET /mcp": "self", "PUT /mcp": "self", "DELETE /mcp": "self", "PATCH /mcp": "self",
 		"HEAD /mcp": "self", "OPTIONS /mcp": "self", "CONNECT /mcp": "self", "TRACE /mcp": "self", "QUERY /mcp": "self",

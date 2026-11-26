@@ -701,10 +701,11 @@ const IMAGE_RE = /^img:(head|face|neck):([a-f0-9]{16,64}|preview)$/;
 
 /**
  * A picture address is only ever one of ours: an upload under /uploads/pets,
- * or a PNG data URL made in this page (a drawing or a chosen file being
- * previewed). Anything else is dropped rather than put in the page.
+ * a ready-made character the server ships, or a PNG data URL made in this
+ * page (a drawing or a chosen file being previewed). Anything else is
+ * dropped rather than put in the page.
  */
-const SAFE_IMAGE_RE = /^(?:\/uploads\/pets\/[a-f0-9]{16,64}\.png|data:image\/png;base64,[A-Za-z0-9+/=]+)$/;
+const SAFE_IMAGE_RE = /^(?:\/uploads\/pets\/[a-f0-9]{16,64}\.png|\/api\/pets\/characters\/[a-z]+\.png|data:image\/png;base64,[A-Za-z0-9+/=]+)$/;
 export function safeImageHref(url: string | undefined): string | undefined {
   return url && SAFE_IMAGE_RE.test(url) ? url : undefined;
 }

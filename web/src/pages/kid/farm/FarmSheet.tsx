@@ -15,7 +15,7 @@ import { DesignSheet } from './DesignSheet';
 import { PictureSheet } from './PictureSheet';
 import { FriendPickSheet } from './FriendPickSheet';
 import { ReactingAnimal, reactionLine, type ReactionEvent } from './PetReaction';
-import { itemLabel, needsPick } from './petLook';
+import { itemLabel, needsPick, petRewardOwned } from './petLook';
 import { PetRewardThumb } from './PetRewardThumb';
 import k from '../kid.module.css';
 import s from './petSheet.module.css';
@@ -146,7 +146,7 @@ function MyAnimal({ pet, data }: { pet: Pet; data: KidData }) {
   }, []);
   useEffect(loadRewards, [loadRewards]);
 
-  const care = (rewards ?? []).filter(r => r.pet_action && r.pet_action !== 'accessory');
+  const care = (rewards ?? []).filter(r => r.pet_action && r.pet_action !== 'accessory' && !petRewardOwned(pet, r));
   const shopItems = (rewards ?? []).filter(r => r.pet_action === 'accessory' && r.pet_item && !pet.items.includes(r.pet_item));
 
   const redeem = async (r: Reward, pick?: PetPick) => {

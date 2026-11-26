@@ -6,12 +6,16 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/liftedkilt/openchore/internal/friends"
 	"github.com/liftedkilt/openchore/internal/model"
 	"github.com/liftedkilt/openchore/internal/pet"
+	"github.com/liftedkilt/openchore/internal/sprite"
+	"github.com/liftedkilt/openchore/internal/sprite/characters"
 	"github.com/liftedkilt/openchore/internal/store"
 	"github.com/liftedkilt/openchore/internal/webhook"
 )
@@ -38,6 +42,8 @@ type PetHandler struct {
 	Ribbons func(ctx context.Context) map[int64]bool
 	// Friends, when set, handles gifts and playdates to linked families.
 	Friends *friends.Service
+	// redeemMu holds pet-care redemptions to one at a time (RewardHandler.Redeem).
+	redeemMu sync.Mutex
 }
 
 func NewPetHandler(s *store.Store) *PetHandler {
@@ -324,6 +330,29 @@ var defaultPetRewards = []model.Reward{
 	{Name: "Treat for a friend's animal", Description: "Send a treat to an animal on a friend family's farm.", Icon: "🎁", Cost: 10, PetAction: model.PetActionGift},
 	{Name: "Playdate", Description: "Send your animal to play on a friend family's farm for the day.", Icon: "🚜", Cost: 15, PetAction: model.PetActionPlaydate},
 	{Name: "New animal", Description: "Trade for a different farm animal. Health, food and joy come along.", Icon: "🔁", Cost: 150, PetAction: model.PetActionNewAnimal},
+	// One per ready-made character (model.PetCharacters). Migration 031 adds
+	// the same rows to a household that turned pets on before they existed.
+	{Name: "Dragon", Description: "Turn your farm animal into a friendly dragon.", Icon: "🐉", Cost: 100, PetAction: model.PetActionCharacter, PetItem: "dragon"},
+	{Name: "Christmas gnome", Description: "Turn your farm animal into a jolly Christmas gnome.", Icon: "🎄", Cost: 100, PetAction: model.PetActionCharacter, PetItem: "gnome"},
+	{Name: "Hippogriff", Description: "Turn your farm animal into a hippogriff: part eagle, part horse.", Icon: "🪶", Cost: 100, PetAction: model.PetActionCharacter, PetItem: "hippogriff"},
+	{Name: "Unicorn", Description: "Turn your farm animal into a rainbow unicorn.", Icon: "🦄", Cost: 100, PetAction: model.PetActionCharacter, PetItem: "unicorn"},
+	{Name: "Yeti", Description: "Turn your farm animal into a fluffy snow yeti.", Icon: "❄️", Cost: 100, PetAction: model.PetActionCharacter, PetItem: "yeti"},
+	{Name: "Phoenix", Description: "Turn your farm animal into a blazing phoenix.", Icon: "🔥", Cost: 100, PetAction: model.PetActionCharacter, PetItem: "phoenix"},
+	{Name: "Griffin", Description: "Turn your farm animal into a griffin: part eagle, part lion.", Icon: "🦁", Cost: 100, PetAction: model.PetActionCharacter, PetItem: "griffin"},
+}
+
+// CharacterPicture serves a ready-made character's picture strip, for the
+// reward thumbnails and the admin preview. Public, like the farm itself.
+func (h *PetHandler) CharacterPicture(w http.ResponseWriter, r *http.Request) {
+	data, ok := characters.PNG(chi.URLParam(r, "id"))
+	if !ok {
+		writeError(w, http.StatusNotFound, "no such character")
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = w.Write(data)
 }
 
 // SetEnabled turns farm pets on or off (grown-ups). Turning them on the
@@ -422,7 +451,7 @@ func (h *PetHandler) Remove(w http.ResponseWriter, r *http.Request) {
 
 // clearSprite goes back to the drawn animal and deletes the picture.
 func (h *PetHandler) clearSprite(ctx context.Context, userID int64) error {
-	old, err := h.store.SetPetSprite(ctx, userID, "", 1)
+	old, err := h.store.SetPetSprite(ctx, userID, "", 1, "")
 	if err == nil && old != "" {
 		removePetImage(old)
 	}
@@ -604,6 +633,23 @@ func (h *PetHandler) checkPetReward(ctx context.Context, u *model.User, rw *mode
 		if err != nil {
 			return err.Error(), nil
 		}
+		// The ready-made characters are rewards of their own.
+		if id := characters.Match(png); id != "" {
+			return "that picture is the " + model.PetCharacterName(id) + "; get it with its own reward", nil
+		}
+		choice.png, choice.frames = png, frames
+	case model.PetActionCharacter:
+		if p.Character == rw.PetItem {
+			return p.Name + " is already the " + model.PetCharacterName(rw.PetItem), nil
+		}
+		raw, ok := characters.PNG(rw.PetItem)
+		if !ok || choice == nil {
+			return "that character isn't available", nil
+		}
+		png, frames, err := sprite.Decode(raw)
+		if err != nil {
+			return "", err
+		}
 		choice.png, choice.frames = png, frames
 	case model.PetActionRestyle:
 		if choice == nil || !model.ValidPetColor(p.Species, choice.Color) {
@@ -641,8 +687,12 @@ func (h *PetHandler) applyPetReward(ctx context.Context, userID int64, rw *model
 	case model.PetActionPlaydate:
 		// A day out: the animal comes home happier.
 		return h.store.AdjustPetNeeds(ctx, userID, 0, playdateJoy)
-	case model.PetActionPicture:
-		old, err := h.store.SetPetSprite(ctx, userID, choice.item, choice.frames)
+	case model.PetActionPicture, model.PetActionCharacter:
+		character := ""
+		if rw.PetAction == model.PetActionCharacter {
+			character = rw.PetItem
+		}
+		old, err := h.store.SetPetSprite(ctx, userID, choice.item, choice.frames, character)
 		if err == nil && old != "" {
 			removePetImage(old)
 		}
