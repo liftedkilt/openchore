@@ -1121,7 +1121,8 @@
       "readonlyTodo": "Not done",
       "autoComplete": "Ticks itself when you finish",
       "rejected": "Not accepted. Try again",
-      "uploadPhotoProof": "Add photo proof"
+      "uploadPhotoProof": "Add photo proof",
+      "siblingDid": "{{name}} did this one. Only they or a grown-up can undo it."
     },
     "colors": {
       "butter": "Butter",

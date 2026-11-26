@@ -1121,7 +1121,8 @@
       "readonlyTodo": "Nicht erledigt",
       "autoComplete": "Wird abgehakt, sobald du fertig bist",
       "rejected": "Nicht angenommen. Versuch es noch mal",
-      "uploadPhotoProof": "Foto als Nachweis hinzufügen"
+      "uploadPhotoProof": "Foto als Nachweis hinzufügen",
+      "siblingDid": "Das hat {{name}} erledigt. Nur {{name}} oder ein Erwachsener kann es rückgängig machen."
     },
     "colors": {
       "butter": "Butter",

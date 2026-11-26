@@ -137,6 +137,12 @@ export function useKidData(user: User | null, opts: { week: boolean; rewards: bo
    */
   const toggle = useCallback(async (chore: ScheduledChore, opts2: { retry?: boolean } = {}): Promise<ToggleResult> => {
     if (chore.date !== today) return {};
+    // A first-come chore a sibling did is theirs: unchecking it here would
+    // undo their work and points, so only they or a parent can.
+    if (chore.completed && chore.completed_by_sibling && !opts2.retry) {
+      showToast(t('kid.chore.siblingDid', { name: chore.completed_by_name || '?' }));
+      return {};
+    }
     // Double-tap guard: drop taps while a request for this chore is in flight.
     if (togglingRef.current.has(chore.schedule_id)) return {};
     setTogglingIds(prev => new Set(prev).add(chore.schedule_id));

@@ -820,10 +820,28 @@ func (h *ChoreHandler) uncomplete(r *http.Request, scheduleID int64, dateStr str
 		}
 	}
 
-	// FCFS: uncomplete the whole group, taking back the finisher's points
-	// whichever copy was unchecked.
+	// FCFS: once someone has taken the chore, unchecking any copy undoes the
+	// whole group and takes back the taker's points, so only the taker or a
+	// parent may do it. A copy nobody has taken (only a rejected try or an
+	// excuse on it) is unchecked on its own, leaving the rest of the group.
 	streakUsers := []int64{completedBy}
+	fcfsTakenBy := int64(0)
 	if schedule != nil && schedule.AssignmentType == model.AssignmentFCFS && schedule.FcfsGroupID != nil {
+		takenBy, err := h.store.FcfsGroupTakenBy(r.Context(), *schedule.FcfsGroupID, dateStr)
+		if err != nil {
+			return http.StatusInternalServerError, "failed to uncomplete FCFS group"
+		}
+		caller := UserFromContext(r.Context())
+		if takenBy != 0 && caller.Role != model.RoleAdmin && takenBy != caller.ID {
+			name := "someone else"
+			if u, _ := h.store.GetUser(r.Context(), takenBy); u != nil {
+				name = u.Name
+			}
+			return http.StatusForbidden, name + " did this chore, so only they or a parent can undo it"
+		}
+		fcfsTakenBy = takenBy
+	}
+	if fcfsTakenBy != 0 {
 		assignees, err := h.store.UncompleteFCFSGroupAndDebitPoints(r.Context(), *schedule.FcfsGroupID, dateStr)
 		if err != nil {
 			return http.StatusInternalServerError, "failed to uncomplete FCFS group"

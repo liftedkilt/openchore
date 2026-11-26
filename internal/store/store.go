@@ -3577,6 +3577,24 @@ func (s *Store) FcfsGroupCompletedForDate(ctx context.Context, groupID, date str
 	return exists, err
 }
 
+// FcfsGroupTakenBy returns who has taken an FCFS group on a date (the
+// completer of an approved or pending completion), or 0 if nobody has.
+func (s *Store) FcfsGroupTakenBy(ctx context.Context, groupID, date string) (int64, error) {
+	var userID int64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT cc.completed_by FROM chore_completions cc
+		   JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
+		   WHERE cs.fcfs_group_id = ? AND cc.completion_date = ?
+		   AND cc.uncompleted_at IS NULL
+		   AND cc.status IN ('approved', 'pending')
+		   ORDER BY cc.id LIMIT 1`,
+		groupID, date).Scan(&userID)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return userID, err
+}
+
 // CompleteFCFSSiblings creates zero-point shadow completions for all sibling schedules in an FCFS group.
 func (s *Store) CompleteFCFSSiblings(ctx context.Context, groupID string, completedByUserID, excludeScheduleID int64, date string) error {
 	rows, err := s.db.QueryContext(ctx,

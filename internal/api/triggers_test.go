@@ -631,3 +631,66 @@ func TestFCFS_ExcusedCopyDoesNotTakeChore(t *testing.T) {
 		t.Errorf("Bob balance = %d, want 10", got)
 	}
 }
+
+// A kid can't undo a first-come chore a sibling did by unchecking their own
+// copy (it would take the sibling's points); a parent still can.
+func TestFCFS_KidCannotUndoSiblingsChore(t *testing.T) {
+	env := setupTest(t)
+	alice, bob, aliceSched, bobSched, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10,
+	})
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", aliceSched), map[string]any{
+		"completion_date": today,
+	}, childHeaders(alice), http.StatusCreated)
+
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/%d/complete?date=%s", bobSched, today), nil, childHeaders(bob), http.StatusForbidden)
+	if got := env.balance(t, alice); got != 10 {
+		t.Errorf("Alice balance after Bob's tap = %d, want 10", got)
+	}
+	if c := fcfsCopy(t, env, bob, today); !c.Completed {
+		t.Errorf("Bob's copy was undone by his own tap")
+	}
+
+	// Alice can undo her own.
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/%d/complete?date=%s", aliceSched, today), nil, childHeaders(alice), http.StatusNoContent)
+	if got := env.balance(t, alice); got != 0 {
+		t.Errorf("Alice balance after undoing her own = %d, want 0", got)
+	}
+}
+
+// After a rejection, "try again" only clears the kid's own attempt: if a
+// sibling has since done the chore, it's theirs and stays done.
+func TestFCFS_RetryAfterRejection(t *testing.T) {
+	env := setupTest(t)
+	alice, bob, aliceSched, bobSched, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10, "requires_approval": true,
+	})
+	try := func() any {
+		resp := env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", aliceSched), map[string]any{
+			"completion_date": today,
+		}, childHeaders(alice), http.StatusCreated)
+		var comp map[string]any
+		decodeBody(t, resp, &comp)
+		return comp["id"]
+	}
+
+	// Nobody else has it: Alice can clear her rejected try and go again.
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%v/reject", try()), nil, adminHeaders(), http.StatusNoContent)
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/%d/complete?date=%s", aliceSched, today), nil, childHeaders(alice), http.StatusNoContent)
+	second := try()
+
+	// Rejected again, and this time Bob does it.
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%v/reject", second), nil, adminHeaders(), http.StatusNoContent)
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", bobSched), map[string]any{
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+
+	// Alice's "try again" can't undo Bob's.
+	env.expectStatus(t, "DELETE", fmt.Sprintf("/api/schedules/%d/complete?date=%s", aliceSched, today), nil, childHeaders(alice), http.StatusForbidden)
+	if got := env.balance(t, bob); got != 10 {
+		t.Errorf("Bob balance = %d, want 10", got)
+	}
+	if c := fcfsCopy(t, env, bob, today); !c.Completed {
+		t.Errorf("Bob's copy was undone")
+	}
+}
