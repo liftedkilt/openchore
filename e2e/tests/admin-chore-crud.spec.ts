@@ -47,7 +47,7 @@ test.describe('Admin Chore CRUD', () => {
     await page.getByRole('button', { name: /Next/i }).click();
 
     // Select interval schedule type
-    await page.getByRole('button', { name: 'Emma' }).click();
+    await page.getByRole('button', { name: 'Emma', exact: true }).click();
     const schedTypeSelect = page.locator('select').filter({ has: page.getByText('Weekly') });
     await schedTypeSelect.selectOption('interval');
 
