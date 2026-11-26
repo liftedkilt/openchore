@@ -525,6 +525,7 @@ func (s *Store) GetScheduledChoresForUser(ctx context.Context, userID int64, dat
 			   AND cs2.id != cs.id
 			   AND cc2.completion_date = ?
 			   AND cc2.uncompleted_at IS NULL
+			   AND cc2.status IN ('approved', 'pending')
 			 LIMIT 1) as completed_by_sibling_name
 		FROM chore_schedules cs
 		JOIN chores c ON c.id = cs.chore_id
@@ -3561,14 +3562,17 @@ func (s *Store) ListNonPausedChildren(ctx context.Context) ([]model.User, error)
 	return users, rows.Err()
 }
 
-// FcfsGroupCompletedForDate checks whether any schedule in an FCFS group has been completed for a given date.
+// FcfsGroupCompletedForDate reports whether someone has taken an FCFS group on
+// a date: a completion that is approved or waiting for approval. A rejected
+// one, or an excused copy, leaves it free for everyone it was offered to.
 func (s *Store) FcfsGroupCompletedForDate(ctx context.Context, groupID, date string) (bool, error) {
 	var exists bool
 	err := s.db.QueryRowContext(ctx,
 		`SELECT EXISTS(SELECT 1 FROM chore_completions cc
 		   JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
 		   WHERE cs.fcfs_group_id = ? AND cc.completion_date = ?
-		   AND cc.uncompleted_at IS NULL)`,
+		   AND cc.uncompleted_at IS NULL
+		   AND cc.status IN ('approved', 'pending'))`,
 		groupID, date).Scan(&exists)
 	return exists, err
 }

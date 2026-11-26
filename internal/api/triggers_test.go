@@ -569,3 +569,65 @@ func TestFCFS_ApprovalMarksOtherCopiesDone(t *testing.T) {
 		t.Errorf("Bob balance = %d, want 0", got)
 	}
 }
+
+// A rejected first-come completion frees the chore: the other kids see it
+// as open again and can do it themselves.
+func TestFCFS_RejectionFreesChore(t *testing.T) {
+	env := setupTest(t)
+	alice, bob, aliceSched, bobSched, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10, "requires_approval": true,
+	})
+	resp := env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", aliceSched), map[string]any{
+		"completion_date": today,
+	}, childHeaders(alice), http.StatusCreated)
+	var comp map[string]any
+	decodeBody(t, resp, &comp)
+
+	// While Alice's completion waits for approval, the chore is taken.
+	if c := fcfsCopy(t, env, bob, today); !c.CompletedBySibling {
+		t.Errorf("Bob's copy while Alice's waits: want it shown as taken by a sibling")
+	}
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", bobSched), map[string]any{
+		"completion_date": today,
+	}, adminHeaders(), http.StatusConflict)
+
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/completions/%v/reject", comp["id"]), nil, adminHeaders(), http.StatusNoContent)
+
+	if c := fcfsCopy(t, env, bob, today); c.Completed || c.CompletedBySibling {
+		t.Fatalf("Bob's copy after rejection: completed=%v bySibling=%v, want open", c.Completed, c.CompletedBySibling)
+	}
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", bobSched), map[string]any{
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+
+	if got := env.balance(t, bob); got != 10 {
+		t.Errorf("Bob balance = %d, want 10", got)
+	}
+	if got := env.balance(t, alice); got != 0 {
+		t.Errorf("Alice balance = %d, want 0", got)
+	}
+	if c := fcfsCopy(t, env, alice, today); !c.Completed || c.CompletedByName != "Bob" {
+		t.Errorf("Alice's copy: completed=%v by %q, want done by Bob", c.Completed, c.CompletedByName)
+	}
+}
+
+// Excusing one kid's copy of a first-come chore doesn't take it from the others.
+func TestFCFS_ExcusedCopyDoesNotTakeChore(t *testing.T) {
+	env := setupTest(t)
+	_, bob, aliceSched, bobSched, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10,
+	})
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/excuse", aliceSched), map[string]any{
+		"date": today, "reason": "sick",
+	}, adminHeaders(), http.StatusCreated)
+
+	if c := fcfsCopy(t, env, bob, today); c.CompletedBySibling {
+		t.Errorf("Bob's copy shows as taken after Alice was excused")
+	}
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", bobSched), map[string]any{
+		"completion_date": today,
+	}, adminHeaders(), http.StatusCreated)
+	if got := env.balance(t, bob); got != 10 {
+		t.Errorf("Bob balance = %d, want 10", got)
+	}
+}
