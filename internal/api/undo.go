@@ -14,7 +14,9 @@ import (
 // store.ListVisiblePointTransactions), so there are no "Undo:" rows:
 //
 //   - chore points: the chore is unchecked, which takes the points (and any
-//     auto-save) back the same way unchecking it on the chore list does;
+//     auto-save) back the same way unchecking it on the chore list does.
+//     Points paid for someone else's completion (an old first-come bug) are
+//     reversed on their own instead, leaving that person's chore alone;
 //   - reward purchase: the redemption is refunded and its row removed;
 //   - penalty, manual adjustment, streak bonus, goal saving: a linked
 //     reversal row cancels it (store.ReversePointTransaction).
@@ -51,6 +53,23 @@ func (h *ChoreHandler) UndoPointsEntry(w http.ResponseWriter, r *http.Request) {
 		if cc.UncompletedAt != nil {
 			writeError(w, http.StatusConflict, store.ErrAlreadyUndone.Error())
 			return
+		}
+		if cc.CompletedBy != txn.UserID {
+			// Paid for someone else's completion (the finisher's 0-point copy
+			// of a first-come chore): take back just this credit. Unchecking
+			// would undo the finisher's chore and points too.
+			switch err := h.store.ReverseStrayChoreCredit(r.Context(), id); {
+			case errors.Is(err, store.ErrCannotUndo):
+				writeError(w, http.StatusUnprocessableEntity, err.Error())
+				return
+			case errors.Is(err, store.ErrAlreadyUndone):
+				writeError(w, http.StatusConflict, err.Error())
+				return
+			case err != nil:
+				writeError(w, http.StatusInternalServerError, "failed to undo")
+				return
+			}
+			break
 		}
 		if status, msg := h.uncomplete(r, cc.ChoreScheduleID, cc.CompletionDate); status != 0 {
 			writeError(w, status, msg)

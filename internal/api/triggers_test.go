@@ -705,3 +705,52 @@ func TestFCFS_RetryAfterRejection(t *testing.T) {
 		t.Errorf("Bob's copy was undone")
 	}
 }
+
+// Points an older first-come bug paid another kid for the finisher's 0-point
+// copy can be undone from the points history on their own: the finisher
+// keeps their chore and points.
+func TestFCFS_UndoStrayCreditLeavesFinisherAlone(t *testing.T) {
+	env := setupTest(t)
+	alice, bob, aliceSched, bobSched, today := fcfsSetup(t, env, map[string]any{
+		"title": "Empty dryer", "category": "core", "points_value": 10,
+	})
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/schedules/%d/complete", aliceSched), map[string]any{
+		"completion_date": today,
+	}, childHeaders(alice), http.StatusCreated)
+
+	// What the old bug wrote: a credit for Bob on Alice's copy of his chore.
+	var shadowID int64
+	if err := env.db.QueryRow(`SELECT id FROM chore_completions WHERE chore_schedule_id = ?`, bobSched).Scan(&shadowID); err != nil {
+		t.Fatal(err)
+	}
+	res, err := env.db.Exec(`INSERT INTO point_transactions (user_id, amount, reason, reference_id) VALUES (?, 10, 'chore_complete', ?)`, bob, shadowID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stray, _ := res.LastInsertId()
+	if got := env.balance(t, bob); got != 10 {
+		t.Fatalf("Bob balance with the stray credit = %d, want 10", got)
+	}
+
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/points/transactions/%d/undo", stray), nil, adminHeaders(), http.StatusNoContent)
+	if got := env.balance(t, bob); got != 0 {
+		t.Errorf("Bob balance after undo = %d, want 0", got)
+	}
+	if got := env.balance(t, alice); got != 10 {
+		t.Errorf("Alice balance after undoing Bob's stray credit = %d, want 10", got)
+	}
+	for _, u := range []int{alice, bob} {
+		if c := fcfsCopy(t, env, u, today); !c.Completed {
+			t.Errorf("user %d's copy was unchecked by undoing Bob's stray credit", u)
+		}
+	}
+
+	// Gone from Bob's history (the pair is hidden), and can't be undone twice.
+	resp := env.expectStatus(t, "GET", fmt.Sprintf("/api/users/%d/points", bob), nil, adminHeaders(), http.StatusOK)
+	var pts map[string]any
+	decodeBody(t, resp, &pts)
+	if txs, _ := pts["transactions"].([]any); len(txs) != 0 {
+		t.Errorf("Bob's history still shows %d entries: %v", len(txs), txs)
+	}
+	env.expectStatus(t, "POST", fmt.Sprintf("/api/points/transactions/%d/undo", stray), nil, adminHeaders(), http.StatusConflict)
+}

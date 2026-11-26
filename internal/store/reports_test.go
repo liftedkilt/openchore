@@ -644,3 +644,74 @@ func TestReportPoints_UseLocalDay(t *testing.T) {
 	earned("ReportPointsSummary", len(points), func(i int) (int64, int) { return points[i].UserID, points[i].PointsEarned })
 	earned("ReportKidSummaries", len(kids), func(i int) (int64, int) { return kids[i].UserID, kids[i].PointsEarned })
 }
+
+// A first-come chore done once counts once in the reports, for whoever did
+// it: not again for the 0-point copies it makes on everyone else's schedule.
+func TestReports_FCFSCopiesCountOnce(t *testing.T) {
+	s := setupStore(t)
+	ctx := context.Background()
+	today := time.Now().Format("2006-01-02")
+
+	admin := createTestUser(t, s, "Admin", "admin")
+	alice := createTestUser(t, s, "Alice", "child")
+	bob := createTestUser(t, s, "Bob", "child")
+	cara := createTestUser(t, s, "Cara", "child")
+	chore := createTestChore(t, s, "Empty dryer", 10, admin.ID)
+	group := "g1"
+	var aliceSched int64
+	for _, kid := range []*model.User{alice, bob, cara} {
+		cs := &model.ChoreSchedule{ChoreID: chore.ID, AssignedTo: kid.ID, AssignmentType: model.AssignmentFCFS,
+			FcfsGroupID: &group, SpecificDate: &today, PointsMultiplier: 1, ExpiryPenalty: "none"}
+		if err := s.CreateSchedule(ctx, cs); err != nil {
+			t.Fatal(err)
+		}
+		if kid == alice {
+			aliceSched = cs.ID
+		}
+	}
+	if err := s.CompleteChore(ctx, &model.ChoreCompletion{ChoreScheduleID: aliceSched, CompletedBy: alice.ID, Status: "approved", CompletionDate: today}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CompleteFCFSSiblings(ctx, group, alice.ID, aliceSched, today); err != nil {
+		t.Fatal(err)
+	}
+
+	kids, err := s.ReportKidSummaries(ctx, today, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, r := range kids {
+		want := 0
+		if r.UserID == alice.ID {
+			want, found = 1, true
+		}
+		if r.TotalCompleted != want {
+			t.Errorf("%s TotalCompleted = %d, want %d", r.Name, r.TotalCompleted, want)
+		}
+	}
+	if !found {
+		t.Error("the kid summary has no row for Alice")
+	}
+	trend, err := s.ReportCompletionTrend(ctx, today, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(trend) != 1 || trend[0].Completed != 1 || trend[0].Assigned != 1 {
+		t.Errorf("trend = %+v, want one day with 1 completed of 1", trend)
+	}
+	cats, err := s.ReportCategoryBreakdown(ctx, today, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cats) != 1 || cats[0].TotalCompleted != 1 {
+		t.Errorf("categories = %+v, want 1 completed", cats)
+	}
+	dows, err := s.ReportDayOfWeek(ctx, today, today)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dows) != 1 || dows[0].TotalCompleted != 1 {
+		t.Errorf("day of week = %+v, want 1 completed", dows)
+	}
+}

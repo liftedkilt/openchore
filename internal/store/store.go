@@ -1041,11 +1041,18 @@ func (s *Store) GetSchedule(ctx context.Context, id int64) (*model.ChoreSchedule
 // GetCompletionForScheduleDate returns the completion row for a schedule+date,
 // INCLUDING soft-deleted (uncompleted_at != NULL) rows so the complete-flow
 // can find a prior approved row and revive it without re-running AI.
+// A first-come copy can hold two rows (its own rejected try or excuse, then
+// the finisher's 0-point copy): live rows come first, in the same status
+// order the daily view uses, so callers see the row that copy shows.
 func (s *Store) GetCompletionForScheduleDate(ctx context.Context, scheduleID int64, completionDate string) (*model.ChoreCompletion, error) {
 	cc := &model.ChoreCompletion{}
 	err := s.db.QueryRowContext(ctx,
 		`SELECT id, chore_schedule_id, completed_by, status, photo_url, approved_by, approved_at, completed_at, completion_date, ai_feedback, ai_confidence, ai_complete, uncompleted_at
-		 FROM chore_completions WHERE chore_schedule_id = ? AND completion_date = ?`,
+		 FROM chore_completions WHERE chore_schedule_id = ? AND completion_date = ?
+		 ORDER BY uncompleted_at IS NOT NULL,
+		   CASE status WHEN 'approved' THEN 1 WHEN 'excused' THEN 2 WHEN 'pending' THEN 3 ELSE 4 END,
+		   id
+		 LIMIT 1`,
 		scheduleID, completionDate).
 		Scan(&cc.ID, &cc.ChoreScheduleID, &cc.CompletedBy, &cc.Status, &cc.PhotoURL, &cc.ApprovedBy, &cc.ApprovedAt, &cc.CompletedAt, &cc.CompletionDate, &cc.AIFeedback, &cc.AIConfidence, &cc.AIComplete, &cc.UncompletedAt)
 	if err == sql.ErrNoRows {
@@ -1383,6 +1390,52 @@ var penaltyReasons = map[string]bool{
 // reversibleReasons can be undone with ReversePointTransaction. Chore
 // credits and reward purchases are undone by unchecking the chore and
 // refunding the redemption instead (see the API's undo handler).
+// ReverseStrayChoreCredit cancels one chore_complete credit that was paid on
+// a completion the person didn't do: an older first-come bug paid the other
+// kids for the finisher's 0-point copies. Unchecking that chore would undo
+// the finisher's work too, so this writes a linked reversal (reverses_id,
+// which hides the pair from the history) and returns any auto-save the
+// credit made, leaving the chore alone. The caller checks the completion
+// belongs to someone else.
+func (s *Store) ReverseStrayChoreCredit(ctx context.Context, txnID int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var orig model.PointTransaction
+	if err := tx.QueryRowContext(ctx,
+		`SELECT id, user_id, amount, reason, reference_id, reverses_id FROM point_transactions WHERE id = ?`, txnID).
+		Scan(&orig.ID, &orig.UserID, &orig.Amount, &orig.Reason, &orig.ReferenceID, &orig.ReversesID); err != nil {
+		return err
+	}
+	if orig.Reason != model.ReasonChoreComplete || orig.ReferenceID == nil || orig.ReversesID != nil || orig.Amount <= 0 {
+		return ErrCannotUndo
+	}
+	var reversed bool
+	if err := tx.QueryRowContext(ctx,
+		`SELECT EXISTS (SELECT 1 FROM point_transactions WHERE reverses_id = ?)`, orig.ID).Scan(&reversed); err != nil {
+		return err
+	}
+	if reversed {
+		return ErrAlreadyUndone
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO point_transactions (user_id, amount, reason, reference_id, note, reverses_id)
+		 VALUES (?, ?, ?, ?, 'Undone', ?)`,
+		orig.UserID, -orig.Amount, orig.Reason, *orig.ReferenceID, orig.ID); err != nil {
+		if isUniqueConstraintErr(err) {
+			return ErrAlreadyUndone
+		}
+		return err
+	}
+	if err := s.reverseAutoContributeTx(ctx, tx, orig.UserID, *orig.ReferenceID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 var reversibleReasons = map[string]bool{
 	model.ReasonExpiryPenalty: true,
 	model.ReasonMissedChore:   true,
@@ -3565,23 +3618,11 @@ func (s *Store) ListNonPausedChildren(ctx context.Context) ([]model.User, error)
 	return users, rows.Err()
 }
 
-// FcfsGroupCompletedForDate reports whether someone has taken an FCFS group on
-// a date: a completion that is approved or waiting for approval. A rejected
-// one, or an excused copy, leaves it free for everyone it was offered to.
-func (s *Store) FcfsGroupCompletedForDate(ctx context.Context, groupID, date string) (bool, error) {
-	var exists bool
-	err := s.db.QueryRowContext(ctx,
-		`SELECT EXISTS(SELECT 1 FROM chore_completions cc
-		   JOIN chore_schedules cs ON cs.id = cc.chore_schedule_id
-		   WHERE cs.fcfs_group_id = ? AND cc.completion_date = ?
-		   AND cc.uncompleted_at IS NULL
-		   AND cc.status IN ('approved', 'pending'))`,
-		groupID, date).Scan(&exists)
-	return exists, err
-}
-
-// FcfsGroupTakenBy returns who has taken an FCFS group on a date (the
-// completer of an approved or pending completion), or 0 if nobody has.
+// FcfsGroupTakenBy returns who has taken an FCFS group on a date, or 0 if
+// nobody has: the completer of an approved completion or one waiting for
+// approval. A rejected one, or an excused copy, leaves it free for everyone
+// it was offered to. The one rule for "taken", used to refuse a second
+// completion and to decide who may uncheck.
 func (s *Store) FcfsGroupTakenBy(ctx context.Context, groupID, date string) (int64, error) {
 	var userID int64
 	err := s.db.QueryRowContext(ctx,
@@ -3629,16 +3670,6 @@ func (s *Store) CompleteFCFSSiblings(ctx context.Context, groupID string, comple
 		}
 	}
 	return nil
-}
-
-// UncompleteByFCFSGroup deletes all completions for an FCFS group on a given date.
-func (s *Store) UncompleteByFCFSGroup(ctx context.Context, groupID, date string) error {
-	_, err := s.db.ExecContext(ctx,
-		`DELETE FROM chore_completions WHERE chore_schedule_id IN (
-		   SELECT id FROM chore_schedules WHERE fcfs_group_id = ?
-		 ) AND completion_date = ?`,
-		groupID, date)
-	return err
 }
 
 // UncompleteFCFSGroupAndDebitPoints atomically unchecks a first-come group on
@@ -4169,6 +4200,13 @@ type KidSummaryRow struct {
 	CurrentStreak  int
 }
 
+// notFCFSCopy keeps a report to real completions: it leaves out the 0-point
+// copies a first-come chore's completion makes on everyone else's schedule
+// (an FCFS schedule completed by someone other than its owner), so a chore
+// done once counts once, for the person who did it.
+const notFCFSCopy = `NOT EXISTS (SELECT 1 FROM chore_schedules fcfs
+	WHERE fcfs.id = cc.chore_schedule_id AND fcfs.assignment_type = 'fcfs' AND fcfs.assigned_to != cc.completed_by)`
+
 // ReportKidSummaries returns per-kid completion and points stats for the date range.
 func (s *Store) ReportKidSummaries(ctx context.Context, startDate, endDate string) ([]KidSummaryRow, error) {
 	query := `
@@ -4187,6 +4225,7 @@ func (s *Store) ReportKidSummaries(ctx context.Context, startDate, endDate strin
 			WHERE cc.completion_date >= ? AND cc.completion_date <= ?
 			AND cc.status = 'approved'
 			AND cc.uncompleted_at IS NULL
+			AND ` + notFCFSCopy + `
 			GROUP BY cc.completed_by
 		) completed ON completed.completed_by = u.id
 		LEFT JOIN (
@@ -4287,6 +4326,7 @@ func (s *Store) ReportCompletionTrend(ctx context.Context, startDate, endDate st
 		FROM chore_completions cc
 		WHERE cc.completion_date >= ? AND cc.completion_date <= ?
 		  AND cc.uncompleted_at IS NULL
+		  AND ` + notFCFSCopy + `
 		GROUP BY cc.completion_date
 		ORDER BY cc.completion_date`
 
@@ -4326,6 +4366,7 @@ func (s *Store) ReportCategoryBreakdown(ctx context.Context, startDate, endDate 
 		JOIN chores c ON c.id = cs.chore_id
 		WHERE cc.completion_date >= ? AND cc.completion_date <= ?
 		  AND cc.uncompleted_at IS NULL
+		  AND ` + notFCFSCopy + `
 		GROUP BY c.category
 		ORDER BY c.category`
 
@@ -4416,6 +4457,7 @@ func (s *Store) ReportDayOfWeek(ctx context.Context, startDate, endDate string) 
 		FROM chore_completions cc
 		WHERE cc.completion_date >= ? AND cc.completion_date <= ?
 		  AND cc.uncompleted_at IS NULL
+		  AND ` + notFCFSCopy + `
 		GROUP BY dow
 		ORDER BY dow`
 

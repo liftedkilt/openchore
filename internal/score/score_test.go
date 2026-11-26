@@ -131,3 +131,14 @@ func TestSumAndRank(t *testing.T) {
 		}
 	}
 }
+
+// A first-come chore a sibling did only marks this copy done: it isn't an
+// extra chore this person did.
+func TestSummarizeDay_SiblingFCFSIsNotBonus(t *testing.T) {
+	mine := chore(model.CategoryCore, model.AssignmentFCFS, true, model.StatusApproved)
+	theirs := chore(model.CategoryCore, model.AssignmentFCFS, true, model.StatusApproved)
+	theirs.CompletedBySibling = true
+	if d := SummarizeDay("2026-03-11", []model.ScheduledChore{mine, theirs}, true); d.Bonus != 1 {
+		t.Errorf("Bonus = %d, want 1 (only the first-come chore this person did)", d.Bonus)
+	}
+}

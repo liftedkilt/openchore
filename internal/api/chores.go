@@ -464,8 +464,8 @@ func (h *ChoreHandler) Complete(w http.ResponseWriter, r *http.Request) {
 
 	// FCFS race condition check: if a sibling already completed this FCFS group, reject
 	if schedule.AssignmentType == model.AssignmentFCFS && schedule.FcfsGroupID != nil {
-		done, err := h.store.FcfsGroupCompletedForDate(r.Context(), *schedule.FcfsGroupID, req.CompletionDate)
-		if err == nil && done {
+		takenBy, err := h.store.FcfsGroupTakenBy(r.Context(), *schedule.FcfsGroupID, req.CompletionDate)
+		if err == nil && takenBy != 0 {
 			writeError(w, http.StatusConflict, "a sibling already completed this chore")
 			return
 		}
