@@ -556,7 +556,9 @@ func TestPetCatchUpNeverKillsWithoutWarning(t *testing.T) {
 	env.expectStatus(t, "PUT", "/api/admin/pets", map[string]any{"death_days": 2}, adminHeaders(), http.StatusOK)
 	now := time.Now()
 	env.missChores(t, kid, now, -4, -3, -2, -1, 0)
-	if _, err := env.db.Exec(`UPDATE pets SET last_day_checked = ?`, now.AddDate(0, 0, -5).Format("2006-01-02")); err != nil {
+	// Sick already, so every one of the four days is a sick night: checking
+	// them one by one would have killed it on the second with no warning.
+	if _, err := env.db.Exec(`UPDATE pets SET health = 20, last_day_checked = ?`, now.AddDate(0, 0, -5).Format("2006-01-02")); err != nil {
 		t.Fatal(err)
 	}
 	checker := webhook.NewPetChecker(env.store)
