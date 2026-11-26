@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import i18n from '../../i18n';
 import type { ScheduledChore, RewardCommitment, PointTransaction } from '../../types';
-import { choreView, type ChoreViewContext } from './choreView';
+import { choreView, siblingTook, type ChoreViewContext } from './choreView';
 import { daysToGoal, goalProgress } from './goals';
 import { weekDates } from './WeekScreen';
 
@@ -65,6 +65,20 @@ describe('choreView', () => {
     expect(choreView(chore({ completed: true, completion_status: 'excused' }), ctx)).toMatchObject({ state: 'done', meta: 'Excused today' });
     const sibling = choreView(chore({ completed: true, completion_status: 'approved', completed_by_sibling: true, completed_by_name: 'Lily' }), ctx);
     expect(sibling).toMatchObject({ state: 'done', meta: 'Done by Lily' });
+  });
+
+  it("shows a first-come chore a sibling's waiting completion has taken", () => {
+    // Not done for this kid yet (a grown-up may still turn it down), but not
+    // theirs to do either.
+    const taken = choreView(chore({ completed: false, completed_by_sibling: true, completed_by_name: 'Lily' }), ctx);
+    expect(taken).toMatchObject({ state: 'waiting', meta: 'Lily got to it first' });
+  });
+
+  it('siblingTook names who took a first-come chore, if anyone else did', () => {
+    expect(siblingTook({ completed_by_sibling: true, completed_by_name: 'Lily' })).toBe('Lily');
+    expect(siblingTook({ completed_by_sibling: true })).toBe('?');
+    expect(siblingTook({ completed_by_sibling: false, completed_by_name: 'Lily' })).toBeNull();
+    expect(siblingTook({})).toBeNull();
   });
 
   it('holds Every day points until Must do is done', () => {

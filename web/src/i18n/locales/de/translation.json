@@ -1122,7 +1122,9 @@
       "autoComplete": "Wird abgehakt, sobald du fertig bist",
       "rejected": "Nicht angenommen. Versuch es noch mal",
       "uploadPhotoProof": "Foto als Nachweis hinzufügen",
-      "siblingDid": "Das hat {{name}} erledigt. Nur {{name}} oder ein Erwachsener kann es rückgängig machen."
+      "siblingDid": "Das hat {{name}} erledigt. Nur {{name}} oder ein Erwachsener kann es rückgängig machen.",
+      "takenBy": "{{name}} war schneller",
+      "siblingTaking": "{{name}} war bei dieser Aufgabe schneller. Sie gehört {{name}}, außer ein Erwachsener lehnt sie ab."
     },
     "colors": {
       "butter": "Butter",

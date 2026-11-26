@@ -65,6 +65,15 @@ export function formatDuration(minutes: number, t: TFunction): string {
 // The Bonus / Every day gates are shared with the wall display.
 export { isChoreDone as isDone, dayGates as gates } from '../../choreRules';
 
+/**
+ * Who took this first-come chore, if it was someone else: done by them, or
+ * waiting for a grown-up to approve theirs. Null when it's still this
+ * person's to do (or they did it). A tap must not uncheck or complete it.
+ */
+export function siblingTook(c: Pick<ScheduledChore, 'completed_by_sibling' | 'completed_by_name'>): string | null {
+  return c.completed_by_sibling ? (c.completed_by_name || '?') : null;
+}
+
 export function choreView(c: ScheduledChore, ctx: ChoreViewContext): ChoreView {
   const { t, now, lang } = ctx;
   const cat = catFromCategory(c.category);
@@ -80,6 +89,13 @@ export function choreView(c: ScheduledChore, ctx: ChoreViewContext): ChoreView {
   const doneAtLine = doneAt && !Number.isNaN(doneAt.getTime())
     ? t('kid.chore.doneAt', { time: formatClock(doneAt, lang) })
     : t('kid.chore.done');
+
+  // --- A sibling got to a first-come chore first and it waits for a
+  // grown-up: it's theirs unless it's turned down. ---
+  const takenBy = siblingTook(c);
+  if (takenBy && !c.completed) {
+    return { ...base, state: 'waiting', meta: t('kid.chore.takenBy', { name: takenBy }) };
+  }
 
   // --- Finished in some way ---
   if (c.completed) {

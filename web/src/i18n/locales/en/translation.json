@@ -1122,7 +1122,9 @@
       "autoComplete": "Ticks itself when you finish",
       "rejected": "Not accepted. Try again",
       "uploadPhotoProof": "Add photo proof",
-      "siblingDid": "{{name}} did this one. Only they or a grown-up can undo it."
+      "siblingDid": "{{name}} did this one. Only they or a grown-up can undo it.",
+      "takenBy": "{{name}} got to it first",
+      "siblingTaking": "{{name}} got to this one first. It's theirs unless a grown-up says no."
     },
     "colors": {
       "butter": "Butter",

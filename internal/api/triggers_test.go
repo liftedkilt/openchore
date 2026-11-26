@@ -609,6 +609,11 @@ func TestFCFS_RejectionFreesChore(t *testing.T) {
 	if c := fcfsCopy(t, env, alice, today); !c.Completed || c.CompletedByName != "Bob" {
 		t.Errorf("Alice's copy: completed=%v by %q, want done by Bob", c.Completed, c.CompletedByName)
 	}
+	// Bob's own copy is his, not a sibling's (Alice's copy now holds a
+	// 0-point completion by Bob next to her rejected try).
+	if c := fcfsCopy(t, env, bob, today); !c.Completed || c.CompletedBySibling {
+		t.Errorf("Bob's own copy: completed=%v bySibling=%v, want done by him", c.Completed, c.CompletedBySibling)
+	}
 }
 
 // Excusing one kid's copy of a first-come chore doesn't take it from the others.
